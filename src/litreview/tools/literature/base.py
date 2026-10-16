@@ -15,9 +15,12 @@ class Record:
     doi: str | None = None
     pmid: str | None = None
     pmcid: str | None = None
+    s2_id: str | None = None        # Semantic Scholar paperId
+    nct_id: str | None = None       # ClinicalTrials.gov registration
     is_preprint: bool = False
     open_access: bool | None = None
     query_family_id: str = ""
+    expansion: dict | None = None   # citation expansion provenance: seed, direction, depth
     record_id: str = ""        # assigned after deduplication
 
     def to_dict(self) -> dict:

@@ -35,3 +35,10 @@ def test_summary_by_agent(tmp_path, monkeypatch):
     t.record("A05-KE", "anthropic", "m", 2000, 500)
     s = t.summary()
     assert s["by_agent"]["A05-KE"]["calls"] == 2
+
+
+def test_long_context_tier(tmp_path, monkeypatch):
+    t = _tracker(tmp_path, monkeypatch, prices={"h": {"input": 0.10, "output": 0.50, "long_context_threshold": 100000,
+                                                       "long_input": 0.50, "long_output": 2.50}})
+    assert t.cost("h", 50_000, 1_000_000) == pytest.approx(0.005 + 0.5)
+    assert t.cost("h", 200_000, 1_000_000) == pytest.approx(0.1 + 2.5)

@@ -24,7 +24,11 @@ discovery_sources:
     enabled: true
     name: PubTator3 (NCBI)
     purpose: Entity-normalized search for genes, proteins, chemicals, diseases, species, variants and cell lines; disambiguates gene symbols and drug names
-    syntax: PubTator3 entity IDs (@GENE_..., @CHEMICAL_..., @DISEASE_...) and relation search
+    syntax: >-
+      Free text, or entity IDs such as @GENE_TP53, @CHEMICAL_Doxorubicin, @DISEASE_Breast_Neoplasms
+      combined with AND/OR; relation search as relations:ANY|@CHEMICAL_X|@DISEASE_Y
+      (relation types include treat, cause, associate, inhibit, stimulate, interact).
+      Abstracts are fetched from PubMed by PMID.
     key_env: null
     full_text: false
 
@@ -33,22 +37,27 @@ discovery_sources:
     name: OpenAlex
     purpose: Broad cross-disciplinary coverage (engineering, chemistry, materials, computing), topics, citation graph
     syntax: OpenAlex filter syntax (title_and_abstract.search, publication_year, type)
-    key_env: OPENALEX_EMAIL      # polite-pool contact email
+    key_env: OPENALEX_API_KEY    # optional; OPENALEX_EMAIL also sent as polite-pool contact
     full_text: false
 
   semanticscholar:
     enabled: true
     name: Semantic Scholar Academic Graph
-    purpose: Citation and reference graph, seed-based paper recommendations (conceptual search)
-    syntax: Keyword search plus recommendations from positive/negative seed papers
+    purpose: Citation and reference graph, seed-based paper recommendations (conceptual search), citation expansion
+    syntax: >-
+      Bulk search syntax: + (AND), | (OR), - (NOT), "phrase", * prefix, ( ) grouping,
+      e.g. "electrochemical biosensor" + (cortisol | glucocorticoid) -review.
+      For seed-based recommendations write: recommend: DOI1, DOI2 ; not: DOI3
     key_env: S2_API_KEY          # optional
     full_text: false
 
   clinicaltrials:
-    enabled: false               # enable when the review covers human interventional studies
+    enabled: true                # registered trials, incl. unpublished/terminated (contrary evidence)
     name: ClinicalTrials.gov (API v2)
     purpose: Registered trials, including unpublished or terminated ones (contrary evidence, publication-bias check)
-    syntax: Condition / intervention / status fields
+    syntax: >-
+      Plain text (searches all fields), or field queries joined by ' && ':
+      cond:<condition> && intr:<intervention> && term:<other terms>
     key_env: null
     full_text: false
 
@@ -109,7 +118,13 @@ normalization_services:
   chebi:          { entity_types: [CHEMICAL_ENTITIES], id_prefix: "CHEBI" }
   pubchem:        { entity_types: [CHEMICAL_ENTITIES], id_prefix: "PubChem CID" }
   chembl:         { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, TOOL_COMPOUND], id_prefix: "CHEMBL", provides: max_clinical_phase }
-  drugbank:       { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, BIOLOGIC], id_prefix: "DB", note: "licence required for some uses" }
+  drugbank:       { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, BIOLOGIC], id_prefix: "DB", enabled: false,
+                    note: "Licensed API (DRUGBANK_API_KEY); not wired in v0.2 — ChEMBL covers approval status" }
+  hmdb:           { entity_types: [ENDOGENOUS_METABOLITE], id_prefix: "HMDB", enabled: false,
+                    note: "No public REST API; ChEBI/PubChem cover metabolites in v0.2" }
+  mygene:         { entity_types: [GENE, PROTEIN], scope: mouse_rat_and_fallback, id_prefix: "NCBIGene" }
+  ols4:           { entity_types: [DISEASE, PHENOTYPE, CELL_TYPE, TISSUE_OR_ORGAN, BIOLOGICAL_PROCESS, ORGANISM],
+                    note: "EBI Ontology Lookup Service: MONDO, HP, CL, UBERON, GO, NCBITaxon" }
   cellosaurus:    { entity_types: [CELL_LINE], id_prefix: "RRID:CVCL", provides: [species_of_origin, misidentified_or_contaminated_flag] }
   cell_ontology:  { entity_types: [CELL_TYPE], id_prefix: "CL" }
   uberon:         { entity_types: [TISSUE_OR_ORGAN], id_prefix: "UBERON" }

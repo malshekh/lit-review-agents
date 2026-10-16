@@ -1,7 +1,7 @@
 # Literature Review Multi-Agent System
 
 A multi-agent pipeline that helps a researcher draft a **narrative literature review** for
-*Scientific Reviews* (Nature Portfolio). Eleven LLM agents (Claude and OpenAI) search, screen,
+*Scientific Reviews* (Nature Portfolio). Eleven LLM agents (Claude, OpenAI and Kimi) search, screen,
 extract, validate, synthesize, write, verify, critique and edit — while **the researcher makes
 every scholarly decision** at three checkpoints, as the journal's AI policy requires.
 
@@ -15,7 +15,7 @@ flowchart LR
   T([Your topic]) --> A02[A02-SP<br/>Scope & perspective]
   A02 --> CP1{{CP1<br/>approve scope}}
   CP1 --> A03[A03-LM<br/>Search plan] --> S[(Literature APIs)] --> A04[A04-CQ<br/>Screen papers]
-  A04 --> CP2{{CP2<br/>select papers}}
+  A04 --> X[Citation expansion] --> A04b[A04-CQ<br/>Screen new papers] --> CP2{{CP2<br/>select papers}}
   CP2 --> A05[A05-KE<br/>Extract findings] --> A06[A06-SV<br/>Validate]
   A06 --> A07[A07-SYN<br/>Synthesis & gaps]
   A07 --> CP3{{CP3<br/>approve argument}}
@@ -36,18 +36,18 @@ See [docs/architecture.md](docs/architecture.md) for the full design.
 | &nbsp;&nbsp;`prompts/agents/` | One prompt per agent, `A02` to `A12`, in pipeline order |
 | [`config/`](config/) | Everything you change between runs — no code edits needed |
 | &nbsp;&nbsp;`pipeline.yaml` | Which model runs each agent, spend cap, loop limits, checkpoints, email events |
-| &nbsp;&nbsp;`prices.yaml` | Model prices for the budget monitor (fill in before first run) |
+| &nbsp;&nbsp;`prices.yaml` | Model prices for the budget monitor (checked 2026-10-16) |
 | &nbsp;&nbsp;`sources.yaml` | Literature databases on/off, and identifier lookup services |
 | &nbsp;&nbsp;`journal_scirev.yaml` | *Scientific Reviews* limits and rules |
 | [`schemas/`](schemas/) | JSON schemas each agent's output is validated against |
 | [`src/litreview/`](src/litreview/) | The Python package |
 | &nbsp;&nbsp;`orchestrator.py` | The pipeline: stages, checkpoints, loops (deterministic — no AI judgement) |
 | &nbsp;&nbsp;`agents/` | Loads prompts, calls models, validates output |
-| &nbsp;&nbsp;`llm/` | Claude and OpenAI API wrappers |
-| &nbsp;&nbsp;`tools/` | Deterministic tools: literature search, deduplication, span checking, compliance, references, full text |
+| &nbsp;&nbsp;`llm/` | Claude, OpenAI and Kimi API wrappers; optional LangSmith tracing |
+| &nbsp;&nbsp;`tools/` | Deterministic tools: literature search (6 databases), citation expansion, deduplication, identifier lookups, span checking, compliance, references, full text, health checks |
 | &nbsp;&nbsp;`budget.py` · `provenance.py` · `checkpoints.py` · `notify.py` | Cost cap, decision log, human review files, email |
 | [`tests/`](tests/) | Unit tests (`pytest`) |
-| [`docs/`](docs/) | Architecture, checkpoints guide, 2-week plan, prompt lineage |
+| [`docs/`](docs/) | Configuration, architecture, checkpoints guide, 2-week plan, prompt lineage |
 | `runs/` | One folder per run (gitignored): inputs, outputs, checkpoints, costs, final manuscript |
 
 ## Quick start
@@ -57,12 +57,10 @@ See [docs/architecture.md](docs/architecture.md) for the full design.
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt && pip install -e .
 
-# 2. Configure
-cp .env.example .env            # add API keys and SMTP settings
-#    edit config/pipeline.yaml  -> set the OpenAI model IDs (openai_default, openai_strong)
-#    edit config/prices.yaml    -> add current prices for every model you use
-#    edit config/sources.yaml   -> enable/disable databases
-litreview check                 # everything should show ✓
+# 2. Configure  (see docs/configuration.md)
+copy .env.example .env          # Windows; macOS/Linux: cp .env.example .env — then add your keys
+litreview check                 # every ✗ must become ✓
+litreview check --ping --apis   # also tests live model and database connections
 
 # 3. Run
 litreview new --topic my_topic.md --notes my_notes.md --seeds seed_dois.txt

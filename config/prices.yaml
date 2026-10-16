@@ -1,10 +1,26 @@
-# USD per 1 million tokens. Fill in from the providers' current pricing pages before the first run:
-#   Anthropic: https://www.anthropic.com/pricing#api
-#   OpenAI:    https://openai.com/api/pricing
-# Prices change; the budget monitor refuses to run a model whose price is null
-# (unless run.allow_unpriced_models is true in pipeline.yaml).
-claude-opus-5-5:   { input: null, output: null }
-claude-sonnet-5-5: { input: null, output: null }
-claude-haiku-5-5:  { input: null, output: null }
-# Add your OpenAI models here using the exact model IDs set in pipeline.yaml, e.g.
-# <openai-model-id>: { input: null, output: null }
+# USD per 1 million tokens, standard (non-batch, non-cached) rates.
+# Checked 2026-10-16 against:
+#   Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
+#   OpenAI:    https://developers.openai.com/api/docs/pricing
+#   Kimi:      https://platform.kimi.ai (international, USD); CNY prices at platform.kimi.com/docs/pricing/chat
+# Prices change — re-check before a long run. The budget monitor refuses unpriced models.
+#
+# Optional tiered pricing: if a prompt exceeds long_context_threshold input tokens,
+# long_input / long_output are charged instead.
+
+# --- Anthropic ---------------------------------------------------------
+claude-opus-5-5:   { input: 4.00, output: 20.00 }
+claude-sonnet-5-5: { input: 2.00, output: 10.00 }
+claude-haiku-5-5:  { input: 0.10, output: 0.50, long_context_threshold: 100000, long_input: 0.50, long_output: 2.50 }
+
+# --- OpenAI ------------------------------------------------------------
+# Long-context rates exist for GPT-6 models (2x input); the threshold is not stated on the
+# pricing page, so it is not modelled here — very long A10 inputs may cost more than logged.
+gpt-6.1-sol:       { input: 2.00, output: 10.00 }
+gpt-6-luna:        { input: 0.10, output: 0.50 }
+gpt-6-astra:       { input: 10.00, output: 50.00 }
+gpt-5-mini:        { input: 0.25, output: 2.00 }   # snapshot shutdown Dec 11, 2026
+
+# --- Kimi (Moonshot, international) ------------------------------------
+kimi-k3:           { input: 3.00, output: 15.00 }
+kimi-k2.6:         { input: 0.95, output: 4.00 }

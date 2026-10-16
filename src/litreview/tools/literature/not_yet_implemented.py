@@ -1,6 +1,6 @@
 """Sources listed in config/sources.yaml that are not wired up yet.
 
-TODO (week 2): pubtator3, semanticscholar, clinicaltrials, arxiv.
+Not yet implemented: arxiv, chemrxiv, ieee_xplore, scopus, web_of_science, embase.
 Until implemented, enabling them returns an explicit SOURCE_UNAVAILABLE result — never an empty
 "no literature" result, so A03-LM REPAIR mode can tell a technical gap from an absence.
 """

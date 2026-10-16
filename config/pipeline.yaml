@@ -1,6 +1,11 @@
 # Pipeline configuration: which model runs each agent, budgets, loop limits, notifications.
-# Change models here, never in code. Provider: "anthropic" or "openai".
-# Design rule: auditors (A06, A10, A11) run on the opposite vendor to the agent whose work they check.
+# Change models here, never in code.
+#
+# Design rule: an auditor never runs on the same vendor as the agent whose work it checks.
+#   Claude (Anthropic) produces:  scope, search, extraction, synthesis, outline, writing, editing
+#   OpenAI audits:                A06-SV (checks A05 extraction), A10-RV (checks A09/A12 prose)
+#   Kimi (Moonshot) critiques:    A11-RC — a third vendor for an independent reader's view
+#   OpenAI GPT-5 mini screens:    A04-CQ — high-volume, low-cost; the researcher reviews every record at CP2
 
 run:
   spend_cap_usd: 50.00          # hard stop for one run; the orchestrator halts before exceeding it
@@ -18,27 +23,53 @@ loops:
 retrieval:
   max_records_total: 3000       # across all query families and sources (A03-LM budget)
   max_records_per_family: 300
+  citation_expansion:
+    enabled: true
+    depth: 1                    # depth 2 only for sparse topics (A03-LM §4.5)
+    max_per_seed: 30            # newest-first cap on citing + cited papers per seed
+    max_total: 600              # cap on new records from expansion
+    directions: [references, citations]   # backward and forward
+
+# Where each provider is reached. API keys are read from .env (never stored here).
+providers:
+  anthropic:
+    key_env: ANTHROPIC_API_KEY
+    send_temperature: true
+  openai:
+    key_env: OPENAI_API_KEY
+    base_url: null              # default OpenAI endpoint
+    send_temperature: false     # GPT-5/GPT-6 reasoning models reject non-default temperature
+    json_mode: true
+  kimi:
+    key_env: MOONSHOT_API_KEY
+    base_url: https://api.moonshot.ai/v1   # international platform (keys from platform.kimi.ai)
+    send_temperature: false
+    json_mode: true
 
 models:
-  # Claude model IDs: see https://docs.claude.com/en/docs/about-claude/models
-  # OpenAI model IDs: see https://platform.openai.com/docs/models  -> set before first run
-  claude_default: claude-sonnet-5-5
-  claude_strong:  claude-opus-5-5
-  claude_fast:    claude-haiku-5-5
-  openai_default: SET_ME
-  openai_strong:  SET_ME
+  # Claude:  https://platform.claude.com/docs/en/about-claude/pricing
+  claude_strong:  claude-opus-5-5     # $4 / $20 per M tokens
+  claude_default: claude-sonnet-5-5   # $2 / $10
+  claude_fast:    claude-haiku-5-5    # $0.10 / $0.50 (prompts <=100k tokens)
+  # OpenAI:  https://developers.openai.com/api/docs/pricing
+  openai_strong:  gpt-6.1-sol         # $2 / $10   — auditors
+  openai_fast:    gpt-5-mini          # $0.25 / $2 — screening. Snapshot shuts down Dec 11, 2026;
+                                      #   switch to gpt-6-luna ($0.10 / $0.50) before then.
+  # Kimi:    https://platform.kimi.ai (international, USD)
+  kimi_strong:    kimi-k3             # $3 / $15
+  kimi_default:   kimi-k2.6           # $0.95 / $4
 
 agents:
   A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 8000,  temperature: 0.4 }
   A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 8000,  temperature: 0.2 }
-  A04-CQ:  { provider: anthropic, model: claude_default, max_tokens: 12000, temperature: 0.0 }
+  A04-CQ:  { provider: openai,    model: openai_fast,    max_tokens: 12000, temperature: 0.0 }
   A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.0 }
   A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A05 (Claude)
   A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.3 }
   A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 12000, temperature: 0.2 }
   A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 20000, temperature: 0.5 }
   A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A09/A12 (Claude)
-  A11-RC:  { provider: openai,    model: openai_default, max_tokens: 10000, temperature: 0.3 }  # audits A09/A12 (Claude)
+  A11-RC:  { provider: kimi,      model: kimi_strong,    max_tokens: 10000, temperature: 0.3 }  # third vendor
   A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 20000, temperature: 0.2 }
 
 checkpoints:
@@ -49,3 +80,8 @@ checkpoints:
 notify:
   on: [checkpoint, complete, budget_warning, failure]
   email_to_env: NOTIFY_EMAIL_TO   # address read from .env
+
+tracing:
+  # LangSmith tracing is switched on by LANGSMITH_TRACING=true in .env.
+  # Traces include prompts and paper text: keep the LangSmith project private.
+  project_env: LANGSMITH_PROJECT

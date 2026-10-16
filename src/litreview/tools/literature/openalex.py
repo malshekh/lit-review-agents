@@ -22,11 +22,14 @@ def search(query: str, family_id: str, max_records: int = 200) -> SearchResult:
     records: list[Record] = []
     cursor, count = "*", None
     mailto = os.environ.get("OPENALEX_EMAIL")
+    api_key = os.environ.get("OPENALEX_API_KEY")
     try:
         while cursor and len(records) < max_records:
             params = {"filter": query, "per-page": 100, "cursor": cursor}
             if mailto:
                 params["mailto"] = mailto
+            if api_key:
+                params["api_key"] = api_key
             r = requests.get(URL, params=params, timeout=30)
             r.raise_for_status()
             data = r.json()

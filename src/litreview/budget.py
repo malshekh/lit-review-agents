@@ -51,6 +51,10 @@ class BudgetTracker:
         p = self.price_of(model)
         if p is None:
             return None
+        tier = self.prices.get(model) or {}
+        threshold = tier.get("long_context_threshold")
+        if threshold and input_tokens > threshold and tier.get("long_input") is not None:
+            p = (float(tier["long_input"]), float(tier["long_output"]))
         return (input_tokens * p[0] + output_tokens * p[1]) / 1_000_000
 
     # --- logging and enforcement --------------------------------------

@@ -25,13 +25,14 @@ def search(query: str, family_id: str, max_records: int = 200) -> SearchResult:
         if "ERROR" in res:
             return SearchResult("pubmed", family_id, query, None, [], f"QUERY_INVALID: {res['ERROR']}")
         ids, count = res.get("idlist", []), int(res.get("count", 0))
-        records = _fetch(ids, family_id) if ids else []
+        records = fetch_by_pmids(ids, family_id) if ids else []
     except (requests.RequestException, KeyError, ET.ParseError) as exc:
         return SearchResult("pubmed", family_id, query, None, [], f"SEARCH_FAILED: {exc}")
     return SearchResult("pubmed", family_id, query, count, records)
 
 
-def _fetch(ids: list[str], family_id: str) -> list[Record]:
+def fetch_by_pmids(ids: list[str], family_id: str) -> list[Record]:
+    """Fetch full PubMed records (incl. abstracts) for a list of PMIDs."""
     records: list[Record] = []
     for i in range(0, len(ids), 200):
         r = requests.post(EUTILS + "efetch.fcgi", data=_params(
@@ -46,10 +47,11 @@ def _fetch(ids: list[str], family_id: str) -> list[Record]:
                        for x in a.findall(".//Author")]
             year = art.findtext(".//PubDate/Year")
             doi = next((e.text for e in art.findall(".//ArticleId") if e.get("IdType") == "doi"), None)
+            pmc = next((e.text for e in art.findall(".//ArticleId") if e.get("IdType") == "pmc"), None)
             records.append(Record(
                 source="pubmed", title="".join(a.find("ArticleTitle").itertext()) if a.find("ArticleTitle") is not None else "",
                 abstract=abstract, authors=authors, year=int(year) if year and year.isdigit() else None,
                 venue=a.findtext(".//Journal/ISOAbbreviation", ""),
                 publication_type=[p.text for p in a.findall(".//PublicationType") if p.text],
-                doi=doi, pmid=art.findtext(".//PMID"), query_family_id=family_id))
+                doi=doi, pmid=art.findtext(".//PMID"), pmcid=pmc, query_family_id=family_id))
     return records

@@ -1,6 +1,6 @@
 """Command line interface.
 
-  litreview check                          check config: models set, prices present, keys loaded
+  litreview check [--ping] [--apis]        check config, keys; optionally test live connections
   litreview new --topic topic.md [--notes notes.md] [--seeds seeds.txt]
   litreview run <run_id>                   run or resume until the next checkpoint or the end
   litreview status <run_id>                current stage, status and spend
@@ -12,14 +12,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-from . import checkpoints, config
-from .agents import AGENTS
+from . import checkpoints
 from .budget import BudgetTracker
 from .orchestrator import Run, new_run
 from .paths import REPO_ROOT, RUNS_DIR
@@ -29,25 +27,28 @@ def _read(path: str | None) -> str:
     return Path(path).read_text(encoding="utf-8") if path else ""
 
 
-def cmd_check(_args) -> int:
-    ok = True
-    prices = config.load("prices")
-    allow = config.load("pipeline")["run"].get("allow_unpriced_models", False)
-    for aid in AGENTS:
-        try:
-            m = config.agent_model(aid)
-        except ValueError as e:
-            print(f"  ✗ {e}")
-            ok = False
-            continue
-        priced = (prices.get(m.model) or {}).get("input") is not None
-        print(f"  {'✓' if priced or allow else '✗'} {aid:8s} {m.provider:9s} {m.model}"
-              f"{'' if priced else '   (no price in config/prices.yaml)'}")
-        ok &= priced or allow
-    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
-        print(f"  {'✓' if os.environ.get(key) else '✗'} {key} {'set' if os.environ.get(key) else 'missing in .env'}")
-        ok &= bool(os.environ.get(key))
-    print("Config OK" if ok else "Fix the items marked ✗ before running.")
+def cmd_check(args) -> int:
+    from .tools import healthcheck as hc
+    print("Models and prices")
+    lines, ok_cfg, providers = hc.config_lines()
+    print("\n".join(lines))
+    print("\nAPI keys (.env)")
+    klines, ok_keys = hc.key_lines(providers)
+    print("\n".join(klines))
+    ok = ok_cfg and ok_keys
+    if args.ping and ok:
+        print("\nLive model check (one tiny call per provider)")
+        l, good = hc.ping_llms(providers)
+        print("\n".join(l))
+        ok &= good
+    if args.apis:
+        print("\nLiterature and lookup APIs")
+        l, good = hc.ping_sources()
+        print("\n".join(l))
+        ok &= good
+    print("\n" + ("All checks passed." if ok else "Fix the items marked ✗ before running."))
+    if ok and not (args.ping and args.apis):
+        print("Tip: `litreview check --ping --apis` also tests live connections.")
     return 0 if ok else 1
 
 
@@ -109,7 +110,10 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="litreview", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("check").set_defaults(fn=cmd_check)
+    c = sub.add_parser("check")
+    c.add_argument("--ping", action="store_true", help="make one tiny call to each LLM provider")
+    c.add_argument("--apis", action="store_true", help="test literature and identifier APIs")
+    c.set_defaults(fn=cmd_check)
     n = sub.add_parser("new")
     n.add_argument("--topic", required=True)
     n.add_argument("--notes")

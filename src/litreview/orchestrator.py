@@ -4,12 +4,13 @@ Run state lives in runs/<run_id>/state.json, so a run can stop (checkpoint, budg
 and resume exactly where it left off with `litreview run <run_id>`.
 
 Stage order
-  scope -> cp1 -> search -> qualify -> cp2 -> extract -> validate -> synthesize -> cp3
+  scope -> cp1 -> search -> qualify -> expand -> cp2 -> extract -> validate -> synthesize -> cp3
   -> outline -> draft -> review_loop -> finish_edit -> finalize -> done
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from collections import defaultdict
@@ -24,9 +25,10 @@ from .tools import compliance, references, span_check, tags
 from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
+from .tools.literature.expansion import choose_seeds, expand
 from .tools.normalization import normalize_entities
 
-STAGES = ["scope", "cp1", "search", "qualify", "cp2", "extract", "validate", "synthesize", "cp3",
+STAGES = ["scope", "cp1", "search", "qualify", "expand", "cp2", "extract", "validate", "synthesize", "cp3",
           "outline", "draft", "review_loop", "finish_edit", "finalize", "done"]
 
 
@@ -168,8 +170,6 @@ class Run:
         self.save("records.json", records)
         self.save("search_log.json", [{k: v for k, v in r.items() if k != "records"} for r in results])
         self.prov.tool_run("search+dedup", "search", stats)
-        # TODO (week 2): citation expansion (OpenCitations, depth 1) from A04-qualified seeds,
-        # seeding from contrary as well as supportive records (A03-LM §4.5).
         return "qualify"
 
     def _execute_plan(self, plan: dict, sources: dict) -> list[dict]:
@@ -203,13 +203,37 @@ class Run:
         return {"families": fams, "seed_recall": recall, "problems": problems}
 
     def stage_qualify(self, st: dict) -> str:
+        self._qualify_pending()
+        return "expand"
+
+    def stage_expand(self, st: dict) -> str:
+        """Citation expansion from qualified seeds, then qualification of the new records."""
+        ecfg = self.cfg["retrieval"].get("citation_expansion", {})
+        if ecfg.get("enabled") and not st.get("expansion_done"):
+            plan = self.load("search_plan.json", {})
+            records = self.load("records.json")
+            seeds = choose_seeds(self.load("qualifications.json"), records,
+                                 plan.get("citation_expansion_seed_families", []))
+            found, log = expand(seeds, ecfg.get("directions", ["references", "citations"]),
+                                int(ecfg.get("max_per_seed", 30)), int(ecfg.get("max_total", 600)))
+            merged, stats = deduplicate(found, existing=records)
+            self.save("records.json", merged)
+            self.save("expansion_log.json", log)
+            self.prov.tool_run("citation_expansion", "expand", {"seeds": len(seeds), **stats})
+            st = self.state()
+            st["expansion_done"] = True
+            self.save_state(st)
+            self._qualify_pending()
+        return "cp2"
+
+    def _qualify_pending(self) -> None:
         spec = self.load("spec_approved.json")
         records = self.load("records.json")
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
         todo = [r for r in records if r["record_id"] not in quals]
         size = int(self.cfg["loops"]["cq_batch_size"])
         fields = ("record_id", "title", "abstract", "authors", "year", "venue", "publication_type", "doi",
-                  "pmid", "is_preprint", "query_family_ids")
+                  "pmid", "nct_id", "is_preprint", "query_family_ids", "expansion")
         for i in range(0, len(todo), size):
             batch = [{**{k: r.get(k) for k in fields},
                       "content_level": "ABSTRACT" if r.get("abstract") else "METADATA_ONLY"} for r in todo[i:i + size]]
@@ -237,11 +261,11 @@ class Run:
                 quals[rid] = {**q, "_fulltext_checked": True}
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
-        return "cp2"
 
     def _bias_report(self, records: list[dict], quals: list[dict]) -> dict:
         plan = self.load("search_plan.json", {})
         purpose = {f["family_id"]: f.get("purpose") for f in plan.get("query_families", [])}
+        purpose.update({"CITEXP:FWD": "CITATION_EXPANSION", "CITEXP:BWD": "CITATION_EXPANSION"})
         by_id = {r["record_id"]: r for r in records}
         tally: dict[str, dict] = defaultdict(lambda: {"received": 0, "excluded": 0})
         themes: dict[str, int] = defaultdict(int)
@@ -291,7 +315,7 @@ class Run:
             self.save(f"fulltext/{rid}.json", sections)
             out = self.agent("A05-KE", {"review_spec": spec, "content_level": level,
                                         "record": {**rec, "content": sections}}, step=f"A05-KE_{rid}")
-            self.save(f"extractions/{rid}.json", normalize_entities(out))
+            self.save(f"extractions/{rid}.json", normalize_entities(out, self.data("normalization_cache.json")))
         return "validate"
 
     def stage_validate(self, st: dict) -> str:
@@ -316,7 +340,7 @@ class Run:
                                             "record": {**rec, "content": sections},
                                             "defects_from_previous_extraction": serious},
                                  step=f"A05-KE_{rid}_reextract")
-                self.save(f"extractions/{rid}.json", normalize_entities(ext))
+                self.save(f"extractions/{rid}.json", normalize_entities(ext, self.data("normalization_cache.json")))
             self.save(f"validations/{rid}.json", val)
         # theme-level pass
         findings = self._validated_findings(corpus)
@@ -354,7 +378,10 @@ class Run:
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
                             "disposition": v.get("disposition"), "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
-                            "entities": {e["entity_id"]: e.get("mention") for e in ext.get("entities", [])}})
+                            "entities": {e["entity_id"]: {k: e.get(k) for k in (
+                                "mention", "type", "approved_symbol", "normalized_id", "normalization_state",
+                                "drug_status_verified", "problematic_cell_line") if e.get(k) is not None}
+                                for e in ext.get("entities", [])}})
         return out
 
     def stage_synthesize(self, st: dict) -> str:
@@ -521,7 +548,7 @@ class Run:
         refs = []
         for rid, n in sorted(numbers.items(), key=lambda x: x[1]):
             r = corpus.get(rid, {})
-            meta = references.crossref_lookup(r["doi"]) if r.get("doi") else None
+            meta = references.crossref_lookup(r["doi"], os.environ.get("CROSSREF_MAILTO")) if r.get("doi") else None
             refs.append(f"{n}. " + (references.format_nature(meta) if meta else
                                     f"{', '.join(r.get('authors', [])[:1])} et al. {r.get('title')}. {r.get('venue')} ({r.get('year')}). [CHECK FORMAT]"))
         legends = [f"**Figure {l['display_id'][1:]}.** {l['legend']}" for l in m.get("figure_legends", [])]
