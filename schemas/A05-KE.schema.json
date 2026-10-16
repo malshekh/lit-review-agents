@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A05-KE output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "content_level": {
+      "enum": [
+        "ABSTRACT",
+        "FULL_TEXT"
+      ]
+    },
+    "study_profile": {
+      "type": "object"
+    },
+    "entities": {
+      "type": "array"
+    },
+    "contexts": {
+      "type": "array"
+    },
+    "findings": {
+      "type": "array"
+    },
+    "author_stated_limitations": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "record_id",
+    "content_level",
+    "study_profile",
+    "entities",
+    "contexts",
+    "findings",
+    "author_stated_limitations"
+  ],
+  "additionalProperties": true
+}

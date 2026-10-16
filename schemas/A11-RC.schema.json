@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A11-RC output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "manuscript_version": {
+      "type": "string"
+    },
+    "reader_passes": {
+      "type": "object"
+    },
+    "strengths": {
+      "type": "array"
+    },
+    "concerns": {
+      "type": "array"
+    },
+    "decision": {
+      "enum": [
+        "ACCEPT",
+        "MINOR_REVISION",
+        "MAJOR_REVISION",
+        "HOLD_FOR_UPSTREAM_REVIEW",
+        "INCOMPLETE_CRITIQUE"
+      ]
+    },
+    "decision_rationale": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "manuscript_version",
+    "reader_passes",
+    "strengths",
+    "concerns",
+    "decision",
+    "decision_rationale"
+  ],
+  "additionalProperties": true
+}

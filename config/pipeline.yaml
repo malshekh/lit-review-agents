@@ -1,0 +1,51 @@
+# Pipeline configuration: which model runs each agent, budgets, loop limits, notifications.
+# Change models here, never in code. Provider: "anthropic" or "openai".
+# Design rule: auditors (A06, A10, A11) run on the opposite vendor to the agent whose work they check.
+
+run:
+  spend_cap_usd: 50.00          # hard stop for one run; the orchestrator halts before exceeding it
+  warn_at_fraction: 0.8         # warning email/log when 80% of the cap is spent
+  allow_unpriced_models: false  # refuse to run a model with no price in prices.yaml
+
+loops:
+  max_json_repair_attempts: 1   # re-ask once if an agent returns invalid JSON
+  max_search_repairs: 2         # A03 REPAIR rounds per query family
+  max_reextractions: 1          # A06 defect -> A05 re-extraction rounds per paper
+  max_critique_cycles: 2        # A11 critique -> A12 revision cycles
+  cq_batch_size: 20             # records per A04 call
+  max_redrafts: 1               # A10 blocking findings on the first draft -> A09 redraft
+
+retrieval:
+  max_records_total: 3000       # across all query families and sources (A03-LM budget)
+  max_records_per_family: 300
+
+models:
+  # Claude model IDs: see https://docs.claude.com/en/docs/about-claude/models
+  # OpenAI model IDs: see https://platform.openai.com/docs/models  -> set before first run
+  claude_default: claude-sonnet-5-5
+  claude_strong:  claude-opus-5-5
+  claude_fast:    claude-haiku-5-5
+  openai_default: SET_ME
+  openai_strong:  SET_ME
+
+agents:
+  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 8000,  temperature: 0.4 }
+  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 8000,  temperature: 0.2 }
+  A04-CQ:  { provider: anthropic, model: claude_default, max_tokens: 12000, temperature: 0.0 }
+  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.0 }
+  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A05 (Claude)
+  A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.3 }
+  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 12000, temperature: 0.2 }
+  A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 20000, temperature: 0.5 }
+  A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A09/A12 (Claude)
+  A11-RC:  { provider: openai,    model: openai_default, max_tokens: 10000, temperature: 0.3 }  # audits A09/A12 (Claude)
+  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 20000, temperature: 0.2 }
+
+checkpoints:
+  CP1: { after: A02-SP,  purpose: "Approve scope, perspective and selection criteria" }
+  CP2: { after: A04-CQ,  purpose: "Select papers (every record shown, all tiers)" }
+  CP3: { after: A07-SYN, purpose: "Approve thesis, adopt or reject interpretations" }
+
+notify:
+  on: [checkpoint, complete, budget_warning, failure]
+  email_to_env: NOTIFY_EMAIL_TO   # address read from .env

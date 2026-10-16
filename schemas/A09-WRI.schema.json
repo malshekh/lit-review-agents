@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A09-WRI output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "draft_version": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "abstract": {
+      "type": "string"
+    },
+    "keywords": {
+      "type": "array"
+    },
+    "sections": {
+      "type": "array"
+    },
+    "figure_legends": {
+      "type": "array"
+    },
+    "main_text_word_count": {
+      "type": "integer"
+    },
+    "plan_gaps": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "draft_version",
+    "title",
+    "abstract",
+    "keywords",
+    "sections",
+    "figure_legends",
+    "main_text_word_count",
+    "plan_gaps"
+  ],
+  "additionalProperties": true
+}

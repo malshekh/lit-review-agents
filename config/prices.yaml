@@ -1,0 +1,10 @@
+# USD per 1 million tokens. Fill in from the providers' current pricing pages before the first run:
+#   Anthropic: https://www.anthropic.com/pricing#api
+#   OpenAI:    https://openai.com/api/pricing
+# Prices change; the budget monitor refuses to run a model whose price is null
+# (unless run.allow_unpriced_models is true in pipeline.yaml).
+claude-opus-5-5:   { input: null, output: null }
+claude-sonnet-5-5: { input: null, output: null }
+claude-haiku-5-5:  { input: null, output: null }
+# Add your OpenAI models here using the exact model IDs set in pipeline.yaml, e.g.
+# <openai-model-id>: { input: null, output: null }

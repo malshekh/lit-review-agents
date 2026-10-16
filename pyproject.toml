@@ -1,0 +1,15 @@
+[project]
+name = "litreview"
+version = "0.1.0"
+description = "Multi-agent pipeline for drafting narrative literature reviews (Scientific Reviews format)"
+requires-python = ">=3.10"
+
+[project.scripts]
+litreview = "litreview.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

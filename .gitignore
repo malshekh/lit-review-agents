@@ -1,0 +1,16 @@
+# Secrets
+.env
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# Run outputs (papers, drafts, costs) - keep folder only
+runs/*
+!runs/.gitkeep
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/settings.json

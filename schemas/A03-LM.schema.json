@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A03-LM output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "enum": [
+        "PLAN",
+        "REPAIR"
+      ]
+    },
+    "plan_version": {
+      "type": "string"
+    },
+    "concept_blocks": {
+      "type": "array"
+    },
+    "query_families": {
+      "type": "array"
+    },
+    "citation_expansion_seed_families": {
+      "type": "array"
+    },
+    "repairs": {
+      "type": "array"
+    },
+    "seeds_not_recalled": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "plan_version",
+    "concept_blocks",
+    "query_families",
+    "citation_expansion_seed_families",
+    "repairs",
+    "seeds_not_recalled"
+  ],
+  "additionalProperties": true
+}

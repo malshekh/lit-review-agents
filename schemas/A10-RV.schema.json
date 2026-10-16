@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A10-RV output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "pass": {
+      "enum": [
+        "DRAFT",
+        "REVISION",
+        "FINAL"
+      ]
+    },
+    "coverage": {
+      "type": "object"
+    },
+    "findings": {
+      "type": "array"
+    },
+    "verification_execution": {
+      "type": "string"
+    },
+    "finding_severity": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "pass",
+    "coverage",
+    "findings",
+    "verification_execution",
+    "finding_severity"
+  ],
+  "additionalProperties": true
+}

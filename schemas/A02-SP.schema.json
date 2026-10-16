@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A02-SP output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "spec_state": {
+      "enum": [
+        "READY_FOR_CHECKPOINT",
+        "READY_WITH_ASSUMPTIONS",
+        "NEEDS_HUMAN_INPUT",
+        "OUT_OF_SCOPE"
+      ]
+    },
+    "original_topic": {
+      "type": "string"
+    },
+    "normalized_topic": {
+      "type": "string"
+    },
+    "readiness": {
+      "type": "object"
+    },
+    "scope": {
+      "type": "object"
+    },
+    "perspective_options": {
+      "type": "array"
+    },
+    "selection_criteria": {
+      "type": "object"
+    },
+    "search_seeds": {
+      "type": "object"
+    },
+    "assumptions": {
+      "type": "array"
+    },
+    "questions_for_researcher": {
+      "type": "array"
+    },
+    "researcher_decision": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "spec_state",
+    "original_topic",
+    "normalized_topic",
+    "readiness",
+    "scope",
+    "perspective_options",
+    "selection_criteria",
+    "search_seeds",
+    "assumptions",
+    "questions_for_researcher",
+    "researcher_decision"
+  ],
+  "additionalProperties": true
+}

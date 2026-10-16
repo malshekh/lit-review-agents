@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A08-OL output (top-level contract; see the prompt's output schema for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan_version": {
+      "type": "string"
+    },
+    "title": {
+      "type": "object"
+    },
+    "abstract_plan": {
+      "type": "object"
+    },
+    "keywords": {
+      "type": "array",
+      "maxItems": 6
+    },
+    "sections": {
+      "type": "array"
+    },
+    "budget_summary": {
+      "type": "object"
+    },
+    "display_items": {
+      "type": "array",
+      "maxItems": 8
+    },
+    "readability": {
+      "type": "object"
+    },
+    "coverage_check": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "plan_version",
+    "title",
+    "abstract_plan",
+    "keywords",
+    "sections",
+    "budget_summary",
+    "display_items",
+    "readability",
+    "coverage_check"
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,66 @@
+# Scientific Reviews (Nature Portfolio) — submission limits
+# Source: https://www.nature.com/scirev/author-instructions/submission-guidelines
+# Checked: 2026-10-16. Re-check before submission; journal policies change.
+
+journal: Scientific Reviews
+article_type: narrative_review   # the only type the journal accepts
+
+limits:
+  title_max_words: 20            # single, scientifically accurate sentence stating the main message
+  abstract_max_words: 200        # unstructured; no headings, subheadings or references
+  main_text_max_words: 5000      # excludes abstract, references, figure legends
+  typeset_pages_max: 12
+  keywords_max: 6
+  references_per_1000_words: 25  # approximate target, not a hard cap
+  display_items_max: 8           # figures + tables combined
+  display_items_max_if_short: 4  # suggested when main text <= 2000 words
+  short_text_threshold_words: 2000
+  figure_legend_max_words: 350
+  table_max_pages: 1
+  footnotes_allowed: false
+  graphical_abstract_allowed: false
+
+abstract_requirements:
+  - broad introduction to the topic
+  - states the review's unique perspective, assessment or synthesis
+  - includes a contribution statement focused on timeliness and impact
+  - readable by a general scientific audience
+
+structure_suggested:
+  - Introduction        # background, context, rationale
+  - Main body           # themed subsections (topic, method or trend), not chronological;
+                        # synthesise and critically appraise; identify knowledge gaps
+  - Conclusion          # key points, significance, future directions
+
+back_matter_order:
+  - References
+  - Acknowledgements (optional)
+  - Author contributions and biographies   # human-written; contribution statement per author
+  - Data availability statement            # "No/Not applicable" selected in submission system
+  - Additional information (Competing interests)
+  - Figure legends
+  - Tables
+
+references:
+  style: nature_numeric          # sequential numbers in square brackets
+  one_publication_per_number: true
+  et_al_threshold_authors: 6     # 6 or more authors -> first author + et al.
+  preprints_allowed: true
+  preprint_sole_support_for_major_point: false
+  in_text_only: [unpublished_work, phd_theses, urls]
+  allowed_extras: [published_conference_abstracts, numbered_patents]
+
+writing:
+  minimise_jargon: true
+  minimise_abbreviations: true
+  define_abbreviations_at_first_use: true
+  selective_not_exhaustive: true  # discuss the most significant work, not every paper
+  gene_nomenclature: approved_symbols  # HGNC (human), MGI (mouse)
+  chemical_nomenclature: iupac_preferred
+
+ai_policy:
+  url: https://www.nature.com/scirev/journal-policies/ai
+  llm_authorship: false
+  disclosure_required: true
+  human_owned: [perspective, evidence_selection, conclusions]
+  prohibited: [fabricated_citations, undisclosed_ai_reasoning, ai_conclusions_presented_as_human]

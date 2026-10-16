@@ -1,0 +1,120 @@
+# Literature sources and lookup services
+# Set enabled: true/false per run. A3-LM only writes queries for enabled discovery sources.
+# API keys go in .env (never in this file). Check each provider's terms and rate limits.
+
+discovery_sources:
+
+  pubmed:
+    enabled: true
+    name: PubMed / MEDLINE (NCBI E-utilities)
+    purpose: Primary biomedical discovery; MeSH, publication-type and fielded searching; species and study-type filters
+    syntax: PubMed query syntax ([tiab], [MeSH Terms], [pt], [majr], Humans[MeSH], Animals[MeSH])
+    key_env: NCBI_API_KEY        # optional; raises rate limit
+    full_text: false
+
+  europepmc:
+    enabled: true
+    name: Europe PMC (REST API)
+    purpose: Abstracts plus open full text (PMC), preprints (bioRxiv, medRxiv and others), methods-level searching
+    syntax: Europe PMC syntax (TITLE:, ABSTRACT:, METHODS:, SRC:PPR for preprints, OPEN_ACCESS:y)
+    key_env: null
+    full_text: true              # open-access full text by section
+
+  pubtator3:
+    enabled: true
+    name: PubTator3 (NCBI)
+    purpose: Entity-normalized search for genes, proteins, chemicals, diseases, species, variants and cell lines; disambiguates gene symbols and drug names
+    syntax: PubTator3 entity IDs (@GENE_..., @CHEMICAL_..., @DISEASE_...) and relation search
+    key_env: null
+    full_text: false
+
+  openalex:
+    enabled: true
+    name: OpenAlex
+    purpose: Broad cross-disciplinary coverage (engineering, chemistry, materials, computing), topics, citation graph
+    syntax: OpenAlex filter syntax (title_and_abstract.search, publication_year, type)
+    key_env: OPENALEX_EMAIL      # polite-pool contact email
+    full_text: false
+
+  semanticscholar:
+    enabled: true
+    name: Semantic Scholar Academic Graph
+    purpose: Citation and reference graph, seed-based paper recommendations (conceptual search)
+    syntax: Keyword search plus recommendations from positive/negative seed papers
+    key_env: S2_API_KEY          # optional
+    full_text: false
+
+  clinicaltrials:
+    enabled: false               # enable when the review covers human interventional studies
+    name: ClinicalTrials.gov (API v2)
+    purpose: Registered trials, including unpublished or terminated ones (contrary evidence, publication-bias check)
+    syntax: Condition / intervention / status fields
+    key_env: null
+    full_text: false
+
+  arxiv:
+    enabled: false               # enable for in silico, machine-learning or computational reviews
+    name: arXiv
+    purpose: Computational and quantitative preprints
+    syntax: arXiv API query (ti:, abs:, cat:)
+    key_env: null
+    full_text: true
+
+  chemrxiv:
+    enabled: false               # enable for chemistry- or materials-heavy reviews
+    name: ChemRxiv
+    purpose: Chemistry and materials preprints
+    key_env: null
+    full_text: true
+
+  ieee_xplore:
+    enabled: false               # enable for device, sensor or engineering reviews; requires key
+    name: IEEE Xplore
+    purpose: Engineering, biosensor and device literature
+    key_env: IEEE_API_KEY
+    full_text: false
+
+  scopus:
+    enabled: false               # licensed; enable only with institutional access
+    name: Scopus (Elsevier API)
+    key_env: SCOPUS_API_KEY
+
+  web_of_science:
+    enabled: false               # licensed
+    name: Web of Science Starter API
+    key_env: WOS_API_KEY
+
+  embase:
+    enabled: false               # licensed
+    name: Embase
+    key_env: EMBASE_API_KEY
+
+# Not discovery sources: used by code for verification, citation expansion and full text
+support_services:
+  crossref:       { purpose: DOI metadata, corrections, retractions (incl. Retraction Watch data), Nature-style reference formatting input }
+  opencitations:  { purpose: Open backward/forward citation links for citation expansion }
+  unpaywall:      { purpose: Legal open-access full-text locations, key_env: UNPAYWALL_EMAIL }
+  pmc_oa:         { purpose: Open-access full text with section structure }
+
+# Identifier lookups used by code to normalize A5-KE entity mentions.
+# A5-KE never invents identifiers; unresolved mentions stay UNRESOLVED.
+normalization_services:
+  ncbi_taxonomy:  { entity_types: [ORGANISM], id_prefix: "NCBITaxon" }
+  hgnc:           { entity_types: [GENE, PROTEIN], scope: human, id_prefix: "HGNC" }
+  mgi:            { entity_types: [GENE, PROTEIN], scope: mouse, id_prefix: "MGI" }
+  rgd:            { entity_types: [GENE, PROTEIN], scope: rat, id_prefix: "RGD" }
+  ncbi_gene:      { entity_types: [GENE], scope: all_species, id_prefix: "NCBIGene" }
+  uniprot:        { entity_types: [PROTEIN, ENZYME, RECEPTOR, ION_CHANNEL, TRANSPORTER], id_prefix: "UniProt" }
+  expasy_enzyme:  { entity_types: [ENZYME], id_prefix: "EC" }
+  chebi:          { entity_types: [CHEMICAL_ENTITIES], id_prefix: "CHEBI" }
+  pubchem:        { entity_types: [CHEMICAL_ENTITIES], id_prefix: "PubChem CID" }
+  chembl:         { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, TOOL_COMPOUND], id_prefix: "CHEMBL", provides: max_clinical_phase }
+  drugbank:       { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, BIOLOGIC], id_prefix: "DB", note: "licence required for some uses" }
+  cellosaurus:    { entity_types: [CELL_LINE], id_prefix: "RRID:CVCL", provides: [species_of_origin, misidentified_or_contaminated_flag] }
+  cell_ontology:  { entity_types: [CELL_TYPE], id_prefix: "CL" }
+  uberon:         { entity_types: [TISSUE_OR_ORGAN], id_prefix: "UBERON" }
+  mondo:          { entity_types: [DISEASE], id_prefix: "MONDO" }
+  hpo:            { entity_types: [PHENOTYPE], id_prefix: "HP" }
+  gene_ontology:  { entity_types: [BIOLOGICAL_PROCESS, MOLECULAR_FUNCTION, CELLULAR_COMPONENT], id_prefix: "GO" }
+  reactome:       { entity_types: [PATHWAY], id_prefix: "R-HSA" }
+  mesh:           { entity_types: [any], id_prefix: "MeSH" }
