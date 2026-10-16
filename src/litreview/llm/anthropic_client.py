@@ -22,7 +22,7 @@ def complete(system: str, user: str, model: str, max_tokens: int, temperature: f
              provider: str = "anthropic") -> LLMResponse:
     kwargs: dict = {"model": model, "max_tokens": max_tokens, "system": system,
                     "messages": [{"role": "user", "content": user}]}
-    if config.load("pipeline")["providers"]["anthropic"].get("send_temperature", True):
+    if config.load("pipeline")["providers"]["anthropic"].get("send_temperature", False):
         kwargs["temperature"] = temperature
     resp = _get_client().messages.create(**kwargs)
     text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")

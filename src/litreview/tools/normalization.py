@@ -235,6 +235,10 @@ def ols(term: str, ontology: str) -> dict:
     src = f"OLS4/{ontology.upper()}"
     ids = {d.get("obo_id") for d in docs if d.get("obo_id")}
     label_exact = [d for d in docs if (d.get("label") or "").lower() == term.lower()]
+    # Ontologies import terms from others (MONDO carries HP:0002099 "Asthma"); prefer native IDs.
+    native = [d for d in label_exact if (d.get("obo_id") or "").upper().startswith(ontology.upper() + ":")]
+    if native:
+        label_exact = native
     pick = docs[0] if len(ids) == 1 else (label_exact[0] if len(label_exact) == 1 else None)
     if pick:
         return _result("RESOLVED", src, normalized_id=pick.get("obo_id"), approved_name=pick.get("label"))
