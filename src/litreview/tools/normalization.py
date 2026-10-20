@@ -23,10 +23,13 @@ Results are cached per run in data/normalization_cache.json.
 from __future__ import annotations
 
 import json
+import os
 import re
 from pathlib import Path
 
 import requests
+
+from .. import config
 
 TIMEOUT = 20
 
@@ -167,6 +170,84 @@ def pubchem(name: str) -> dict:
     return _result("UNRESOLVED", "PubChem", normalized_id=None)
 
 
+# ------------------------------------------------------------------ DrugBank (optional, licensed)
+def drugbank_settings() -> dict | None:
+    """DrugBank settings if enabled in config/sources.yaml and a key is set, else None."""
+    cfg = (config.load("sources").get("normalization_services") or {}).get("drugbank") or {}
+    key = os.environ.get(cfg.get("key_env") or "DRUGBANK_API_KEY")
+    if not cfg.get("enabled") or not key:
+        return None
+    return {"key": key, "base_url": (cfg.get("base_url") or "https://api.drugbank.com/v1").rstrip("/"),
+            "region": cfg.get("region")}
+
+
+def _dicts_with(obj, key):
+    """Yield every dict anywhere in a nested JSON object that has `key`."""
+    if isinstance(obj, dict):
+        if key in obj:
+            yield obj
+        for v in obj.values():
+            yield from _dicts_with(v, key)
+    elif isinstance(obj, list):
+        for x in obj:
+            yield from _dicts_with(x, key)
+
+
+def _drugbank_get(s: dict, path: str, params: dict | None = None):
+    r = requests.get(f"{s['base_url']}{path}", params=params, timeout=TIMEOUT,
+                     headers={"Authorization": s["key"], "Accept": "application/json"})
+    if r.status_code == 404:
+        return None
+    r.raise_for_status()   # 401/403 (bad key) and 5xx are technical failures, never "no such drug"
+    return r.json()
+
+
+def drugbank(name: str, s: dict | None = None) -> dict:
+    """Drug name search, then the drug record for its approval groups.
+
+    Response parsing is deliberately loose (any nested object carrying `drugbank_id`), because
+    the exact JSON shape depends on the DrugBank product licensed. Check with
+    `litreview check --apis` after enabling.
+    """
+    s = s or drugbank_settings()
+    if not s:
+        return {"drugbank_state": "NOT_ENABLED"}
+    params = {"q": name, **({"region": s["region"]} if s.get("region") else {})}
+    hits = list(_dicts_with(_drugbank_get(s, "/drug_names", params) or {}, "drugbank_id"))
+    exact = {h["drugbank_id"] for h in hits if (h.get("name") or "").lower() == name.lower()}
+    ids = exact or {h["drugbank_id"] for h in hits}
+    if not ids:
+        return {"drugbank_state": "UNRESOLVED"}
+    if len(ids) > 1:
+        return {"drugbank_state": "AMBIGUOUS", "drugbank_candidates": sorted(ids)[:5]}
+    dbid = ids.pop()
+    drug = _drugbank_get(s, f"/drugs/{dbid}") or {}
+    groups = [str(g).lower() for g in drug.get("groups") or []] if isinstance(drug, dict) else []
+    return {"drugbank_state": "RESOLVED", "drugbank_id": dbid, "drugbank_groups": groups or None}
+
+
+def _drugbank_crosscheck(res: dict, name: str) -> dict:
+    """Add DrugBank fields to a ChEMBL result. ChEMBL stays the source of drug_status_verified;
+    a disagreement is flagged for the reader, never resolved here."""
+    s = drugbank_settings()
+    if not s:
+        return res
+    try:
+        db = drugbank(name, s)
+    except (requests.RequestException, ValueError) as exc:
+        return {**res, "drugbank_state": "LOOKUP_FAILED", "drugbank_note": str(exc)[:200]}
+    res = {**res, **db}
+    groups = db.get("drugbank_groups")
+    if groups and res.get("drug_status_verified"):
+        db_approved = "approved" in groups
+        if db_approved != (res["drug_status_verified"] == "APPROVED"):
+            res["drug_status_conflict"] = (f"ChEMBL: {res['drug_status_verified']} (max phase "
+                                           f"{res.get('max_clinical_phase')}); DrugBank groups: {', '.join(groups)}")
+        if "withdrawn" in groups:
+            res["drug_status_conflict"] = (res.get("drug_status_conflict", "") + " DrugBank lists it as withdrawn.").strip()
+    return res
+
+
 def normalize_chemical(entity: dict) -> dict:
     name = entity.get("mention", "").strip()
     if entity.get("type") in DRUG_TYPES:
@@ -175,7 +256,7 @@ def normalize_chemical(entity: dict) -> dict:
             pc = pubchem(name)
             if pc.get("normalized_id"):
                 res["pubchem"] = pc["normalized_id"]
-            return res
+            return _drugbank_crosscheck(res, name)
     res = pubchem(name)
     if res["normalization_state"] != "RESOLVED":
         chebi = ols(name, "chebi")
@@ -284,6 +365,8 @@ def normalize_entities(extraction: dict, cache_path: Path | None = None) -> dict
                 e.update(_result("LOOKUP_FAILED", "error", normalized_id=None, note=str(exc)[:200]))
                 continue
         e.update(cache[key])
+        if cache[key].get("drugbank_state") == "LOOKUP_FAILED":
+            del cache[key]   # keep the ChEMBL result on the entity, but retry DrugBank next time
     if cache_path:
         Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
         Path(cache_path).write_text(json.dumps(cache, indent=1), encoding="utf-8")

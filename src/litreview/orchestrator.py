@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -21,11 +22,11 @@ from .agents import AgentError, run_agent
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
-from .tools import compliance, references, span_check, tags
+from .tools import compliance, display_items, manuscript_export, references, span_check, tags
 from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
-from .tools.literature.expansion import choose_seeds, expand
+from .tools.literature.expansion import choose_next_seeds, choose_seeds, expand
 from .tools.normalization import normalize_entities
 
 STAGES = ["scope", "cp1", "search", "qualify", "expand", "cp2", "extract", "validate", "synthesize", "cp3",
@@ -207,21 +208,33 @@ class Run:
         return "expand"
 
     def stage_expand(self, st: dict) -> str:
-        """Citation expansion from qualified seeds, then qualification of the new records."""
+        """Citation expansion, one depth at a time: expand, deduplicate, qualify the new records.
+        Depth 2 seeds only from depth-1 records A04-CQ qualified, so it follows relevant papers,
+        not the whole citation neighbourhood."""
         ecfg = self.cfg["retrieval"].get("citation_expansion", {})
-        if ecfg.get("enabled") and not st.get("expansion_done"):
-            plan = self.load("search_plan.json", {})
-            records = self.load("records.json")
-            seeds = choose_seeds(self.load("qualifications.json"), records,
-                                 plan.get("citation_expansion_seed_families", []))
-            found, log = expand(seeds, ecfg.get("directions", ["references", "citations"]),
-                                int(ecfg.get("max_per_seed", 30)), int(ecfg.get("max_total", 600)))
+        if not ecfg.get("enabled"):
+            return "cp2"
+        max_depth = min(int(ecfg.get("depth", 1)), 2)
+        done = st.get("expansion_depth_done", 1 if st.get("expansion_done") else 0)
+        for depth in range(done + 1, max_depth + 1):
+            self._qualify_pending()   # no-op unless a previous depth was interrupted mid-qualification
+            records, quals = self.load("records.json"), self.load("qualifications.json", [])
+            if depth == 1:
+                seeds = choose_seeds(quals, records, self.load("search_plan.json", {})
+                                     .get("citation_expansion_seed_families", []))
+            else:
+                seeds = choose_next_seeds(quals, records, depth - 1)
+            already = sum(1 for r in records if r.get("expansion"))
+            per_seed = int(ecfg.get("max_per_seed_depth2", ecfg.get("max_per_seed", 30)) if depth == 2
+                           else ecfg.get("max_per_seed", 30))
+            found, log = expand(seeds, ecfg.get("directions", ["references", "citations"]), per_seed,
+                                max(int(ecfg.get("max_total", 600)) - already, 0), depth=depth)
             merged, stats = deduplicate(found, existing=records)
             self.save("records.json", merged)
-            self.save("expansion_log.json", log)
-            self.prov.tool_run("citation_expansion", "expand", {"seeds": len(seeds), **stats})
+            self.save("expansion_log.json", self.load("expansion_log.json", []) + log)
+            self.prov.tool_run("citation_expansion", "expand", {"depth": depth, "seeds": len(seeds), **stats})
             st = self.state()
-            st["expansion_done"] = True
+            st["expansion_depth_done"] = depth
             self.save_state(st)
             self._qualify_pending()
         return "cp2"
@@ -433,7 +446,27 @@ class Run:
         if plan.get("status") == "NEEDS_HUMAN_INPUT":
             raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
                         "adjust the selection or plan, then run again")
+        self._build_display_items(plan)
         return "draft"
+
+    def _build_display_items(self, plan: dict) -> list[dict]:
+        """Tables and the evidence map from validated findings (code only; A08-OL supplies no values)."""
+        out_dir = self.dir / "data" / "display_items"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)   # a new plan replaces every item
+        built = display_items.build_all(plan, self.load("synthesis_approved.json"),
+                                        self.load("validated_findings.json", []),
+                                        self.load("selected_corpus.json", []), out_dir)
+        self.save("display_items.json", built)
+        self.prov.tool_run("display_items", "outline",
+                           {d["display_id"]: d["status"] for d in built})
+        return built
+
+    def _built_tables(self) -> list[dict]:
+        built = self.load("display_items.json")
+        if built is None:   # runs outlined before the builder existed
+            built = self._build_display_items(self.load("manuscript_plan.json", {}))
+        return sorted((d for d in built if d.get("kind") == "TABLE"), key=lambda d: int(d["display_id"][1:]))
 
     # --- writing and review ------------------------------------------
     def _verify(self, manuscript: dict, pass_: str, step: str, changed: list | None = None) -> dict:
@@ -450,8 +483,11 @@ class Run:
         selected = {r["record_id"] for r in self.load("selected_corpus.json", [])}
         text = "\n".join(s.get("text_markdown", "") for s in m.get("sections", []))
         binds = tags.bindings(text)
-        cited = tags.cited_records(text)
+        built = self.load("display_items.json", [])
+        cited = tags.cited_records(text) + tags.cited_records(
+            " ".join(c for d in built if d.get("kind") == "TABLE" for row in d.get("rows", []) for c in row))
         return {
+            "display_item_warnings": {d["display_id"]: d.get("warnings") for d in built if d.get("warnings")},
             "untagged_sentences": [s for s, ids in binds if not ids and len(s.split()) > 3][:50],
             "unknown_tags": sorted({i for _, ids in binds for i in ids if i not in known}),
             "plan_items_not_rendered": sorted(known - {i for _, ids in binds for i in ids} - {"ORG"}),
@@ -531,37 +567,59 @@ class Run:
 
     def stage_finalize(self, st: dict) -> str:
         m = self._current()
+        plan = self.load("manuscript_plan.json")
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json")}
-        texts = [s["text_markdown"] for s in m["sections"]]
+        tables = self._built_tables()
+        # tables come after the text, so a paper cited only in a table is numbered after every text citation
+        texts = [s["text_markdown"] for s in m["sections"]] + [" ".join(c for row in t["rows"] for c in row)
+                                                                for t in tables]
         numbers = references.number_citations(texts)
 
         def cite(match):
             ids = [p.strip().lstrip("@") for p in match.group(1).split(";")]
             return "[" + ",".join(str(numbers[i]) for i in ids if i in numbers) + "]"
 
+        levels = {s.get("section_id"): s.get("level", 1) for s in plan.get("sections", [])}
         body = []
         for s in m["sections"]:
             t = tags.strip_tags(s["text_markdown"])
             t = tags.CITE_RE.sub(cite, t)
             t = tags.DISPLAY_RE.sub(lambda x: ("Fig. " if x.group(1)[0] == "F" else "Table ") + x.group(1)[1:], t)
-            body.append(f"## {s['heading']}\n\n{t}")
+            body.append({"heading": s["heading"], "level": levels.get(s.get("section_id"), 1), "text": t})
         refs = []
         for rid, n in sorted(numbers.items(), key=lambda x: x[1]):
             r = corpus.get(rid, {})
             meta = references.crossref_lookup(r["doi"], os.environ.get("CROSSREF_MAILTO")) if r.get("doi") else None
             refs.append(f"{n}. " + (references.format_nature(meta) if meta else
                                     f"{', '.join(r.get('authors', [])[:1])} et al. {r.get('title')}. {r.get('venue')} ({r.get('year')}). [CHECK FORMAT]"))
-        legends = [f"**Figure {l['display_id'][1:]}.** {l['legend']}" for l in m.get("figure_legends", [])]
-        doc = "\n\n".join([f"# {m['title']}", "## Abstract", m["abstract"],
-                           "**Keywords:** " + "; ".join(m.get("keywords", [])), *body,
-                           "## References", "\n".join(refs),
-                           "## Author contributions and biographies", "[TO BE WRITTEN BY THE AUTHORS]",
-                           "## AI use disclosure", "[TO BE WRITTEN BY THE AUTHORS — see provenance_summary.json]",
-                           "## Competing interests", "[TO BE WRITTEN BY THE AUTHORS]",
-                           "## Figure legends", "\n\n".join(legends)])
         final_dir = self.dir / "final"
         final_dir.mkdir(exist_ok=True)
-        (final_dir / "manuscript.md").write_text(doc, encoding="utf-8")
+        src_items, out_items = self.dir / "data" / "display_items", final_dir / "display_items"
+        if src_items.exists():
+            shutil.copytree(src_items, out_items, dirs_exist_ok=True)
+        built = {d["display_id"]: d for d in self.load("display_items.json", [])}
+        figures = []
+        for leg in m.get("figure_legends", []):
+            b = built.get(leg["display_id"], {})
+            figures.append({"display_id": leg["display_id"], "legend": tags.strip_tags(leg["legend"]),
+                            "image": out_items / b["image"] if b.get("image") else None, "brief": b.get("brief")})
+        captions = {c["display_id"]: tags.strip_tags(c["caption"]) for c in m.get("table_captions", [])}
+        doc = {"title": m["title"], "abstract": m["abstract"], "keywords": m.get("keywords", []),
+               "sections": body, "references": refs,
+               "back_matter": [("Author contributions and biographies", "[TO BE WRITTEN BY THE AUTHORS]"),
+                               ("AI use disclosure", "[TO BE WRITTEN BY THE AUTHORS — see provenance_summary.json]"),
+                               ("Competing interests", "[TO BE WRITTEN BY THE AUTHORS]")],
+               "figures": figures,
+               "tables": [{"display_id": t["display_id"], "columns": t["columns"],
+                           "caption": captions.get(t["display_id"], "[CAPTION TO BE WRITTEN]"),
+                           "rows": [[tags.CITE_RE.sub(cite, c) for c in row] for row in t["rows"]],
+                           "notes": ["NR, not reported. Values are taken from validated findings; "
+                                     "check against the source papers before submission."]
+                                    + ([f"Left blank for the authors: {', '.join(t['unmapped_columns'])}."]
+                                       if t.get("unmapped_columns") else [])}
+                          for t in tables]}
+        (final_dir / "manuscript.md").write_text(manuscript_export.render_markdown(doc), encoding="utf-8")
+        manuscript_export.render_docx(doc, final_dir / "manuscript.docx")
         comp = compliance.check({**m, "references": list(numbers),
                                  "display_items": self.load("manuscript_plan.json").get("display_items", [])})
         (final_dir / "compliance.json").write_text(json.dumps(comp, indent=2), encoding="utf-8")
@@ -575,6 +633,6 @@ class Run:
                     f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
                     f"Main text: {comp['main_text_words']} words, {comp['references']} references\n\n"
                     f"{self.budget.summary_text()}",
-                    attachments=[final_dir / "manuscript.md", final_dir / "compliance.json",
+                    attachments=[final_dir / "manuscript.docx", final_dir / "manuscript.md", final_dir / "compliance.json",
                                  final_dir / "provenance_summary.json"])
         return "done"
