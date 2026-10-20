@@ -118,8 +118,12 @@ normalization_services:
   chebi:          { entity_types: [CHEMICAL_ENTITIES], id_prefix: "CHEBI" }
   pubchem:        { entity_types: [CHEMICAL_ENTITIES], id_prefix: "PubChem CID" }
   chembl:         { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, TOOL_COMPOUND], id_prefix: "CHEMBL", provides: max_clinical_phase }
-  drugbank:       { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, BIOLOGIC], id_prefix: "DB", enabled: false,
-                    note: "Licensed API (DRUGBANK_API_KEY); not wired in v0.2 — ChEMBL covers approval status" }
+  drugbank:       { entity_types: [APPROVED_DRUG, INVESTIGATIONAL_DRUG, TOOL_COMPOUND], id_prefix: "DB",
+                    enabled: false,              # licensed; set true and DRUGBANK_API_KEY in .env to use
+                    key_env: DRUGBANK_API_KEY,
+                    base_url: "https://api.drugbank.com/v1",
+                    region: null,                # e.g. us, ca, eu — limits name search to one market
+                    note: "Cross-check only: ChEMBL stays the source of drug_status_verified; disagreements are flagged" }
   hmdb:           { entity_types: [ENDOGENOUS_METABOLITE], id_prefix: "HMDB", enabled: false,
                     note: "No public REST API; ChEBI/PubChem cover metabolites in v0.2" }
   mygene:         { entity_types: [GENE, PROTEIN], scope: mouse_rat_and_fallback, id_prefix: "NCBIGene" }

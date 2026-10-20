@@ -48,6 +48,14 @@ def key_lines(providers: set[str]) -> tuple[list[str], bool]:
     for env, why in optional.items():
         lines.append(f"  {OK if os.environ.get(env) else INFO} {env:20s} "
                      f"{'set' if os.environ.get(env) else 'not set (optional)'} — {why}")
+    db_cfg = (config.load("sources").get("normalization_services") or {}).get("drugbank") or {}
+    if db_cfg.get("enabled"):
+        has = bool(os.environ.get(db_cfg.get("key_env") or "DRUGBANK_API_KEY"))
+        lines.append(f"  {OK if has else BAD} DRUGBANK_API_KEY     {'set' if has else 'missing'} "
+                     "(DrugBank enabled in config/sources.yaml)")
+        ok &= has
+    else:
+        lines.append(f"  {INFO} DrugBank             off (licensed; enable in config/sources.yaml)")
     tracing = os.environ.get("LANGSMITH_TRACING", "").lower() == "true"
     if tracing:
         has = bool(os.environ.get("LANGSMITH_API_KEY"))
@@ -84,7 +92,7 @@ def ping_llms(providers: set[str]) -> tuple[list[str], bool]:
 
 def ping_sources() -> tuple[list[str], bool]:
     from .literature import enabled_sources, search
-    from .normalization import chembl, hgnc, ols
+    from .normalization import chembl, drugbank, drugbank_settings, hgnc, ols
     tests = {"pubmed": "biosensor[tiab]", "europepmc": "biosensor", "pubtator3": "@GENE_TP53",
              "openalex": "title_and_abstract.search:biosensor", "semanticscholar": "biosensor",
              "clinicaltrials": "cond:diabetes"}
@@ -103,6 +111,17 @@ def ping_sources() -> tuple[list[str], bool]:
             lines.append(f"  {OK if good else BAD} {name:16s} {r['normalization_state']} {r.get('normalized_id') or ''}")
         except Exception as e:  # noqa: BLE001
             lines.append(f"  {BAD} {name:16s} {type(e).__name__}: {str(e)[:120]}")
+            good = False
+        ok &= good
+    if drugbank_settings():
+        try:
+            r = drugbank("aspirin")
+            good = r["drugbank_state"] == "RESOLVED"
+            lines.append(f"  {OK if good else BAD} {'DrugBank':16s} {r['drugbank_state']} {r.get('drugbank_id') or ''}"
+                         + ("" if r.get("drugbank_groups") else "  (no approval groups in response: "
+                                                                 "check the API product/shape)" if good else ""))
+        except Exception as e:  # noqa: BLE001
+            lines.append(f"  {BAD} {'DrugBank':16s} {type(e).__name__}: {str(e)[:120]}")
             good = False
         ok &= good
     return lines, ok

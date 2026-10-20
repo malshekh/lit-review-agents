@@ -24,17 +24,17 @@
 | 2 | **CP1** | researcher | `spec_approved.json` |
 | 3 | search | A03-LM (PLAN, REPAIR ≤2), search clients, dedup | `search_plan.json`, `records.json`, `search_log.json` |
 | 4 | qualify | A04-CQ (batches; full text for unresolved) | `qualifications.json`, `bias_report.json` |
-| 4b | expand | citation expansion (Semantic Scholar, depth 1, from qualified supportive *and* contrary seeds) → A04-CQ on new records | `records.json`, `expansion_log.json` |
+| 4b | expand | citation expansion (Semantic Scholar, from qualified supportive *and* contrary seeds) → A04-CQ on new records; with `depth: 2`, repeated once from the depth-1 records A04-CQ qualified | `records.json`, `expansion_log.json` |
 | 5 | **CP2** | researcher (every record shown) | `selected_corpus.json` |
 | 6 | extract | full-text fetch, A05-KE, identifier lookups (HGNC, MyGene, UniProt, ChEMBL, PubChem, Cellosaurus, OLS4) | `extractions/`, `fulltext/`, `normalization_cache.json` |
 | 7 | validate | span check (Gate 1), A06-SV per paper (≤1 re-extraction), A06-SV per theme | `validations/`, `validated_findings.json`, `theme_records.json` |
 | 8 | synthesize | coverage manifest (code), A07-SYN | `synthesis_package.json` |
 | 9 | **CP3** | researcher | `synthesis_approved.json` |
-| 10 | outline | A08-OL | `manuscript_plan.json` |
+| 10 | outline | A08-OL; display-item builder (code): evidence tables and the evidence map from validated findings, briefs for figures a person must draw | `manuscript_plan.json`, `display_items.json`, `display_items/` |
 | 11 | draft | A09-WRI → A10-RV (≤1 redraft) | `manuscripts/` |
 | 12 | review loop | A11-RC → A12-EDI REVISION → A10-RV (≤2 cycles) | `rc_latest.json`, `rv_latest.json` |
 | 13 | finish edit | A12-EDI LINE → A10-RV → A12-EDI PROOF → A10-RV FINAL | `rv_final.json` |
-| 14 | finalize | reference numbering + Nature format, compliance, email | `final/` |
+| 14 | finalize | reference numbering + Nature format, tables and figures, Word + Markdown export, compliance, email | `final/` |
 
 ## Run folder
 
@@ -44,7 +44,7 @@ runs/<run_id>/
   checkpoints/    CPn_review.md, CPn_decision.json, CP2_records.csv, CPn_approved.json
   data/           everything in the table above
   outputs/        raw and parsed output of every agent call
-  final/          manuscript.md, compliance.json, costs.txt, provenance_summary.json
+  final/          manuscript.docx, manuscript.md, display_items/, compliance.json, costs.txt, provenance_summary.json
   state.json      current stage and status (resume point)
   costs.jsonl     one line per model call
   provenance.jsonl  one line per agent call, tool run and human decision

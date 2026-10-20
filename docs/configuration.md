@@ -59,8 +59,13 @@ Enabled: PubMed, Europe PMC, PubTator3, OpenAlex, Semantic Scholar, ClinicalTria
 Identifier lookups (no keys needed): HGNC, MyGene.info, UniProt, ChEMBL, PubChem, Cellosaurus,
 EBI OLS4 (MONDO, HP, CL, UBERON, GO, NCBITaxon).
 
+Optional, off by default:
+- **DrugBank** — licensed. To use it, set `drugbank: enabled: true` in `config/sources.yaml` and
+  `DRUGBANK_API_KEY` in `.env`, then run `litreview check --apis`. It is a cross-check only: ChEMBL
+  stays the source of `drug_status_verified`; when DrugBank's approval groups disagree, or list the
+  drug as withdrawn, the entity gets a `drug_status_conflict` note for the reader.
+
 Not wired, by design:
-- **DrugBank** — licensed API; ChEMBL already verifies approval status.
 - **HMDB** — no public REST API; PubChem/ChEBI cover metabolites.
 - **BioGRID** — interaction networks aren't needed to write a narrative review.
 - **Neo4j** — the knowledge graph belonged to the drug-repurposing framework; this pipeline stores

@@ -188,12 +188,8 @@ def draw_evidence_map(props: list[str], labels: dict[str, str], systems: list[st
     plt.rcParams.update({"font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
                          "font.size": 7})
     width_in = 7.08   # 180 mm, double column
-    label_w = 2.6
-    cell_w = (width_in - label_w) / max(len(systems), 1)
-    height_in = 0.9 + 0.38 * len(props)
-    fig = plt.figure(figsize=(width_in, height_in), dpi=300, facecolor=surface)
-    ax = fig.add_axes([label_w / width_in, 0.12 / height_in * 2, 1 - label_w / width_in - 0.01,
-                       1 - 0.9 / height_in])
+    fig, ax = plt.subplots(figsize=(width_in, 0.8 + 0.42 * len(props)), dpi=300, facecolor=surface,
+                           layout="constrained")
     for i, p in enumerate(props):
         for j, s in enumerate(systems):
             sup, con = counts.get((p, s), (0, 0))
@@ -203,7 +199,7 @@ def draw_evidence_map(props: list[str], labels: dict[str, str], systems: list[st
             ax.add_patch(Rectangle((j + 0.04, i + 0.06), 0.92, 0.88, facecolor=fill, edgecolor=edge,
                                    linewidth=1.6 if con else 0.6))
             if n:
-                dark_fill = n / peak > 0.55
+                dark_fill = n / peak > 0.8   # white text only where the fill is dark enough to carry it
                 txt = f"{sup} supporting" + (f"\n{con} conflicting" if con else "")
                 ax.text(j + 0.5, i + 0.5, txt, ha="center", va="center", fontsize=6,
                         color=surface if dark_fill else ink)
@@ -213,13 +209,13 @@ def draw_evidence_map(props: list[str], labels: dict[str, str], systems: list[st
     ax.set_xticklabels([textwrap.fill(s, 14) for s in systems], color=ink)
     ax.xaxis.tick_top()
     ax.set_yticks([i + 0.5 for i in range(len(props))])
-    ax.set_yticklabels([textwrap.shorten(f"{p}  {labels.get(p, '')}", 70, placeholder="…") for p in props],
-                       color=ink)
+    ax.set_yticklabels([textwrap.fill(textwrap.shorten(f"{p}  {labels.get(p, '')}", 80, placeholder="…"), 42)
+                        for p in props], color=ink)
     ax.tick_params(length=0)
     for side in ax.spines.values():
         side.set_visible(False)
-    fig.text(0.01, 0.01, "Cell shade: number of validated findings. Red outline: at least one conflicting finding.",
-             fontsize=6, color=muted)
+    fig.supxlabel("Cell shade: number of validated findings. Red outline: at least one conflicting finding.",
+                  fontsize=6, color=muted, x=0.01, ha="left")
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=300, facecolor=surface)
     plt.close(fig)

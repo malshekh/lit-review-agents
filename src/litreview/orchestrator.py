@@ -393,7 +393,8 @@ class Run:
                             "plain_language_limit": v.get("plain_language_limit"),
                             "entities": {e["entity_id"]: {k: e.get(k) for k in (
                                 "mention", "type", "approved_symbol", "normalized_id", "normalization_state",
-                                "drug_status_verified", "problematic_cell_line") if e.get(k) is not None}
+                                "drug_status_verified", "drug_status_conflict", "drugbank_id",
+                                "problematic_cell_line") if e.get(k) is not None}
                                 for e in ext.get("entities", [])}})
         return out
 

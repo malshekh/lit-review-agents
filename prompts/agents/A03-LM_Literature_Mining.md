@@ -91,7 +91,7 @@ Precision controls never use citation count, journal prestige, impact factor or 
 For each family, write the source-specific query string for every enabled source, using that source's syntax and fields. Keep the conceptual logic (`logic`) separate from the compiled strings so a reader can see what each query is meant to do.
 
 ### 4.5 Citation expansion request
-State which families' qualified records should seed citation expansion. The code performs backward and forward expansion at depth 1 from records A4-CQ qualifies — always seeding from contrary as well as supportive records, so heavily cited work does not crowd out less-cited counter-evidence. Citation count is discovery metadata, never a signal of importance.
+State which families' qualified records should seed citation expansion. The code performs backward and forward expansion from records A4-CQ qualifies (depth 1; depth 2, from the depth-1 records A4-CQ then qualifies, only when the researcher configures it for a sparse topic) — always seeding from contrary as well as supportive records, so heavily cited work does not crowd out less-cited counter-evidence. Citation count is discovery metadata, never a signal of importance.
 
 ## 5. REPAIR mode
 

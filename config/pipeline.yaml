@@ -25,8 +25,10 @@ retrieval:
   max_records_per_family: 300
   citation_expansion:
     enabled: true
-    depth: 1                    # depth 2 only for sparse topics (A03-LM §4.5)
+    depth: 1                    # 1 or 2. Use 2 only for sparse topics (A03-LM §4.5): it seeds from
+                                #   depth-1 records A04-CQ qualified, and costs extra A04 screening
     max_per_seed: 30            # newest-first cap on citing + cited papers per seed
+    max_per_seed_depth2: 15     # tighter cap per seed at depth 2
     max_total: 600              # cap on new records from expansion
     directions: [references, citations]   # backward and forward
 
