@@ -23,7 +23,8 @@ def _get_client(provider: str):
 
 
 def complete(system: str, user: str, model: str, max_tokens: int, temperature: float,
-             provider: str = "openai") -> LLMResponse:
+             provider: str = "openai", effort: str | None = None) -> LLMResponse:
+    # `effort` is a Claude setting (pipeline.yaml agents.<id>.effort); OpenAI/Kimi calls ignore it.
     p = config.load("pipeline")["providers"][provider]
     kwargs: dict = {
         "model": model,

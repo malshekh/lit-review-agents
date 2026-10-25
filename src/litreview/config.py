@@ -24,6 +24,7 @@ class AgentModel:
     model: str
     max_tokens: int
     temperature: float
+    effort: str | None = None   # Claude reasoning effort: low | medium | high | xhigh | max
 
 
 def agent_model(agent_id: str) -> AgentModel:
@@ -42,4 +43,5 @@ def agent_model(agent_id: str) -> AgentModel:
         model=model_id,
         max_tokens=int(entry.get("max_tokens", 8000)),
         temperature=float(entry.get("temperature", 0.0)),
+        effort=entry.get("effort"),
     )

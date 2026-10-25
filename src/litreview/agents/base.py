@@ -85,7 +85,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             user + "\n\nYour previous reply was not valid against the required output schema:\n"
             + last_error + "\nReturn only the corrected JSON object.")
         resp = complete(m.provider, system=system, user=message, model=m.model,
-                        max_tokens=m.max_tokens, temperature=m.temperature,
+                        max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
                         trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
                                "attempt": attempt, "prompt_version": prompt_version(agent_id)})
         for model, tin, tout in resp.usage_parts or [(resp.model, resp.input_tokens, resp.output_tokens)]:

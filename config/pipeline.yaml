@@ -64,17 +64,19 @@ models:
   kimi_default:   kimi-k2.6           # $0.95 / $4
 
 agents:
-  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.4 }
-  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.2 }
+  # Claude agents: thinking is always on and counts toward max_tokens (requests are streamed, so
+  # large caps are safe; you pay only for tokens used). `effort` sets how much thinking is spent.
+  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 32000, effort: high,   temperature: 0.4 }
+  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
   A04-CQ:  { provider: openai,    model: openai_fast,    max_tokens: 12000, temperature: 0.0 }
-  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.0 }
+  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.0 }
   A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A05 (Claude)
-  A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.3 }
-  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.2 }
-  A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 20000, temperature: 0.5 }
+  A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.3 }
+  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
+  A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.5 }
   A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A09/A12 (Claude)
   A11-RC:  { provider: kimi,      model: kimi_strong,    max_tokens: 10000, temperature: 0.3 }  # third vendor
-  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 20000, temperature: 0.2 }
+  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 64000, effort: medium, temperature: 0.2 }
 
 checkpoints:
   CP1: { after: A02-SP,  purpose: "Approve scope, perspective and selection criteria" }

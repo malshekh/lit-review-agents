@@ -36,17 +36,24 @@ def _usage_parts(resp, requested: str) -> list[tuple[str, int, int]]:
 
 
 def complete(system: str, user: str, model: str, max_tokens: int, temperature: float,
-             provider: str = "anthropic") -> LLMResponse:
+             provider: str = "anthropic", effort: str | None = None) -> LLMResponse:
+    """Streams the request (so large max_tokens never hits the SDK's non-streaming timeout) and
+    returns the final message. Thinking is always on for Claude 5.5 models and counts toward
+    max_tokens; `effort` (per agent in pipeline.yaml) controls how much of it is spent."""
     pcfg = config.load("pipeline")["providers"]["anthropic"]
     kwargs: dict = {"model": model, "max_tokens": max_tokens, "system": system,
                     "messages": [{"role": "user", "content": user}]}
     if pcfg.get("send_temperature", False):
         kwargs["temperature"] = temperature
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
     fallbacks = pcfg.get("fallbacks", "default")
     if fallbacks:
-        resp = _get_client().beta.messages.create(betas=[FALLBACK_BETA], fallbacks=fallbacks, **kwargs)
+        stream = _get_client().beta.messages.stream(betas=[FALLBACK_BETA], fallbacks=fallbacks, **kwargs)
     else:
-        resp = _get_client().messages.create(**kwargs)
+        stream = _get_client().messages.stream(**kwargs)
+    with stream as s:
+        resp = s.get_final_message()
     text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
     parts = _usage_parts(resp, model)
     served = next((getattr(it, "model", None) for it in getattr(resp.usage, "iterations", None) or []
