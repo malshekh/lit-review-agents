@@ -88,9 +88,16 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                         max_tokens=m.max_tokens, temperature=m.temperature,
                         trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
                                "attempt": attempt, "prompt_version": prompt_version(agent_id)})
-        budget.record(agent_id, resp.provider, resp.model, resp.input_tokens,
-                      resp.output_tokens, step=step)
+        for model, tin, tout in resp.usage_parts or [(resp.model, resp.input_tokens, resp.output_tokens)]:
+            budget.record(agent_id, resp.provider, model, tin, tout, step=step)
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
+        if resp.stop_reason == "refusal":
+            # a policy decline, not a formatting error: re-asking for JSON would only spend money
+            provenance.agent_call(agent_id, step, resp.model, prompt_version(agent_id), "", "REFUSED")
+            raise AgentError(
+                f"{agent_id} ({step}): {resp.model} declined the request (safety classifier category: "
+                f"{resp.refusal_category or 'unspecified'}), after any configured fallback. Rephrasing the "
+                "topic or notes, or moving this agent to another model in config/pipeline.yaml, may help.")
         if resp.stop_reason in ("max_tokens", "length"):
             last_error = "Output was truncated at max_tokens. Increase max_tokens in config/pipeline.yaml."
             break

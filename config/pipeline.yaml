@@ -8,7 +8,7 @@
 #   OpenAI GPT-5 mini screens:    A04-CQ — high-volume, low-cost; the researcher reviews every record at CP2
 
 run:
-  spend_cap_usd: 50.00          # hard stop for one run; the orchestrator halts before exceeding it
+  spend_cap_usd: 10.00          # hard stop for one run; the orchestrator halts before exceeding it
   warn_at_fraction: 0.8         # warning email/log when 80% of the cap is spent
   allow_unpriced_models: false  # refuse to run a model with no price in prices.yaml
 
@@ -21,7 +21,7 @@ loops:
   max_redrafts: 1               # A10 blocking findings on the first draft -> A09 redraft
 
 retrieval:
-  max_records_total: 3000       # across all query families and sources (A03-LM budget)
+  max_records_total: 300        # across all query families and sources (A03-LM budget)
   max_records_per_family: 300
   citation_expansion:
     enabled: true
@@ -29,7 +29,7 @@ retrieval:
                                 #   depth-1 records A04-CQ qualified, and costs extra A04 screening
     max_per_seed: 30            # newest-first cap on citing + cited papers per seed
     max_per_seed_depth2: 15     # tighter cap per seed at depth 2
-    max_total: 600              # cap on new records from expansion
+    max_total: 100              # cap on new records from expansion
     directions: [references, citations]   # backward and forward
 
 # Where each provider is reached. API keys are read from .env (never stored here).
@@ -37,6 +37,8 @@ providers:
   anthropic:
     key_env: ANTHROPIC_API_KEY
     send_temperature: false     # Opus 5.5 / Sonnet 5.5 removed sampling params; anthropic SDK 1.x dropped the argument
+    fallbacks: default          # server-side fallback when a safety classifier declines (biomedical
+                                #   topics can trigger the "bio" category by mistake); null = off
   openai:
     key_env: OPENAI_API_KEY
     base_url: null              # default OpenAI endpoint
@@ -62,13 +64,13 @@ models:
   kimi_default:   kimi-k2.6           # $0.95 / $4
 
 agents:
-  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 8000,  temperature: 0.4 }
-  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 8000,  temperature: 0.2 }
+  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.4 }
+  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.2 }
   A04-CQ:  { provider: openai,    model: openai_fast,    max_tokens: 12000, temperature: 0.0 }
   A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.0 }
   A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A05 (Claude)
   A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 16000, temperature: 0.3 }
-  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 12000, temperature: 0.2 }
+  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 16000, temperature: 0.2 }
   A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 20000, temperature: 0.5 }
   A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A09/A12 (Claude)
   A11-RC:  { provider: kimi,      model: kimi_strong,    max_tokens: 10000, temperature: 0.3 }  # third vendor
