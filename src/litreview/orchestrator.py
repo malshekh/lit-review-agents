@@ -22,7 +22,7 @@ from .agents import AgentError, run_agent
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
-from .tools import compliance, display_items, manuscript_export, references, span_check, tags
+from .tools import compliance, display_items, manuscript_export, references, span_check, tags, themes
 from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
@@ -89,12 +89,25 @@ class Run:
         return st["counters"][key]
 
     # --- main loop -----------------------------------------------------
-    def run(self) -> str:
+    def verify_source_inconsistency(self, record_id: str, statement: str, matches: str | None = None) -> None:
+        """Record a researcher's verification of an inconsistency inside one paper. It reaches A07 through
+        the coverage manifest and is logged as a human decision (for the AI-use disclosure)."""
+        if record_id not in {r["record_id"] for r in self.load("selected_corpus.json", [])}:
+            raise ValueError(f"{record_id} is not in the selected corpus")
+        entry = {"record_id": record_id, "statement": statement, "matches": matches,
+                 "verified_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        self.save("researcher_verifications.json", self.load("researcher_verifications.json", []) + [entry])
+        self.prov.human_decision("SOURCE_VERIFICATION", {"record_id": record_id, "matches": matches,
+                                                         "verified": True}, statement)
+
+    def run(self, until: str | None = None) -> str:
         st = self.state()
         st["status"] = "RUNNING"
         self.save_state(st)
         try:
             while st["stage"] != "done":
+                if until and st["stage"] == until:
+                    raise Pause(f"stopped before {until} (--until)")
                 handler = getattr(self, f"stage_{st['stage']}")
                 nxt = handler(st)
                 st = self.state() | {"stage": nxt}
@@ -340,19 +353,31 @@ class Run:
             if self.data(f"validations/{rid}.json").exists():
                 continue
             sections = self.load(f"fulltext/{rid}.json")
-            for attempt in range(max_re + 1):
+            # resume after an interruption: a paper already re-extracted continues at its next validation
+            start = 1 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 0
+            label_offset = start - min(start, max_re)   # keeps v2 as v2 if re-extraction was later turned off
+            for attempt in range(min(start, max_re), max_re + 1):
                 ext = self.load(f"extractions/{rid}.json")
                 gate1 = span_check.check_findings(ext, sections)
                 val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
                                             "gate1_results": gate1, "paper_text": sections},
-                                 step=f"A06-SV_{rid}_v{attempt + 1}")
+                                 step=f"A06-SV_{rid}_v{attempt + 1 + label_offset}")
                 serious = [d for d in val.get("defect_reports", []) if d.get("severity") in ("CRITICAL", "MAJOR")]
                 if not serious or attempt == max_re:
                     break
-                ext = self.agent("A05-KE", {"review_spec": spec, "content_level": ext.get("content_level"),
-                                            "record": {**rec, "content": sections},
-                                            "defects_from_previous_extraction": serious},
-                                 step=f"A05-KE_{rid}_reextract")
+                try:
+                    ext = self.agent("A05-KE", {"review_spec": spec, "content_level": ext.get("content_level"),
+                                                "record": {**rec, "content": sections},
+                                                "defects_from_previous_extraction": serious},
+                                     step=f"A05-KE_{rid}_reextract")
+                except AgentError as e:
+                    # Re-extraction is a best-effort repair. If it fails (e.g. a very dense paper exceeds
+                    # max_tokens), keep the first extraction and the A06 dispositions that already mark
+                    # its defective findings, rather than stopping the run.
+                    self.prov.tool_run("reextraction_failed", f"validate_{rid}",
+                                       {"record_id": rid, "error": str(e)[:300],
+                                        "kept": "first extraction with its A06 validation"})
+                    break
                 self.save(f"extractions/{rid}.json", normalize_entities(ext, self.data("normalization_cache.json")))
             self.save(f"validations/{rid}.json", val)
         # theme-level pass
@@ -391,16 +416,42 @@ class Run:
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
                             "disposition": v.get("disposition"), "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
+                            # only this finding's own subject and object, not the paper's whole entity list
                             "entities": {e["entity_id"]: {k: e.get(k) for k in (
                                 "mention", "type", "approved_symbol", "normalized_id", "normalization_state",
                                 "drug_status_verified", "drug_status_conflict", "drugbank_id",
                                 "problematic_cell_line") if e.get(k) is not None}
-                                for e in ext.get("entities", [])}})
+                                for e in ext.get("entities", [])
+                                if e["entity_id"] in (f.get("subject_entity_id"), f.get("object_entity_id"))}})
         return out
+
+    def _consolidate_themes(self, findings: list[dict], theme_records: dict) -> tuple[list[dict], dict]:
+        """String-level merge of theme labels (tools/themes.py). Findings keep their original labels in
+        `themes_original`, merged theme records list what they were merged from, and the mapping is logged."""
+        counts: dict[str, int] = defaultdict(int)
+        for f in findings:
+            for th in f.get("themes") or []:
+                counts[th] += 1
+        for th in theme_records:
+            counts.setdefault(th, 0)
+        mapping, summary = themes.consolidate(dict(counts), int(self.cfg.get("synthesis", {}).get("theme_merge_max", 40)))
+        self.save("theme_consolidation.json", {**summary, "mapping": mapping})
+        self.prov.tool_run("theme_consolidation", "synthesize", summary)
+        if not summary["applied"]:
+            return findings, theme_records
+        findings = [{**f, "themes_original": f.get("themes"),
+                     "themes": sorted({mapping.get(t, t) for t in f.get("themes") or []})} for f in findings]
+        merged: dict[str, dict] = {}
+        for th, rec in theme_records.items():
+            m = merged.setdefault(mapping.get(th, th), {"merged_from": [], "records": {}})
+            m["merged_from"].append(th)
+            m["records"][th] = rec
+        return findings, merged
 
     def stage_synthesize(self, st: dict) -> str:
         corpus = self.load("selected_corpus.json")
         theme_records = self.load("theme_records.json")
+        findings, theme_records_for_a07 = self._consolidate_themes(self.load("validated_findings.json"), theme_records)
         manifest = [{"item_id": f"PAPER:{r['record_id']}", "kind": "SELECTED_PAPER", "required_visibility": "CITED",
                      "narrative_required": r.get("tier") == "CORE" and bool(r.get("is_contrary_evidence"))}
                     for r in corpus]
@@ -412,17 +463,83 @@ class Run:
                              "detail": rec.get("evidence_reach"), "required_visibility": "NARRATIVE"})
             for m in (rec.get("evidence_reach") or {}).get("systems_missing", []):
                 manifest.append({"item_id": f"MISSING:{th}:{m}", "kind": "SYSTEM_GAP", "required_visibility": "NARRATIVE"})
+        manifest += self._inconsistency_items(corpus)
         self.save("coverage_manifest.json", manifest)
         pkg = self.agent("A07-SYN", {"review_spec": self.load("spec_approved.json"),
                                      "selected_corpus": [{k: r.get(k) for k in ("record_id", "title", "authors", "year",
                                                                                 "venue", "tier", "themes", "is_preprint")}
                                                          for r in corpus],
-                                     "validated_findings": self.load("validated_findings.json"),
-                                     "theme_records": theme_records, "coverage_manifest": manifest,
+                                     "validated_findings": findings,
+                                     "theme_records": theme_records_for_a07, "coverage_manifest": manifest,
                                      "revision_feedback": self.load("cp3_feedback.json")},
                          step=f"A07-SYN_v{self.counter(st, 'synth')}")
         self.save("synthesis_package.json", pkg)
         return "cp3"
+
+    # Free-text A06 warnings that describe a contradiction inside the paper (validations written
+    # before A06-SV v0.2 added the structured `source_inconsistencies` field).
+    _INCONSISTENCY_RE = re.compile(r"inconsisten|discrepan|contradict|whereas|conflicts? with|does not match",
+                                   re.IGNORECASE)
+
+    # Findings with these A06 dispositions can feed synthesis; the others (DOES_NOT_ESTABLISH, BLOCKED_*,
+    # HUMAN_REVIEW_REQUIRED, UNRESOLVED_SOURCE_ACCESS) cannot, so the review does not build on them.
+    _USABLE = {"SUPPORTED", "SUPPORTED_WITH_CONSTRAINTS", "SUPPORTED_FOR_OBSERVATION", "PARTIALLY_SUPPORTED"}
+
+    @classmethod
+    def _inconsistency_visibility(cls, item: dict, rec: dict, usable: set[str]) -> tuple[str, str]:
+        """NARRATIVE: researcher-verified, or it names a usable finding of a CORE or contrary-evidence paper.
+        An item with no finding IDs cannot be placed beside the finding it qualifies, which is what NARRATIVE
+        visibility is for, so it is at most DISPLAY (a note under the evidence table), as is a named
+        usable finding the review cites but does not build on. SUPPLEMENTARY: everything else.
+        The full list is kept in data/inconsistencies.json."""
+        if item.get("researcher_verified"):
+            return "NARRATIVE", "researcher-verified"
+        ids = item.get("finding_ids") or []
+        if not ids:
+            return (("DISPLAY", "paper-level (no finding IDs): cannot be placed beside a finding") if usable
+                    else ("SUPPLEMENTARY", "paper-level (no finding IDs); paper has no usable findings"))
+        if not [f for f in ids if f in usable]:
+            return "SUPPLEMENTARY", "affected findings are not used (not supported by A06)"
+        if rec.get("tier") == "CORE" or rec.get("is_contrary_evidence"):
+            kind = "contrary-evidence" if rec.get("is_contrary_evidence") else "CORE"
+            return "NARRATIVE", f"names a usable finding of a {kind} paper"
+        return "DISPLAY", f"names a usable finding of a {rec.get('tier') or 'non-CORE'} paper"
+
+    def _inconsistency_items(self, corpus: list[dict]) -> list[dict]:
+        """Coverage items for contradictions inside individual papers: A05 `in_paper_conflicts` and A06
+        source inconsistencies, each with a required visibility from `_inconsistency_visibility`.
+        A researcher verification (`litreview verify`) marks the matching item as verified."""
+        verified = self.load("researcher_verifications.json", [])
+        items = []
+        for rec in corpus:
+            rid = rec["record_id"]
+            ext = self.load(f"extractions/{rid}.json", {})
+            val = self.load(f"validations/{rid}.json", {})
+            usable = {v["finding_id"] for v in val.get("validations", []) if v.get("disposition") in self._USABLE}
+            found = [{"kind": "IN_PAPER_CONFLICT", "source": "A05-KE in_paper_conflicts",
+                      "description": c.get("description"), "finding_ids": c.get("finding_ids", [])}
+                     for c in ext.get("in_paper_conflicts") or []]
+            if "source_inconsistencies" in val:
+                found += [{"kind": "SOURCE_INCONSISTENCY", "source": "A06-SV source_inconsistencies", **s}
+                          for s in val.get("source_inconsistencies") or []]
+            else:
+                found += [{"kind": "SOURCE_INCONSISTENCY", "source": "A06-SV warning (free text)", "description": w}
+                          for w in val.get("warnings") or [] if self._INCONSISTENCY_RE.search(w)]
+            mine = [v for v in verified if v["record_id"] == rid]
+            for v in mine:
+                hit = next((f for f in found if v.get("matches") and v["matches"].lower()
+                            in (f.get("description") or "").lower()), None)
+                if hit is None:   # the researcher found something no agent recorded
+                    hit = {"kind": "SOURCE_INCONSISTENCY", "source": "RESEARCHER", "description": v["statement"]}
+                    found.append(hit)
+                hit.update(researcher_verified=True, researcher_statement=v["statement"])
+            for i, f in enumerate(found, 1):
+                visibility, reason = self._inconsistency_visibility(f, rec, usable)
+                items.append({"item_id": f"INCONSISTENCY:{rid}:{i}", "record_id": rid, **f,
+                              "researcher_verified": f.get("researcher_verified", False),
+                              "required_visibility": visibility, "visibility_reason": reason})
+        self.save("inconsistencies.json", items)   # the full record, whatever reaches the text
+        return items
 
     def stage_cp3(self, st: dict) -> str:
         decision = checkpoints.approved(self.dir, "CP3")
@@ -455,12 +572,16 @@ class Run:
         out_dir = self.dir / "data" / "display_items"
         if out_dir.exists():
             shutil.rmtree(out_dir)   # a new plan replaces every item
+        incons = self.load("inconsistencies.json", [])
         built = display_items.build_all(plan, self.load("synthesis_approved.json"),
                                         self.load("validated_findings.json", []),
-                                        self.load("selected_corpus.json", []), out_dir)
+                                        self.load("selected_corpus.json", []), out_dir, incons)
         self.save("display_items.json", built)
+        placed = {n["item_id"] for d in built for n in d.get("inconsistency_notes", [])}
+        unplaced = [i["item_id"] for i in incons if i.get("required_visibility") == "DISPLAY" and i["item_id"] not in placed]
         self.prov.tool_run("display_items", "outline",
-                           {d["display_id"]: d["status"] for d in built})
+                           {**{d["display_id"]: d["status"] for d in built},
+                            "display_inconsistencies_unplaced": unplaced})
         return built
 
     def _built_tables(self) -> list[dict]:
@@ -478,6 +599,16 @@ class Run:
                                      "deterministic_report": self._deterministic_report(manuscript),
                                      "changed_passages": changed}, step=step)
 
+    def _maybe_verify(self, manuscript: dict, pass_: str, step: str, previous: dict,
+                      changed: list | None = None) -> dict:
+        """An intermediate A10 check (after a redraft, a revision or the line edit). With
+        loops.verification: draft_and_final only the first-draft and final checks run; a skipped check is
+        logged, and the previous findings are passed on, marked as describing an earlier version."""
+        if self.cfg["loops"].get("verification", "all") != "draft_and_final":
+            return self._verify(manuscript, pass_, step, changed)
+        self.prov.tool_run("verification_skipped", step, {"reason": "loops.verification: draft_and_final"})
+        return {**previous, "stale": f"{step} skipped; these findings describe an earlier version"}
+
     def _deterministic_report(self, m: dict) -> dict:
         plan = self.load("manuscript_plan.json", {})
         known = {i["item_id"] for s in plan.get("sections", []) for i in s.get("ordered_items", [])} | {"ORG"}
@@ -485,10 +616,14 @@ class Run:
         text = "\n".join(s.get("text_markdown", "") for s in m.get("sections", []))
         binds = tags.bindings(text)
         built = self.load("display_items.json", [])
+        placed = {n["item_id"] for d in built for n in d.get("inconsistency_notes", [])}
         cited = tags.cited_records(text) + tags.cited_records(
             " ".join(c for d in built if d.get("kind") == "TABLE" for row in d.get("rows", []) for c in row))
         return {
             "display_item_warnings": {d["display_id"]: d.get("warnings") for d in built if d.get("warnings")},
+            "display_inconsistencies_not_in_any_table": [
+                i["item_id"] for i in self.load("inconsistencies.json", [])
+                if i.get("required_visibility") == "DISPLAY" and i["item_id"] not in placed],
             "untagged_sentences": [s for s, ids in binds if not ids and len(s.split()) > 3][:50],
             "unknown_tags": sorted({i for _, ids in binds for i in ids if i not in known}),
             "plan_items_not_rendered": sorted(known - {i for _, ids in binds for i in ids} - {"ORG"}),
@@ -522,7 +657,7 @@ class Run:
                                            "revision_request": rv.get("findings"), "previous_draft": draft},
                                step=f"A09-WRI_draft{i + 2}")
             self._save_manuscript(draft, f"m01_draft{i + 2}")
-            rv = self._verify(draft, "DRAFT", f"A10-RV_draft{i + 2}")
+            rv = self._maybe_verify(draft, "DRAFT", f"A10-RV_draft{i + 2}", rv)
         self.save("rv_latest.json", rv)
         return "review_loop"
 
@@ -543,7 +678,7 @@ class Run:
                                         "critique": rc, "verification_findings": rv.get("findings")},
                             step=f"A12-EDI_revision{cycle}")
             self._save_manuscript(ed, f"m02_revision{cycle}")
-            rv = self._verify(ed, "REVISION", f"A10-RV_revision{cycle}", ed.get("change_log"))
+            rv = self._maybe_verify(ed, "REVISION", f"A10-RV_revision{cycle}", rv, ed.get("change_log"))
             self.save("rv_latest.json", rv)
         raise Pause("critique cycles exhausted without ACCEPT — review data/rc_latest.json "
                     "(the draft is never accepted just because cycles ran out)")
@@ -553,7 +688,7 @@ class Run:
         line = self.agent("A12-EDI", {"mode": "LINE", "manuscript": self._current(), "manuscript_plan": plan},
                           step="A12-EDI_line")
         self._save_manuscript(line, "m03_line")
-        rv = self._verify(line, "REVISION", "A10-RV_line", line.get("change_log"))
+        rv = self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log"))
         if rv.get("finding_severity") == "BLOCKING":
             self.save("rv_latest.json", rv)
             raise Pause("blocking findings after line edit (see data/rv_latest.json)")
@@ -616,6 +751,7 @@ class Run:
                            "rows": [[tags.CITE_RE.sub(cite, c) for c in row] for row in t["rows"]],
                            "notes": ["NR, not reported. Values are taken from validated findings; "
                                      "check against the source papers before submission."]
+                                    + [tags.CITE_RE.sub(cite, n["text"]) for n in t.get("inconsistency_notes", [])]
                                     + ([f"Left blank for the authors: {', '.join(t['unmapped_columns'])}."]
                                        if t.get("unmapped_columns") else [])}
                           for t in tables]}

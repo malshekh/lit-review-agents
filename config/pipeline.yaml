@@ -8,17 +8,18 @@
 #   OpenAI GPT-5 mini screens:    A04-CQ — high-volume, low-cost; the researcher reviews every record at CP2
 
 run:
-  spend_cap_usd: 10.00          # hard stop for one run; the orchestrator halts before exceeding it
+  spend_cap_usd: 35.00          # hard stop for one run; the orchestrator halts before exceeding it
   warn_at_fraction: 0.8         # warning email/log when 80% of the cap is spent
   allow_unpriced_models: false  # refuse to run a model with no price in prices.yaml
 
 loops:
   max_json_repair_attempts: 1   # re-ask once if an agent returns invalid JSON
   max_search_repairs: 2         # A03 REPAIR rounds per query family
-  max_reextractions: 1          # A06 defect -> A05 re-extraction rounds per paper
+  max_reextractions: 0          # A06 defect -> A05 re-extraction rounds per paper
   max_critique_cycles: 2        # A11 critique -> A12 revision cycles
   cq_batch_size: 20             # records per A04 call
   max_redrafts: 1               # A10 blocking findings on the first draft -> A09 redraft
+  verification: draft_and_final # A10 checks: all (after every draft and edit) | draft_and_final
 
 retrieval:
   max_records_total: 300        # across all query families and sources (A03-LM budget)
@@ -69,8 +70,8 @@ agents:
   A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 32000, effort: high,   temperature: 0.4 }
   A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
   A04-CQ:  { provider: openai,    model: openai_fast,    max_tokens: 12000, temperature: 0.0 }
-  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.0 }
-  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A05 (Claude)
+  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 64000, effort: medium, temperature: 0.0 }
+  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 32000, temperature: 0.0 }  # audits A05 (Claude)
   A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.3 }
   A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
   A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.5 }

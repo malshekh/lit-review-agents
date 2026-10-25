@@ -6,15 +6,27 @@ import unicodedata
 
 _QUOTES = {"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"', "\u2013": "-", "\u2014": "-",
            "\u2212": "-", "\u00a0": " ", "\u2009": " "}
-_NUM_RE = re.compile(r"[-+]?\d+(?:[.,]\d+)?")
+# A sign belongs to a number only when it does not follow a digit: "12.1-56.3" is a range, not -56.3.
+_NUM_RE = re.compile(r"(?:(?<![\d.])[-+])?\d+(?:[.,]\d+)?")
+# "figure 8 h", "fig. 8 h-j", "table 1", "supplementary figure s2 b": number plus optional panel letters
+_DISPLAY_REF_RE = re.compile(r"\b(fig(?:ure)?s?\.?|tables?)\s*(s?\d+)((?:\s*[a-z]\b(?:\s*[-,]\s*[a-z]\b)*)?)")
+
+
+def _compact_ref(m: re.Match) -> str:
+    return f"{m.group(1)} {m.group(2)}{re.sub(r'\s+', '', m.group(3))}"
 
 
 def normalize(text: str) -> str:
+    """Normalize for verbatim comparison. Applied identically to span and paper, so it only removes
+    differences that come from text extraction (spacing, quote styles, line breaks), never wording."""
     text = unicodedata.normalize("NFKC", text)
     for a, b in _QUOTES.items():
         text = text.replace(a, b)
     text = re.sub(r"-\s*\n\s*", "", text)        # rejoin hyphenated line breaks
-    return re.sub(r"\s+", " ", text).strip().lower()
+    text = re.sub(r"\s+", " ", text).strip().lower()
+    text = re.sub(r"([(\[])\s+", r"\1", text)    # "( figure" -> "(figure"
+    text = re.sub(r"\s+([)\]])", r"\1", text)    # "8h )" -> "8h)"
+    return _DISPLAY_REF_RE.sub(_compact_ref, text)  # "figure 8 h" -> "figure 8h"
 
 
 def span_found(span: str, source_text: str) -> bool:

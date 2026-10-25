@@ -2,11 +2,13 @@
 
   litreview check [--ping] [--apis]        check config, keys; optionally test live connections
   litreview new --topic topic.md [--notes notes.md] [--seeds seeds.txt]
-  litreview run <run_id>                   run or resume until the next checkpoint or the end
+  litreview run <run_id> [--until STAGE]   run or resume until the next checkpoint, the end, or STAGE
   litreview status <run_id>                current stage, status and spend
   litreview approve <run_id> CP1|CP2|CP3   record your checkpoint decision
   litreview revise <run_id> CP1|CP3 --feedback feedback.md   send the stage back with your corrections
   litreview costs <run_id>                 per-agent cost breakdown
+  litreview verify <run_id> <record_id> --statement TEXT [--matches TEXT]
+                                           record that you verified an inconsistency inside a paper
 """
 from __future__ import annotations
 
@@ -60,8 +62,19 @@ def cmd_new(args) -> int:
 
 
 def cmd_run(args) -> int:
-    status = Run(args.run_id).run()
+    status = Run(args.run_id).run(until=args.until)
     print(status)
+    return 0
+
+
+def cmd_verify(args) -> int:
+    try:
+        Run(args.run_id).verify_source_inconsistency(args.record_id, args.statement, args.matches)
+    except ValueError as e:
+        print(e)
+        return 1
+    print(f"Verification for {args.record_id} recorded and logged as your decision. It reaches synthesis "
+          "through the coverage manifest (re-run synthesis if it has already run).")
     return 0
 
 
@@ -122,7 +135,15 @@ def main(argv: list[str] | None = None) -> int:
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)
         s.add_argument("run_id")
+        if name == "run":
+            s.add_argument("--until", help="stop before this stage (e.g. synthesize), to review before paying for it")
         s.set_defaults(fn=fn)
+    vf = sub.add_parser("verify")
+    vf.add_argument("run_id")
+    vf.add_argument("record_id")
+    vf.add_argument("--statement", required=True, help="what you checked in the paper and what you found")
+    vf.add_argument("--matches", help="text from the agent's description of the same inconsistency, to link to it")
+    vf.set_defaults(fn=cmd_verify)
     a = sub.add_parser("approve")
     a.add_argument("run_id")
     a.add_argument("checkpoint", choices=["CP1", "CP2", "CP3"])

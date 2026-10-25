@@ -275,7 +275,26 @@ def _write_csv(path: Path, header: list[str], rows: list[list[str]]) -> None:
         w.writerows(rows)
 
 
-def build_all(plan: dict, synthesis: dict, findings: list[dict], corpus: list[dict], out_dir: Path) -> list[dict]:
+def inconsistency_notes(table: dict, inconsistencies: list[dict], corpus: list[dict]) -> list[dict]:
+    """Table notes for DISPLAY-visibility inconsistencies that affect a paper or finding shown in this table."""
+    rows = set(table.get("row_finding_ids") or [])
+    records = {f.split(":")[0] for f in rows}
+    recs = {r["record_id"]: r for r in corpus}
+    notes = []
+    for item in inconsistencies:
+        if item.get("required_visibility") != "DISPLAY" or item["record_id"] not in records:
+            continue
+        ids = item.get("finding_ids") or []
+        if ids and not any(f"{item['record_id']}:{f}" in rows for f in ids):
+            continue
+        study = _study(recs.get(item["record_id"], {}), item["record_id"])
+        notes.append({"item_id": item["item_id"],
+                      "text": f"{study}: inconsistency reported within the paper — {item.get('description')}"})
+    return notes
+
+
+def build_all(plan: dict, synthesis: dict, findings: list[dict], corpus: list[dict], out_dir: Path,
+              inconsistencies: list[dict] | None = None) -> list[dict]:
     """Build every display item in the manuscript plan; returns one summary per item."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -287,6 +306,7 @@ def build_all(plan: dict, synthesis: dict, findings: list[dict], corpus: list[di
             continue
         if did.startswith("T") or item.get("type") in TABLE_TYPES:
             res = build_table(item, synthesis, findings, corpus)
+            res["inconsistency_notes"] = inconsistency_notes(res, inconsistencies or [], corpus)
             _write_csv(out_dir / f"{did}.csv", res["columns"], res["rows"])
         else:
             res = build_figure(item, synthesis, findings, corpus, out_dir)

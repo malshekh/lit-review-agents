@@ -73,7 +73,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     max_repairs = int(config.load("pipeline")["loops"].get("max_json_repair_attempts", 1))
 
     system = build_system_prompt(agent_id)
-    user = json.dumps(payload, ensure_ascii=False, indent=1)
+    user = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))   # compact: large payloads near context limits
     out_dir = Path(run_dir) / "outputs"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{step}.json"
@@ -84,10 +84,14 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         message = user if attempt == 0 else (
             user + "\n\nYour previous reply was not valid against the required output schema:\n"
             + last_error + "\nReturn only the corrected JSON object.")
-        resp = complete(m.provider, system=system, user=message, model=m.model,
-                        max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
-                        trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
-                               "attempt": attempt, "prompt_version": prompt_version(agent_id)})
+        try:
+            resp = complete(m.provider, system=system, user=message, model=m.model,
+                            max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
+                            trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
+                                   "attempt": attempt, "prompt_version": prompt_version(agent_id)})
+        except Exception as exc:  # noqa: BLE001 — any provider/API error fails the run cleanly, with a status
+            provenance.agent_call(agent_id, step, m.model, prompt_version(agent_id), "", "FAILED")
+            raise AgentError(f"{agent_id} ({step}): API error: {type(exc).__name__}: {str(exc)[:400]}") from exc
         for model, tin, tout in resp.usage_parts or [(resp.model, resp.input_tokens, resp.output_tokens)]:
             budget.record(agent_id, resp.provider, model, tin, tout, step=step)
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
