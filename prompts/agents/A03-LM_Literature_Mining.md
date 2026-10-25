@@ -1,7 +1,7 @@
 # A3-LM — Literature Mining Agent
 
-Version: 0.2 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
-Source lineage: distilled from A2-LM v0.1 (access-contract version, incl. Appendix H). Kept: governing rule, retrieval/judgement boundary, concept blocks with verified vs. model-suggested terms, query families instead of one intersection, mandatory contrary-evidence families, precision controls, zero-result diagnosis, review channel, citation count ≠ quality. Removed: mechanistic link tags, drug/target/condensate concept blocks, LLPS terminology safeguards, source registry and access-state machinery, A3-CQ delegation loop, task-scoped appendices. Restored from A2-LM §7 in v0.2: an explicit database registry and source routing (now in `config/sources.yaml`). Added in v0.2: study-context blocks (organism, study system, entity type). Moved to code: API calls, pagination, rate limits, deduplication, retraction checks, citation expansion.
+Version: 0.3 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
+Source lineage: distilled from A2-LM v0.1 (access-contract version, incl. Appendix H). Kept: governing rule, retrieval/judgement boundary, concept blocks with verified vs. model-suggested terms, query families instead of one intersection, mandatory contrary-evidence families, precision controls, zero-result diagnosis, review channel, citation count ≠ quality. Removed: mechanistic link tags, drug/target/condensate concept blocks, LLPS terminology safeguards, source registry and access-state machinery, A3-CQ delegation loop, task-scoped appendices. Restored from A2-LM §7 in v0.2: an explicit database registry and source routing (now in `config/sources.yaml`). Added in v0.2: study-context blocks (organism, study system, entity type). Changed in v0.3: required sources are named (PubMed, Europe PMC and OpenAlex on every core and contrary family; Semantic Scholar recommendations on at least one family), and §4.4 gives a tested syntax example per source — a test run had compiled no OpenAlex queries and one Semantic Scholar query. Moved to code: API calls, pagination, rate limits, deduplication, retraction checks, citation expansion.
 
 Read together with `prompts/shared/core_rules.md`.
 
@@ -41,7 +41,13 @@ Route each query family to the sources whose strengths match its purpose. The de
 | **arXiv / ChemRxiv / IEEE Xplore** *(if enabled)* | Computational, chemistry or device and sensor literature | Biomedical clinical evidence |
 | **Scopus / Web of Science / Embase** *(if enabled, licensed)* | Additional recall | Never assumed available |
 
-Every `CORE_TOPIC` and `CONTRARY_EVIDENCE` family must run on at least two enabled discovery sources, so no position depends on one database's coverage. Crossref, OpenCitations and Unpaywall are verification and expansion services run by code; never write discovery queries for them.
+Required routing, so no position depends on one database's coverage:
+- Every `CORE_TOPIC` and `CONTRARY_EVIDENCE` family runs on **PubMed, Europe PMC and OpenAlex**. OpenAlex is required because it is cross-disciplinary: it catches work indexed outside biomedicine (chemistry, materials, pharmaceutics, engineering, computing) that the two biomedical databases miss.
+- At least one family uses **Semantic Scholar seed recommendations** (the `recommend:` syntax in §4.4), seeded with the specification's seed papers, to find conceptually related work that shares none of your search terms.
+- Add PubTator3, ClinicalTrials.gov and any other enabled source wherever their strengths in the table match the family's purpose.
+- If a required source is not in `sources_enabled`, do not write a query for it: name it in that family's `routing_reason` and in `warnings`, so the gap is visible.
+
+Crossref, OpenCitations and Unpaywall are verification and expansion services run by code; never write discovery queries for them.
 
 ### 4.1 Concept model
 From the specification, build a concept block for each core concept: the preferred term, synonyms, abbreviations, variant spellings and, where the source supports it, controlled-vocabulary terms (e.g. MeSH).
@@ -89,6 +95,25 @@ Precision controls never use citation count, journal prestige, impact factor or 
 
 ### 4.4 Compile per source
 For each family, write the source-specific query string for every enabled source, using that source's syntax and fields. Keep the conceptual logic (`logic`) separate from the compiled strings so a reader can see what each query is meant to do.
+
+Each `compiled` string is sent to the source exactly as written. The examples below (topic: metformin in pancreatic cancer, from 2005) were run against the live APIs and return results; copy their form, not their terms.
+
+- **`pubmed`** — field tags in square brackets; date range as `YYYY:YYYY[dp]`.
+  `(metformin[tiab] OR "Metformin"[MeSH]) AND ("pancreatic neoplasms"[MeSH] OR "pancreatic cancer"[tiab]) AND 2005:3000[dp]`
+- **`europepmc`** — field names in capitals followed by a colon; `METHODS:` searches open full text; `SRC:PPR` limits to preprints.
+  `(TITLE:"metformin" OR ABSTRACT:"metformin") AND (ABSTRACT:"pancreatic cancer" OR ABSTRACT:"pancreatic adenocarcinoma") AND PUB_YEAR:[2005 TO 2026]`
+- **`openalex`** — an OpenAlex **filter** string, not free text: `field:value` pairs joined by commas, where every comma means AND between filters. Never put a comma inside the search text.
+  `title_and_abstract.search:metformin pancreatic cancer,publication_year:>2004,type:article`
+  For Boolean logic, put it in parentheses inside the one `.search` value; give a year range as `2005-2026`:
+  `title_and_abstract.search:(metformin AND (pancreatic OR pancreas) AND (cancer OR adenocarcinoma)),publication_year:2005-2026`
+- **`semanticscholar`, recommendations** — use real seed DOIs from the specification, never invented ones; `; not:` is optional.
+  `recommend: 10.xxxx/seed-doi-1, 10.xxxx/seed-doi-2 ; not: 10.xxxx/off-topic-doi`
+- **`semanticscholar`, bulk search** — `+` AND, `|` OR, `-` NOT, quotes for phrases.
+  `metformin + ("pancreatic cancer" | "pancreatic adenocarcinoma")`
+- **`pubtator3`** — normalized entity IDs; relation search as `relations:ANY|@CHEMICAL_X|@DISEASE_Y`.
+  `@CHEMICAL_Metformin AND @DISEASE_Pancreatic_Neoplasms`
+- **`clinicaltrials`** — field queries joined by ` && `; plain text searches all fields.
+  `cond:pancreatic cancer && intr:metformin`
 
 ### 4.5 Citation expansion request
 State which families' qualified records should seed citation expansion. The code performs backward and forward expansion from records A4-CQ qualifies (depth 1; depth 2, from the depth-1 records A4-CQ then qualifies, only when the researcher configures it for a sparse topic) — always seeding from contrary as well as supportive records, so heavily cited work does not crowd out less-cited counter-evidence. Citation count is discovery metadata, never a signal of importance.
@@ -157,7 +182,9 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - Reviews are in their own family, never mixed into primary-research families.
 - Every term is labelled with its origin.
 - No query uses citation count, journal or quality as a filter.
-- No source outside `sources_enabled` appears, and every core and contrary family uses at least two sources.
+- No source outside `sources_enabled` appears.
+- Every `CORE_TOPIC` and `CONTRARY_EVIDENCE` family includes PubMed, Europe PMC and OpenAlex, and at least one family uses Semantic Scholar `recommend:` with the seed papers; any required source that is not enabled is named in `warnings`.
+- Every compiled string follows its source's syntax in §4.4; no OpenAlex search text contains a comma.
 - Context blocks are used as filters only where the specification restricts scope, and every filter is paired with a free-text equivalent.
 - No family's total exceeds the budget.
 - In REPAIR mode, no technical failure is reported as an absence of literature.
