@@ -49,6 +49,8 @@ def complete(system: str, user, model: str, max_tokens: int, temperature: float,
     text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
     details = getattr(resp, "stop_details", None)
     u = resp.usage
+    written = getattr(u, "cache_creation_input_tokens", None) or 0
+    written_1h = getattr(getattr(u, "cache_creation", None), "ephemeral_1h_input_tokens", None) or 0
     return LLMResponse(
         text=text,
         provider="anthropic",
@@ -58,5 +60,6 @@ def complete(system: str, user, model: str, max_tokens: int, temperature: float,
         stop_reason=resp.stop_reason,
         refusal_category=getattr(details, "category", None) if resp.stop_reason == "refusal" else None,
         cached_input_tokens=getattr(u, "cache_read_input_tokens", None) or 0,
-        cache_write_tokens=getattr(u, "cache_creation_input_tokens", None) or 0,
+        cache_write_tokens=written - written_1h,   # the total includes 1-hour writes; split them out
+        cache_write_1h_tokens=written_1h,
     )

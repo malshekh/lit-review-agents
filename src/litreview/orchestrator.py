@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import checkpoints, config, model_record, notify
 from .agents import AgentError, RefusalError, run_agent
+from .agents.base import prompt_version
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
@@ -57,6 +58,7 @@ class Run:
         self.budget = BudgetTracker(self.dir)
         self.prov = ProvenanceLog(self.dir)
         self.cfg = config.load("pipeline")
+        self.last_model: str | None = None   # model that served the most recent agent call
 
     # --- state and data helpers ---------------------------------------
     def state(self) -> dict:
@@ -101,6 +103,7 @@ class Run:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
         model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
+        self.last_model = m.model
         if self.budget.should_warn():
             notify.send("budget_warning", f"Run {self.id}: 80% of budget used", self.budget.summary_text())
         return out
@@ -285,13 +288,16 @@ class Run:
         for i in range(0, len(todo), size):
             batch = [{**{k: r.get(k) for k in fields},
                       "content_level": "ABSTRACT" if r.get("abstract") else "METADATA_ONLY"} for r in todo[i:i + size]]
-            out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": f"B{i // size + 1:03d}",
-                                        "records": batch}, step=f"A04-CQ_B{i // size + 1:03d}")
+            # numbered across resumes, so a rerun batch never overwrites an earlier batch's outputs
+            bid = f"B{self.counter(self.state(), 'cq_batch'):03d}"
+            out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": bid, "records": batch},
+                             step=f"A04-CQ_{bid}")
             got = {q["record_id"]: q for q in out.get("qualifications", [])}
             for r in batch:  # nothing may disappear: any record without a disposition is flagged
-                quals[r["record_id"]] = got.get(r["record_id"]) or {
+                quals[r["record_id"]] = {**(got.get(r["record_id"]) or {
                     "record_id": r["record_id"], "disposition": "UNRESOLVED_HUMAN_REVIEW",
-                    "reason": "Agent returned no disposition for this record.", "themes": [], "flags": []}
+                    "reason": "Agent returned no disposition for this record.", "themes": [], "flags": []}),
+                    **self._screener()}
             self.save("qualifications.json", list(quals.values()))
         # Level 2: full text for records the agent could not decide from the abstract
         by_id = {r["record_id"]: r for r in records}
@@ -306,9 +312,12 @@ class Run:
                 {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}]},
                 step=f"A04-CQ_FT_{rid}")
             for q in out.get("qualifications", []):
-                quals[rid] = {**q, "_fulltext_checked": True}
+                quals[rid] = {**q, "_fulltext_checked": True, **self._screener()}
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
+
+    def _screener(self) -> dict:
+        return {"screened_by": self.last_model, "screening_prompt": f"A04-CQ v{prompt_version('A04-CQ')}"}
 
     def _bias_report(self, records: list[dict], quals: list[dict]) -> dict:
         plan = self.load("search_plan.json", {})
@@ -330,7 +339,14 @@ class Run:
                           and any(s.lower() in json.dumps(by_id.get(q["record_id"], {})).lower() for s in seeds if s)]
         rates = {k: {**v, "exclusion_rate": round(v["excluded"] / v["received"], 3) if v["received"] else None}
                  for k, v in tally.items()}
-        return {"exclusion_rate_by_query_purpose": rates, "excluded_seed_records": excluded_seeds,
+        by_model: dict[str, dict] = defaultdict(lambda: {"received": 0, "excluded": 0})
+        for q in quals:
+            m = by_model[q.get("screened_by") or "not recorded"]
+            m["received"] += 1
+            m["excluded"] += q["disposition"] == "EXCLUDED"
+        split = {k: {**v, "exclusion_rate": round(v["excluded"] / v["received"], 3)} for k, v in by_model.items()}
+        extra = {"exclusion_rate_by_screening_model": split} if len(split) > 1 else {}
+        return {"exclusion_rate_by_query_purpose": rates, **extra, "excluded_seed_records": excluded_seeds,
                 "qualified_per_theme": dict(themes),
                 "note": "A markedly higher exclusion rate for CONTRARY_EVIDENCE, or any excluded seed, "
                         "suggests a screening or criteria problem."}

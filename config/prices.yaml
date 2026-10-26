@@ -1,5 +1,5 @@
 # USD per 1 million tokens, standard (non-batch) rates.
-# Checked 2026-10-16 against:
+# Checked 2026-10-16 against (Anthropic rates, including all cache rates, re-checked 2026-10-25):
 #   Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
 #   OpenAI:    https://developers.openai.com/api/docs/pricing
 #   Kimi:      https://platform.kimi.ai (international, USD); CNY prices at platform.kimi.com/docs/pricing/chat
@@ -9,15 +9,22 @@
 #   input, output      standard rates (required)
 #   cached_input       reading tokens from the prompt cache. If missing, cached reads are billed at
 #                      `input` (never undercounted) and `litreview check` lists the gap.
-#   cache_write        writing tokens into the cache (Anthropic: 1.25x input for the 5-minute cache;
-#                      1-hour writes cost 2x). If missing, writes are billed at `input`.
-#   long_context_threshold / long_input / long_output   tiered rates above a prompt size.
+#   cache_write        writing tokens into the 5-minute cache. If missing, billed at `input`.
+#   cache_write_1h     writing tokens into the 1-hour cache. Recorded for reference: nothing requests
+#                      the 1-hour cache. If one appears without this rate, it is billed at `output`
+#                      (an upper bound), so it is never undercounted.
+#   long_context_threshold / long_input / long_output   tiered rates above a prompt size, with
+#                      long_cached_input / long_cache_write / long_cache_write_1h for the cache.
+# Only rates read from a provider's pricing page go here; a missing rate is left blank, never estimated.
 
 # --- Anthropic ---------------------------------------------------------
-claude-opus-5-5:   { input: 4.00, output: 20.00, cached_input: 0.20, cache_write: 5.00 }
-claude-sonnet-5-5: { input: 2.00, output: 10.00, cached_input: 0.20, cache_write: 2.50 }
-claude-haiku-5-5:  { input: 0.10, output: 0.50, cache_write: 0.125, long_context_threshold: 100000, long_input: 0.50, long_output: 2.50 }
-claude-opus-5:     { input: 5.00, output: 25.00, cache_write: 6.25 }
+# Cache reads: 0.05x input on Opus 5.5 and Sonnet 5.5, 0.1x on the others (pricing page, 2026-10-25).
+claude-opus-5-5:   { input: 4.00, output: 20.00, cached_input: 0.20, cache_write: 5.00, cache_write_1h: 8.00 }
+claude-sonnet-5-5: { input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50, cache_write_1h: 4.00 }
+claude-haiku-5-5:  { input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125, cache_write_1h: 0.20,
+                     long_context_threshold: 100000, long_input: 0.50, long_output: 2.50,
+                     long_cached_input: 0.05, long_cache_write: 0.625, long_cache_write_1h: 1.00 }
+claude-opus-5:     { input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 6.25, cache_write_1h: 10.00 }
 claude-opus-4-8:   { input: 5.00, output: 25.00 }
 claude-opus-4-7:   { input: 5.00, output: 25.00 }
 claude-sonnet-5:   { input: 2.00, output: 10.00 }

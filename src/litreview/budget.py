@@ -47,26 +47,48 @@ class BudgetTracker:
                 "run.allow_unpriced_models: true in config/pipeline.yaml."
             )
 
-    def cost(self, model: str, input_tokens: int, output_tokens: int,
-             cached_input_tokens: int = 0, cache_write_tokens: int = 0) -> float | None:
-        """input_tokens: uncached input only. Cached reads bill at `cached_input` and cache writes at
-        `cache_write`; a missing rate falls back to `input`, so a cost is never undercounted."""
+    def _rates(self, model: str, prompt_tokens: int) -> dict | None:
+        """Per-million rates for one call. A missing cache rate never undercounts: reads and 5-minute
+        writes fall back to `input`, 1-hour writes (2x input on Anthropic) to `output`."""
         p = self.price_of(model)
         if p is None:
             return None
         tier = self.prices.get(model) or {}
+        pre = ""
         threshold = tier.get("long_context_threshold")
-        prompt = input_tokens + cached_input_tokens + cache_write_tokens
-        if threshold and prompt > threshold and tier.get("long_input") is not None:
-            p = (float(tier["long_input"]), float(tier["long_output"]))
-        read = float(tier.get("cached_input", p[0]))
-        write = float(tier.get("cache_write", p[0]))
-        return (input_tokens * p[0] + output_tokens * p[1]
-                + cached_input_tokens * read + cache_write_tokens * write) / 1_000_000
+        if threshold and prompt_tokens > threshold and tier.get("long_input") is not None:
+            pre, p = "long_", (float(tier["long_input"]), float(tier["long_output"]))
+
+        def get(key: str, default: float) -> float:
+            return float(tier[pre + key]) if tier.get(pre + key) is not None else default
+        return {"input": p[0], "output": p[1], "cached_input": get("cached_input", p[0]),
+                "cache_write": get("cache_write", p[0]), "cache_write_1h": get("cache_write_1h", p[1])}
+
+    def cost(self, model: str, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0,
+             cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0) -> float | None:
+        """input_tokens: uncached input only. cache_write_tokens: 5-minute writes; cache_write_1h_tokens:
+        1-hour writes (counted separately, not included in cache_write_tokens)."""
+        r = self._rates(model, input_tokens + cached_input_tokens + cache_write_tokens + cache_write_1h_tokens)
+        if r is None:
+            return None
+        return (input_tokens * r["input"] + output_tokens * r["output"] + cached_input_tokens * r["cached_input"]
+                + cache_write_tokens * r["cache_write"] + cache_write_1h_tokens * r["cache_write_1h"]) / 1_000_000
 
     def missing_cache_rates(self, model: str) -> list[str]:
         tier = self.prices.get(model) or {}
         return [k for k in ("cached_input", "cache_write") if tier.get(k) is None]
+
+    def _seconds_since_previous(self, agent_id: str, model: str) -> float | None:
+        """Gap since the previous call by the same agent and model. A prompt cache survives only if the
+        gap is under its lifetime (5 minutes), and only a call to the same provider refreshes it."""
+        for e in reversed(self.entries()):
+            if e["agent"] == agent_id and e["model"] == model:
+                try:
+                    prev = time.mktime(time.strptime(e["time"], "%Y-%m-%dT%H:%M:%S"))
+                except (KeyError, ValueError):
+                    return None
+                return round(time.time() - prev, 1)
+        return None
 
     # --- logging and enforcement --------------------------------------
     def entries(self) -> list[dict]:
@@ -85,7 +107,8 @@ class BudgetTracker:
 
     def record(self, agent_id: str, provider: str, model: str, input_tokens: int,
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
-               cache_write_tokens: int = 0) -> dict:
+               cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0) -> dict:
+        since = self._seconds_since_previous(agent_id, model)
         entry = {
             "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "agent": agent_id,
@@ -95,9 +118,21 @@ class BudgetTracker:
             "input_tokens": input_tokens,
             "cached_input_tokens": cached_input_tokens,
             "cache_write_tokens": cache_write_tokens,
+            "cache_write_1h_tokens": cache_write_1h_tokens,
             "output_tokens": output_tokens,
-            "cost_usd": self.cost(model, input_tokens, output_tokens, cached_input_tokens, cache_write_tokens),
+            "cost_usd": self.cost(model, input_tokens, output_tokens, cached_input_tokens,
+                                  cache_write_tokens, cache_write_1h_tokens),
         }
+        if cached_input_tokens or cache_write_tokens or cache_write_1h_tokens:
+            prompt = input_tokens + cached_input_tokens + cache_write_tokens + cache_write_1h_tokens
+            input_cost = self.cost(model, input_tokens, 0, cached_input_tokens, cache_write_tokens,
+                                   cache_write_1h_tokens)
+            entry["cache"] = {
+                "hit": cached_input_tokens > 0,
+                "seconds_since_previous_call": since,   # same agent and model
+                "effective_input_rate_per_m": round(input_cost / prompt * 1e6, 4) if input_cost is not None else None,
+                "list_input_rate_per_m": (self.price_of(model) or (None,))[0],
+            }
         with open(self.log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")
         return entry
@@ -112,15 +147,18 @@ class BudgetTracker:
     def summary(self) -> dict:
         by_agent: dict[str, dict] = defaultdict(lambda: {"calls": 0, "input_tokens": 0, "cached_input_tokens": 0,
                                                          "cache_write_tokens": 0, "output_tokens": 0,
-                                                         "cost_usd": 0.0})
+                                                         "cost_usd": 0.0, "cache_calls": 0, "cache_hits": 0})
         unpriced = 0
         for e in self.entries():
             a = by_agent[e["agent"]]
             a["calls"] += 1
             a["input_tokens"] += e["input_tokens"]
             a["cached_input_tokens"] += e.get("cached_input_tokens", 0)
-            a["cache_write_tokens"] += e.get("cache_write_tokens", 0)
+            a["cache_write_tokens"] += e.get("cache_write_tokens", 0) + e.get("cache_write_1h_tokens", 0)
             a["output_tokens"] += e["output_tokens"]
+            if e.get("cache"):
+                a["cache_calls"] += 1
+                a["cache_hits"] += bool(e["cache"]["hit"])
             if e["cost_usd"] is None:
                 unpriced += 1
             else:
@@ -132,8 +170,8 @@ class BudgetTracker:
         s = self.summary()
         lines = [f"Spent ${s['spent_usd']:.2f} of ${s['cap_usd']:.2f} cap"]
         for agent, a in sorted(s["by_agent"].items()):
-            cache = (f"  ({a['cached_input_tokens']:,d} cached, {a['cache_write_tokens']:,d} written)"
-                     if a["cached_input_tokens"] or a["cache_write_tokens"] else "")
+            cache = (f"  (cache: {a['cache_hits']}/{a['cache_calls']} calls hit, {a['cached_input_tokens']:,d} "
+                     f"tokens read, {a['cache_write_tokens']:,d} written)" if a["cache_calls"] else "")
             lines.append(f"  {agent:8s} {a['calls']:4d} calls  {a['input_tokens']:>9,d} in  "
                          f"{a['output_tokens']:>8,d} out  ${a['cost_usd']:.2f}{cache}")
         if s["unpriced_calls"]:

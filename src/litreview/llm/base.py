@@ -16,4 +16,5 @@ class LLMResponse:
     stop_reason: str | None = None         # "refusal" when a provider declined for policy reasons
     refusal_category: str | None = None
     cached_input_tokens: int = 0           # read from the prompt cache
-    cache_write_tokens: int = 0            # written to the prompt cache
+    cache_write_tokens: int = 0            # written to the prompt cache (5-minute, or provider default)
+    cache_write_1h_tokens: int = 0         # written to Anthropic's 1-hour cache (priced separately)

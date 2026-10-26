@@ -72,11 +72,34 @@ def test_cache_pricing(tmp_path):
     b = BudgetTracker(tmp_path)
     # gpt-6-luna: input 0.10, cached 0.01, write 0.125 per M
     assert b.cost("gpt-6-luna", 1_000_000, 0, 1_000_000, 1_000_000) == pytest.approx(0.10 + 0.01 + 0.125)
-    # claude-opus-5 has no cached_input rate: reads billed at input, never undercounted
-    assert b.cost("claude-opus-5", 0, 0, 1_000_000, 0) == pytest.approx(5.00)
-    assert b.missing_cache_rates("claude-opus-5") == ["cached_input"]
-    e = b.record("A07-SYN", "anthropic", "claude-opus-5", 10, 10, "s", cached_input_tokens=5, cache_write_tokens=2)
-    assert e["cached_input_tokens"] == 5 and "5 cached" in b.summary_text()
+    # verified Anthropic rates (pricing page, 2026-10-25): Sonnet 5.5 reads at 0.05x input = $0.10/M
+    assert b.cost("claude-sonnet-5-5", 0, 0, 1_000_000, 0) == pytest.approx(0.10)
+    # the live test call: 25 uncached, 10,629 read, 4 out on Sonnet 5.5
+    assert b.cost("claude-sonnet-5-5", 25, 4, 10629) == pytest.approx(0.0010629 + 0.00005 + 0.00004)  # $0.00115
+    # gpt-6.1-sol has no cache rates: reads billed at input, never undercounted
+    assert b.cost("gpt-6.1-sol", 0, 0, 1_000_000, 0) == pytest.approx(2.00)
+    assert b.missing_cache_rates("gpt-6.1-sol") == ["cached_input", "cache_write"]
+
+
+def test_one_hour_writes_priced_separately_and_never_undercounted(tmp_path):
+    b = BudgetTracker(tmp_path)
+    assert b.cost("claude-sonnet-5-5", 0, 0, 0, 0, 1_000_000) == pytest.approx(4.00)     # listed 1h rate
+    assert b.cost("gpt-6.1-sol", 0, 0, 0, 0, 1_000_000) == pytest.approx(10.00)          # no rate: output, upper bound
+    # Haiku above 100k tokens switches every rate, cache rates included
+    assert b.cost("claude-haiku-5-5", 0, 0, 200_000, 0) == pytest.approx(200_000 * 0.05 / 1e6)
+
+
+def test_cache_telemetry(tmp_path):
+    b = BudgetTracker(tmp_path)
+    w = b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 25, 4, "s1", cache_write_tokens=10629)
+    r = b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 25, 4, "s2", cached_input_tokens=10629)
+    assert not w["cache"]["hit"] and w["cache"]["seconds_since_previous_call"] is None
+    assert r["cache"]["hit"] and 0 <= r["cache"]["seconds_since_previous_call"] < 60
+    assert r["cache"]["effective_input_rate_per_m"] == pytest.approx((25 * 2 + 10629 * 0.10) / 10654, rel=1e-3)
+    assert r["cache"]["list_input_rate_per_m"] == 2.00
+    plain = b.record("A06-SV", "openai", "gpt-6.1-sol", 10, 10, "s3")
+    assert "cache" not in plain
+    assert "cache: 1/2 calls hit, 10,629 tokens read, 10,629 written" in b.summary_text()
 
 
 @pytest.fixture

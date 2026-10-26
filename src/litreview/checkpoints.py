@@ -53,7 +53,7 @@ def write_cp1(run_dir: Path, spec: dict) -> None:
 
 # ---------------------------------------------------------------- CP2: papers
 CP2_COLUMNS = ["select", "tier_override", "record_id", "disposition", "proposed_tier", "tier_signal",
-               "contrary", "themes", "year", "title", "venue", "flags", "reason", "doi", "pmid"]
+               "contrary", "themes", "year", "title", "venue", "flags", "reason", "doi", "pmid", "screened_by"]
 
 
 def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report: dict) -> None:
@@ -73,9 +73,13 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
                         "themes": "; ".join(q.get("themes", [])), "year": r.get("year"),
                         "title": r.get("title"), "venue": r.get("venue"),
                         "flags": "; ".join(q.get("flags", [])), "reason": q.get("reason", ""),
-                        "doi": r.get("doi"), "pmid": r.get("pmid")})
+                        "doi": r.get("doi"), "pmid": r.get("pmid"),
+                        "screened_by": f"{q.get('screened_by') or 'not recorded'}"
+                                       + (f" ({q['screening_prompt']})" if q.get("screening_prompt") else "")})
     counts: dict[str, int] = {}
+    screeners: dict[str, int] = {}
     for q in quals:
+        screeners[q.get("screened_by") or "not recorded"] = screeners.get(q.get("screened_by") or "not recorded", 0) + 1
         key = q["disposition"] if q["disposition"] != "QUALIFIED" else f"QUALIFIED/{q.get('proposed_tier')}"
         counts[key] = counts.get(key, 0) + 1
     lines = ["# Checkpoint 2 — Select papers", "",
@@ -83,6 +87,9 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
              "Tiers are sorting aids only. Put `Y` in the `select` column for every paper the review should use. "
              "You may select excluded or unresolved records too, and set `tier_override`.", "",
              "## Counts", *[f"- {k}: {v}" for k, v in sorted(counts.items())], "",
+             "## Screened by", *[f"- {k}: {v} records" for k, v in sorted(screeners.items())],
+             *(["", "Screening was split between models: compare `exclusion_rate_by_screening_model` "
+                "in the bias checks below before approving."] if len(screeners) > 1 else []), "",
              "## Bias checks", "```json", json.dumps(bias_report, indent=2), "```", "",
              "Then run `litreview approve <run_id> CP2`."]
     (d / "CP2_review.md").write_text("\n".join(lines), encoding="utf-8")
