@@ -17,7 +17,7 @@
 - [x] LangSmith tracing (optional)
 - [ ] Fill in `.env`, run `litreview check --ping --apis` on your machine
 - [ ] First end-to-end run on a small topic (~30 papers) to calibrate costs and token limits
-- [ ] Before Dec 11, 2026: move A04-CQ from gpt-5-mini to gpt-6-luna (snapshot shutdown)
+- [x] A04-CQ moved off gpt-5-mini (now claude-haiku-5-5)
 - [x] Optional: DrugBank lookups (licensed API, off by default; response parsing unverified until a key is available), depth-2 citation expansion
 - [x] Render final manuscript to `.docx` (journal prefers Word) and embed figures/tables
 - [x] Display-item builder: evidence tables and the evidence map from validated findings; briefs for figures drawn by hand

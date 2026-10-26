@@ -25,6 +25,8 @@ class AgentModel:
     max_tokens: int
     temperature: float
     effort: str | None = None   # Claude reasoning effort: low | medium | high | xhigh | max
+    cache_system: bool = False  # Claude prompt caching: cache the system prompt (reused across calls)
+    cache_payload: tuple[str, ...] = ()   # payload keys sent first and cached (e.g. the paper), for repairs
 
 
 def agent_model(agent_id: str) -> AgentModel:
@@ -44,4 +46,21 @@ def agent_model(agent_id: str) -> AgentModel:
         max_tokens=int(entry.get("max_tokens", 8000)),
         temperature=float(entry.get("temperature", 0.0)),
         effort=entry.get("effort"),
+        cache_system=bool(entry.get("cache_system", False)),
+        cache_payload=tuple(entry.get("cache_payload") or ()),
     )
+
+
+def agent_candidates(agent_id: str) -> list[AgentModel]:
+    """The agent's configured model, then its alternates (pipeline.yaml -> routing.alternates), in order.
+    An alternate gives provider and model; other settings come from the agent unless it overrides them."""
+    cfg = load("pipeline")
+    primary = agent_model(agent_id)
+    out = [primary]
+    for alt in ((cfg.get("routing") or {}).get("alternates") or {}).get(agent_id) or []:
+        out.append(AgentModel(agent_id=agent_id, provider=alt["provider"],
+                              model=cfg["models"].get(alt["model"], alt["model"]),
+                              max_tokens=int(alt.get("max_tokens", primary.max_tokens)),
+                              temperature=primary.temperature, effort=alt.get("effort", primary.effort),
+                              cache_system=primary.cache_system, cache_payload=primary.cache_payload))
+    return out

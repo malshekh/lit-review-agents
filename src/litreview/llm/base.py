@@ -1,13 +1,19 @@
 from dataclasses import dataclass
 
 
+def as_parts(user) -> list[dict]:
+    """A user message as [{"text", "cache"}] blocks (agents pass blocks; a plain string is one block)."""
+    return [{"text": user, "cache": False}] if isinstance(user, str) else list(user)
+
+
 @dataclass
 class LLMResponse:
     text: str
     provider: str
-    model: str                      # the model that produced `text` (a fallback model if one served it)
-    input_tokens: int
+    model: str
+    input_tokens: int                      # uncached input only (cache reads and writes are counted below)
     output_tokens: int
-    stop_reason: str | None = None
-    refusal_category: str | None = None   # set when stop_reason == "refusal"
-    usage_parts: list[tuple[str, int, int]] | None = None   # (model, input, output) per billed model
+    stop_reason: str | None = None         # "refusal" when a provider declined for policy reasons
+    refusal_category: str | None = None
+    cached_input_tokens: int = 0           # read from the prompt cache
+    cache_write_tokens: int = 0            # written to the prompt cache

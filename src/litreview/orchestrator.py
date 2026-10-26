@@ -17,8 +17,8 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import checkpoints, config, notify
-from .agents import AgentError, run_agent
+from . import checkpoints, config, model_record, notify
+from .agents import AgentError, RefusalError, run_agent
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
@@ -38,13 +38,14 @@ class Pause(Exception):
 
 
 # ------------------------------------------------------------------ run setup
-def new_run(topic: str, notes: str = "", seeds: list[str] | None = None) -> str:
+def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified") -> str:
     run_id = time.strftime("%Y%m%d-%H%M%S")
     d = RUNS_DIR / run_id / "input"
     d.mkdir(parents=True)
     (d / "topic.md").write_text(topic, encoding="utf-8")
     (d / "notes.md").write_text(notes, encoding="utf-8")
     (d / "seeds.txt").write_text("\n".join(seeds or []), encoding="utf-8")
+    (d / "topic_family.txt").write_text(family, encoding="utf-8")
     Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}})
     return run_id
 
@@ -77,8 +78,29 @@ class Run:
         p = self.data(name)
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
 
+    def family(self) -> str:
+        p = self.dir / "input" / "topic_family.txt"
+        return (p.read_text(encoding="utf-8").strip() if p.exists() else "") or "unspecified"
+
+    def route(self, agent_id: str) -> config.AgentModel:
+        """First of the agent's candidate models that has not refused in this run's topic family."""
+        refused = model_record.refused(self.family())
+        candidates = config.agent_candidates(agent_id)
+        for m in candidates:
+            if m.model not in refused:
+                return m
+        raise AgentError(f"{agent_id}: every candidate model has refused topic family '{self.family()}' "
+                         f"({', '.join(f'{m.model}: {refused[m.model]}' for m in candidates)}). Add an "
+                         "alternate under pipeline.yaml -> routing.alternates.")
+
     def agent(self, agent_id: str, payload: dict, step: str) -> dict:
-        out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov)
+        m = self.route(agent_id)
+        try:
+            out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m)
+        except RefusalError as e:
+            model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
+            raise
+        model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
         if self.budget.should_warn():
             notify.send("budget_warning", f"Run {self.id}: 80% of budget used", self.budget.summary_text())
         return out

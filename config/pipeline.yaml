@@ -2,10 +2,11 @@
 # Change models here, never in code.
 #
 # Design rule: an auditor never runs on the same vendor as the agent whose work it checks.
-#   Claude (Anthropic) produces:  scope, search, extraction, synthesis, outline, writing, editing
-#   OpenAI audits:                A06-SV (checks A05 extraction), A10-RV (checks A09/A12 prose)
+#   Claude (Anthropic) produces:  screening (Haiku), extraction and editing (Sonnet), synthesis and writing (Opus 5)
+#   OpenAI GPT-6.1 plans and audits: scope, search, outline; A06-SV checks A05 extraction, A10-RV checks A09/A12 prose
 #   Kimi (Moonshot) critiques:    A11-RC — a third vendor for an independent reader's view
-#   OpenAI GPT-5 mini screens:    A04-CQ — high-volume, low-cost; the researcher reviews every record at CP2
+# Qualified on a drug-repurposing oncology topic (run 20261025-100039): Opus 5.5 refused twice ("bio"
+# classifier), so A07/A09 use Opus 5. Refusals are recorded per model and topic family (see routing).
 
 run:
   spend_cap_usd: 35.00          # hard stop for one run; the orchestrator halts before exceeding it
@@ -38,8 +39,6 @@ providers:
   anthropic:
     key_env: ANTHROPIC_API_KEY
     send_temperature: false     # Opus 5.5 / Sonnet 5.5 removed sampling params; anthropic SDK 1.x dropped the argument
-    fallbacks: default          # server-side fallback when a safety classifier declines (biomedical
-                                #   topics can trigger the "bio" category by mistake); null = off
   openai:
     key_env: OPENAI_API_KEY
     base_url: null              # default OpenAI endpoint
@@ -56,28 +55,45 @@ models:
   claude_strong:  claude-opus-5-5     # $4 / $20 per M tokens
   claude_default: claude-sonnet-5-5   # $2 / $10
   claude_fast:    claude-haiku-5-5    # $0.10 / $0.50 (prompts <=100k tokens)
+  claude_opus5:   claude-opus-5       # $5 / $25 — used where Opus 5.5 refuses the topic
   # OpenAI:  https://developers.openai.com/api/docs/pricing
   openai_strong:  gpt-6.1-sol         # $2 / $10   — auditors
-  openai_fast:    gpt-5-mini          # $0.25 / $2 — screening. Snapshot shuts down Dec 11, 2026;
-                                      #   switch to gpt-6-luna ($0.10 / $0.50) before then.
+  openai_fast:    gpt-5-mini          # $0.25 / $2. Snapshot shuts down Dec 11, 2026
+  openai_luna:    gpt-6-luna          # $0.10 / $0.50 — A04 alternate if Haiku refuses a topic
   # Kimi:    https://platform.kimi.ai (international, USD)
   kimi_strong:    kimi-k3             # $3 / $15
+  kimi_pro:       kimi-k3.1-pro       # $2 / $10
   kimi_default:   kimi-k2.6           # $0.95 / $4
 
 agents:
   # Claude agents: thinking is always on and counts toward max_tokens (requests are streamed, so
   # large caps are safe; you pay only for tokens used). `effort` sets how much thinking is spent.
-  A02-SP:  { provider: anthropic, model: claude_strong,  max_tokens: 32000, effort: high,   temperature: 0.4 }
-  A03-LM:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
-  A04-CQ:  { provider: openai,    model: openai_fast,    max_tokens: 12000, temperature: 0.0 }
-  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 64000, effort: medium, temperature: 0.0 }
-  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 32000, temperature: 0.0 }  # audits A05 (Claude)
-  A07-SYN: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.3 }
-  A08-OL:  { provider: anthropic, model: claude_default, max_tokens: 32000, effort: medium, temperature: 0.2 }
-  A09-WRI: { provider: anthropic, model: claude_strong,  max_tokens: 64000, effort: high,   temperature: 0.5 }
-  A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 16000, temperature: 0.0 }  # audits A09/A12 (Claude)
-  A11-RC:  { provider: kimi,      model: kimi_strong,    max_tokens: 10000, temperature: 0.3 }  # third vendor
-  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 64000, effort: medium, temperature: 0.2 }
+  # OpenAI and Kimi agents ignore `effort`.
+  A02-SP:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.4 }
+  A03-LM:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.2 }
+  A04-CQ:  { provider: anthropic, model: claude_fast,    max_tokens: 32000,  temperature: 0.0 }
+  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 64000,  effort: medium, temperature: 0.0,
+             cache_system: true }   # system prompt (~10.6k tokens) is identical for every paper
+             # cache_payload: [review_spec, record] caches the paper for a re-extraction. Off: extraction
+             # and re-extraction are separate stages, often an hour apart, beyond the 5-minute cache,
+             # so every paper would pay the 25% write premium without a read.
+  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.0 }  # audits A05 (Claude)
+  A07-SYN: { provider: anthropic, model: claude_opus5,   max_tokens: 128000, effort: high,   temperature: 0.3 }
+  A08-OL:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.2 }
+  A09-WRI: { provider: anthropic, model: claude_opus5,   max_tokens: 64000,  effort: high,   temperature: 0.5 }
+  A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.0 }  # audits A09/A12 (Claude)
+  A11-RC:  { provider: kimi,      model: kimi_pro,       max_tokens: 32000,  temperature: 0.3 }  # third vendor
+  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 64000,  effort: medium, temperature: 0.2 }
+
+# Refusal routing. Every agent call is recorded in runs/model_record.jsonl (shared by all runs) as
+# COMPLETED or REFUSED, with model, agent and the run's topic family (`litreview new --family`).
+# A model that has refused in a topic family is not used again for that family: the agent moves to
+# its next alternate, or the stage fails before any call if none is left. A refusal is never retried.
+routing:
+  alternates:
+    # Haiku shares the 5.5 safety-classifier family that refused this topic at Opus 5.5; screening
+    # processes hundreds of records, so A04 has a non-Anthropic alternate at the same price.
+    A04-CQ: [{ provider: openai, model: openai_luna }]
 
 checkpoints:
   CP1: { after: A02-SP,  purpose: "Approve scope, perspective and selection criteria" }

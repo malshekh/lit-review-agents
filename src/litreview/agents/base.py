@@ -26,6 +26,14 @@ class AgentError(RuntimeError):
     pass
 
 
+class RefusalError(AgentError):
+    """The model declined for policy reasons. Never retried; the orchestrator records it and reroutes."""
+
+    def __init__(self, message: str, model: str, category: str | None):
+        super().__init__(message)
+        self.model, self.category = model, category
+
+
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
@@ -63,17 +71,33 @@ def validate(agent_id: str, output: dict) -> None:
     jsonschema.validate(output, schema)
 
 
+def _json(obj) -> str:
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))   # compact: large payloads near context limits
+
+
+def user_parts(payload: dict, cache_keys: tuple[str, ...] = ()) -> list[dict]:
+    """The user message as text blocks. With cache_keys, those payload keys go first in their own
+    cacheable block (e.g. the paper, reread by a repair call) and the rest follow uncached."""
+    head = {k: payload[k] for k in cache_keys if k in payload}
+    if not head:
+        return [{"text": _json(payload), "cache": False}]
+    rest = {k: v for k, v in payload.items() if k not in head}
+    return [{"text": "Task inputs, part 1 of 2 (JSON):\n" + _json(head), "cache": True},
+            {"text": "Task inputs, part 2 of 2 (JSON):\n" + _json(rest), "cache": False}]
+
+
 def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
-              budget: BudgetTracker, provenance: ProvenanceLog) -> dict:
-    """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/."""
+              budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None) -> dict:
+    """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
+    `model` overrides the agent's configured model (refusal routing)."""
     if agent_id not in AGENTS:
         raise AgentError(f"Unknown agent {agent_id}")
-    m = config.agent_model(agent_id)
+    m = model or config.agent_model(agent_id)
     budget.check_priced(m.model)
     max_repairs = int(config.load("pipeline")["loops"].get("max_json_repair_attempts", 1))
 
     system = build_system_prompt(agent_id)
-    user = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))   # compact: large payloads near context limits
+    user = user_parts(payload, m.cache_payload)
     out_dir = Path(run_dir) / "outputs"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"{step}.json"
@@ -81,27 +105,30 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     last_error = ""
     for attempt in range(max_repairs + 1):
         budget.ensure_headroom()
-        message = user if attempt == 0 else (
-            user + "\n\nYour previous reply was not valid against the required output schema:\n"
-            + last_error + "\nReturn only the corrected JSON object.")
+        # a repair appends a new block, so the cached blocks before it stay byte-identical
+        message = user if attempt == 0 else user + [{
+            "text": "Your previous reply was not valid against the required output schema:\n"
+                    + last_error + "\nReturn only the corrected JSON object.", "cache": False}]
         try:
             resp = complete(m.provider, system=system, user=message, model=m.model,
                             max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
+                            cache_system=m.cache_system,
                             trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
                                    "attempt": attempt, "prompt_version": prompt_version(agent_id)})
         except Exception as exc:  # noqa: BLE001 — any provider/API error fails the run cleanly, with a status
             provenance.agent_call(agent_id, step, m.model, prompt_version(agent_id), "", "FAILED")
             raise AgentError(f"{agent_id} ({step}): API error: {type(exc).__name__}: {str(exc)[:400]}") from exc
-        for model, tin, tout in resp.usage_parts or [(resp.model, resp.input_tokens, resp.output_tokens)]:
-            budget.record(agent_id, resp.provider, model, tin, tout, step=step)
+        budget.record(agent_id, resp.provider, resp.model, resp.input_tokens, resp.output_tokens, step=step,
+                      cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens)
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
         if resp.stop_reason == "refusal":
-            # a policy decline, not a formatting error: re-asking for JSON would only spend money
+            # a policy decline, not a formatting error: never retried (same model, same request, same answer)
             provenance.agent_call(agent_id, step, resp.model, prompt_version(agent_id), "", "REFUSED")
-            raise AgentError(
-                f"{agent_id} ({step}): {resp.model} declined the request (safety classifier category: "
-                f"{resp.refusal_category or 'unspecified'}), after any configured fallback. Rephrasing the "
-                "topic or notes, or moving this agent to another model in config/pipeline.yaml, may help.")
+            raise RefusalError(
+                f"{agent_id} ({step}): {resp.model} declined the request (category: "
+                f"{resp.refusal_category or 'unspecified'}). Recorded for this topic family; the next run "
+                "routes this agent to an alternate in pipeline.yaml -> routing, if one is configured.",
+                resp.model, resp.refusal_category)
         if resp.stop_reason in ("max_tokens", "length"):
             last_error = "Output was truncated at max_tokens. Increase max_tokens in config/pipeline.yaml."
             break

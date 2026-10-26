@@ -47,15 +47,26 @@ class BudgetTracker:
                 "run.allow_unpriced_models: true in config/pipeline.yaml."
             )
 
-    def cost(self, model: str, input_tokens: int, output_tokens: int) -> float | None:
+    def cost(self, model: str, input_tokens: int, output_tokens: int,
+             cached_input_tokens: int = 0, cache_write_tokens: int = 0) -> float | None:
+        """input_tokens: uncached input only. Cached reads bill at `cached_input` and cache writes at
+        `cache_write`; a missing rate falls back to `input`, so a cost is never undercounted."""
         p = self.price_of(model)
         if p is None:
             return None
         tier = self.prices.get(model) or {}
         threshold = tier.get("long_context_threshold")
-        if threshold and input_tokens > threshold and tier.get("long_input") is not None:
+        prompt = input_tokens + cached_input_tokens + cache_write_tokens
+        if threshold and prompt > threshold and tier.get("long_input") is not None:
             p = (float(tier["long_input"]), float(tier["long_output"]))
-        return (input_tokens * p[0] + output_tokens * p[1]) / 1_000_000
+        read = float(tier.get("cached_input", p[0]))
+        write = float(tier.get("cache_write", p[0]))
+        return (input_tokens * p[0] + output_tokens * p[1]
+                + cached_input_tokens * read + cache_write_tokens * write) / 1_000_000
+
+    def missing_cache_rates(self, model: str) -> list[str]:
+        tier = self.prices.get(model) or {}
+        return [k for k in ("cached_input", "cache_write") if tier.get(k) is None]
 
     # --- logging and enforcement --------------------------------------
     def entries(self) -> list[dict]:
@@ -73,7 +84,8 @@ class BudgetTracker:
             raise BudgetExceeded(f"Spend cap ${self.cap:.2f} reached (${self.spent():.2f} spent).")
 
     def record(self, agent_id: str, provider: str, model: str, input_tokens: int,
-               output_tokens: int, step: str = "") -> dict:
+               output_tokens: int, step: str = "", cached_input_tokens: int = 0,
+               cache_write_tokens: int = 0) -> dict:
         entry = {
             "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "agent": agent_id,
@@ -81,8 +93,10 @@ class BudgetTracker:
             "provider": provider,
             "model": model,
             "input_tokens": input_tokens,
+            "cached_input_tokens": cached_input_tokens,
+            "cache_write_tokens": cache_write_tokens,
             "output_tokens": output_tokens,
-            "cost_usd": self.cost(model, input_tokens, output_tokens),
+            "cost_usd": self.cost(model, input_tokens, output_tokens, cached_input_tokens, cache_write_tokens),
         }
         with open(self.log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")
@@ -96,13 +110,16 @@ class BudgetTracker:
 
     # --- reporting -----------------------------------------------------
     def summary(self) -> dict:
-        by_agent: dict[str, dict] = defaultdict(lambda: {"calls": 0, "input_tokens": 0,
-                                                         "output_tokens": 0, "cost_usd": 0.0})
+        by_agent: dict[str, dict] = defaultdict(lambda: {"calls": 0, "input_tokens": 0, "cached_input_tokens": 0,
+                                                         "cache_write_tokens": 0, "output_tokens": 0,
+                                                         "cost_usd": 0.0})
         unpriced = 0
         for e in self.entries():
             a = by_agent[e["agent"]]
             a["calls"] += 1
             a["input_tokens"] += e["input_tokens"]
+            a["cached_input_tokens"] += e.get("cached_input_tokens", 0)
+            a["cache_write_tokens"] += e.get("cache_write_tokens", 0)
             a["output_tokens"] += e["output_tokens"]
             if e["cost_usd"] is None:
                 unpriced += 1
@@ -115,8 +132,10 @@ class BudgetTracker:
         s = self.summary()
         lines = [f"Spent ${s['spent_usd']:.2f} of ${s['cap_usd']:.2f} cap"]
         for agent, a in sorted(s["by_agent"].items()):
+            cache = (f"  ({a['cached_input_tokens']:,d} cached, {a['cache_write_tokens']:,d} written)"
+                     if a["cached_input_tokens"] or a["cache_write_tokens"] else "")
             lines.append(f"  {agent:8s} {a['calls']:4d} calls  {a['input_tokens']:>9,d} in  "
-                         f"{a['output_tokens']:>8,d} out  ${a['cost_usd']:.2f}")
+                         f"{a['output_tokens']:>8,d} out  ${a['cost_usd']:.2f}{cache}")
         if s["unpriced_calls"]:
             lines.append(f"  WARNING: {s['unpriced_calls']} calls had no price and are not counted.")
         return "\n".join(lines)

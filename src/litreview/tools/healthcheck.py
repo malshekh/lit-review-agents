@@ -26,6 +26,22 @@ def config_lines() -> tuple[list[str], bool, set[str]]:
         price = f"${p['input']:.2f} / ${p['output']:.2f} per M" if priced else "no price in config/prices.yaml"
         lines.append(f"  {OK if priced or allow else BAD} {aid:8s} {m.provider:9s} {m.model:18s} {price}")
         ok &= priced or allow
+    gaps = {}
+    for aid in AGENTS:
+        try:
+            model = config.agent_model(aid).model
+        except ValueError:
+            continue
+        missing = [k for k in ("cached_input", "cache_write") if (prices.get(model) or {}).get(k) is None]
+        if missing:
+            gaps[model] = missing
+    for model, missing in sorted(gaps.items()):
+        lines.append(f"  {INFO} {model:18s} no {' or '.join(missing)} rate: billed at the input price until set")
+    from .. import model_record
+    for family, models in sorted(model_record.summary().items()):
+        refused = [f"{m} ({c['REFUSED']})" for m, c in sorted(models.items()) if c["REFUSED"]]
+        lines.append(f"  {INFO} topic family '{family}': {sum(c['COMPLETED'] for c in models.values())} completed calls; "
+                     f"refused: {', '.join(refused) or 'none'}")
     return lines, ok, providers
 
 
@@ -72,20 +88,28 @@ def ping_llms(providers: set[str]) -> tuple[list[str], bool]:
     from ..llm import complete
     lines, ok = [], True
     seen = set()
+    targets = []   # (model, label): one per provider in use, plus every routing alternate
     for aid in AGENTS:
         m = config.agent_model(aid)
-        if m.provider in seen:
-            continue
-        seen.add(m.provider)
+        if m.provider not in seen:
+            seen.add(m.provider)
+            targets.append((m, ""))
+    pinged = {m.model for m, _ in targets}
+    for aid in AGENTS:
+        for alt in config.agent_candidates(aid)[1:]:
+            if alt.model not in pinged:
+                pinged.add(alt.model)
+                targets.append((alt, f"  (alternate for {aid})"))
+    for m, label in targets:
         try:
             r = complete(m.provider, system="Reply with the JSON object {\"ok\": true} and nothing else.",
                          user="ping", model=m.model, max_tokens=200, temperature=0.0, trace={"agent": "healthcheck"})
             good = "ok" in r.text
             lines.append(f"  {OK if good else BAD} {m.provider:9s} {m.model:18s} replied "
-                         f"({r.input_tokens} in / {r.output_tokens} out tokens)")
+                         f"({r.input_tokens} in / {r.output_tokens} out tokens){label}")
             ok &= good
         except Exception as e:  # noqa: BLE001 — report any failure to the user
-            lines.append(f"  {BAD} {m.provider:9s} {m.model:18s} {type(e).__name__}: {str(e)[:150]}")
+            lines.append(f"  {BAD} {m.provider:9s} {m.model:18s} {type(e).__name__}: {str(e)[:150]}{label}")
             ok = False
     return lines, ok
 

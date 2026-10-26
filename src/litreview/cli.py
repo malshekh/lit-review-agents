@@ -1,7 +1,7 @@
 """Command line interface.
 
   litreview check [--ping] [--apis]        check config, keys; optionally test live connections
-  litreview new --topic topic.md [--notes notes.md] [--seeds seeds.txt]
+  litreview new --topic topic.md [--notes notes.md] [--seeds seeds.txt] [--family NAME]
   litreview run <run_id> [--until STAGE]   run or resume until the next checkpoint, the end, or STAGE
   litreview status <run_id>                current stage, status and spend
   litreview approve <run_id> CP1|CP2|CP3   record your checkpoint decision
@@ -56,7 +56,7 @@ def cmd_check(args) -> int:
 
 def cmd_new(args) -> int:
     seeds = [s for s in _read(args.seeds).splitlines() if s.strip()]
-    run_id = new_run(_read(args.topic), _read(args.notes), seeds)
+    run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family)
     print(f"Created run {run_id}. Start it with:  litreview run {run_id}")
     return 0
 
@@ -120,6 +120,9 @@ def cmd_costs(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(REPO_ROOT / ".env")
+    for stream in (sys.stdout, sys.stderr):   # piped output on Windows may be cp1252: never crash on ✓/✗
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(errors="replace")
     p = argparse.ArgumentParser(prog="litreview", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -131,6 +134,8 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--topic", required=True)
     n.add_argument("--notes")
     n.add_argument("--seeds")
+    n.add_argument("--family", default="unspecified",
+                   help="topic family for refusal routing, e.g. oncology-drug-repurposing (see runs/model_record.jsonl)")
     n.set_defaults(fn=cmd_new)
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)

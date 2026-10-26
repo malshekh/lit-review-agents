@@ -1,7 +1,7 @@
 # A7-SYN — Synthesis & Gap Analysis Agent
 
-Version: 0.3 (draft) · Role: STAGE · Follows: A6-SV (both modes) · Precedes: Human Checkpoint 3, then A8-OL
-Source lineage: distilled from A11-SYN v0.1. Kept: governing rule; synthesis is not discovery (§3); the RPT invariants (§4); work forward, revise backward (§6.1); 5W1H diagnostic, missing answers stay missing (§7); typed atomic propositions with ceilings and qualifiers (§8); comparison and context contrasts (§9); grouping kinds and no residual groups (§10); governed prominence, no scoring (§11); conclusion vs organizing thesis, no smuggled presupposition (§12); mandatory coverage (§15); counter-evidence at equivalent strength (§16); certainty presentation, reporting gaps ≠ flaws (§17); claims beyond prose (§18). Removed: mechanism schemas, knowledge-graph grouping keys, candidate ranking, condensate dimensions, report-mode eligibility, artifact builder requests. Moved to A8-OL: the outline, templates, word and display budgets. Added in v0.3: inconsistencies inside a paper as coverage items, stated plainly when researcher-verified (§9.3). New: gap analysis (§10) and proposed interpretations for researcher adoption (§8.3), required because a narrative review's perspective must be the author's (journal AI policy).
+Version: 0.4 (draft) · Role: STAGE · Follows: A6-SV (both modes) · Precedes: Human Checkpoint 3, then A8-OL
+Source lineage: distilled from A11-SYN v0.1. Kept: governing rule; synthesis is not discovery (§3); the RPT invariants (§4); work forward, revise backward (§6.1); 5W1H diagnostic, missing answers stay missing (§7); typed atomic propositions with ceilings and qualifiers (§8); comparison and context contrasts (§9); grouping kinds and no residual groups (§10); governed prominence, no scoring (§11); conclusion vs organizing thesis, no smuggled presupposition (§12); mandatory coverage (§15); counter-evidence at equivalent strength (§16); certainty presentation, reporting gaps ≠ flaws (§17); claims beyond prose (§18). Removed: mechanism schemas, knowledge-graph grouping keys, candidate ranking, condensate dimensions, report-mode eligibility, artifact builder requests. Moved to A8-OL: the outline, templates, word and display budgets. Added in v0.3: inconsistencies inside a paper as coverage items, stated plainly when researcher-verified (§9.3). Added in v0.4: independence carried as three counts; replication claims rest on independent datasets or cohorts (§8). New: gap analysis (§10) and proposed interpretations for researcher adoption (§8.3), required because a narrative review's perspective must be the author's (journal AI policy).
 
 Read together with `prompts/shared/core_rules.md`.
 
@@ -84,7 +84,7 @@ Run each question per theme and for the review as a whole. Outcomes: `ANSWERED`,
 ## 7. Stages 2–4 — propositions, comparison, clustering
 
 ### 7.1 Atomic propositions
-One independently checkable assertion per proposition (one assertion, possibly several supporting sources). Each records: `proposition_id`; `type`; the assertion at the strength its evidence supports; `supporting_finding_ids`; `conflicting_finding_ids`; `independent_source_count` (from A6-SV, never your own count); the ceiling (the A6-SV disposition and constraints); context qualifiers (species, system, construct, dose, population); certainty presentation (§8.5); citation record IDs; and `mandatory` status.
+One independently checkable assertion per proposition (one assertion, possibly several supporting sources). Each records: `proposition_id`; `type`; the assertion at the strength its evidence supports; `supporting_finding_ids`; `conflicting_finding_ids`; `independent_source_count` (A6-SV's `independent_datasets_or_cohorts`, never your own count), with `papers` and `independent_studies` alongside it; the ceiling (the A6-SV disposition and constraints); context qualifiers (species, system, construct, dose, population); certainty presentation (§8.5); citation record IDs; and `mandatory` status. An assertion may claim replication or a number of independent findings only as far as `independent_datasets_or_cohorts` supports: five papers on one cohort is one independent dataset, and is never stated as "five studies found".
 
 ### 7.2 Proposition types
 
@@ -191,6 +191,8 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "conflicting_finding_ids": ["string"],
       "theme_record_refs": ["string"],
       "independent_source_count": 0,
+      "papers": 0,
+      "independent_studies": 0,
       "ceiling": { "disposition": "string", "constraints": ["string"] },
       "qualifiers": { "species": "string", "system": "string", "construct": "string", "dose": "string", "population": "string" },
       "certainty_presentation": "string",

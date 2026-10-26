@@ -1,20 +1,23 @@
-# USD per 1 million tokens, standard (non-batch, non-cached) rates.
+# USD per 1 million tokens, standard (non-batch) rates.
 # Checked 2026-10-16 against:
 #   Anthropic: https://platform.claude.com/docs/en/about-claude/pricing
 #   OpenAI:    https://developers.openai.com/api/docs/pricing
 #   Kimi:      https://platform.kimi.ai (international, USD); CNY prices at platform.kimi.com/docs/pricing/chat
 # Prices change — re-check before a long run. The budget monitor refuses unpriced models.
 #
-# Optional tiered pricing: if a prompt exceeds long_context_threshold input tokens,
-# long_input / long_output are charged instead.
+# Fields:
+#   input, output      standard rates (required)
+#   cached_input       reading tokens from the prompt cache. If missing, cached reads are billed at
+#                      `input` (never undercounted) and `litreview check` lists the gap.
+#   cache_write        writing tokens into the cache (Anthropic: 1.25x input for the 5-minute cache;
+#                      1-hour writes cost 2x). If missing, writes are billed at `input`.
+#   long_context_threshold / long_input / long_output   tiered rates above a prompt size.
 
 # --- Anthropic ---------------------------------------------------------
-claude-opus-5-5:   { input: 4.00, output: 20.00 }
-claude-sonnet-5-5: { input: 2.00, output: 10.00 }
-claude-haiku-5-5:  { input: 0.10, output: 0.50, long_context_threshold: 100000, long_input: 0.50, long_output: 2.50 }
-# Possible server-side fallback models (providers.anthropic.fallbacks). Priced so a fallback-served
-# reply is costed correctly instead of stopping the run as unpriced.
-claude-opus-5:     { input: 5.00, output: 25.00 }
+claude-opus-5-5:   { input: 4.00, output: 20.00, cached_input: 0.20, cache_write: 5.00 }
+claude-sonnet-5-5: { input: 2.00, output: 10.00, cached_input: 0.20, cache_write: 2.50 }
+claude-haiku-5-5:  { input: 0.10, output: 0.50, cache_write: 0.125, long_context_threshold: 100000, long_input: 0.50, long_output: 2.50 }
+claude-opus-5:     { input: 5.00, output: 25.00, cache_write: 6.25 }
 claude-opus-4-8:   { input: 5.00, output: 25.00 }
 claude-opus-4-7:   { input: 5.00, output: 25.00 }
 claude-sonnet-5:   { input: 2.00, output: 10.00 }
@@ -24,10 +27,11 @@ claude-sonnet-4-6: { input: 3.00, output: 15.00 }
 # Long-context rates exist for GPT-6 models (2x input); the threshold is not stated on the
 # pricing page, so it is not modelled here — very long A10 inputs may cost more than logged.
 gpt-6.1-sol:       { input: 2.00, output: 10.00 }
-gpt-6-luna:        { input: 0.10, output: 0.50 }
+gpt-6-luna:        { input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125 }
 gpt-6-astra:       { input: 10.00, output: 50.00 }
 gpt-5-mini:        { input: 0.25, output: 2.00 }   # snapshot shutdown Dec 11, 2026
 
 # --- Kimi (Moonshot, international) ------------------------------------
+kimi-k3.1-pro:     { input: 2.00, output: 10.00, cached_input: 0.20 }
 kimi-k3:           { input: 3.00, output: 15.00 }
 kimi-k2.6:         { input: 0.95, output: 4.00 }
