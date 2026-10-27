@@ -25,21 +25,35 @@ def _get_client():
     return _client
 
 
-CACHE = {"type": "ephemeral"}   # 5-minute prompt cache; a write costs 1.25x input, a read about 0.1x
+def _cache(ttl: str) -> dict:
+    """5m: write 1.25x input. 1h: write 2x input. Reads are the same price for both."""
+    return {"type": "ephemeral"} if ttl == "5m" else {"type": "ephemeral", "ttl": ttl}
+
+
+def request_body(system: str, user, cache_system: bool = False, cache_ttl: str = "5m") -> dict:
+    """System and messages with cache marks (shared by complete() and the token counter)."""
+    mark = _cache(cache_ttl)
+    content = [{"type": "text", "text": p["text"], **({"cache_control": mark} if p.get("cache") else {})}
+               for p in as_parts(user)]
+    return {"system": [{"type": "text", "text": system, "cache_control": mark}] if cache_system else system,
+            "messages": [{"role": "user", "content": content}]}
+
+
+def count_tokens(system: str, user, model: str, cache_system: bool = False, cache_ttl: str = "5m") -> int:
+    """Input tokens for a request, from the token-counting API (free). Used to gate long jobs."""
+    return _get_client().messages.count_tokens(model=model, **request_body(system, user, cache_system,
+                                                                           cache_ttl)).input_tokens
 
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
-             provider: str = "anthropic", effort: str | None = None, cache_system: bool = False) -> LLMResponse:
+             provider: str = "anthropic", effort: str | None = None, cache_system: bool = False,
+             cache_ttl: str = "5m") -> LLMResponse:
     """Streams the request (so large max_tokens never hits the SDK's non-streaming timeout) and
     returns the final message. Thinking counts toward max_tokens; `effort` (per agent in
     pipeline.yaml) controls how much of it is spent. Prompt caching: `cache_system` marks the system
     prompt, and user blocks with "cache": True are marked too (the prefix up to each mark is cached)."""
     pcfg = config.load("pipeline")["providers"]["anthropic"]
-    content = [{"type": "text", "text": p["text"], **({"cache_control": CACHE} if p.get("cache") else {})}
-               for p in as_parts(user)]
-    kwargs: dict = {"model": model, "max_tokens": max_tokens,
-                    "system": [{"type": "text", "text": system, "cache_control": CACHE}] if cache_system else system,
-                    "messages": [{"role": "user", "content": content}]}
+    kwargs: dict = {"model": model, "max_tokens": max_tokens, **request_body(system, user, cache_system, cache_ttl)}
     if pcfg.get("send_temperature", False):
         kwargs["temperature"] = temperature
     if effort:

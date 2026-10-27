@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from pathlib import Path
 from typing import Any
 
@@ -65,8 +66,8 @@ def parse_json(text: str) -> dict[str, Any]:
         raise
 
 
-def validate(agent_id: str, output: dict) -> None:
-    schema_path = SCHEMAS_DIR / AGENTS[agent_id].schema_file
+def validate(agent_id: str, output: dict, schema_file: str | None = None) -> None:
+    schema_path = SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)
     schema = json.loads(_read(schema_path))
     jsonschema.validate(output, schema)
 
@@ -87,9 +88,11 @@ def user_parts(payload: dict, cache_keys: tuple[str, ...] = ()) -> list[dict]:
 
 
 def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
-              budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None) -> dict:
+              budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None,
+              schema_file: str | None = None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
-    `model` overrides the agent's configured model (refusal routing)."""
+    `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
+    overrides its output schema (A07 job turns)."""
     if agent_id not in AGENTS:
         raise AgentError(f"Unknown agent {agent_id}")
     m = model or config.agent_model(agent_id)
@@ -105,6 +108,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     last_error = ""
     for attempt in range(max_repairs + 1):
         budget.ensure_headroom()
+        started = time.time()
         # a repair appends a new block, so the cached blocks before it stay byte-identical
         message = user if attempt == 0 else user + [{
             "text": "Your previous reply was not valid against the required output schema:\n"
@@ -112,7 +116,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         try:
             resp = complete(m.provider, system=system, user=message, model=m.model,
                             max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
-                            cache_system=m.cache_system,
+                            cache_system=m.cache_system, cache_ttl=m.cache_ttl,
                             trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
                                    "attempt": attempt, "prompt_version": prompt_version(agent_id)})
         except Exception as exc:  # noqa: BLE001 — any provider/API error fails the run cleanly, with a status
@@ -120,7 +124,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             raise AgentError(f"{agent_id} ({step}): API error: {type(exc).__name__}: {str(exc)[:400]}") from exc
         budget.record(agent_id, resp.provider, resp.model, resp.input_tokens, resp.output_tokens, step=step,
                       cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens,
-                      cache_write_1h_tokens=resp.cache_write_1h_tokens)
+                      cache_write_1h_tokens=resp.cache_write_1h_tokens, started_at=started)
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
         if resp.stop_reason == "refusal":
             # a policy decline, not a formatting error: never retried (same model, same request, same answer)
@@ -135,7 +139,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             break
         try:
             output = parse_json(resp.text)
-            validate(agent_id, output)
+            validate(agent_id, output, schema_file)
         except (json.JSONDecodeError, jsonschema.ValidationError) as exc:
             last_error = str(exc)[:2000]
             continue

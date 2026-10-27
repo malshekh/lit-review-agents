@@ -1,6 +1,6 @@
 # A2-SP — Scope & Perspective Agent
 
-Version: 0.1 (draft) · Role: STAGE · Precedes: Human Checkpoint 1
+Version: 0.2 (draft) · Role: STAGE · Precedes: Human Checkpoint 1
 Source lineage: intake and research-specification logic from A1-O v0.1 §9 (question preservation, readiness gate, disconfirming evidence, minimal clarification), adapted for a narrative review. New sections: perspective options, selection criteria, journal front matter.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -47,6 +47,11 @@ Narrative reviews are judged on the perspective they bring, not on coverage. Pro
 - `risks` — e.g., evidence too thin, field already well reviewed, angle depends on a few contested studies.
 
 Do not rank the options or recommend one. Present them neutrally so the researcher's choice is their own.
+
+### 3.4a Propose the theme framework
+Propose the **primary themes** that will organize the review: they control the main body's structure and how A7-SYN groups the evidence. Aim for the number in `theme_guidance` (by default 5 to 8), but justify the number you choose against how heterogeneous the expected evidence is, in `count_justification`: fewer when the evidence is narrow, more when it genuinely spans distinct systems or questions. The range is guidance, not a rule. Give each theme an ID (`T1`, `T2`, ...), a name, its scope, and what it includes and excludes, so two agents would assign the same record to it. Themes must follow the selected perspective's organizing principle and must not presuppose a conclusion.
+
+Later agents assign records and findings to these primary themes and may add free **subthemes** for specificity; they never create a primary theme. Evidence that fits no primary theme is queued for the researcher, who alone may change the framework.
 
 ### 3.5 Competing positions (disconfirming evidence)
 For each angle, state what findings or positions in the literature would weaken or challenge it. A specification that names only what the author hopes to find produces a search built to find it, and every downstream stage inherits that bias. If no evidence could count against an angle, it is not yet a scholarly argument; say so.
@@ -121,6 +126,10 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
     "significance_signals": ["string"],
     "exclusion_reason_vocabulary": ["string"]
   },
+  "theme_framework": {
+    "primary_themes": [{ "theme_id": "T1", "name": "string", "scope": "string", "includes": "string", "excludes": "string" }],
+    "count_justification": "string"
+  },
   "keywords": ["string"],
   "contribution_statement_draft": "string",
   "search_seeds": {
@@ -147,6 +156,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - `original_topic` matches the input exactly.
 - No required dimension is `UNRESOLVED` unless the state is `NEEDS_HUMAN_INPUT`.
 - Every angle has at least one competing position.
+- The theme framework has a justified number of primary themes, each with a scope a second reader could apply.
 - No significance signal amounts to "agrees with the angle".
 - Every title candidate is one sentence of 20 words or fewer.
 - Nothing is presented as verified that you did not verify; background knowledge is labelled as such.

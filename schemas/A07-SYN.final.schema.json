@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A07-SYN job turn: FINAL (see the prompt's \u00a712 for full detail)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "type": "string"
+    },
+    "propositions": {
+      "type": "array"
+    },
+    "knowledge_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "gap_id",
+          "statement",
+          "satisfies"
+        ]
+      }
+    },
+    "proposed_interpretations": {
+      "type": "array"
+    },
+    "thesis_options": {
+      "type": "array"
+    },
+    "beyond_prose_bindings": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "knowledge_gaps",
+    "proposed_interpretations",
+    "thesis_options",
+    "beyond_prose_bindings"
+  ],
+  "additionalProperties": true
+}

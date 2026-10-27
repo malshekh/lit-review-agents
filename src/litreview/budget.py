@@ -78,16 +78,20 @@ class BudgetTracker:
         tier = self.prices.get(model) or {}
         return [k for k in ("cached_input", "cache_write") if tier.get(k) is None]
 
-    def _seconds_since_previous(self, agent_id: str, model: str) -> float | None:
-        """Gap since the previous call by the same agent and model. A prompt cache survives only if the
-        gap is under its lifetime (5 minutes), and only a call to the same provider refreshes it."""
+    def _seconds_since_previous(self, agent_id: str, model: str, started_at: float | None) -> float | None:
+        """Start-to-start gap since the previous call by the same agent and model. A cache entry is
+        refreshed when a request reads it, so whether it survives depends on the interval between request
+        starts (under 5 minutes for the 5-minute cache); only a call to the same provider refreshes it."""
+        now = started_at if started_at is not None else time.time()
         for e in reversed(self.entries()):
             if e["agent"] == agent_id and e["model"] == model:
-                try:
-                    prev = time.mktime(time.strptime(e["time"], "%Y-%m-%dT%H:%M:%S"))
-                except (KeyError, ValueError):
-                    return None
-                return round(time.time() - prev, 1)
+                prev = e.get("started_at")
+                if prev is None:
+                    try:
+                        prev = time.mktime(time.strptime(e["time"], "%Y-%m-%dT%H:%M:%S"))
+                    except (KeyError, ValueError):
+                        return None
+                return round(now - prev, 1)
         return None
 
     # --- logging and enforcement --------------------------------------
@@ -107,12 +111,14 @@ class BudgetTracker:
 
     def record(self, agent_id: str, provider: str, model: str, input_tokens: int,
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
-               cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0) -> dict:
-        since = self._seconds_since_previous(agent_id, model)
+               cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0,
+               started_at: float | None = None) -> dict:
+        since = self._seconds_since_previous(agent_id, model, started_at)
         entry = {
             "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "agent": agent_id,
             "step": step,
+            "started_at": round(started_at, 3) if started_at is not None else None,
             "provider": provider,
             "model": model,
             "input_tokens": input_tokens,
@@ -129,7 +135,7 @@ class BudgetTracker:
                                    cache_write_1h_tokens)
             entry["cache"] = {
                 "hit": cached_input_tokens > 0,
-                "seconds_since_previous_call": since,   # same agent and model
+                "seconds_since_previous_start": since,   # same agent and model, start to start
                 "effective_input_rate_per_m": round(input_cost / prompt * 1e6, 4) if input_cost is not None else None,
                 "list_input_rate_per_m": (self.price_of(model) or (None,))[0],
             }

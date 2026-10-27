@@ -12,8 +12,9 @@ limits:
   typeset_pages_max: 12
   keywords_max: 6
   references_per_1000_words: 25  # approximate target, not a hard cap
-  display_items_max: 8           # figures + tables combined
-  display_items_max_if_short: 4  # suggested when main text <= 2000 words
+  display_items_max: 1           # researcher's choice (journal allows 8, figures + tables combined):
+                                 #   one strong item; the authors produce any others
+  display_items_max_if_short: 1  # (journal suggests 4 when main text <= 2000 words)
   short_text_threshold_words: 2000
   figure_legend_max_words: 350
   table_max_pages: 1

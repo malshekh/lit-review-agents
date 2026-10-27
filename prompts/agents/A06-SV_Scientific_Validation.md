@@ -1,6 +1,6 @@
 # A6-SV — Scientific Validation Agent
 
-Version: 0.3 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
+Version: 0.4 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
 Recommended model: the opposite vendor to A5-KE (an agent checking its own vendor's reading tends to read it the same way twice).
 Source lineage: distilled from A5-SV v0.1. Kept: validity belongs to the inference, not the paper (§4.2); never strengthen (§4.3); not-applicable costs nothing (§4.4); unreported ≠ absent (§4.5); never resolve scientific conflict (§4.6); no numeric confidence (§4.7); the four separations (§5); gated sequence (§7); failure classification (§8.3); claim decomposition, weakest component governs (§9); alignment gate (§10); validity dimensions (§11); profiles chosen by method, not publication type (§12); null and contrary claims (§14); conflict and falsification (§15); evidence independence (§16); dispositions (§17); extraction defect reports, report-never-repair (§20). Removed: condensate validation rules, knowledge-graph eligibility, research-relevance assessment (already decided by A4-CQ and Checkpoint 2), validation overlay versioning. Moved to code: verbatim span matching and number matching (Gate 1). New: evidence profiles for the A5-KE study systems (§6), theme-level pass (§9). Added in v0.2: a structured `source_inconsistencies` field (§8.1), so contradictions inside a paper reach synthesis through the coverage manifest instead of staying in free-text warnings. Added in v0.3: independence is reported as three counts — papers, independent studies, independent datasets or cohorts — with the grouping basis named (§7.2).
 
@@ -129,7 +129,7 @@ These are prompts for judgement, not checklists to fail papers on. A cell-free b
 
 ## 7. PER_THEME mode
 
-Inputs: all validated findings for one theme (dispositions, constraints, contexts and spans), the A4-CQ `POSSIBLE_SAME_STUDY` flags, and the record metadata (authors, years, models).
+Inputs: all validated findings for one primary theme (dispositions, constraints, contexts, spans and their `subthemes`), the theme's definition from the approved framework, the A4-CQ `POSSIBLE_SAME_STUDY` flags, and the record metadata (authors, years, models). Compare within and across subthemes: a conflict between two subthemes of one primary theme is still a conflict, and evidence reach is reported for the primary theme with the subthemes it covers.
 
 ### 7.1 Conflict — look for it deliberately
 For each finding, ask what evidence in this theme would contradict it, and check whether it exists. Record conflicts; **never resolve them** — not by count of studies, journal, recency, or fit with the review's perspective. Characterize each:

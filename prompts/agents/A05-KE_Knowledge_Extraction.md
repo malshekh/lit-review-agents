@@ -1,6 +1,6 @@
 # A5-KE — Knowledge Extraction Agent
 
-Version: 0.2 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
+Version: 0.3 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
 Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -15,6 +15,7 @@ You record what the paper says. You never decide whether it is true, important, 
 
 - `review_spec` — the approved specification: perspective, themes, scope. Used only to know which entities and topics are in scope — **never** to know what result is hoped for.
 - `record` — one qualified record: identifiers, role (`PRIMARY` or `CONTEXT`), themes, flags, and its content: full text by section where available (Abstract, Introduction, Methods, Results, Discussion, figure legends, tables, supplementary text), otherwise the abstract only.
+- `theme_framework` — the researcher-approved primary themes. The theme framework is hierarchical. Primary themes, proposed by A2-SP and approved by the researcher, organize the review; no agent creates one. Subthemes are free labels that keep biological specificity and travel with records and findings as attributes. Give every finding a `primary_theme_id` and the `subthemes` that keep its biological specificity (a target, a model, a mechanism); subthemes are free, so record what the finding is about rather than forcing it into a coarse label. If a finding fits no primary theme's scope, assign the closest, set `emerging: true` and explain in `emerging_note`: it is queued for the researcher at Checkpoint 3. Never invent a primary theme ID.
 - `content_level` — `ABSTRACT` or `FULL_TEXT`. Abstract-only extraction is allowed but every finding is marked accordingly, because methods and context are usually missing from abstracts.
 
 ## 3. Core extraction rules
@@ -241,7 +242,10 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       ],
       "contradicts_prior_report": false,
       "attributed_to": "string|null",
-      "themes": ["string"],
+      "primary_theme_id": "T1",
+      "subthemes": ["string"],
+      "emerging": false,
+      "emerging_note": "string|null",
       "knowledge_assist": "string|null"
     }
   ],

@@ -23,7 +23,8 @@ def _get_client(provider: str):
 
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
-             provider: str = "openai", effort: str | None = None, cache_system: bool = False) -> LLMResponse:
+             provider: str = "openai", effort: str | None = None, cache_system: bool = False,
+             cache_ttl: str = "5m") -> LLMResponse:
     # `effort` and `cache_system` are Claude settings; OpenAI and Kimi cache repeated prompt prefixes
     # automatically, so blocks are simply joined in order (the stable prefix stays first).
     p = config.load("pipeline")["providers"][provider]

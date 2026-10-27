@@ -29,7 +29,7 @@ def run(tmp_path, monkeypatch):
 
 
 def _fake(calls, refuse_batch=None):
-    def run_agent(agent_id, payload, run_dir, step, budget, prov, model=None):
+    def run_agent(agent_id, payload, run_dir, step, budget, prov, model=None, schema_file=None):
         calls.append({"step": step, "model": model.model, "spec": json.dumps(payload["review_spec"]),
                       "ids": [x["record_id"] for x in payload["records"]]})
         if step == refuse_batch:

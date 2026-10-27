@@ -93,8 +93,8 @@ def test_cache_telemetry(tmp_path):
     b = BudgetTracker(tmp_path)
     w = b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 25, 4, "s1", cache_write_tokens=10629)
     r = b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 25, 4, "s2", cached_input_tokens=10629)
-    assert not w["cache"]["hit"] and w["cache"]["seconds_since_previous_call"] is None
-    assert r["cache"]["hit"] and 0 <= r["cache"]["seconds_since_previous_call"] < 60
+    assert not w["cache"]["hit"] and w["cache"]["seconds_since_previous_start"] is None
+    assert r["cache"]["hit"] and 0 <= r["cache"]["seconds_since_previous_start"] < 60
     assert r["cache"]["effective_input_rate_per_m"] == pytest.approx((25 * 2 + 10629 * 0.10) / 10654, rel=1e-3)
     assert r["cache"]["list_input_rate_per_m"] == 2.00
     plain = b.record("A06-SV", "openai", "gpt-6.1-sol", 10, 10, "s3")
@@ -192,7 +192,7 @@ def test_json_repair_keeps_cached_prefix_identical(monkeypatch, tmp_path):
     replies = iter(["not json", '{"agent_id": "A05-KE"}'])
     monkeypatch.setattr(agent_base, "complete", lambda provider, **kw: seen.append(kw["user"]) or
                         LLMResponse(next(replies), "anthropic", kw["model"], 1, 1, "end_turn"))
-    monkeypatch.setattr(agent_base, "validate", lambda a, o: None)
+    monkeypatch.setattr(agent_base, "validate", lambda a, o, s=None: None)
     m = config.AgentModel("A05-KE", "anthropic", "claude-sonnet-5-5", 100, 0.0, cache_system=True,
                           cache_payload=("record",))
     agent_base.run_agent("A05-KE", {"record": {"r": 1}, "other": 2}, tmp_path, "s",

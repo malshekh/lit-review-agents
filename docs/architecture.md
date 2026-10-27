@@ -20,15 +20,15 @@
 
 | # | Stage | Agents / tools | Output (`runs/<id>/data/`) |
 |---|---|---|---|
-| 1 | scope | A02-SP | `spec.json` |
-| 2 | **CP1** | researcher | `spec_approved.json` |
+| 1 | scope | A02-SP (incl. proposed primary themes) | `spec.json` |
+| 2 | **CP1** | researcher (approves perspective, criteria and the theme framework, v1) | `spec_approved.json`, `theme_framework.json` |
 | 3 | search | A03-LM (PLAN, REPAIR ≤2), search clients, dedup | `search_plan.json`, `records.json`, `search_log.json` |
 | 4 | qualify | A04-CQ (batches; full text for unresolved) | `qualifications.json`, `bias_report.json` |
 | 4b | expand | citation expansion (Semantic Scholar, from qualified supportive *and* contrary seeds) → A04-CQ on new records; with `depth: 2`, repeated once from the depth-1 records A04-CQ qualified | `records.json`, `expansion_log.json` |
 | 5 | **CP2** | researcher (every record shown) | `selected_corpus.json` |
 | 6 | extract | full-text fetch, A05-KE, identifier lookups (HGNC, MyGene, UniProt, ChEMBL, PubChem, Cellosaurus, OLS4) | `extractions/`, `fulltext/`, `normalization_cache.json` |
 | 7 | validate | span check (Gate 1), A06-SV per paper (≤1 re-extraction), A06-SV per theme | `validations/`, `validated_findings.json`, `theme_records.json` |
-| 8 | synthesize | coverage manifest (code), A07-SYN | `synthesis_package.json` |
+| 8 | synthesize | coverage manifest (code); A07-SYN as one job over bounded calls — PLAN, one GROUP call per group, FINAL — with the frozen corpus as a cached prefix and a runtime coverage ledger | `synthesis_package.json`, `synthesis_job_<tag>/` (ledger, turns, report) |
 | 9 | **CP3** | researcher | `synthesis_approved.json` |
 | 10 | outline | A08-OL; display-item builder (code): evidence tables and the evidence map from validated findings, briefs for figures a person must draw | `manuscript_plan.json`, `display_items.json`, `display_items/` |
 | 11 | draft | A09-WRI → A10-RV (≤1 redraft) | `manuscripts/` |

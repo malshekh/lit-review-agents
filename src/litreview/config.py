@@ -27,6 +27,7 @@ class AgentModel:
     effort: str | None = None   # Claude reasoning effort: low | medium | high | xhigh | max
     cache_system: bool = False  # Claude prompt caching: cache the system prompt (reused across calls)
     cache_payload: tuple[str, ...] = ()   # payload keys sent first and cached (e.g. the paper), for repairs
+    cache_ttl: str = "5m"       # Anthropic cache lifetime: 5m (write 1.25x input) or 1h (write 2x input)
 
 
 def agent_model(agent_id: str) -> AgentModel:
@@ -48,6 +49,7 @@ def agent_model(agent_id: str) -> AgentModel:
         effort=entry.get("effort"),
         cache_system=bool(entry.get("cache_system", False)),
         cache_payload=tuple(entry.get("cache_payload") or ()),
+        cache_ttl=str(entry.get("cache_ttl", "5m")),
     )
 
 
@@ -62,5 +64,6 @@ def agent_candidates(agent_id: str) -> list[AgentModel]:
                               model=cfg["models"].get(alt["model"], alt["model"]),
                               max_tokens=int(alt.get("max_tokens", primary.max_tokens)),
                               temperature=primary.temperature, effort=alt.get("effort", primary.effort),
-                              cache_system=primary.cache_system, cache_payload=primary.cache_payload))
+                              cache_system=primary.cache_system, cache_payload=primary.cache_payload,
+                              cache_ttl=primary.cache_ttl))
     return out

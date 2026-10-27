@@ -9,6 +9,8 @@ Stage order
 """
 from __future__ import annotations
 
+import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -23,6 +25,9 @@ from .agents.base import prompt_version
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
+from . import synthesis_input, theme_framework
+from .agents.base import build_system_prompt, user_parts
+from .synthesis_job import JobStopped, SynthesisJob
 from .tools import compliance, display_items, manuscript_export, references, span_check, tags, themes
 from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
@@ -95,10 +100,14 @@ class Run:
                          f"({', '.join(f'{m.model}: {refused[m.model]}' for m in candidates)}). Add an "
                          "alternate under pipeline.yaml -> routing.alternates.")
 
-    def agent(self, agent_id: str, payload: dict, step: str) -> dict:
+    def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
+              schema_file: str | None = None) -> dict:
         m = self.route(agent_id)
+        if overrides:
+            m = dataclasses.replace(m, **overrides)
         try:
-            out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m)
+            out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
+                            schema_file=schema_file)
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
@@ -167,6 +176,7 @@ class Run:
             "researcher_notes": (inp / "notes.md").read_text(encoding="utf-8"),
             "seed_papers": [s for s in (inp / "seeds.txt").read_text(encoding="utf-8").splitlines() if s.strip()],
             "journal_profile": config.load("journal_scirev"),
+            "theme_guidance": self.cfg.get("themes", {"primary_min": 5, "primary_max": 8}),
             "revision_feedback": feedback,
         }, step=f"A02-SP_scope_v{self.counter(st, 'scope')}")
         self.save("spec.json", spec)
@@ -181,8 +191,26 @@ class Run:
         spec["researcher_decision"] = decision
         if decision.get("edited_selection_criteria"):
             spec["selection_criteria"] = decision["edited_selection_criteria"]
+        proposed = decision.get("edited_theme_framework") or spec.get("theme_framework")
+        if proposed and proposed.get("primary_themes") and not self.load("theme_framework.json"):
+            fw = theme_framework.create(proposed["primary_themes"], proposed.get("count_justification", ""), "CP1")
+            self.save("theme_framework.json", fw)
+            self.prov.human_decision("THEME_FRAMEWORK", {"version": 1, "primary_theme_ids": sorted(theme_framework.ids(fw)),
+                                                         "edited": bool(decision.get("edited_theme_framework"))},
+                                     "theme framework approved at CP1")
         self.save("spec_approved.json", spec)
         return "search"
+
+    def _framework_update(self, decision: dict, checkpoint: str) -> None:
+        """A framework change approved at CP2 or CP3: a new version, logged as the researcher's decision."""
+        upd = decision.get("theme_framework_update")
+        fw = self.load("theme_framework.json")
+        if not upd or not fw:
+            return
+        new = theme_framework.revise(fw, upd["primary_themes"], checkpoint, upd.get("note", ""))
+        self.save("theme_framework.json", new)
+        self.prov.human_decision("THEME_FRAMEWORK", {"version": new["version"], **{k: new["history"][-1][k]
+                                 for k in ("added", "removed")}}, upd.get("note", ""))
 
     def stage_search(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
@@ -281,6 +309,7 @@ class Run:
         spec = self.load("spec_approved.json")
         records = self.load("records.json")
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
+        fw = self.load("theme_framework.json")
         todo = [r for r in records if r["record_id"] not in quals]
         size = int(self.cfg["loops"]["cq_batch_size"])
         fields = ("record_id", "title", "abstract", "authors", "year", "venue", "publication_type", "doi",
@@ -290,14 +319,16 @@ class Run:
                       "content_level": "ABSTRACT" if r.get("abstract") else "METADATA_ONLY"} for r in todo[i:i + size]]
             # numbered across resumes, so a rerun batch never overwrites an earlier batch's outputs
             bid = f"B{self.counter(self.state(), 'cq_batch'):03d}"
-            out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": bid, "records": batch},
-                             step=f"A04-CQ_{bid}")
+            out = self.agent("A04-CQ", {"review_spec": spec, "theme_framework": fw, "batch_id": bid,
+                                        "records": batch}, step=f"A04-CQ_{bid}")
             got = {q["record_id"]: q for q in out.get("qualifications", [])}
             for r in batch:  # nothing may disappear: any record without a disposition is flagged
                 quals[r["record_id"]] = {**(got.get(r["record_id"]) or {
                     "record_id": r["record_id"], "disposition": "UNRESOLVED_HUMAN_REVIEW",
                     "reason": "Agent returned no disposition for this record.", "themes": [], "flags": []}),
                     **self._screener()}
+                quals[r["record_id"]] = theme_framework.normalize(quals[r["record_id"]], fw) \
+                    if quals[r["record_id"]].get("disposition") == "QUALIFIED" else quals[r["record_id"]]
             self.save("qualifications.json", list(quals.values()))
         # Level 2: full text for records the agent could not decide from the abstract
         by_id = {r["record_id"]: r for r in records}
@@ -354,15 +385,19 @@ class Run:
     def stage_cp2(self, st: dict) -> str:
         decision = checkpoints.approved(self.dir, "CP2")
         if not decision:
-            checkpoints.write_cp2(self.dir, self.load("records.json"), self.load("qualifications.json"),
-                                  self.load("bias_report.json"))
+            quals = self.load("qualifications.json")
+            checkpoints.write_cp2(self.dir, self.load("records.json"), quals, self.load("bias_report.json"),
+                                  emerging=theme_framework.emerging(quals, "record_id"),
+                                  framework=self.load("theme_framework.json"))
             self.pause_for_checkpoint("CP2")
+        self._framework_update(decision, "CP2")
         by_id = {r["record_id"]: r for r in self.load("records.json")}
         quals = {q["record_id"]: q for q in self.load("qualifications.json")}
         corpus = []
         for rid in decision["selected_record_ids"]:
             q = quals.get(rid, {})
             corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
+                           "subthemes": q.get("subthemes", []),
                            "tier": decision["tier_overrides"].get(rid) or q.get("proposed_tier"),
                            "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence")})
         self.save("selected_corpus.json", corpus)
@@ -377,8 +412,9 @@ class Run:
             sections = fetch_sections(rec.get("pmcid")) or {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
-            out = self.agent("A05-KE", {"review_spec": spec, "content_level": level,
-                                        "record": {**rec, "content": sections}}, step=f"A05-KE_{rid}")
+            out = self.agent("A05-KE", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
+                                        "content_level": level, "record": {**rec, "content": sections}},
+                             step=f"A05-KE_{rid}")
             self.save(f"extractions/{rid}.json", normalize_entities(out, self.data("normalization_cache.json")))
         return "validate"
 
@@ -404,7 +440,9 @@ class Run:
                 if not serious or attempt == max_re:
                     break
                 try:
-                    ext = self.agent("A05-KE", {"review_spec": spec, "content_level": ext.get("content_level"),
+                    ext = self.agent("A05-KE", {"review_spec": spec,
+                                                "theme_framework": self.load("theme_framework.json"),
+                                                "content_level": ext.get("content_level"),
                                                 "record": {**rec, "content": sections},
                                                 "defects_from_previous_extraction": serious},
                                      step=f"A05-KE_{rid}_reextract")
@@ -427,7 +465,10 @@ class Run:
         same_study = {r["record_id"]: [x for x in r.get("flags", []) if "SAME_STUDY" in x] for r in corpus}
         theme_records = {}
         for th, fs in by_theme.items():
-            theme_records[th] = self.agent("A06-SV", {"mode": "PER_THEME", "theme": th, "validated_findings": fs,
+            definition = next((t for t in (self.load("theme_framework.json") or {}).get("primary_themes", [])
+                               if t["theme_id"] == th), None)
+            theme_records[th] = self.agent("A06-SV", {"mode": "PER_THEME", "theme": th, "theme_definition": definition,
+                                                      "validated_findings": fs,
                                                       "same_study_flags": same_study,
                                                       "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")}
                                                                   for r in corpus]},
@@ -447,10 +488,11 @@ class Run:
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
                 out.append({"finding_id": f"{rid}:{f['finding_id']}", "record_id": rid,
-                            "themes": f.get("themes") or rec.get("themes", []),
+                            **self._finding_themes(f, rec),
                             "subject": f.get("subject_entity_id"), "predicate": f.get("predicate"),
                             "object": f.get("object_entity_id"), "polarity": f.get("polarity"),
                             "span": f.get("span"), "quantities": f.get("quantities", []),
+                            "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
                             "disposition": v.get("disposition"), "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
@@ -486,33 +528,82 @@ class Run:
             m["records"][th] = rec
         return findings, merged
 
+    def _finding_themes(self, f: dict, rec: dict) -> dict:
+        """A finding's primary theme and subthemes. A finding that fits no primary theme is attached to its
+        record's primary theme and flagged as emerging, for the researcher at Checkpoint 3."""
+        base = {"themes": f.get("themes") or rec.get("themes", []), "primary_theme_id": f.get("primary_theme_id"),
+                "subthemes": f.get("subthemes") or [], "emerging": bool(f.get("emerging")),
+                "emerging_note": f.get("emerging_note")}
+        fw = self.load("theme_framework.json")
+        if not fw:
+            return base
+        out = theme_framework.normalize(base, fw)
+        if not out["themes"]:
+            out["themes"] = rec.get("themes", [])
+            out["primary_theme_id"] = (rec.get("themes") or [None])[0]
+        return out
+
     def stage_synthesize(self, st: dict) -> str:
+        """A07 as one logical job over bounded calls (synthesis_job.py). The frozen corpus is the cached
+        prefix of every call; the runtime keeps the coverage and finding ledgers."""
         corpus = self.load("selected_corpus.json")
         theme_records = self.load("theme_records.json")
         findings, theme_records_for_a07 = self._consolidate_themes(self.load("validated_findings.json"), theme_records)
-        manifest = [{"item_id": f"PAPER:{r['record_id']}", "kind": "SELECTED_PAPER", "required_visibility": "CITED",
-                     "narrative_required": r.get("tier") == "CORE" and bool(r.get("is_contrary_evidence"))}
-                    for r in corpus]
-        for th, rec in theme_records.items():
-            for i, c in enumerate(rec.get("conflicts", []), 1):
-                manifest.append({"item_id": f"CONFLICT:{th}:{i}", "kind": "CONFLICT", "detail": c,
-                                 "required_visibility": "NARRATIVE"})
-            manifest.append({"item_id": f"REACH:{th}", "kind": "EVIDENCE_REACH",
-                             "detail": rec.get("evidence_reach"), "required_visibility": "NARRATIVE"})
-            for m in (rec.get("evidence_reach") or {}).get("systems_missing", []):
-                manifest.append({"item_id": f"MISSING:{th}:{m}", "kind": "SYSTEM_GAP", "required_visibility": "NARRATIVE"})
-        manifest += self._inconsistency_items(corpus)
+        manifest = synthesis_input.build_manifest(corpus, theme_records, self._inconsistency_items(corpus))
         self.save("coverage_manifest.json", manifest)
-        pkg = self.agent("A07-SYN", {"review_spec": self.load("spec_approved.json"),
-                                     "selected_corpus": [{k: r.get(k) for k in ("record_id", "title", "authors", "year",
-                                                                                "venue", "tier", "themes", "is_preprint")}
-                                                         for r in corpus],
-                                     "validated_findings": findings,
-                                     "theme_records": theme_records_for_a07, "coverage_manifest": manifest,
-                                     "revision_feedback": self.load("cp3_feedback.json")},
-                         step=f"A07-SYN_v{self.counter(st, 'synth')}")
+        feedback = self.load("cp3_feedback.json")
+        frozen = {**synthesis_input.build_corpus(self.load("spec_approved.json"), corpus, findings,
+                                                 theme_records_for_a07, manifest, self.load("theme_framework.json")),
+                  "revision_feedback": feedback}
+        scfg = self.cfg["synthesis"]
+        # a CP3 revision starts a new job; an interrupted job resumes in the same directory
+        tag = hashlib.sha256(json.dumps(feedback, sort_keys=True).encode()).hexdigest()[:8]
+        overrides = {"cache_system": True, "cache_payload": ("corpus",), "cache_ttl": scfg.get("cache_ttl", "5m"),
+                     "max_tokens": int(scfg["max_tokens_per_turn"])}
+
+        def call(mode: str, turn: dict, name: str) -> dict:
+            return self.agent("A07-SYN", {"corpus": frozen, "turn": turn}, step=f"A07-SYN_job{tag}_{name}",
+                              overrides=overrides, schema_file=f"A07-SYN.{mode.lower()}.schema.json")
+
+        def count(turn: dict) -> int:
+            m = self.route("A07-SYN")
+            parts = user_parts({"corpus": frozen, "turn": turn}, ("corpus",))
+            if m.provider != "anthropic":   # no counting endpoint: conservative estimate (2.5 chars/token)
+                return int(sum(len(p["text"]) for p in parts) / 2.5) + 20000
+            from .llm import anthropic_client
+            return anthropic_client.count_tokens(build_system_prompt("A07-SYN"), parts, m.model, True,
+                                                 overrides["cache_ttl"])
+
+        job = SynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", synthesis_input.mandatory_items(manifest),
+                           [f["finding_id"] for f in findings], {f["finding_id"]: f["record_id"] for f in findings},
+                           call, count, scfg)
+        try:
+            pkg = job.run()
+        except JobStopped as e:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            raise Pause(f"synthesis job stopped cleanly — {e}. `litreview run` resumes from the last committed turn.")
+        self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, pkg))
         self.save("synthesis_package.json", pkg)
         return "cp3"
+
+    def _job_report(self, tag: str, pkg: dict) -> dict:
+        """Totals across the job's calls, from the cost log, plus the ledger's counts."""
+        calls = [e for e in self.budget.entries() if e["step"].startswith(f"A07-SYN_job{tag}_")]
+        cached = [e for e in calls if e.get("cache")]
+        return {
+            "calls": len(calls),
+            "output_tokens_total": sum(e["output_tokens"] for e in calls),
+            "input_tokens_uncached": sum(e["input_tokens"] for e in calls),
+            "cache_read_tokens": sum(e.get("cached_input_tokens", 0) for e in calls),
+            "cache_write_tokens": sum(e.get("cache_write_tokens", 0) + e.get("cache_write_1h_tokens", 0) for e in calls),
+            "cache_hit_rate": round(sum(e["cache"]["hit"] for e in cached) / len(cached), 3) if cached else None,
+            "start_to_start_seconds": [e["cache"].get("seconds_since_previous_start") for e in cached],
+            "cost_usd": round(sum(e["cost_usd"] or 0 for e in calls), 4),
+            "status": pkg.get("status"),
+            **pkg.get("job_stats", {}),
+            "coverage_incomplete_item_ids": pkg.get("coverage_incomplete_item_ids"),
+            "findings_unaccounted": len(pkg.get("findings_unaccounted") or []),
+        }
 
     # Free-text A06 warnings that describe a contradiction inside the paper (validations written
     # before A06-SV v0.2 added the structured `source_inconsistencies` field).
@@ -582,8 +673,12 @@ class Run:
     def stage_cp3(self, st: dict) -> str:
         decision = checkpoints.approved(self.dir, "CP3")
         if not decision:
-            checkpoints.write_cp3(self.dir, self.load("synthesis_package.json"))
+            pkg = self.load("synthesis_package.json")
+            checkpoints.write_cp3(self.dir, pkg,
+                                  emerging=theme_framework.emerging(self.load("validated_findings.json", []), "finding_id"),
+                                  framework=self.load("theme_framework.json"))
             self.pause_for_checkpoint("CP3")
+        self._framework_update(decision, "CP3")
         pkg = self.load("synthesis_package.json")
         pkg["researcher_decision"] = decision
         adopted = set(decision.get("adopted_interpretations", []))
@@ -596,7 +691,8 @@ class Run:
     def stage_outline(self, st: dict) -> str:
         plan = self.agent("A08-OL", {"synthesis_package": self.load("synthesis_approved.json"),
                                      "selected_corpus": self.load("selected_corpus.json"),
-                                     "journal_profile": config.load("journal_scirev")},
+                                     "journal_profile": config.load("journal_scirev"),
+                                     "display_preference": (self.cfg.get("outline") or {}).get("display_preference")},
                           step=f"A08-OL_v{self.counter(st, 'outline')}")
         self.save("manuscript_plan.json", plan)
         if plan.get("status") == "NEEDS_HUMAN_INPUT":

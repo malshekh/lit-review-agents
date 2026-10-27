@@ -41,13 +41,16 @@ def write_cp1(run_dir: Path, spec: dict) -> None:
                   f"- Title candidates: {' | '.join(o.get('title_candidates', []))}", ""]
     lines += ["## Selection criteria (frozen once approved)", "```json",
               json.dumps(spec.get("selection_criteria"), indent=2), "```", "",
+              *_framework_lines(spec.get("theme_framework"), "Theme framework (proposed by A02)"),
+              "To change the framework, put the edited version in `edited_theme_framework` "
+              "(same shape: `primary_themes`, `count_justification`).", "",
               "## Assumptions", *[f"- {a}" for a in spec.get("assumptions", [])], "",
               "## Questions for you", *[f"- {q}" for q in spec.get("questions_for_researcher", [])], "",
               "Fill in `CP1_decision.json`, then run `litreview approve <run_id> CP1`."]
     (d / "CP1_review.md").write_text("\n".join(lines), encoding="utf-8")
     template = {"selected_option_id": None, "edited_angle": None,
                 "approve_selection_criteria": None, "edited_selection_criteria": None,
-                "answers_to_questions": {}, "notes": ""}
+                "edited_theme_framework": None, "answers_to_questions": {}, "notes": ""}
     (d / "CP1_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
 
@@ -56,7 +59,31 @@ CP2_COLUMNS = ["select", "tier_override", "record_id", "disposition", "proposed_
                "contrary", "themes", "year", "title", "venue", "flags", "reason", "doi", "pmid", "screened_by"]
 
 
-def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report: dict) -> None:
+def _framework_lines(fw: dict | None, title: str) -> list[str]:
+    if not fw:
+        return []
+    out = [f"## {title}" + (f" — version {fw['version']}" if fw.get("version") else ""), ""]
+    for t in fw.get("primary_themes", []):
+        out.append(f"- **{t.get('theme_id')} {t.get('name')}** — {t.get('scope')} "
+                   f"(includes: {t.get('includes')}; excludes: {t.get('excludes')})")
+    if fw.get("count_justification"):
+        out += ["", f"Why this number: {fw['count_justification']}"]
+    return out + [""]
+
+
+def _emerging_lines(emerging: list[dict] | None, what: str) -> list[str]:
+    if not emerging:
+        return []
+    return ([f"## Emerging evidence: {len(emerging)} {what} fit no primary theme", "",
+             "Each is attached to its closest primary theme for now. Decide whether the framework should change: "
+             "to change it, put the new `primary_themes` list (and a `note`) in `theme_framework_update` in the "
+             "decision file. The change becomes a new framework version, recorded as your decision.", ""]
+            + [f"- {e['id']} (now under {e.get('primary_theme_id')}; subthemes: {', '.join(e.get('subthemes') or []) or '—'}): "
+               f"{e.get('note') or ''}" for e in emerging] + [""])
+
+
+def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report: dict,
+              emerging: list[dict] | None = None, framework: dict | None = None) -> None:
     """Every record is listed — qualified (all tiers), unresolved and excluded. Nothing is hidden."""
     d = cp_dir(run_dir)
     by_id = {r["record_id"]: r for r in records}
@@ -91,9 +118,11 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
              *(["", "Screening was split between models: compare `exclusion_rate_by_screening_model` "
                 "in the bias checks below before approving."] if len(screeners) > 1 else []), "",
              "## Bias checks", "```json", json.dumps(bias_report, indent=2), "```", "",
+             *_emerging_lines(emerging, "records"), *_framework_lines(framework, "Current theme framework"),
              "Then run `litreview approve <run_id> CP2`."]
     (d / "CP2_review.md").write_text("\n".join(lines), encoding="utf-8")
-    (d / "CP2_decision.json").write_text(json.dumps({"notes": ""}, indent=2), encoding="utf-8")
+    (d / "CP2_decision.json").write_text(json.dumps({"theme_framework_update": None, "notes": ""}, indent=2),
+                                         encoding="utf-8")
 
 
 def read_cp2_selection(run_dir: Path) -> dict:
@@ -104,7 +133,7 @@ def read_cp2_selection(run_dir: Path) -> dict:
 
 
 # ---------------------------------------------------------------- CP3: argument
-def write_cp3(run_dir: Path, pkg: dict) -> None:
+def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, framework: dict | None = None) -> None:
     d = cp_dir(run_dir)
     lines = ["# Checkpoint 3 — Approve the argument", "", "## Thesis options", ""]
     for t in pkg.get("thesis_options", []):
@@ -117,11 +146,18 @@ def write_cp3(run_dir: Path, pkg: dict) -> None:
                   f"  - Goes beyond the evidence by: {p.get('what_it_goes_beyond')}",
                   f"  - Premises: {', '.join(p.get('premise_proposition_ids', []))}"]
     lines += ["", "## Knowledge gaps", *[f"- [{g.get('type')}] {g.get('statement')}"
-                                          for g in pkg.get("knowledge_gaps", [])],
-              "", "Fill in `CP3_decision.json`, then run `litreview approve <run_id> CP3`."]
+                                          for g in pkg.get("knowledge_gaps", [])], ""]
+    if pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
+        lines += ["## Synthesis coverage is INCOMPLETE", "",
+                  f"- Mandatory items not satisfied: {len(pkg.get('coverage_incomplete_item_ids') or [])} "
+                  f"({', '.join((pkg.get('coverage_incomplete_item_ids') or [])[:20])})",
+                  f"- Findings accounted for nowhere: {len(pkg.get('findings_unaccounted') or [])}",
+                  "- Coverage is structural only: a satisfied item is not a check that the claim is correct.", ""]
+    lines += [*_emerging_lines(emerging, "findings"), *_framework_lines(framework, "Current theme framework"),
+              "Fill in `CP3_decision.json`, then run `litreview approve <run_id> CP3`."]
     (d / "CP3_review.md").write_text("\n".join(lines), encoding="utf-8")
     template = {"selected_thesis": None, "adopted_interpretations": [], "rejected_interpretations": [],
-                "edits": None, "notes": ""}
+                "edits": None, "theme_framework_update": None, "notes": ""}
     (d / "CP3_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
 

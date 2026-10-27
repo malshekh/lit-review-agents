@@ -1,6 +1,6 @@
 # A4-CQ — Corpus Qualification Agent
 
-Version: 0.2 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
+Version: 0.3 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
 Source lineage: distilled from A3-CQ v0.1 (CANONICAL_RECONCILED). Kept: the core qualification rules (§4.1–4.8), topic-not-evidence boundary (§9), asymmetric two-level screening (§10.2–10.5), dispositions and specific exclusion reasons (§12), reviews never as primary evidence (§11.3), preserved uncertainty and consequence-ordered human review (§13), retraction and preprint handling (§14), bias checks (§17, moved partly to code). Removed: mechanistic link roles and per-link qualification, compound/target/compartment identity boundaries, background and pharmacology partitions, evaluation runs. New for a narrative review: theme assignment and significance tiers (proposals for the researcher, §5).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -60,7 +60,7 @@ A review qualifies with role `CONTEXT` only. It never counts as primary evidence
 
 For each `QUALIFIED` record, add two proposals. These help the researcher choose what the review discusses; they are not decisions.
 
-**Themes.** Assign one or more themes from the specification's organizing principle. If a record fits none, propose a new theme name in `theme_suggestions` rather than forcing it into an existing one.
+**Themes.** The theme framework is hierarchical. Primary themes, proposed by A2-SP and approved by the researcher, organize the review; no agent creates one. Subthemes are free labels that keep biological specificity and travel with records and findings as attributes. Assign `primary_theme_id` from `theme_framework` (the best fit) and any `subthemes` you need to say precisely what the record is about. If the record fits no primary theme's scope, still assign the closest one, set `emerging: true` and say why in `emerging_note`: the record is queued for the researcher at Checkpoint 2. Never invent a primary theme ID. (`themes` is filled by code from `primary_theme_id`.)
 
 **Significance tier.** Propose one tier and give the factual signal behind it, using the specification's `significance_signals`:
 - `CORE` — the review likely cannot discuss its theme without this work (e.g., first demonstration, largest or best-controlled study, a result that changed the field's direction, a strong contrary finding).
@@ -111,7 +111,10 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "sections_inspected": ["string"],
       "exclusion_code": "string|null",
       "reason": "string",
-      "themes": ["string"],
+      "primary_theme_id": "T1",
+      "subthemes": ["string"],
+      "emerging": false,
+      "emerging_note": "string|null",
       "proposed_tier": "CORE | SUPPORTING | CONTEXT | PERIPHERAL | null",
       "tier_signal": "string|null",
       "is_contrary_evidence": true,
