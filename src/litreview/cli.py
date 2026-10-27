@@ -135,7 +135,7 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--notes")
     n.add_argument("--seeds")
     n.add_argument("--family", default="unspecified",
-                   help="topic family for refusal routing, e.g. oncology-drug-repurposing (see runs/model_record.jsonl)")
+                   help="topic family for refusal routing, e.g. oncology-drug-repurposing (see records/model_record.jsonl)")
     n.set_defaults(fn=cmd_new)
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)

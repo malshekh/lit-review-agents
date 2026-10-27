@@ -57,6 +57,10 @@ def write_cp1(run_dir: Path, spec: dict) -> None:
 # ---------------------------------------------------------------- CP2: papers
 CP2_COLUMNS = ["select", "tier_override", "record_id", "disposition", "proposed_tier", "tier_signal",
                "contrary", "themes", "year", "title", "venue", "flags", "reason", "doi", "pmid", "screened_by"]
+SCREENING_SPLIT_CAVEAT = (
+    "The models screened different records, so comparing their exclusion rates is an observational "
+    "screening-bias indicator, not a measure of agreement between models: equal rates do not establish "
+    "agreement, and different rates may reflect different record populations rather than different judgment.")
 
 
 def _framework_lines(fw: dict | None, title: str) -> list[str]:
@@ -116,7 +120,8 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
              "## Counts", *[f"- {k}: {v}" for k, v in sorted(counts.items())], "",
              "## Screened by", *[f"- {k}: {v} records" for k, v in sorted(screeners.items())],
              *(["", "Screening was split between models: compare `exclusion_rate_by_screening_model` "
-                "in the bias checks below before approving."] if len(screeners) > 1 else []), "",
+                "in the bias checks below before approving. " + SCREENING_SPLIT_CAVEAT]
+               if len(screeners) > 1 else []), "",
              "## Bias checks", "```json", json.dumps(bias_report, indent=2), "```", "",
              *_emerging_lines(emerging, "records"), *_framework_lines(framework, "Current theme framework"),
              "Then run `litreview approve <run_id> CP2`."]
@@ -151,8 +156,11 @@ def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, fram
         lines += ["## Synthesis coverage is INCOMPLETE", "",
                   f"- Mandatory items not satisfied: {len(pkg.get('coverage_incomplete_item_ids') or [])} "
                   f"({', '.join((pkg.get('coverage_incomplete_item_ids') or [])[:20])})",
-                  f"- Findings accounted for nowhere: {len(pkg.get('findings_unaccounted') or [])}",
-                  "- Coverage is structural only: a satisfied item is not a check that the claim is correct.", ""]
+                  f"- Findings accounted for nowhere: {len(pkg.get('findings_unaccounted') or [])}", ""]
+    lines += ["## What coverage means", "",
+              "Coverage is structural only: SATISFIED means a mandatory item is linked to a proposition that "
+              "cites its findings. It is not a check that the proposition is correct or states the evidence at "
+              "the right strength; that judgment is yours here, and A10-RV's after drafting.", ""]
     lines += [*_emerging_lines(emerging, "findings"), *_framework_lines(framework, "Current theme framework"),
               "Fill in `CP3_decision.json`, then run `litreview approve <run_id> CP3`."]
     (d / "CP3_review.md").write_text("\n".join(lines), encoding="utf-8")

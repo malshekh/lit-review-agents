@@ -8,3 +8,4 @@ AGENT_PROMPTS_DIR = PROMPTS_DIR / "agents"
 CONFIG_DIR = REPO_ROOT / "config"
 SCHEMAS_DIR = REPO_ROOT / "schemas"
 RUNS_DIR = REPO_ROOT / "runs"
+RECORDS_DIR = REPO_ROOT / "records"   # tracked in git: evidence that outlives a run and a machine

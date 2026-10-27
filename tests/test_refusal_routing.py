@@ -102,6 +102,31 @@ def test_cache_telemetry(tmp_path):
     assert "cache: 1/2 calls hit, 10,629 tokens read, 10,629 written" in b.summary_text()
 
 
+def test_requested_cache_that_neither_read_nor_wrote_is_logged_as_a_miss(tmp_path):
+    b = BudgetTracker(tmp_path)
+    b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 25, 4, "s1", cached_input_tokens=10629, cache_requested=True)
+    dead = b.record("A05-KE", "anthropic", "claude-sonnet-5-5", 10654, 4, "s2", cache_requested=True)
+    assert dead["cache"] == {**dead["cache"], "requested": True, "hit": False, "wrote": False}
+    a = b.summary()["by_agent"]["A05-KE"]
+    assert (a["cache_calls"], a["cache_hits"], a["cache_no_effect"]) == (2, 1, 1)
+    assert "cache: 1/2 calls hit" in b.summary_text() and "1 requested but neither read nor wrote" in b.summary_text()
+    assert "cache" not in b.record("A06-SV", "openai", "gpt-6.1-sol", 10, 10, "s3")   # not requested, nothing cached
+
+
+def test_each_entry_and_the_summary_split_cost_by_token_class(tmp_path):
+    b = BudgetTracker(tmp_path)
+    e = b.record("A07-SYN", "anthropic", "claude-opus-5", 1_000_000, 1_000_000, "s1", cached_input_tokens=1_000_000,
+                 cache_write_tokens=1_000_000, cache_write_1h_tokens=1_000_000, cache_requested=True)
+    assert e["cost_parts_usd"] == {"input": 5.00, "cache_write": 16.25, "cache_read": 0.50, "output": 25.00}
+    assert e["cost_usd"] == pytest.approx(sum(e["cost_parts_usd"].values()))
+    with open(b.log_path, "a", encoding="utf-8") as fh:   # an entry logged before the split existed
+        fh.write('{"agent": "A05-KE", "model": "m", "input_tokens": 1, "output_tokens": 1, "cost_usd": 1.0}\n')
+    s = b.summary()
+    assert s["cost_parts_usd"] == {"input": 5.0, "cache_write": 16.25, "cache_read": 0.5, "output": 25.0}
+    assert s["calls_without_cost_parts"] == 1 and s["spent_usd"] == pytest.approx(47.75)
+    assert "split: input $5.00, cache write $16.25, cache read $0.50, output $25.00  (+1 earlier" in b.summary_text()
+
+
 @pytest.fixture
 def run(tmp_path, monkeypatch):
     monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
@@ -208,3 +233,21 @@ def test_openai_joins_blocks(monkeypatch):
     oc.complete(system="s", user=[{"text": "A", "cache": True}, {"text": "B", "cache": False}],
                 model="gpt-6-luna", max_tokens=10, temperature=0, cache_system=True)
     assert sent["messages"][1]["content"] == "A\n\nB"
+
+
+def test_model_record_is_tracked_and_a_legacy_record_migrates_once(tmp_path, monkeypatch):
+    from litreview.paths import RECORDS_DIR, REPO_ROOT
+    assert model_record.DEFAULT_RECORD == RECORDS_DIR / "model_record.jsonl"
+    assert "records" not in (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    new, old = tmp_path / "records" / "model_record.jsonl", tmp_path / "runs" / "model_record.jsonl"
+    monkeypatch.setattr(model_record, "RECORD", new)
+    monkeypatch.setattr(model_record, "DEFAULT_RECORD", new)
+    monkeypatch.setattr(model_record, "LEGACY", old)
+    model_record.add("m1", "A04-CQ", "onc", "COMPLETED", "r1", "s")
+    shared = new.read_text(encoding="utf-8")
+    old.parent.mkdir()
+    old.write_text(shared + '{"model": "m2", "family": "onc", "outcome": "REFUSED", "category": "bio"}\n',
+                   encoding="utf-8")
+    assert model_record.refused("onc") == {"m2": "bio"}            # migrated on first read
+    assert len(model_record.entries()) == 2                         # the shared line is not duplicated
+    assert not old.exists() and old.with_name("model_record.jsonl.migrated").exists()

@@ -43,10 +43,13 @@ Never paste keys into chat, issues, commits or prompts.
 
 **Refusal routing.** Safety classifiers on some models decline biomedical topics by mistake (Opus 5.5
 declined a drug-repurposing oncology review twice, category `bio`). Refusals are never retried. Every
-agent call is recorded in `runs/model_record.jsonl` with model, agent, outcome and the run's topic
-family (`litreview new --family NAME`). A model that has refused in a family is not used again for it:
-the agent moves to its next alternate (`routing.alternates` in `pipeline.yaml`), or the stage stops
-before any call. `litreview check` summarizes the record per family.
+agent call is recorded in `records/model_record.jsonl` with model, agent, outcome and the run's topic
+family (`litreview new --family NAME`). The record is tracked in git, so qualification evidence
+accumulates across machines and survives a fresh clone: commit it after a run. It merges with git's
+`union` driver (`.gitattributes`), so two machines' appends never conflict. A model that has refused
+in a family is not used again for it: the agent moves to its next alternate (`routing.alternates` in
+`pipeline.yaml`; every agent has one), or the stage stops before any call. `litreview check`
+summarizes the record per family and pings every alternate.
 
 Alternatives already priced in `prices.yaml`: `gpt-6-luna` ($0.10 / $0.50), `kimi-k2.6` ($0.95 / $4), `claude-opus-5-5` ($4 / $20; refuses some biomedical topics).
 

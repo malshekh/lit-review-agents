@@ -104,17 +104,32 @@ synthesis:
   max_tokens_per_turn: 48000     # output cap per call (thinking included)
   max_findings_per_group: 40     # larger groups are split mechanically (same kind and basis)
   context_ceiling_tokens: 900000 # stop cleanly if projected input + max output would exceed this (window 1M)
-  cache_ttl: 5m                  # 5m or 1h. Calls must start within the TTL of the previous call to hit.
+  cache_ttl: 1h                  # 5m or 1h. Calls must start within the TTL of the previous call to hit.
+                                 #   1h: a long GROUP call (thinking at effort high) can exceed 5 minutes
+                                 #   start to start, and one miss re-writes the whole ~440k-token corpus.
 
-# Refusal routing. Every agent call is recorded in runs/model_record.jsonl (shared by all runs) as
-# COMPLETED or REFUSED, with model, agent and the run's topic family (`litreview new --family`).
-# A model that has refused in a topic family is not used again for that family: the agent moves to
-# its next alternate, or the stage fails before any call if none is left. A refusal is never retried.
+# Refusal routing. Every agent call is recorded in records/model_record.jsonl (tracked in git, shared by
+# all runs and machines) as COMPLETED or REFUSED, with model, agent and the run's topic family
+# (`litreview new --family`). A model that has refused in a topic family is not used again for that
+# family: the agent moves to its next alternate, or the stage fails before any call if none is left.
+# A refusal is never retried. Every agent has an alternate; each keeps the vendor rule above (an
+# auditor's alternate is still a different vendor from the agent it checks).
 routing:
   alternates:
+    A02-SP:  [{ provider: kimi,      model: kimi_pro }]          # same price; planners have no vendor constraint
+    A03-LM:  [{ provider: kimi,      model: kimi_pro }]
     # Haiku shares the 5.5 safety-classifier family that refused this topic at Opus 5.5; screening
     # processes hundreds of records, so A04 has a non-Anthropic alternate at the same price.
-    A04-CQ: [{ provider: openai, model: openai_luna }]
+    A04-CQ:  [{ provider: openai,    model: openai_luna }]
+    A05-KE:  [{ provider: anthropic, model: claude_opus5 }]      # audited by OpenAI (A06): stays off OpenAI; 2.5x price
+    A06-SV:  [{ provider: kimi,      model: kimi_pro }]          # audits Claude: stays off Anthropic
+    # Synthesis and writing: Sonnet 5.5 completed every A05 call on this topic family (1M input, 128k output).
+    A07-SYN: [{ provider: anthropic, model: claude_default }]
+    A08-OL:  [{ provider: kimi,      model: kimi_pro }]
+    A09-WRI: [{ provider: anthropic, model: claude_default }]
+    A10-RV:  [{ provider: kimi,      model: kimi_pro }]          # audits Claude: stays off Anthropic
+    A11-RC:  [{ provider: openai,    model: openai_strong }]     # critiques Claude: stays off Anthropic
+    A12-EDI: [{ provider: anthropic, model: claude_opus5 }]      # audited by OpenAI (A10): stays off OpenAI; 2.5x price
 
 checkpoints:
   CP1: { after: A02-SP,  purpose: "Approve scope, perspective and selection criteria" }

@@ -1,0 +1,2 @@
+# Append-only record shared across machines: keep both sides' lines on merge instead of conflicting.
+records/model_record.jsonl merge=union

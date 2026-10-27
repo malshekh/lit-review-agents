@@ -37,6 +37,9 @@ def test_emerging_queue_and_checkpoint_sections(tmp_path):
     write_cp3(tmp_path, {"coverage_incomplete_item_ids": ["MISSING:HUMAN"], "findings_unaccounted": []}, [], FW)
     cp3 = (tmp_path / "checkpoints" / "CP3_review.md").read_text(encoding="utf-8")
     assert "Synthesis coverage is INCOMPLETE" in cp3 and "MISSING:HUMAN" in cp3 and "structural only" in cp3
+    write_cp3(tmp_path, {"coverage_incomplete_item_ids": [], "findings_unaccounted": []}, [], FW)
+    complete = (tmp_path / "checkpoints" / "CP3_review.md").read_text(encoding="utf-8")
+    assert "INCOMPLETE" not in complete and "Coverage is structural only" in complete
 
 
 @pytest.fixture

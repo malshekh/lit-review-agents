@@ -10,8 +10,8 @@
 #   cached_input       reading tokens from the prompt cache. If missing, cached reads are billed at
 #                      `input` (never undercounted) and `litreview check` lists the gap.
 #   cache_write        writing tokens into the 5-minute cache. If missing, billed at `input`.
-#   cache_write_1h     writing tokens into the 1-hour cache. Recorded for reference: nothing requests
-#                      the 1-hour cache. If one appears without this rate, it is billed at `output`
+#   cache_write_1h     writing tokens into the 1-hour cache (the A07 synthesis job, pipeline.yaml ->
+#                      synthesis.cache_ttl). If one appears without this rate, it is billed at `output`
 #                      (an upper bound), so it is never undercounted.
 #   long_context_threshold / long_input / long_output   tiered rates above a prompt size, with
 #                      long_cached_input / long_cache_write / long_cache_write_1h for the cache.

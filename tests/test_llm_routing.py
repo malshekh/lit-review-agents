@@ -36,11 +36,23 @@ def test_every_agent_resolves_to_a_priced_model():
         assert m.provider in config.load("pipeline")["providers"]
 
 
+def test_every_agent_has_a_priced_alternate():
+    prices = config.load("prices")
+    for aid in config.load("pipeline")["agents"]:
+        alts = config.agent_candidates(aid)[1:]
+        assert alts, f"{aid} has no alternate: a refusal would stop the stage"
+        for m in alts:
+            assert prices[m.model]["input"] is not None, (aid, m.model)
+            assert m.provider in config.load("pipeline")["providers"]
+
+
 def test_auditors_use_a_different_vendor_than_producers():
-    a = {aid: config.agent_model(aid).provider for aid in config.load("pipeline")["agents"]}
-    assert a["A06-SV"] != a["A05-KE"]
-    assert a["A10-RV"] != a["A09-WRI"] and a["A10-RV"] != a["A12-EDI"]
-    assert a["A11-RC"] != a["A09-WRI"] and a["A11-RC"] != a["A12-EDI"]
+    """Holds for every candidate, so routing to an alternate never puts an auditor on its producer's vendor."""
+    a = {aid: {m.provider for m in config.agent_candidates(aid)} for aid in config.load("pipeline")["agents"]}
+    for auditor, producers in (("A06-SV", ["A05-KE"]), ("A10-RV", ["A09-WRI", "A12-EDI"]),
+                               ("A11-RC", ["A09-WRI", "A12-EDI"])):
+        for p in producers:
+            assert not a[auditor] & a[p], (auditor, p, a[auditor] & a[p])
 
 
 def test_tracing_is_a_no_op_when_disabled(monkeypatch):

@@ -1,7 +1,7 @@
 # A5-KE — Knowledge Extraction Agent
 
-Version: 0.3 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
-Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check).
+Version: 0.4 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
+Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check). Added in v0.3: primary themes from the approved framework, free subthemes, an emerging flag. Added in v0.4: the table-cell span rule in the self-check (§11).
 
 Read together with `prompts/shared/core_rules.md`.
 
@@ -260,6 +260,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - Every finding has a verbatim span and a warrant note, and the span actually contains the warranting words.
 - No span contains an ellipsis or joins non-adjacent text.
 - Every number in a finding's `quantities` appears inside that finding's span.
+- A value printed only in a table has the table row or cell text as its span, and `span_location.figure_or_table` names that table.
 - No finding's predicate is stronger than its span; no prediction is recorded as a measurement.
 - Null, negative and contrary findings in the inspected content have been extracted.
 - Every finding is bound to a context, and no context value was inferred or borrowed from another experiment.

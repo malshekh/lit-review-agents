@@ -80,6 +80,8 @@ def test_cp2_shows_screener_per_record_and_split_bias_check(run, monkeypatch):
     review = (run2.dir / "checkpoints" / "CP2_review.md").read_text(encoding="utf-8")
     assert "- claude-haiku-5-5: 2 records" in review and "- gpt-6-luna: 3 records" in review
     assert "Screening was split between models" in review
+    assert "not a measure of agreement between models" in bias["exclusion_rate_by_screening_model_caveat"]
+    assert "observational screening-bias indicator" in review and "equal rates do not establish agreement" in review
 
 
 def test_single_screener_has_no_split_section(run, monkeypatch):

@@ -376,7 +376,9 @@ class Run:
             m["received"] += 1
             m["excluded"] += q["disposition"] == "EXCLUDED"
         split = {k: {**v, "exclusion_rate": round(v["excluded"] / v["received"], 3)} for k, v in by_model.items()}
-        extra = {"exclusion_rate_by_screening_model": split} if len(split) > 1 else {}
+        extra = ({"exclusion_rate_by_screening_model": split,
+                  "exclusion_rate_by_screening_model_caveat": checkpoints.SCREENING_SPLIT_CAVEAT}
+                 if len(split) > 1 else {})
         return {"exclusion_rate_by_query_purpose": rates, **extra, "excluded_seed_records": excluded_seeds,
                 "qualified_per_theme": dict(themes),
                 "note": "A markedly higher exclusion rate for CONTRARY_EVIDENCE, or any excluded seed, "
