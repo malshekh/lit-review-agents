@@ -108,6 +108,18 @@ synthesis:
                                  #   1h: a long GROUP call (thinking at effort high) can exceed 5 minutes
                                  #   start to start, and one miss re-writes the whole ~440k-token corpus.
 
+# Vendor batch APIs (50% off) for stages of independent calls: A05 and A06 per paper (A06 only while
+# loops.max_reextractions is 0). Before a batch: one real item runs interactively (a refusal stops the stage
+# for one paper's cost), and the batch is NOT submitted if its projected cost exceeds what is left under
+# spend_cap_usd. Expect under an hour; the vendors allow 24. `litreview run` reattaches to a running batch.
+batch:
+  enabled: true
+  agents: [A05-KE, A06-SV]
+  min_items: 3                 # fewer items left after the probe: run them interactively
+  poll_seconds: 60
+  max_wait_hours: 24.5         # past this the run pauses; rerunning reattaches (results kept 29-30 days)
+  cache_ttl: 1h                # Anthropic: batch items run concurrently, often beyond 5 minutes
+
 # Refusal routing. Every agent call is recorded in records/model_record.jsonl (tracked in git, shared by
 # all runs and machines) as COMPLETED or REFUSED, with model, agent and the run's topic family
 # (`litreview new --family`). A model that has refused in a topic family is not used again for that

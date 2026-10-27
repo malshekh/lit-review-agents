@@ -125,7 +125,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         budget.record(agent_id, resp.provider, resp.model, resp.input_tokens, resp.output_tokens, step=step,
                       cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens,
                       cache_write_1h_tokens=resp.cache_write_1h_tokens, started_at=started,
-                      cache_requested=m.provider == "anthropic" and (m.cache_system or any(p["cache"] for p in user)))
+                      cache_requested=m.provider == "anthropic" and (m.cache_system or any(p["cache"] for p in user)),
+                      prompt_chars=len(system) + sum(len(p["text"]) for p in message))
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
         if resp.stop_reason == "refusal":
             # a policy decline, not a formatting error: never retried (same model, same request, same answer)

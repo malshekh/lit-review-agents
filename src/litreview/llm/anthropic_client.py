@@ -45,6 +45,18 @@ def count_tokens(system: str, user, model: str, cache_system: bool = False, cach
                                                                            cache_ttl)).input_tokens
 
 
+def message_params(system: str, user, model: str, max_tokens: int, temperature: float,
+                   effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m") -> dict:
+    """The Messages request, shared by complete() and a batch item's `params` (identical by construction)."""
+    pcfg = config.load("pipeline")["providers"]["anthropic"]
+    kwargs: dict = {"model": model, "max_tokens": max_tokens, **request_body(system, user, cache_system, cache_ttl)}
+    if pcfg.get("send_temperature", False):
+        kwargs["temperature"] = temperature
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
+    return kwargs
+
+
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
              provider: str = "anthropic", effort: str | None = None, cache_system: bool = False,
              cache_ttl: str = "5m") -> LLMResponse:
@@ -52,14 +64,14 @@ def complete(system: str, user, model: str, max_tokens: int, temperature: float,
     returns the final message. Thinking counts toward max_tokens; `effort` (per agent in
     pipeline.yaml) controls how much of it is spent. Prompt caching: `cache_system` marks the system
     prompt, and user blocks with "cache": True are marked too (the prefix up to each mark is cached)."""
-    pcfg = config.load("pipeline")["providers"]["anthropic"]
-    kwargs: dict = {"model": model, "max_tokens": max_tokens, **request_body(system, user, cache_system, cache_ttl)}
-    if pcfg.get("send_temperature", False):
-        kwargs["temperature"] = temperature
-    if effort:
-        kwargs["output_config"] = {"effort": effort}
+    kwargs = message_params(system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl)
     with _get_client().messages.stream(**kwargs) as s:
         resp = s.get_final_message()
+    return parse_message(resp, model)
+
+
+def parse_message(resp, model: str) -> LLMResponse:
+    """A Message (streamed, or a batch item's `result.message`) as an LLMResponse."""
     text = "".join(block.text for block in resp.content if getattr(block, "type", "") == "text")
     details = getattr(resp, "stop_details", None)
     u = resp.usage

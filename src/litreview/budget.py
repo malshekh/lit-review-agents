@@ -47,9 +47,13 @@ class BudgetTracker:
                 "run.allow_unpriced_models: true in config/pipeline.yaml."
             )
 
-    def _rates(self, model: str, prompt_tokens: int) -> dict | None:
+    def _rates(self, model: str, prompt_tokens: int, batch: bool = False) -> dict | None:
         """Per-million rates for one call. A missing cache rate never undercounts: reads and 5-minute
-        writes fall back to `input`, 1-hour writes (2x input on Anthropic) to `output`."""
+        writes fall back to `input`, 1-hour writes (2x input on Anthropic) to `output`. A batched call uses
+        the `<model>-batch` entry when there is one (else the standard rates, an overstatement); the
+        long-context tier applies within whichever table is used, so batching halves the cliff, not removes it."""
+        if batch and self.price_of(f"{model}-batch") is not None:
+            model = f"{model}-batch"
         p = self.price_of(model)
         if p is None:
             return None
@@ -65,11 +69,12 @@ class BudgetTracker:
                 "cache_write": get("cache_write", p[0]), "cache_write_1h": get("cache_write_1h", p[1])}
 
     def cost_parts(self, model: str, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0,
-                   cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0) -> dict[str, float] | None:
+                   cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0,
+                   batch: bool = False) -> dict[str, float] | None:
         """USD per token class: ordinary input, cache writes (5-minute and 1-hour), cache reads, output.
         input_tokens: uncached input only. cache_write_tokens: 5-minute writes; cache_write_1h_tokens:
         1-hour writes (counted separately, not included in cache_write_tokens)."""
-        r = self._rates(model, input_tokens + cached_input_tokens + cache_write_tokens + cache_write_1h_tokens)
+        r = self._rates(model, input_tokens + cached_input_tokens + cache_write_tokens + cache_write_1h_tokens, batch)
         if r is None:
             return None
         return {"input": input_tokens * r["input"] / 1e6,
@@ -78,9 +83,9 @@ class BudgetTracker:
                 "output": output_tokens * r["output"] / 1e6}
 
     def cost(self, model: str, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0,
-             cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0) -> float | None:
+             cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0, batch: bool = False) -> float | None:
         parts = self.cost_parts(model, input_tokens, output_tokens, cached_input_tokens, cache_write_tokens,
-                                cache_write_1h_tokens)
+                                cache_write_1h_tokens, batch)
         return None if parts is None else sum(parts.values())
 
     def alternate_cost_multiple(self, agent_id: str, primary: str, alternate: str) -> dict | None:
@@ -93,14 +98,18 @@ class BudgetTracker:
         keys = ("input_tokens", "output_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_1h_tokens")
         rows = [e for e in self.entries() if e["agent"] == agent_id and e["model"] == primary]
         if rows:
-            a = sum(self.cost(primary, *(e.get(k, 0) for k in keys)) for e in rows)
-            b = sum(self.cost(alternate, *(e.get(k, 0) for k in keys)) for e in rows)
+            a = sum(self.cost(primary, *(e.get(k, 0) for k in keys), batch=bool(e.get("batch_id"))) for e in rows)
+            b = sum(self.cost(alternate, *(e.get(k, 0) for k in keys), batch=bool(e.get("batch_id"))) for e in rows)
             if a > 0:
                 return {"multiple": round(b / a, 2), "basis": f"this run's {len(rows)} {agent_id} calls on {primary}",
                         "per_call_primary_usd": round(a / len(rows), 4), "per_call_alternate_usd": round(b / len(rows), 4)}
+        # no history: the larger of the input and output ratios. Cache rates are left out: they are a small
+        # share of any call, and a cache-read ratio alone (Kimi 0.20 vs GPT-6.1 0.10) would flag an
+        # alternate that costs the same.
         ra, rb = self._rates(primary, 0), self._rates(alternate, 0)
-        multiple = max(rb[k] / ra[k] for k in ("input", "output", "cached_input", "cache_write") if ra[k])
-        return {"multiple": round(multiple, 2), "basis": "largest rate ratio (no calls on the primary in this run)",
+        multiple = max(rb[k] / ra[k] for k in ("input", "output"))
+        return {"multiple": round(multiple, 2),
+                "basis": "largest rate ratio, input or output (no calls on the primary in this run)",
                 "per_call_primary_usd": None, "per_call_alternate_usd": None}
 
     def missing_cache_rates(self, model: str) -> list[str]:
@@ -141,12 +150,15 @@ class BudgetTracker:
     def record(self, agent_id: str, provider: str, model: str, input_tokens: int,
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
                cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0,
-               started_at: float | None = None, cache_requested: bool = False) -> dict:
+               started_at: float | None = None, cache_requested: bool = False, batch_id: str | None = None,
+               prompt_chars: int | None = None) -> dict:
         """cache_requested: the request carried cache_control marks. A requested cache that neither read
-        nor wrote (a prefix changed by a byte, or below the provider's minimum) is logged as a miss."""
-        since = self._seconds_since_previous(agent_id, model, started_at)
+        nor wrote (a prefix changed by a byte, or below the provider's minimum) is logged as a miss.
+        batch_id: the call ran inside that batch and is billed at batch rates. prompt_chars: characters sent
+        (system + user), so a batch's input can be projected from this run's own tokens-per-character ratio."""
+        since = self._seconds_since_previous(agent_id, model, started_at) if not batch_id else None
         parts = self.cost_parts(model, input_tokens, output_tokens, cached_input_tokens, cache_write_tokens,
-                                cache_write_1h_tokens)
+                                cache_write_1h_tokens, batch=bool(batch_id))
         entry = {
             "time": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "agent": agent_id,
@@ -162,6 +174,10 @@ class BudgetTracker:
             "cost_usd": None if parts is None else sum(parts.values()),
             "cost_parts_usd": None if parts is None else {k: round(v, 6) for k, v in parts.items()},
         }
+        if batch_id:
+            entry["batch_id"] = batch_id
+        if prompt_chars:
+            entry["prompt_chars"] = prompt_chars
         wrote = bool(cache_write_tokens or cache_write_1h_tokens)
         if cache_requested or cached_input_tokens or wrote:
             prompt = input_tokens + cached_input_tokens + cache_write_tokens + cache_write_1h_tokens

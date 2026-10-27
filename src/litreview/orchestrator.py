@@ -27,6 +27,7 @@ from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
 from . import synthesis_input, theme_framework
 from .agents.base import build_system_prompt, user_parts
+from .batch_stage import BatchStage
 from .synthesis_job import JobStopped, SynthesisJob
 from .tools import compliance, display_items, manuscript_export, references, span_check, tags, themes
 from .tools.fulltext import fetch_sections
@@ -484,25 +485,62 @@ class Run:
         self.save("selected_corpus.json", corpus)
         return "extract"
 
+    def run_many(self, agent_id: str, items: list[tuple[str, dict]], on_output) -> None:
+        """Independent calls of one agent (step, payload), each output passed to on_output(step, output) as
+        it arrives. An output already saved for a step is reused, never paid for twice. Agents listed under
+        pipeline.yaml -> batch go through a vendor batch (batch_stage.py); the rest run one by one."""
+        pending = []
+        for step, payload in items:
+            done = self.dir / "outputs" / f"{step}.json"
+            if done.exists():
+                on_output(step, json.loads(done.read_text(encoding="utf-8")))
+            else:
+                pending.append((step, payload))
+        bcfg = self.cfg.get("batch") or {}
+        if pending and bcfg.get("enabled") and agent_id in (bcfg.get("agents") or []):
+            BatchStage(self, agent_id, pending, on_output).run_all()
+            return
+        for step, payload in pending:
+            on_output(step, self.agent(agent_id, payload, step))
+
     def stage_extract(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
+        items, rid_of = [], {}
         for rec in self.load("selected_corpus.json"):
             rid = rec["record_id"]
             if self.data(f"extractions/{rid}.json").exists():
                 continue
-            sections = fetch_sections(rec.get("pmcid")) or {"Abstract": rec.get("abstract") or ""}
+            sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
+                or {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
-            out = self.agent("A05-KE", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
-                                        "content_level": level, "record": {**rec, "content": sections}},
-                             step=f"A05-KE_{rid}")
-            self.save(f"extractions/{rid}.json", normalize_entities(out, self.data("normalization_cache.json")))
+            rid_of[f"A05-KE_{rid}"] = rid
+            items.append((f"A05-KE_{rid}", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
+                                            "content_level": level, "record": {**rec, "content": sections}}))
+        self.run_many("A05-KE", items, lambda step, out: self.save(
+            f"extractions/{rid_of[step]}.json", normalize_entities(out, self.data("normalization_cache.json"))))
         return "validate"
 
     def stage_validate(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
         corpus = self.load("selected_corpus.json")
         max_re = int(self.cfg["loops"]["max_reextractions"])
+        if max_re == 0:
+            # no extract-validate loop: every paper's validation is independent (and can be batched)
+            items, rid_of = [], {}
+            for rec in corpus:
+                rid = rec["record_id"]
+                if self.data(f"validations/{rid}.json").exists():
+                    continue
+                sections = self.load(f"fulltext/{rid}.json")
+                ext = self.load(f"extractions/{rid}.json")
+                # a paper re-extracted before re-extraction was turned off keeps its label (v2)
+                n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
+                rid_of[f"A06-SV_{rid}_v{n}"] = rid
+                items.append((f"A06-SV_{rid}_v{n}", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
+                                                    "gate1_results": span_check.check_findings(ext, sections),
+                                                    "paper_text": sections}))
+            self.run_many("A06-SV", items, lambda step, out: self.save(f"validations/{rid_of[step]}.json", out))
         for rec in corpus:
             rid = rec["record_id"]
             if self.data(f"validations/{rid}.json").exists():

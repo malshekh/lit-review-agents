@@ -76,15 +76,29 @@ def test_cache_pricing(tmp_path):
     assert b.cost("claude-sonnet-5-5", 0, 0, 1_000_000, 0) == pytest.approx(0.10)
     # the live test call: 25 uncached, 10,629 read, 4 out on Sonnet 5.5
     assert b.cost("claude-sonnet-5-5", 25, 4, 10629) == pytest.approx(0.0010629 + 0.00005 + 0.00004)  # $0.00115
-    # gpt-6.1-sol has no cache rates: reads billed at input, never undercounted
-    assert b.cost("gpt-6.1-sol", 0, 0, 1_000_000, 0) == pytest.approx(2.00)
-    assert b.missing_cache_rates("gpt-6.1-sol") == ["cached_input", "cache_write"]
+    # gpt-6-astra has no cache rates: reads billed at input, never undercounted
+    assert b.cost("gpt-6-astra", 0, 0, 1_000_000, 0) == pytest.approx(10.00)
+    assert b.missing_cache_rates("gpt-6-astra") == ["cached_input", "cache_write"]
+
+
+def test_long_context_tier_applies_in_both_standard_and_batch_tables(tmp_path):
+    """gpt-6.1-sol, pricing page 2026-10-27: over 272k prompt tokens every rate switches, batched or not."""
+    b = BudgetTracker(tmp_path)
+    assert b.cost("gpt-6.1-sol", 0, 0, 1_000_000, 0) == pytest.approx(0.20)       # cached read, long tier
+    assert b.cost("gpt-6.1-sol", 200_000, 0, 0, 0) == pytest.approx(0.40)         # short: $2/M
+    assert b.cost("gpt-6.1-sol", 300_000, 100_000) == pytest.approx(1.20 + 1.50)  # long: $4 / $15
+    assert b.cost("gpt-6.1-sol", 200_000, 0, batch=True) == pytest.approx(0.20)   # batch short: $1/M
+    assert b.cost("gpt-6.1-sol", 300_000, 100_000, batch=True) == pytest.approx(0.60 + 0.75)  # batch long: $2 / $7.50
+    assert b.cost("claude-sonnet-5-5", 1_000_000, 1_000_000, 1_000_000, 0, 1_000_000, batch=True)         == pytest.approx(1.00 + 5.00 + 0.05 + 2.00)
+    assert b.cost("gpt-6-luna", 1_000_000, 0, batch=True) == pytest.approx(0.10)   # no batch entry: standard rate
+    e = b.record("A06-SV", "openai", "gpt-6.1-sol", 200_000, 0, "s", batch_id="batch_1")
+    assert e["batch_id"] == "batch_1" and e["cost_usd"] == pytest.approx(0.20)
 
 
 def test_one_hour_writes_priced_separately_and_never_undercounted(tmp_path):
     b = BudgetTracker(tmp_path)
     assert b.cost("claude-sonnet-5-5", 0, 0, 0, 0, 1_000_000) == pytest.approx(4.00)     # listed 1h rate
-    assert b.cost("gpt-6.1-sol", 0, 0, 0, 0, 1_000_000) == pytest.approx(10.00)          # no rate: output, upper bound
+    assert b.cost("gpt-6-astra", 0, 0, 0, 0, 1_000_000) == pytest.approx(50.00)          # no rate: output, upper bound
     # Haiku above 100k tokens switches every rate, cache rates included
     assert b.cost("claude-haiku-5-5", 0, 0, 200_000, 0) == pytest.approx(200_000 * 0.05 / 1e6)
 

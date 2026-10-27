@@ -22,9 +22,8 @@ def _get_client(provider: str):
     return _clients[provider]
 
 
-def complete(system: str, user, model: str, max_tokens: int, temperature: float,
-             provider: str = "openai", effort: str | None = None, cache_system: bool = False,
-             cache_ttl: str = "5m") -> LLMResponse:
+def chat_params(system: str, user, model: str, max_tokens: int, temperature: float, provider: str = "openai") -> dict:
+    """The Chat Completions request body, shared by complete() and a batch line's `body`."""
     # `effort` and `cache_system` are Claude settings; OpenAI and Kimi cache repeated prompt prefixes
     # automatically, so blocks are simply joined in order (the stable prefix stays first).
     p = config.load("pipeline")["providers"][provider]
@@ -38,7 +37,22 @@ def complete(system: str, user, model: str, max_tokens: int, temperature: float,
         kwargs["temperature"] = temperature
     if p.get("json_mode", True):
         kwargs["response_format"] = {"type": "json_object"}
-    resp = _get_client(provider).chat.completions.create(**kwargs)
+    return kwargs
+
+
+def complete(system: str, user, model: str, max_tokens: int, temperature: float,
+             provider: str = "openai", effort: str | None = None, cache_system: bool = False,
+             cache_ttl: str = "5m") -> LLMResponse:
+    resp = _get_client(provider).chat.completions.create(**chat_params(system, user, model, max_tokens,
+                                                                       temperature, provider))
+    return parse_completion(resp, provider, model)
+
+
+def parse_completion(resp, provider: str, model: str) -> LLMResponse:
+    """A ChatCompletion (or a batch output line's `response.body`, as a dict) as an LLMResponse."""
+    if isinstance(resp, dict):
+        from openai.types.chat import ChatCompletion
+        resp = ChatCompletion.model_validate(resp)
     choice = resp.choices[0]
     u = resp.usage
     details = getattr(u, "prompt_tokens_details", None)

@@ -81,6 +81,28 @@ provider reports per call; `litreview costs` shows cached tokens per agent. Wher
 those tokens are billed at the full input price, so spend is never undercounted; `litreview check`
 lists the gaps.
 
+Batch rates live in a separate entry, `<model>-batch`, with the same fields. A batched call on a model
+without one is billed at standard rates. Long-context tiers (`long_context_threshold`, `long_*`) apply
+within whichever table is used: batching halves the price above the threshold but does not remove the
+jump. GPT-6.1 doubles input and raises output 1.5x above 272k prompt tokens.
+
+**Batching** (`batch:` in `pipeline.yaml`). A05 and A06 per-paper calls go through the vendors' batch
+APIs at 50% off. A06 is batched only while `loops.max_reextractions` is 0. Each batch works as follows:
+
+1. One real paper runs interactively first. If the model refuses, nothing is submitted, and the
+   stage stops at the cost of one paper.
+2. The batch is not submitted if its projected cost exceeds what is left under `spend_cap_usd`. A
+   submitted batch cannot be stopped, so the run refuses rather than asks.
+3. An intent record is written before the batch is created. If the run stops at any point,
+   `litreview run` reattaches to the batch rather than resubmitting it, including when the batch ID was
+   never saved.
+4. Results are ingested one at a time, and each item's cost is logged once.
+5. Items that came back as invalid JSON or truncated are retried interactively, with JSON repair.
+   Expired items are resubmitted. Refused items go to the alternate through the cost check.
+
+Expect under an hour; the vendors allow 24 hours. Kimi has no batch endpoint, so A06 on its Kimi
+alternate runs interactively, at about twice the batched GPT-6.1 cost, and the cost check asks first.
+
 ## 4. Databases — `config/sources.yaml`
 
 Enabled: PubMed, Europe PMC, PubTator3, OpenAlex, Semantic Scholar, ClinicalTrials.gov.
