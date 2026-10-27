@@ -115,6 +115,10 @@ synthesis:
 # A refusal is never retried. Every agent has an alternate; each keeps the vendor rule above (an
 # auditor's alternate is still a different vendor from the agent it checks).
 routing:
+  # Routing to an alternate that would cost more than this multiple of the primary (priced from the
+  # run's own calls) stops the run before any call and asks: `litreview approve-alternate RUN AGENT`.
+  # A05 and A12 on Opus 5 (about 2.5x, more with cache reads) always ask.
+  max_cost_multiple: 1.5
   alternates:
     A02-SP:  [{ provider: kimi,      model: kimi_pro }]          # same price; planners have no vendor constraint
     A03-LM:  [{ provider: kimi,      model: kimi_pro }]

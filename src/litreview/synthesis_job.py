@@ -58,7 +58,7 @@ class Ledger:
 
     def state(self) -> dict:
         st = {"items": {}, "satisfied_by": {}, "committed": [], "propositions": [], "duplicates_rejected": 0,
-              "propositions_rejected": [], "findings": {}, "turns_rejected": []}
+              "propositions_rejected": [], "findings": {}, "turns_rejected": [], "models_by_turn": {}}
         pending: list[dict] = []
         for e in self.events():
             t = e["event"]
@@ -72,6 +72,7 @@ class Ledger:
                         self._apply(st, p)
                 pending = [p for p in pending if p["turn"] != e["turn"]]
                 st["committed"].append(e["turn"])
+                st["models_by_turn"][e["turn"]] = e.get("model")
             elif t == "TURN_REJECTED":
                 st["turns_rejected"].append({"turn": e["turn"], "reason": e["reason"]})
         return st
@@ -97,16 +98,18 @@ class Ledger:
 # ------------------------------------------------------------------ the job
 class SynthesisJob:
     def __init__(self, job_dir: Path, mandatory: dict[str, dict], finding_ids: list[str], record_of: dict[str, str],
-                 call: Callable[[str, dict, str], dict], count: Callable[[dict], int], cfg: dict):
+                 call: Callable[[str, dict, str], dict], count: Callable[[dict], int], cfg: dict,
+                 served_by: Callable[[], str | None] = lambda: None):
         """call(mode, turn, step) -> parsed output; raises AgentError (incl. truncation). count(turn) ->
-        projected input tokens for that call. cfg: max_tokens_per_turn, context_ceiling_tokens,
-        max_findings_per_group."""
+        projected input tokens for that call. served_by() -> the model that served the last call (recorded
+        on each turn's commit, so a job resumed on an alternate after a refusal names both models).
+        cfg: max_tokens_per_turn, context_ceiling_tokens, max_findings_per_group."""
         self.dir = Path(job_dir)
         self.turns_dir = self.dir / "turns"
         self.turns_dir.mkdir(parents=True, exist_ok=True)
         self.ledger = Ledger(self.dir / "ledger.jsonl")
         self.mandatory, self.finding_ids, self.record_of = mandatory, set(finding_ids), record_of
-        self.call, self.count, self.cfg = call, count, cfg
+        self.call, self.count, self.cfg, self.served_by = call, count, cfg, served_by
         self.peak_projected = 0
         if not self.ledger.events():
             self.ledger.append({"event": "JOB_STARTED", "mandatory_item_ids": sorted(mandatory)})
@@ -123,7 +126,8 @@ class SynthesisJob:
         """Turn file first, then the staged effects, then the commit marker. A crash before the marker
         leaves the turn uncommitted: it is redone, and its staged effects are never applied."""
         self._turn_file(turn).write_text(json.dumps(output, ensure_ascii=False, indent=1), encoding="utf-8")
-        self.ledger.append({"event": "TURN_STAGED", "turn": turn, **staged}, {"event": "TURN_COMMITTED", "turn": turn})
+        self.ledger.append({"event": "TURN_STAGED", "turn": turn, **staged},
+                           {"event": "TURN_COMMITTED", "turn": turn, "model": self.served_by()})
 
     def _run_turn(self, mode: str, turn: str, payload: dict) -> dict:
         projected = self.count(payload) + int(self.cfg["max_tokens_per_turn"])
@@ -284,10 +288,15 @@ class SynthesisJob:
         dispositions = {f: st["findings"].get(f, ["UNACCOUNTED"]) for f in sorted(self.finding_ids)}
         pending = [c["manifest_item_id"] for c in coverage if c["status"] != "SATISFIED"]
         unaccounted = [f for f, u in dispositions.items() if u == ["UNACCOUNTED"]]
+        models = sorted({m for m in st["models_by_turn"].values() if m})
+        mixed = ([f"MIXED_MODELS: this synthesis was produced by {len(models)} models ({', '.join(models)}); "
+                  "see models_by_turn. Report both in the AI-use disclosure."] if len(models) > 1 else [])
         return {
             "agent_id": "A07-SYN", "prompt_version": plan.get("prompt_version", ""),
             "status": "COMPLETE" if not pending and not unaccounted else "INCOMPLETE",
-            "warnings": [w for t in turns for w in t.get("warnings") or []],
+            "warnings": mixed + [w for t in turns for w in t.get("warnings") or []],
+            "models": models,
+            "models_by_turn": dict(st["models_by_turn"]),
             "limitations": [x for t in turns for x in t.get("limitations") or []],
             "package_version": f"job-{len(st['committed'])}-turns",
             "fivew1h": plan.get("fivew1h") or [],

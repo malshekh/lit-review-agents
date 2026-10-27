@@ -38,10 +38,12 @@ def config_lines() -> tuple[list[str], bool, set[str]]:
     for model, missing in sorted(gaps.items()):
         lines.append(f"  {INFO} {model:18s} no {' or '.join(missing)} rate: billed at the input price until set")
     from .. import model_record
+    blocked = model_record.blocked()
     for family, models in sorted(model_record.summary().items()):
         refused = [f"{m} ({c['REFUSED']})" for m, c in sorted(models.items()) if c["REFUSED"]]
         lines.append(f"  {INFO} topic family '{family}': {sum(c['COMPLETED'] for c in models.values())} completed calls; "
-                     f"refused: {', '.join(refused) or 'none'}")
+                     f"refused: {', '.join(refused) or 'none'}"
+                     + (f"; no qualified model recorded for {', '.join(blocked[family])}" if family in blocked else ""))
     return lines, ok, providers
 
 

@@ -140,7 +140,17 @@ def read_cp2_selection(run_dir: Path) -> dict:
 # ---------------------------------------------------------------- CP3: argument
 def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, framework: dict | None = None) -> None:
     d = cp_dir(run_dir)
-    lines = ["# Checkpoint 3 — Approve the argument", "", "## Thesis options", ""]
+    lines = ["# Checkpoint 3 — Approve the argument", ""]
+    if len(pkg.get("models") or []) > 1:
+        by_model: dict[str, list[str]] = {}
+        for turn, model in (pkg.get("models_by_turn") or {}).items():
+            by_model.setdefault(model or "not recorded", []).append(turn)
+        lines += ["## This synthesis was produced by more than one model", "",
+                  "A model refused partway through, and the job resumed on its alternate. Propositions from "
+                  "different models sit side by side; the AI-use disclosure must name both "
+                  "(`provenance_summary.json`).", "",
+                  *[f"- {m}: {', '.join(t)}" for m, t in sorted(by_model.items())], ""]
+    lines += ["## Thesis options", ""]
     for t in pkg.get("thesis_options", []):
         lines += [f"### {t.get('option_id')} ({t.get('type')})", t.get("text", ""), "",
                   f"- Title draft: {t.get('title_draft')}",

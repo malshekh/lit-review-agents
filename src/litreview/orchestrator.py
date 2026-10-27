@@ -37,6 +37,14 @@ from .tools.normalization import normalize_entities
 
 STAGES = ["scope", "cp1", "search", "qualify", "expand", "cp2", "extract", "validate", "synthesize", "cp3",
           "outline", "draft", "review_loop", "finish_edit", "finalize", "done"]
+# The last stage that calls each agent (A05 re-extracts during validation; A10 verifies through finalize).
+AGENT_LAST_STAGE = {"A02-SP": "scope", "A03-LM": "search", "A04-CQ": "expand", "A05-KE": "validate",
+                    "A06-SV": "validate", "A07-SYN": "synthesize", "A08-OL": "outline", "A09-WRI": "draft",
+                    "A10-RV": "finalize", "A11-RC": "review_loop", "A12-EDI": "finish_edit"}
+
+
+class NoQualifiedModel(AgentError):
+    """Every candidate model for an agent has refused the run's topic family."""
 
 
 class Pause(Exception):
@@ -95,10 +103,80 @@ class Run:
         candidates = config.agent_candidates(agent_id)
         for m in candidates:
             if m.model not in refused:
+                if m is not candidates[0]:
+                    self._check_alternate_cost(agent_id, candidates[0].model, m.model)
                 return m
-        raise AgentError(f"{agent_id}: every candidate model has refused topic family '{self.family()}' "
-                         f"({', '.join(f'{m.model}: {refused[m.model]}' for m in candidates)}). Add an "
-                         "alternate under pipeline.yaml -> routing.alternates.")
+        raise self._no_qualified_model(agent_id, [m.model for m in candidates], "route")
+
+    def _no_qualified_model(self, agent_id: str, tried: list[str], step: str) -> NoQualifiedModel:
+        """Every candidate has refused this family. Deliberately a dead end, not a reason to add a model
+        chosen for availability rather than fitness. The message names every model tried, where and why it
+        refused, so the researcher can judge whether the topic needs rewording or the family is blocked.
+        Recorded once per agent and family in the model record."""
+        family, all_refusals = self.family(), model_record.refusals(self.family())
+        lines = []
+        for model in tried:
+            seen: dict[tuple, list[dict]] = {}
+            for r in all_refusals.get(model, []):
+                seen.setdefault((r["agent"], r["category"] or "category not returned"), []).append(r)
+            lines.append(f"  - {model}: " + "; ".join(
+                f"refused at {a} ({c}), {len(rs)}x, first in run {rs[0]['run_id']} step {rs[0]['step']}"
+                for (a, c), rs in seen.items()))
+        if agent_id not in model_record.blocked().get(family, []):
+            model_record.no_qualified_model(agent_id, family, tried, self.id, step)
+        return NoQualifiedModel(
+            f"No qualified model for {agent_id} in topic family '{family}'. Every candidate, in routing order, "
+            "has refused this family:\n" + "\n".join(lines) + "\nThe pipeline cannot run this agent for this "
+            "family. If the refusals look like classifier false positives on the wording, reword the topic and "
+            "start a run under a new family; otherwise the family is blocked for this agent.")
+
+    def preflight_routing(self) -> None:
+        """At run start: stop before any spending if some agent has no unrefused model in this family,
+        rather than paying for search and extraction and stopping at synthesis."""
+        refused = model_record.refused(self.family())
+        done = STAGES[:STAGES.index(self.state()["stage"])]
+        for agent_id in self.cfg["agents"]:
+            if AGENT_LAST_STAGE.get(agent_id) in done:   # this run no longer needs the agent
+                continue
+            tried = [m.model for m in config.agent_candidates(agent_id)]
+            if all(t in refused for t in tried):
+                raise self._no_qualified_model(agent_id, tried, "preflight")
+
+    def _check_alternate_cost(self, agent_id: str, primary: str, alternate: str) -> None:
+        """Routing to an alternate that would raise the agent's cost by more than routing.max_cost_multiple
+        stops the run and asks, before any call. `litreview approve-alternate` records the researcher's
+        consent for this run, agent and model (a logged human decision)."""
+        limit = float((self.cfg.get("routing") or {}).get("max_cost_multiple", 1.5))
+        approved = self.load("approved_alternates.json", {}).get(agent_id) or {}
+        if approved.get("model") == alternate:
+            return
+        est = self.budget.alternate_cost_multiple(agent_id, primary, alternate)
+        if est is not None and est["multiple"] <= limit:
+            return
+        per_call = (f" (about ${est['per_call_primary_usd']:.2f} -> ${est['per_call_alternate_usd']:.2f} per call)"
+                    if est and est["per_call_primary_usd"] is not None else "")
+        msg = (f"{agent_id}: {primary} has refused this topic family, and its alternate {alternate} would cost "
+               + (f"{est['multiple']}x as much{per_call}, above routing.max_cost_multiple {limit}x; basis: {est['basis']}"
+                  if est else "an unknown amount (unpriced)")
+               + f". To accept, run:  litreview approve-alternate {self.id} {agent_id}")
+        self.save("alternate_pending.json", {"agent": agent_id, "primary": primary, "alternate": alternate,
+                                             "estimate": est, "limit": limit})
+        notify.send("budget_warning", f"Run {self.id}: alternate for {agent_id} needs your approval", msg)
+        raise Pause(msg)
+
+    def approve_alternate(self, agent_id: str) -> dict:
+        pending = self.load("alternate_pending.json")
+        if not pending or pending["agent"] != agent_id:
+            raise ValueError(f"no alternate for {agent_id} is waiting for approval in run {self.id}")
+        approved = self.load("approved_alternates.json", {})
+        approved[agent_id] = {"model": pending["alternate"], "estimate": pending["estimate"],
+                              "approved_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        self.save("approved_alternates.json", approved)
+        self.data("alternate_pending.json").unlink()
+        self.prov.human_decision("ALTERNATE_COST", {"agent": agent_id, "primary": pending["primary"],
+                                                    "alternate": pending["alternate"], **(pending["estimate"] or {})},
+                                 "approved routing to a costlier alternate after a refusal")
+        return pending
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None) -> dict:
@@ -139,6 +217,7 @@ class Run:
         st["status"] = "RUNNING"
         self.save_state(st)
         try:
+            self.preflight_routing()
             while st["stage"] != "done":
                 if until and st["stage"] == until:
                     raise Pause(f"stopped before {until} (--until)")
@@ -578,7 +657,7 @@ class Run:
 
         job = SynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", synthesis_input.mandatory_items(manifest),
                            [f["finding_id"] for f in findings], {f["finding_id"]: f["record_id"] for f in findings},
-                           call, count, scfg)
+                           call, count, scfg, served_by=lambda: self.last_model)
         try:
             pkg = job.run()
         except JobStopped as e:
@@ -586,7 +665,31 @@ class Run:
             raise Pause(f"synthesis job stopped cleanly — {e}. `litreview run` resumes from the last committed turn.")
         self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, pkg))
         self.save("synthesis_package.json", pkg)
+        # which model produced which turns: the source for the AI-use disclosure (provenance_summary.json)
+        self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
+                           {"models": pkg["models"], "mixed_models": len(pkg["models"]) > 1,
+                            "models_by_turn": pkg["models_by_turn"]})
         return "cp3"
+
+    def _provenance_summary(self) -> dict:
+        """The source for the AI-use disclosure. Names every model that produced output, per agent, and
+        flags agents whose output came from more than one model (an alternate after a refusal): a review
+        whose synthesis came from two models is a different artifact and must say so."""
+        ev = self.prov.events()
+        by_agent: dict[str, dict[str, int]] = {}
+        for e in ev:
+            if e["type"] == "agent_call" and e["status"] not in ("FAILED", "REFUSED"):
+                m = by_agent.setdefault(e["agent"], {})
+                m[e["model"]] = m.get(e["model"], 0) + 1
+        jobs = [e["summary"] for e in ev if e["type"] == "tool_run" and e["tool"] == "synthesis_job"]
+        return {"agent_calls": sum(e["type"] == "agent_call" for e in ev),
+                "models_by_agent": by_agent,
+                "mixed_model_agents": sorted(a for a, m in by_agent.items() if len(m) > 1),
+                "synthesis_models_by_turn": jobs[-1]["models_by_turn"] if jobs else None,
+                "refusals": [{"agent": e["agent"], "model": e["model"], "step": e["step"]}
+                             for e in ev if e["type"] == "agent_call" and e["status"] == "REFUSED"],
+                "human_decisions": [e for e in ev if e["type"] == "human_decision"],
+                "verification_statement": self.load("rv_final.json", {}).get("verification_statement")}
 
     def _job_report(self, tag: str, pkg: dict) -> dict:
         """Totals across the job's calls, from the cost log, plus the ledger's counts."""
@@ -601,6 +704,8 @@ class Run:
             "cache_hit_rate": round(sum(e["cache"]["hit"] for e in cached) / len(cached), 3) if cached else None,
             "start_to_start_seconds": [e["cache"].get("seconds_since_previous_start") for e in cached],
             "cost_usd": round(sum(e["cost_usd"] or 0 for e in calls), 4),
+            "models": pkg.get("models"),
+            "models_by_turn": pkg.get("models_by_turn"),
             "status": pkg.get("status"),
             **pkg.get("job_stats", {}),
             "coverage_incomplete_item_ids": pkg.get("coverage_incomplete_item_ids"),
@@ -897,11 +1002,8 @@ class Run:
                                  "display_items": self.load("manuscript_plan.json").get("display_items", [])})
         (final_dir / "compliance.json").write_text(json.dumps(comp, indent=2), encoding="utf-8")
         (final_dir / "costs.txt").write_text(self.budget.summary_text(), encoding="utf-8")
-        ev = self.prov.events()
-        prov = {"agent_calls": sum(e["type"] == "agent_call" for e in ev),
-                "human_decisions": [e for e in ev if e["type"] == "human_decision"],
-                "verification_statement": self.load("rv_final.json", {}).get("verification_statement")}
-        (final_dir / "provenance_summary.json").write_text(json.dumps(prov, indent=2), encoding="utf-8")
+        (final_dir / "provenance_summary.json").write_text(json.dumps(self._provenance_summary(), indent=2),
+                                                           encoding="utf-8")
         notify.send("complete", f"Run {self.id}: review draft complete",
                     f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
                     f"Main text: {comp['main_text_words']} words, {comp['references']} references\n\n"

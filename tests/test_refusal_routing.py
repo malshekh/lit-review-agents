@@ -161,8 +161,49 @@ def test_all_candidates_refused_stops_before_any_call(run, monkeypatch):
     monkeypatch.setattr(config, "agent_candidates",
                         lambda a: [config.AgentModel(a, "anthropic", "claude-opus-5", 1000, 0.0)])
     monkeypatch.setattr(agent_base, "complete", lambda *a, **k: pytest.fail("must not call the API"))
-    with pytest.raises(agent_base.AgentError, match="every candidate model has refused"):
+    with pytest.raises(agent_base.AgentError, match="No qualified model for A07-SYN"):
         run.agent("A07-SYN", {}, "s")
+
+
+def test_dead_end_names_every_model_tried_and_is_recorded_once(run, monkeypatch):
+    model_record.add("claude-opus-5", "A07-SYN", "onc", "REFUSED", "r1", "A07-SYN_job_PLAN", "bio")
+    model_record.add("claude-sonnet-5-5", "A05-KE", "onc", "REFUSED", "r1", "A05-KE_R0007", "bio")
+    model_record.add("claude-sonnet-5-5", "A05-KE", "onc", "REFUSED", "r2", "A05-KE_R0012", "bio")
+    model_record.add("claude-sonnet-5-5", "A09-WRI", "onc", "REFUSED", "r2", "A09-WRI_draft1", None)
+    with pytest.raises(orch.NoQualifiedModel) as e:
+        run.route("A07-SYN")
+    msg = str(e.value)
+    assert "No qualified model for A07-SYN in topic family 'onc'" in msg
+    assert "- claude-opus-5: refused at A07-SYN (bio), 1x, first in run r1 step A07-SYN_job_PLAN" in msg
+    assert ("- claude-sonnet-5-5: refused at A05-KE (bio), 2x, first in run r1 step A05-KE_R0007; "
+            "refused at A09-WRI (category not returned), 1x" in msg)
+    assert msg.index("claude-opus-5:") < msg.index("claude-sonnet-5-5:")   # routing order
+    with pytest.raises(orch.NoQualifiedModel):
+        run.route("A07-SYN")
+    dead = [x for x in model_record.entries() if x["outcome"] == "NO_QUALIFIED_MODEL"]
+    assert len(dead) == 1 and dead[0]["agent"] == "A07-SYN" and "claude-sonnet-5-5" in dead[0]["note"]
+    assert model_record.blocked() == {"onc": ["A07-SYN"]}
+    assert "(none)" not in model_record.summary()["onc"]                # dead ends are not a model's calls
+    assert model_record.refusals("onc")["claude-sonnet-5-5"][0]["agent"] == "A05-KE"   # agent kept per refusal
+
+
+def test_preflight_stops_a_new_run_before_any_spending(run, monkeypatch):
+    model_record.add("claude-opus-5", "A07-SYN", "onc", "REFUSED", "r1", "s", "bio")
+    model_record.add("claude-sonnet-5-5", "A05-KE", "onc", "REFUSED", "r1", "s", "bio")
+    monkeypatch.setattr(orch, "run_agent", lambda *a, **k: pytest.fail("must not call any agent"))
+    monkeypatch.setattr(orch.notify, "send", lambda *a, **k: None)
+    status = run.run()
+    assert status.startswith("FAILED: No qualified model for A05-KE")    # first blocked agent in pipeline order
+    assert run.state()["stage"] == "scope"
+
+
+def test_preflight_ignores_agents_whose_stages_are_done(run):
+    model_record.add("claude-haiku-5-5", "A04-CQ", "onc", "REFUSED", "r1", "s", "bio")
+    model_record.add("gpt-6-luna", "A04-CQ", "onc", "REFUSED", "r1", "s", "bio")
+    with pytest.raises(orch.NoQualifiedModel, match="A04-CQ"):
+        run.preflight_routing()
+    run.save_state({"stage": "synthesize", "status": "READY", "counters": {}})
+    run.preflight_routing()                                                 # screening is behind this run
 
 
 def test_completed_call_is_recorded(run, monkeypatch, tmp_path):
@@ -251,3 +292,50 @@ def test_model_record_is_tracked_and_a_legacy_record_migrates_once(tmp_path, mon
     assert model_record.refused("onc") == {"m2": "bio"}            # migrated on first read
     assert len(model_record.entries()) == 2                         # the shared line is not duplicated
     assert not old.exists() and old.with_name("model_record.jsonl.migrated").exists()
+    with open(new, "a", encoding="utf-8") as fh:                      # what a union merge can leave behind
+        fh.write(shared)
+    assert len(model_record.entries()) == 2 and model_record.summary()["onc"]["m1"]["COMPLETED"] == 1
+
+
+def test_costly_alternate_stops_and_asks_before_any_call(run, monkeypatch):
+    """A05 on Opus 5 after a Sonnet 5.5 refusal: priced from this run's own A05 calls, then approved once."""
+    for i in range(3):   # A05's real profile: cached system prompt, uncached paper, long output
+        run.budget.record("A05-KE", "anthropic", "claude-sonnet-5-5", 30_000, 12_000, f"p{i}",
+                          cached_input_tokens=10_600, cache_requested=True)
+    model_record.add("claude-sonnet-5-5", "A05-KE", "onc", "REFUSED", "t", "p3", "bio")
+    monkeypatch.setattr(agent_base, "complete", lambda *a, **k: pytest.fail("must not call the API"))
+    with pytest.raises(orch.Pause, match=r"A05-KE: .*claude-opus-5 would cost 2\.5\dx as much .*approve-alternate t A05-KE"):
+        run.agent("A05-KE", {}, "p3")
+    pending = run.load("alternate_pending.json")
+    assert pending["estimate"]["basis"] == "this run's 3 A05-KE calls on claude-sonnet-5-5"
+    assert pending["estimate"]["per_call_alternate_usd"] > 2.5 * pending["estimate"]["per_call_primary_usd"]
+    run.approve_alternate("A05-KE")
+    assert run.route("A05-KE").model == "claude-opus-5"                     # consent holds for this run
+    ev = [e for e in run.prov.events() if e["type"] == "human_decision"][-1]
+    assert ev["checkpoint"] == "ALTERNATE_COST" and ev["decision"]["alternate"] == "claude-opus-5"
+    with pytest.raises(ValueError):
+        run.approve_alternate("A05-KE")                                     # nothing pending any more
+
+
+def test_cheaper_or_equal_alternates_route_without_asking(run):
+    (run.dir / "input" / "topic_family.txt").write_text("other", encoding="utf-8")
+    model_record.add("claude-sonnet-5-5", "A12-EDI", "other", "REFUSED", "t", "s", "bio")
+    with pytest.raises(orch.Pause, match=r"largest rate ratio"):          # no A12 calls yet: upper bound
+        run.route("A12-EDI")
+    (run.dir / "input" / "topic_family.txt").write_text("onc", encoding="utf-8")
+    model_record.add("claude-opus-5", "A07-SYN", "onc", "REFUSED", "t", "s", "bio")
+    model_record.add("gpt-6.1-sol", "A06-SV", "onc", "REFUSED", "t", "s", "cyber")
+    assert run.route("A07-SYN").model == "claude-sonnet-5-5"               # cheaper: no question
+    assert run.route("A06-SV").model == "kimi-k3.1-pro"                    # same price: no question
+
+
+def test_provenance_summary_names_every_model_and_flags_mixed_agents(run):
+    run.prov.agent_call("A07-SYN", "j_PLAN", "claude-opus-5", "0.6", "o", "OK")
+    run.prov.agent_call("A07-SYN", "j_GROUP_G2", "claude-opus-5", "0.6", "", "REFUSED")
+    run.prov.agent_call("A07-SYN", "j_GROUP_G2", "claude-sonnet-5-5", "0.6", "o", "OK")
+    run.prov.agent_call("A05-KE", "p1", "claude-sonnet-5-5", "0.4", "o", "OK")
+    run.prov.tool_run("synthesis_job", "j", {"models_by_turn": {"PLAN": "claude-opus-5", "GROUP_G2": "claude-sonnet-5-5"}})
+    s = run._provenance_summary()
+    assert s["models_by_agent"]["A07-SYN"] == {"claude-opus-5": 1, "claude-sonnet-5-5": 1}
+    assert s["mixed_model_agents"] == ["A07-SYN"] and s["synthesis_models_by_turn"]["GROUP_G2"] == "claude-sonnet-5-5"
+    assert s["refusals"] == [{"agent": "A07-SYN", "model": "claude-opus-5", "step": "j_GROUP_G2"}]

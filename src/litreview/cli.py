@@ -97,6 +97,20 @@ def cmd_approve(args) -> int:
     return 0
 
 
+def cmd_approve_alternate(args) -> int:
+    r = Run(args.run_id)
+    try:
+        p = r.approve_alternate(args.agent)
+    except ValueError as e:
+        print(e)
+        return 1
+    est = p["estimate"] or {}
+    print(f"{args.agent} may use {p['alternate']} for this run"
+          + (f" ({est['multiple']}x the cost of {p['primary']})" if est else "")
+          + f". Logged as your decision. Continue with:  litreview run {args.run_id}")
+    return 0
+
+
 def cmd_revise(args) -> int:
     back = {"CP1": ("scope", "cp1_feedback.json"), "CP3": ("synthesize", "cp3_feedback.json")}
     if args.checkpoint not in back:
@@ -153,6 +167,10 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("run_id")
     a.add_argument("checkpoint", choices=["CP1", "CP2", "CP3"])
     a.set_defaults(fn=cmd_approve)
+    aa = sub.add_parser("approve-alternate", help="accept a costlier alternate model after a refusal (this run only)")
+    aa.add_argument("run_id")
+    aa.add_argument("agent", help="e.g. A05-KE")
+    aa.set_defaults(fn=cmd_approve_alternate)
     v = sub.add_parser("revise")
     v.add_argument("run_id")
     v.add_argument("checkpoint", choices=["CP1", "CP3"])

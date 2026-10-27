@@ -83,6 +83,26 @@ class BudgetTracker:
                                 cache_write_1h_tokens)
         return None if parts is None else sum(parts.values())
 
+    def alternate_cost_multiple(self, agent_id: str, primary: str, alternate: str) -> dict | None:
+        """How much more the agent's work would cost on `alternate` than on `primary`. Priced from this run's
+        calls by the agent on the primary (each call re-priced at both models' rates, so tiers apply per call);
+        with no such calls, the largest ratio between the two models' rates, an upper bound. None if either
+        model is unpriced."""
+        if self.price_of(primary) is None or self.price_of(alternate) is None:
+            return None
+        keys = ("input_tokens", "output_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_1h_tokens")
+        rows = [e for e in self.entries() if e["agent"] == agent_id and e["model"] == primary]
+        if rows:
+            a = sum(self.cost(primary, *(e.get(k, 0) for k in keys)) for e in rows)
+            b = sum(self.cost(alternate, *(e.get(k, 0) for k in keys)) for e in rows)
+            if a > 0:
+                return {"multiple": round(b / a, 2), "basis": f"this run's {len(rows)} {agent_id} calls on {primary}",
+                        "per_call_primary_usd": round(a / len(rows), 4), "per_call_alternate_usd": round(b / len(rows), 4)}
+        ra, rb = self._rates(primary, 0), self._rates(alternate, 0)
+        multiple = max(rb[k] / ra[k] for k in ("input", "output", "cached_input", "cache_write") if ra[k])
+        return {"multiple": round(multiple, 2), "basis": "largest rate ratio (no calls on the primary in this run)",
+                "per_call_primary_usd": None, "per_call_alternate_usd": None}
+
     def missing_cache_rates(self, model: str) -> list[str]:
         tier = self.prices.get(model) or {}
         return [k for k in ("cached_input", "cache_write") if tier.get(k) is None]

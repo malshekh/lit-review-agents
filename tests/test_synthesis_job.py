@@ -251,3 +251,24 @@ def test_stage_synthesize_sends_a_byte_identical_corpus_every_call(tmp_path, mon
     tag = sent[0][0].split("_")[1][3:]
     rep = r.load(f"synthesis_job_{tag}/report.json")
     assert rep["status"] == "COMPLETE" and rep["propositions_valid"] == 3
+
+
+def test_job_resumed_on_an_alternate_after_a_refusal_names_both_models(tmp_path):
+    from litreview.agents import RefusalError
+    from litreview.checkpoints import write_cp3
+    served = {"model": "claude-opus-5"}
+    m = Model(OUT, fail={"GROUP_G2": RefusalError("declined", "claude-opus-5", "bio")})
+    with pytest.raises(RefusalError):        # a refusal is not a clean stop: the run fails and re-routes
+        SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, m, lambda t: 1000, CFG,
+                     served_by=lambda: served["model"]).run()
+    served["model"] = "claude-sonnet-5-5"   # the next run routes A07 to its alternate and resumes
+    pkg = SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, m, lambda t: 1000, CFG,
+                       served_by=lambda: served["model"]).run()
+    assert pkg["models_by_turn"] == {"PLAN": "claude-opus-5", "GROUP_G1": "claude-opus-5",
+                                     "GROUP_G2": "claude-sonnet-5-5", "FINAL": "claude-sonnet-5-5"}
+    assert pkg["models"] == ["claude-opus-5", "claude-sonnet-5-5"] and pkg["warnings"][0].startswith("MIXED_MODELS")
+    write_cp3(tmp_path, pkg)
+    cp3 = (tmp_path / "checkpoints" / "CP3_review.md").read_text(encoding="utf-8")
+    assert "produced by more than one model" in cp3 and "- claude-sonnet-5-5: GROUP_G2, FINAL" in cp3
+    single = job(tmp_path / "one", Model(OUT)).run()
+    assert not any(w.startswith("MIXED_MODELS") for w in single["warnings"])

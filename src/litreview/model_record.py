@@ -39,7 +39,10 @@ def entries(path: Path | None = None) -> list[dict]:
     if not Path(path).exists():
         return []
     with open(path, encoding="utf-8") as fh:
-        return [json.loads(line) for line in fh if line.strip()]
+        # a union merge keeps both copies of a line two branches added at different positions; every line
+        # carries time, run and step, so an exact repeat is a merge artifact, never a second call
+        lines = dict.fromkeys(line.strip() for line in fh if line.strip())
+    return [json.loads(line) for line in lines]
 
 
 def add(model: str, agent: str, family: str, outcome: str, run_id: str, step: str,
@@ -65,10 +68,43 @@ def refused(family: str, path: Path | None = None) -> dict[str, str]:
     return out
 
 
+def refusals(family: str, path: Path | None = None) -> dict[str, list[dict]]:
+    """{model: [{agent, category, run_id, step}, ...]} — every refusal in this family, with the agent it
+    happened at. Routing disqualifies a model for the whole family; the agent is kept so the rule can be
+    narrowed to per-agent later if the evidence shows the classifier fires per task, not per topic."""
+    out: dict[str, list[dict]] = {}
+    for e in entries(path):
+        if e["family"] == family and e["outcome"] == "REFUSED":
+            out.setdefault(e["model"], []).append({k: e.get(k) for k in ("agent", "category", "run_id", "step")})
+    return out
+
+
+def no_qualified_model(agent: str, family: str, tried: list[str], run_id: str, step: str,
+                       path: Path | None = None) -> None:
+    """Record that every candidate for `agent` has refused this family: the pipeline cannot run this agent
+    for it. Informational (routing derives the dead end from the refusals and the current candidates, so
+    adding a qualified alternate later unblocks it); it makes the dead end visible in the record and in
+    `litreview check`."""
+    add("(none)", agent, family, "NO_QUALIFIED_MODEL", run_id, step,
+        note=f"every candidate refused: {', '.join(tried)}", path=path)
+
+
 def summary(path: Path | None = None) -> dict[str, dict[str, dict[str, int]]]:
-    """{family: {model: {"COMPLETED": n, "REFUSED": n}}} for `litreview check`."""
+    """{family: {model: {"COMPLETED": n, "REFUSED": n}}} for `litreview check`. Dead ends
+    (NO_QUALIFIED_MODEL) are reported by `blocked`, not counted here."""
     out: dict = {}
     for e in entries(path):
+        if e["outcome"] == "NO_QUALIFIED_MODEL":
+            continue
         m = out.setdefault(e["family"], {}).setdefault(e["model"], {"COMPLETED": 0, "REFUSED": 0})
         m[e["outcome"]] = m.get(e["outcome"], 0) + 1
+    return out
+
+
+def blocked(path: Path | None = None) -> dict[str, list[str]]:
+    """{family: [agents]} with a recorded dead end."""
+    out: dict[str, list[str]] = {}
+    for e in entries(path):
+        if e["outcome"] == "NO_QUALIFIED_MODEL" and e["agent"] not in out.get(e["family"], []):
+            out.setdefault(e["family"], []).append(e["agent"])
     return out

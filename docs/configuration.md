@@ -51,6 +51,21 @@ in a family is not used again for it: the agent moves to its next alternate (`ro
 `pipeline.yaml`; every agent has one), or the stage stops before any call. `litreview check`
 summarizes the record per family and pings every alternate.
 
+If every candidate for an agent has refused a family, the run stops with "No qualified model for
+AGENT", naming each model tried, the agent it refused at and its category, so you can judge whether
+to reword the topic (a new family) or treat the family as blocked. This is deliberate: no model is
+added just to fill the slot. The dead end is recorded (`NO_QUALIFIED_MODEL`, shown by `litreview
+check`). Every run checks routing when it starts and stops before spending anything if an agent it
+still needs has no qualified model. Refusals disqualify a model for the whole family, but each records
+the agent it happened at, so the rule can be narrowed to per-agent if the evidence supports it.
+
+An alternate that would cost more than `routing.max_cost_multiple` (default 1.5x) times the primary
+stops the run before any call and asks. The multiple is priced from the run's own calls on the primary,
+or from the largest rate ratio if there are none. `litreview approve-alternate RUN AGENT` accepts it for
+that run, and is logged as your decision. A05 and A12 on Opus 5 always ask (2.5x on run 20261025-100039).
+If an agent's output came from two models, `provenance_summary.json` lists it under `mixed_model_agents`;
+for the A07 job it also records which model produced each turn (`synthesis_models_by_turn`).
+
 Alternatives already priced in `prices.yaml`: `gpt-6-luna` ($0.10 / $0.50), `kimi-k2.6` ($0.95 / $4), `claude-opus-5-5` ($4 / $20; refuses some biomedical topics).
 
 To change a model: edit the alias under `models:` or the `model:` of one agent. Keep auditors on a
