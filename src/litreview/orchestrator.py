@@ -29,7 +29,8 @@ from . import synthesis_input, theme_framework
 from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
 from .synthesis_job import JobStopped, SynthesisJob
-from .tools import compliance, display_items, manuscript_export, references, span_check, tags, themes
+from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
+                    verification_scope)
 from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
@@ -98,15 +99,24 @@ class Run:
         p = self.dir / "input" / "topic_family.txt"
         return (p.read_text(encoding="utf-8").strip() if p.exists() else "") or "unspecified"
 
-    def route(self, agent_id: str) -> config.AgentModel:
-        """First of the agent's candidate models that has not refused in this run's topic family."""
+    def route(self, agent_id: str, exclude_providers: frozenset = frozenset()) -> config.AgentModel:
+        """First of the agent's candidate models that has not refused in this run's topic family and is not
+        on an excluded vendor. `exclude_providers`: the vendors that produced the work this call audits (an
+        auditor never runs on the vendor it checks; A06 passes the vendor of each paper's actual extraction)."""
         refused = model_record.refused(self.family())
         candidates = config.agent_candidates(agent_id)
         for m in candidates:
-            if m.model not in refused:
+            if m.model not in refused and m.provider not in exclude_providers:
                 if m is not candidates[0]:
-                    self._check_alternate_cost(agent_id, candidates[0].model, m.model)
+                    why = ("has refused this topic family" if candidates[0].model in refused else
+                           f"is on {candidates[0].provider}, the vendor that produced the work it audits")
+                    self._check_alternate_cost(agent_id, candidates[0].model, m.model, why)
                 return m
+        if exclude_providers and any(m.model not in refused for m in candidates):
+            raise AgentError(
+                f"{agent_id}: no candidate model outside {', '.join(sorted(exclude_providers))}, the vendor(s) "
+                "that produced the work it audits. Vendor separation is a scientific property of the audit, "
+                "not an optimization: add an alternate on another vendor in pipeline.yaml -> routing.")
         raise self._no_qualified_model(agent_id, [m.model for m in candidates], "route")
 
     def _no_qualified_model(self, agent_id: str, tried: list[str], step: str) -> NoQualifiedModel:
@@ -143,7 +153,8 @@ class Run:
             if all(t in refused for t in tried):
                 raise self._no_qualified_model(agent_id, tried, "preflight")
 
-    def _check_alternate_cost(self, agent_id: str, primary: str, alternate: str) -> None:
+    def _check_alternate_cost(self, agent_id: str, primary: str, alternate: str,
+                              why: str = "has refused this topic family") -> None:
         """Routing to an alternate that would raise the agent's cost by more than routing.max_cost_multiple
         stops the run and asks, before any call. `litreview approve-alternate` records the researcher's
         consent for this run, agent and model (a logged human decision)."""
@@ -156,7 +167,7 @@ class Run:
             return
         per_call = (f" (about ${est['per_call_primary_usd']:.2f} -> ${est['per_call_alternate_usd']:.2f} per call)"
                     if est and est["per_call_primary_usd"] is not None else "")
-        msg = (f"{agent_id}: {primary} has refused this topic family, and its alternate {alternate} would cost "
+        msg = (f"{agent_id}: {primary} {why}, and its alternate {alternate} would cost "
                + (f"{est['multiple']}x as much{per_call}, above routing.max_cost_multiple {limit}x; basis: {est['basis']}"
                   if est else "an unknown amount (unpriced)")
                + f". To accept, run:  litreview approve-alternate {self.id} {agent_id}")
@@ -180,8 +191,8 @@ class Run:
         return pending
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
-              schema_file: str | None = None) -> dict:
-        m = self.route(agent_id)
+              schema_file: str | None = None, exclude_providers: frozenset = frozenset()) -> dict:
+        m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
         try:
@@ -485,10 +496,12 @@ class Run:
         self.save("selected_corpus.json", corpus)
         return "extract"
 
-    def run_many(self, agent_id: str, items: list[tuple[str, dict]], on_output) -> None:
+    def run_many(self, agent_id: str, items: list[tuple[str, dict]], on_output, exclude=None) -> None:
         """Independent calls of one agent (step, payload), each output passed to on_output(step, output) as
         it arrives. An output already saved for a step is reused, never paid for twice. Agents listed under
-        pipeline.yaml -> batch go through a vendor batch (batch_stage.py); the rest run one by one."""
+        pipeline.yaml -> batch go through a vendor batch (batch_stage.py); the rest run one by one.
+        exclude(step): vendors that item may not run on (the vendors of the work it audits)."""
+        exclude = exclude or (lambda step: frozenset())
         pending = []
         for step, payload in items:
             done = self.dir / "outputs" / f"{step}.json"
@@ -498,10 +511,10 @@ class Run:
                 pending.append((step, payload))
         bcfg = self.cfg.get("batch") or {}
         if pending and bcfg.get("enabled") and agent_id in (bcfg.get("agents") or []):
-            BatchStage(self, agent_id, pending, on_output).run_all()
+            BatchStage(self, agent_id, pending, on_output, exclude).run_all()
             return
         for step, payload in pending:
-            on_output(step, self.agent(agent_id, payload, step))
+            on_output(step, self.agent(agent_id, payload, step, exclude_providers=frozenset(exclude(step))))
 
     def stage_extract(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
@@ -520,6 +533,18 @@ class Run:
         self.run_many("A05-KE", items, lambda step, out: self.save(
             f"extractions/{rid_of[step]}.json", normalize_entities(out, self.data("normalization_cache.json"))))
         return "validate"
+
+    def _extraction_vendor(self, rid: str, entries: list[dict] | None = None) -> str:
+        """The vendor that actually produced this paper's current extraction: the provider of the last call
+        logged for its extraction step (the re-extraction when one was kept). A refused call is logged before
+        the alternate's, so the last call is the producer. Unknown -> stop: the vendor rule cannot be checked."""
+        step = (f"A05-KE_{rid}_reextract" if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists()
+                else f"A05-KE_{rid}")
+        calls = [e for e in (entries if entries is not None else self.budget.entries()) if e["step"] == step]
+        if not calls:
+            raise AgentError(f"A06-SV: cannot tell which vendor produced the extraction of {rid} (no call logged "
+                             f"for {step}), so vendor separation cannot be enforced; not validating it.")
+        return calls[-1]["provider"]
 
     def stage_validate(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
@@ -540,7 +565,10 @@ class Run:
                 items.append((f"A06-SV_{rid}_v{n}", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
                                                     "gate1_results": span_check.check_findings(ext, sections),
                                                     "paper_text": sections}))
-            self.run_many("A06-SV", items, lambda step, out: self.save(f"validations/{rid_of[step]}.json", out))
+            entries = self.budget.entries()
+            vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
+            self.run_many("A06-SV", items, lambda step, out: self.save(f"validations/{rid_of[step]}.json", out),
+                          exclude=vendor.__getitem__)
         for rec in corpus:
             rid = rec["record_id"]
             if self.data(f"validations/{rid}.json").exists():
@@ -554,7 +582,8 @@ class Run:
                 gate1 = span_check.check_findings(ext, sections)
                 val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
                                             "gate1_results": gate1, "paper_text": sections},
-                                 step=f"A06-SV_{rid}_v{attempt + 1 + label_offset}")
+                                 step=f"A06-SV_{rid}_v{attempt + 1 + label_offset}",
+                                 exclude_providers=frozenset({self._extraction_vendor(rid)}))
                 serious = [d for d in val.get("defect_reports", []) if d.get("severity") in ("CRITICAL", "MAJOR")]
                 if not serious or attempt == max_re:
                     break
@@ -583,6 +612,9 @@ class Run:
                 by_theme[th].append(f)
         same_study = {r["record_id"]: [x for x in r.get("flags", []) if "SAME_STUDY" in x] for r in corpus}
         theme_records = {}
+        # a theme pass audits findings from many papers: it stays off every vendor that produced any of them
+        entries = self.budget.entries()
+        theme_exclude = frozenset(self._extraction_vendor(r["record_id"], entries) for r in corpus) if by_theme else frozenset()
         for th, fs in by_theme.items():
             definition = next((t for t in (self.load("theme_framework.json") or {}).get("primary_themes", [])
                                if t["theme_id"] == th), None)
@@ -591,7 +623,8 @@ class Run:
                                                       "same_study_flags": same_study,
                                                       "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")}
                                                                   for r in corpus]},
-                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}")
+                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}",
+                                           exclude_providers=theme_exclude)
         self.save("validated_findings.json", findings)
         self.save("theme_records.json", theme_records)
         return "synthesize"
@@ -871,12 +904,29 @@ class Run:
 
     # --- writing and review ------------------------------------------
     def _verify(self, manuscript: dict, pass_: str, step: str, changed: list | None = None) -> dict:
-        return self.agent("A10-RV", {"pass": pass_, "manuscript": manuscript,
-                                     "manuscript_plan": self.load("manuscript_plan.json"),
-                                     "synthesis_package": self.load("synthesis_approved.json"),
-                                     "validated_findings": self.load("validated_findings.json"),
-                                     "deterministic_report": self._deterministic_report(manuscript),
-                                     "changed_passages": changed}, step=step)
+        """A10 sees, in full, the findings the manuscript's claims are bound to (through its tags and the
+        plan's title, abstract, heading and display propositions), with their contexts and source passages;
+        every other validated finding only as a contradiction-index line (ID, assertion, disposition), enough
+        to flag a conflict and ask for the record. Requested records are sent in one detail round (at most
+        verification_scope.MAX_DETAIL), and that round's output replaces the first."""
+        plan, pkg = self.load("manuscript_plan.json"), self.load("synthesis_approved.json")
+        findings = self.load("validated_findings.json")
+        full, index, stats = verification_scope.scope(manuscript, plan, pkg, findings)
+        payload = {"pass": pass_, "manuscript": manuscript, "manuscript_plan": plan, "synthesis_package": pkg,
+                   "validated_findings": full, "contradiction_index": index,
+                   "deterministic_report": self._deterministic_report(manuscript), "changed_passages": changed}
+        rv = self.agent("A10-RV", payload, step=step)
+        wanted, ignored = verification_scope.requested(rv, index)
+        self.prov.tool_run("verification_scope", step, {**stats, "detail_requested": len(wanted) + len(ignored),
+                                                        "detail_ignored": ignored})
+        if not wanted:
+            return rv
+        by_id = {f["finding_id"]: f for f in findings}
+        return self.agent("A10-RV", {**payload, "validated_findings": full + [by_id[f] for f in wanted],
+                                     "contradiction_index": [i for i in index if i["finding_id"] not in wanted],
+                                     "detail_round": {"requested": rv.get("detail_requests"),
+                                                      "first_round_findings": rv.get("findings")}},
+                          step=f"{step}_detail")
 
     def _maybe_verify(self, manuscript: dict, pass_: str, step: str, previous: dict,
                       changed: list | None = None) -> dict:

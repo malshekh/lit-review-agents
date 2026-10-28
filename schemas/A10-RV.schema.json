@@ -48,6 +48,26 @@
     },
     "finding_severity": {
       "type": "string"
+    },
+    "detail_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "type": "string"
+          },
+          "assertion_excerpt": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id"
+        ]
+      }
     }
   },
   "required": [

@@ -89,19 +89,52 @@ jump. GPT-6.1 doubles input and raises output 1.5x above 272k prompt tokens.
 **Batching** (`batch:` in `pipeline.yaml`). A05 and A06 per-paper calls go through the vendors' batch
 APIs at 50% off. A06 is batched only while `loops.max_reextractions` is 0. Each batch works as follows:
 
-1. One real paper runs interactively first. If the model refuses, nothing is submitted, and the
-   stage stops at the cost of one paper.
-2. The batch is not submitted if its projected cost exceeds what is left under `spend_cap_usd`. A
-   submitted batch cannot be stopped, so the run refuses rather than asks.
-3. An intent record is written before the batch is created. If the run stops at any point,
-   `litreview run` reattaches to the batch rather than resubmitting it, including when the batch ID was
-   never saved.
-4. Results are ingested one at a time, and each item's cost is logged once.
-5. Items that came back as invalid JSON or truncated are retried interactively, with JSON repair.
-   Expired items are resubmitted. Refused items go to the alternate through the cost check.
+1. **Routing per paper.** Each item routes on its own, and an auditor never runs on the vendor that
+   produced the work it audits: A06 routes each paper on the provider that actually produced that paper's
+   extraction (the last call logged for it). Items are grouped by model into provider-specific batches,
+   and the rule is checked again before anything is uploaded. If the extraction's vendor cannot be
+   determined, the paper is not validated.
+2. **Probe.** One real paper per model runs interactively first. If the model refuses, nothing is
+   submitted, and the stage stops at the cost of one paper.
+3. **Reservation.** The batch's worst-case cost (every item at the configured `max_tokens`, every
+   Anthropic item paying a cache write) is reserved under a lock before submission and held until the
+   batch settles. If it does not fit under `spend_cap_usd` after spend and every other reservation,
+   nothing is submitted: the run refuses rather than asks. Expect it to refuse batches that would have
+   fit. Interactive calls also count held reservations. `litreview costs` shows what is reserved.
+4. **Fingerprint.** Before the batch is created, the run records an intent with a fingerprint: run ID,
+   stage, a submission ID, the request IDs (each step plus the submission's nonce) and the SHA-256 of the
+   frozen request manifest (`data/batches/manifests/`).
+5. **Recovery by identity.** If the batch ID was never saved, time, item count and input file only
+   nominate candidates. A candidate is adopted only when confirmed against the manifest: on OpenAI by
+   the hash of its input file, on Anthropic by its request IDs once it has ended. A batch that cannot be
+   confirmed leaves the submission UNRESOLVED and the run paused; a replacement is never submitted
+   automatically. "Never created" is concluded only from a complete listing of a closed 15-minute
+   creation window. Batch creation is never retried by the SDK, since a retry after a timeout can
+   create a second batch.
+6. **Ingestion.** Results are ingested one at a time, and each item's cost is logged once. The
+   reservation shrinks as costs are logged and is released when the batch settles.
+7. **Failures.** Items that came back as invalid JSON or truncated are retried interactively, with JSON
+   repair. Expired items are resubmitted as a new submission. Refused items go to the alternate through
+   the cost check.
 
-Expect under an hour; the vendors allow 24 hours. Kimi has no batch endpoint, so A06 on its Kimi
-alternate runs interactively, at about twice the batched GPT-6.1 cost, and the cost check asks first.
+The vendors allow 24 hours. Turnaround and throughput at full scale are unmeasured: the 2-item tests in
+`records/batch_tests.jsonl` established compatibility only (6 minutes on Anthropic, 63 on OpenAI). Kimi has
+no batch endpoint, so A06 on its Kimi alternate runs interactively, at about twice the batched GPT-6.1
+cost, and the cost check asks first.
+
+**Savings reporting.** `litreview costs` reports cache savings apart from the batch discount, so each can
+be judged on its own: cache reads saved (cached tokens at input minus read rate), cache-write premiums
+over the input price (5-minute and 1-hour separately), their net, and the batch discount (the same calls
+at standard rates minus what they cost). The 1-hour configuration pays only if reads saved exceed the
+1-hour write premium at scale.
+
+**A10 input scope.** A10 receives in full only the validated findings the manuscript's claims are bound to
+(through sentence tags and the plan's title, abstract, heading and display propositions), with their
+contexts and source passages. Every other finding goes in a contradiction index: ID, assertion
+(A06's plain-language limit) and disposition, about 53 tokens a line against 514 for a full record
+(run 20261025-100039). A finding that contradicts a claim is not cited by it, so it must stay visible.
+A10 lists index entries that seem to bear on a claim in `detail_requests`; one detail round sends those
+records in full (at most 40), and its output replaces the first.
 
 ## 4. Databases — `config/sources.yaml`
 

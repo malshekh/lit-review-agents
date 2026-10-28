@@ -7,9 +7,14 @@ openai_compatible.chat_params) and each result parsed by the same parser, so a b
 interactive call differ only in transport and price. Both vendors process within 24 hours (Anthropic: most
 batches under an hour) and return partial results on expiry; unfinished items are reported, not lost.
 Results are kept 29 days (Anthropic) or 30 days (OpenAI), so a stopped run can reattach by batch ID.
+
+Batch creation is never retried by the SDK (max_retries=0): a create that timed out may still have created
+the batch, and an automatic retry would create and bill a second one. A failed create leaves the caller's
+intent record, which is resolved by identity (input_sha256, result_ids), never by resubmitting.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 
@@ -39,19 +44,32 @@ def request(provider: str, custom_id: str, system: str, user, model: str, max_to
     raise ValueError(f"no batch support for provider '{provider}'")
 
 
-def upload(provider: str, requests: list[dict]) -> str | None:
-    """OpenAI: upload the JSONL input file (no cost, creates no batch). Anthropic: nothing to upload."""
+def manifest(requests: list[dict]) -> bytes:
+    """The frozen request manifest: the exact JSONL bytes uploaded to OpenAI, hashed for identity on both."""
+    return "".join(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n" for r in requests).encode("utf-8")
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def upload(provider: str, data: bytes) -> str | None:
+    """OpenAI: upload the manifest as the JSONL input file (no cost, creates no batch). Anthropic: nothing."""
     if provider != "openai":
         return None
-    data = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in requests).encode("utf-8")
     return openai_compatible._get_client("openai").files.create(file=("batch.jsonl", data), purpose="batch").id
 
 
-def create(provider: str, requests: list[dict], input_file_id: str | None = None) -> str:
+def create(provider: str, requests: list[dict], input_file_id: str | None = None,
+           metadata: dict | None = None) -> str:
+    """Create the batch, once. OpenAI carries the submission fingerprint as batch metadata; Anthropic batches
+    have no metadata, so there the fingerprint lives in the custom_ids."""
     if provider == "anthropic":
-        return anthropic_client._get_client().messages.batches.create(requests=requests).id
-    return openai_compatible._get_client("openai").batches.create(
-        input_file_id=input_file_id, endpoint="/v1/chat/completions", completion_window="24h").id
+        client = anthropic_client._get_client().with_options(max_retries=0, timeout=600)
+        return client.messages.batches.create(requests=requests).id
+    client = openai_compatible._get_client("openai").with_options(max_retries=0, timeout=600)
+    return client.batches.create(input_file_id=input_file_id, endpoint="/v1/chat/completions",
+                                 completion_window="24h", metadata=metadata or {}).id
 
 
 def status(provider: str, batch_id: str) -> dict:
@@ -100,22 +118,39 @@ def results(provider: str, batch_id: str, model: str) -> list[ItemResult]:
     return out
 
 
-def recent(provider: str, limit: int = 20) -> list[dict]:
-    """Recent batches, for recovering one whose ID was never saved: [{id, created_at (epoch), total,
-    input_file_id}]."""
+def recent(provider: str, since: float, max_rows: int = 2000) -> tuple[list[dict], bool]:
+    """Batches created at or after `since` (epoch), newest first, paging as far back as needed:
+    ([{id, created_at, total, input_file_id, metadata}], covered). `covered` is True only if the listing
+    reached a batch older than `since` or its end, so an empty result is proof of absence, not a short page."""
     if provider == "anthropic":
-        rows = []
-        for b in anthropic_client._get_client().messages.batches.list(limit=limit):
-            c = b.request_counts
-            rows.append({"id": b.id, "created_at": b.created_at.timestamp(), "input_file_id": None,
-                         "total": c.processing + c.succeeded + c.errored + c.canceled + c.expired})
-            if len(rows) >= limit:
-                break
-        return rows
+        listing = anthropic_client._get_client().messages.batches.list(limit=100)
+    else:
+        listing = openai_compatible._get_client("openai").batches.list(limit=100)
     rows = []
-    for b in openai_compatible._get_client("openai").batches.list(limit=limit):
-        rows.append({"id": b.id, "created_at": float(b.created_at), "input_file_id": b.input_file_id,
-                     "total": b.request_counts.total if b.request_counts else None})
-        if len(rows) >= limit:
-            break
-    return rows
+    for b in listing:   # the SDK pages automatically
+        if provider == "anthropic":
+            c = b.request_counts
+            row = {"id": b.id, "created_at": b.created_at.timestamp(), "input_file_id": None, "metadata": None,
+                   "total": c.processing + c.succeeded + c.errored + c.canceled + c.expired}
+        else:
+            row = {"id": b.id, "created_at": float(b.created_at), "input_file_id": b.input_file_id,
+                   "metadata": dict(b.metadata or {}), "total": b.request_counts.total if b.request_counts else None}
+        if row["created_at"] < since:
+            return rows, True
+        rows.append(row)
+        if len(rows) >= max_rows:
+            return rows, False
+    return rows, True
+
+
+def input_sha256(input_file_id: str) -> str:
+    """OpenAI: the hash of a batch's input file as the vendor holds it."""
+    return sha256(openai_compatible._get_client("openai").files.content(input_file_id).content)
+
+
+def result_ids(provider: str, batch_id: str) -> list[str] | None:
+    """Anthropic: the custom_ids a batch actually processed, available once it has ended (None before)."""
+    client = anthropic_client._get_client()
+    if client.messages.batches.retrieve(batch_id).processing_status != "ended":
+        return None
+    return [r.custom_id for r in client.messages.batches.results(batch_id)]

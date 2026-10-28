@@ -6,8 +6,10 @@ token counts the APIs return and the per-million-token prices in config/prices.y
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import config
@@ -29,6 +31,7 @@ class BudgetTracker:
         self.allow_unpriced = bool(pipeline.get("allow_unpriced_models", False))
         self.prices = config.load("prices")
         self.log_path = Path(run_dir) / "costs.jsonl"
+        self.reservations_path = Path(run_dir) / "reservations.json"
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
         self._warned = False
 
@@ -143,9 +146,87 @@ class BudgetTracker:
         return sum(e["cost_usd"] or 0.0 for e in self.entries())
 
     def ensure_headroom(self) -> None:
-        """Raise before a call if the cap is already reached."""
-        if self.spent() >= self.cap:
-            raise BudgetExceeded(f"Spend cap ${self.cap:.2f} reached (${self.spent():.2f} spent).")
+        """Raise before a call if the cap is already reached, counting spend reserved by unsettled batches."""
+        held = self.reserved()
+        if self.spent() + held >= self.cap:
+            raise BudgetExceeded(f"Spend cap ${self.cap:.2f} reached (${self.spent():.2f} spent"
+                                 + (f", ${held:.2f} reserved by unsettled batches" if held else "") + ").")
+
+    # --- reservations ----------------------------------------------------
+    # A batch commits its whole cost at submission and cannot be stopped, so its worst-case cost is reserved
+    # before submission and held until the batch settles. The check and the reservation happen under one
+    # lock, so two submissions cannot both pass the same remaining-cap check. A held reservation shrinks
+    # as its batch's actual costs are logged (never below zero), so nothing is counted twice.
+    @contextmanager
+    def _lock(self, timeout: float = 120.0, stale_after: float = 600.0):
+        lock = self.log_path.with_name("budget.lock")
+        start = time.time()
+        while True:
+            try:
+                fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+                break
+            except (FileExistsError, PermissionError):   # Windows: PermissionError while the holder deletes it
+                try:
+                    if time.time() - lock.stat().st_mtime > stale_after:   # left by a crashed holder
+                        lock.unlink(missing_ok=True)
+                        continue
+                except FileNotFoundError:
+                    continue
+                if time.time() - start > timeout:
+                    raise BudgetExceeded(f"budget lock {lock} held for over {timeout:.0f}s; nothing reserved")
+                time.sleep(0.2)
+        try:
+            yield
+        finally:
+            os.close(fd)
+            lock.unlink(missing_ok=True)
+
+    def reservations(self) -> dict:
+        if not self.reservations_path.exists():
+            return {}
+        return json.loads(self.reservations_path.read_text(encoding="utf-8"))
+
+    def _write_reservations(self, res: dict) -> None:
+        tmp = self.reservations_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(res, indent=1), encoding="utf-8")
+        os.replace(tmp, self.reservations_path)
+
+    def reserved(self) -> float:
+        """Spend held by unsettled batches: each reservation less the costs its batch has already logged."""
+        res = self.reservations()
+        if not res:
+            return 0.0
+        logged: dict[str, float] = defaultdict(float)
+        for e in self.entries():
+            if e.get("batch_id"):
+                logged[e["batch_id"]] += e["cost_usd"] or 0.0
+        return sum(max(0.0, r["usd"] - (logged[r["batch_id"]] if r.get("batch_id") else 0.0)) for r in res.values())
+
+    def reserve(self, key: str, usd: float, agent_id: str, note: str = "") -> tuple[bool, float]:
+        """Hold `usd` under `key` if it fits under the cap after spend and every other reservation.
+        Returns (reserved, what was available before this reservation)."""
+        with self._lock():
+            available = self.cap - self.spent() - self.reserved()
+            if usd > available:
+                return False, available
+            res = self.reservations()
+            res[key] = {"usd": round(usd, 6), "agent": agent_id, "batch_id": None, "note": note,
+                        "reserved_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "reserved_epoch": time.time()}
+            self._write_reservations(res)
+            return True, available
+
+    def attach_reservation(self, key: str, batch_id: str) -> None:
+        with self._lock():
+            res = self.reservations()
+            if key in res:
+                res[key]["batch_id"] = batch_id
+                self._write_reservations(res)
+
+    def release(self, key: str) -> None:
+        with self._lock():
+            res = self.reservations()
+            if res.pop(key, None) is not None:
+                self._write_reservations(res)
 
     def record(self, agent_id: str, provider: str, model: str, input_tokens: int,
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
@@ -202,17 +283,41 @@ class BudgetTracker:
         return False
 
     # --- reporting -----------------------------------------------------
+    _TOKENS = ("input_tokens", "output_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_1h_tokens")
+
+    def savings(self, e: dict) -> dict | None:
+        """What caching and batching changed for one logged call, kept apart so each can be judged on its own.
+        cache_read_saved: cached tokens x (input rate - cache-read rate). cache_write_premium (5-minute) and
+        cache_write_1h_premium: written tokens x (write rate - input rate). All three at the rates of the table
+        the call was billed at (batch or standard). batch_discount: the same call, same token mix, at standard
+        rates, minus what it cost. None if the model is unpriced."""
+        t = [e.get(k, 0) for k in self._TOKENS]
+        batched = bool(e.get("batch_id"))
+        r = self._rates(e["model"], t[0] + t[2] + t[3] + t[4], batched)
+        actual = self.cost(e["model"], *t, batch=batched)
+        if r is None or actual is None:
+            return None
+        return {"cache_read_saved": t[2] * (r["input"] - r["cached_input"]) / 1e6,
+                "cache_write_premium": t[3] * (r["cache_write"] - r["input"]) / 1e6,
+                "cache_write_1h_premium": t[4] * (r["cache_write_1h"] - r["input"]) / 1e6,
+                "batch_discount": (self.cost(e["model"], *t) - actual) if batched else 0.0}
+
     def summary(self) -> dict:
         """`cost_parts_usd` sums the per-entry split; calls logged before the split existed (2026-10-27)
         carry only a total and are counted in `calls_without_cost_parts` instead of being re-priced."""
         def parts() -> dict:
             return {"input": 0.0, "cache_write": 0.0, "cache_read": 0.0, "output": 0.0}
+
+        def saved() -> dict:
+            return {"cache_read_saved": 0.0, "cache_write_premium": 0.0, "cache_write_1h_premium": 0.0,
+                    "batch_discount": 0.0}
         by_agent: dict[str, dict] = defaultdict(lambda: {"calls": 0, "input_tokens": 0, "cached_input_tokens": 0,
                                                          "cache_write_tokens": 0, "output_tokens": 0,
                                                          "cost_usd": 0.0, "cost_parts_usd": parts(),
                                                          "calls_without_cost_parts": 0, "cache_calls": 0,
-                                                         "cache_hits": 0, "cache_no_effect": 0})
-        total = parts()
+                                                         "cache_hits": 0, "cache_no_effect": 0,
+                                                         "batched_calls": 0, "savings_usd": saved()})
+        total, total_saved = parts(), saved()
         unpriced = 0
         for e in self.entries():
             a = by_agent[e["agent"]]
@@ -236,7 +341,13 @@ class BudgetTracker:
                     total[k] += v
             elif e["cost_usd"] is not None:
                 a["calls_without_cost_parts"] += 1
-        return {"cap_usd": self.cap, "spent_usd": round(self.spent(), 4),
+            a["batched_calls"] += bool(e.get("batch_id"))
+            for k, v in (self.savings(e) or {}).items():
+                a["savings_usd"][k] += v
+                total_saved[k] += v
+        net = total_saved["cache_read_saved"] - total_saved["cache_write_premium"] - total_saved["cache_write_1h_premium"]
+        return {"cap_usd": self.cap, "spent_usd": round(self.spent(), 4), "reserved_usd": round(self.reserved(), 4),
+                "savings_usd": {**{k: round(v, 4) for k, v in total_saved.items()}, "cache_net": round(net, 4)},
                 "cost_parts_usd": {k: round(v, 4) for k, v in total.items()},
                 "calls_without_cost_parts": sum(a["calls_without_cost_parts"] for a in by_agent.values()),
                 "unpriced_calls": unpriced, "by_agent": dict(by_agent)}
@@ -251,12 +362,25 @@ class BudgetTracker:
             lines.append(f"  split: {split(s['cost_parts_usd'])}"
                          + (f"  (+{s['calls_without_cost_parts']} earlier calls logged as totals only)"
                             if s["calls_without_cost_parts"] else ""))
+        if s["reserved_usd"]:
+            lines.append(f"  reserved by unsettled batches: ${s['reserved_usd']:.2f}")
+        v = s["savings_usd"]
+        if any(v.values()):
+            lines.append(f"  cache: reads saved ${v['cache_read_saved']:.2f}; writes cost ${v['cache_write_premium']:.2f} "
+                         f"(5-minute) + ${v['cache_write_1h_premium']:.2f} (1-hour) over the input price; net "
+                         f"${v['cache_net']:.2f}.  Batch discount, separately: ${v['batch_discount']:.2f}")
         for agent, a in sorted(s["by_agent"].items()):
             cache = (f"  (cache: {a['cache_hits']}/{a['cache_calls']} calls hit, {a['cached_input_tokens']:,d} "
                      f"tokens read, {a['cache_write_tokens']:,d} written"
                      + (f"; {a['cache_no_effect']} requested but neither read nor wrote" if a["cache_no_effect"] else "")
                      + ")" if a["cache_calls"] else "")
             parts = f"  [{split(a['cost_parts_usd'])}]" if any(a["cost_parts_usd"].values()) else ""
+            av = a["savings_usd"]
+            if a["batched_calls"] or av["cache_read_saved"] or av["cache_write_premium"] or av["cache_write_1h_premium"]:
+                net = av["cache_read_saved"] - av["cache_write_premium"] - av["cache_write_1h_premium"]
+                parts += (f"  [cache net ${net:.2f}"
+                          + (f"; {a['batched_calls']} batched, discount ${av['batch_discount']:.2f}"
+                             if a["batched_calls"] else "") + "]")
             lines.append(f"  {agent:8s} {a['calls']:4d} calls  {a['input_tokens']:>9,d} in  "
                          f"{a['output_tokens']:>8,d} out  ${a['cost_usd']:.2f}{parts}{cache}")
         if s["unpriced_calls"]:

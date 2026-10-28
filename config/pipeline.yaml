@@ -110,8 +110,10 @@ synthesis:
 
 # Vendor batch APIs (50% off) for stages of independent calls: A05 and A06 per paper (A06 only while
 # loops.max_reextractions is 0). Before a batch: one real item runs interactively (a refusal stops the stage
-# for one paper's cost), and the batch is NOT submitted if its projected cost exceeds what is left under
-# spend_cap_usd. Expect under an hour; the vendors allow 24. `litreview run` reattaches to a running batch.
+# for one paper's cost), and the batch's worst-case cost (every item at max_tokens) is reserved under the
+# cap, or the batch is NOT submitted. A06 routes per paper away from the vendor of that paper's extraction.
+# `litreview run` reattaches to a running batch, adopting one only when its identity is proven. The vendors
+# allow 24 hours; throughput at full scale is unmeasured (records/batch_tests.jsonl: compatibility only).
 batch:
   enabled: true
   agents: [A05-KE, A06-SV]
