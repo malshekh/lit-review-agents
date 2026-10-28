@@ -107,6 +107,54 @@ def scope(manuscript: dict, plan: dict, package: dict, findings: list[dict]) -> 
     return full, index, stats
 
 
+def detail_report(events: list[dict], entries: list[dict]) -> dict | None:
+    """How often A10 asks for detail and for how much, so it can be seen whether scoping pays. If most passes
+    ask for the full MAX_DETAIL, one large call has become two medium ones."""
+    passes = [e for e in events if e.get("type") == "tool_run" and e.get("tool") == "verification_scope"]
+    if not passes:
+        return None
+    sent = [p["summary"].get("detail_sent", p["summary"].get("detail_requested", 0)) for p in passes]
+    asked = [p["summary"].get("detail_requested", 0) for p in passes]
+
+    def calls(detail: bool) -> dict:
+        rows = [e for e in entries if e["agent"] == "A10-RV" and e["step"].endswith("_detail") == detail]
+        tokens = [e["input_tokens"] + e.get("cached_input_tokens", 0) + e.get("cache_write_tokens", 0)
+                  + e.get("cache_write_1h_tokens", 0) for e in rows]
+        return {"calls": len(rows), "cost_usd": round(sum(e["cost_usd"] or 0 for e in rows), 4),
+                "input_tokens_avg": round(sum(tokens) / len(tokens)) if tokens else None}
+    at_cap = sum(n >= MAX_DETAIL for n in sent)
+    with_requests = sum(n > 0 for n in asked)
+    if not with_requests:
+        verdict = "NO_REQUESTS"
+    elif at_cap * 2 >= len(passes):
+        verdict = "ROUTINELY_AT_CAP"      # scoping may not pay: two medium calls instead of one large
+    elif with_requests * 2 >= len(passes):
+        verdict = "FREQUENT"
+    else:
+        verdict = "RARE"
+    return {"passes": len(passes), "passes_with_requests": with_requests, "records_requested": asked,
+            "records_sent": sent, "passes_at_cap": at_cap, "cap": MAX_DETAIL, "verdict": verdict,
+            "first_calls": calls(False), "detail_calls": calls(True),
+            "scope": [{"step": p["step"], "bound_in_full": p["summary"].get("bound_in_full"),
+                       "contradiction_index": p["summary"].get("contradiction_index")} for p in passes]}
+
+
+def detail_report_text(r: dict | None) -> str:
+    if not r:
+        return "A10 detail rounds: A10 has not run yet."
+    f, d = r["first_calls"], r["detail_calls"]
+    note = {"NO_REQUESTS": "A10 has not asked for any record in full.",
+            "RARE": "Rare requests: scoping is working as intended.",
+            "FREQUENT": "Frequent requests: watch the detail-call cost against the first-call saving.",
+            "ROUTINELY_AT_CAP": "Routinely at the cap: one large call has become two medium ones; scoping may "
+                                "not pay."}[r["verdict"]]
+    return (f"A10 detail rounds: {r['passes_with_requests']} of {r['passes']} passes asked for records in full; "
+            f"records requested per pass {r['records_requested']} (cap {r['cap']}, reached {r['passes_at_cap']}x). "
+            f"First calls: {f['calls']}, ${f['cost_usd']:.2f}, ~{f['input_tokens_avg'] or 0:,d} input tokens each. "
+            f"Detail calls: {d['calls']}, ${d['cost_usd']:.2f}"
+            + (f", ~{d['input_tokens_avg']:,d} input tokens each" if d["input_tokens_avg"] else "") + f". {note}")
+
+
 def requested(rv: dict, index: list[dict]) -> tuple[list[str], list[str]]:
     """Finding IDs A10 asked to see in full that are in the index, capped at MAX_DETAIL; and the rest."""
     in_index = {i["finding_id"] for i in index}

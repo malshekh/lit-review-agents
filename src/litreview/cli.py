@@ -128,7 +128,13 @@ def cmd_revise(args) -> int:
 
 
 def cmd_costs(args) -> int:
-    print(BudgetTracker(RUNS_DIR / args.run_id).summary_text())
+    from .provenance import ProvenanceLog
+    from .tools import verification_scope
+    budget = BudgetTracker(RUNS_DIR / args.run_id)
+    print(budget.summary_text())
+    report = verification_scope.detail_report(ProvenanceLog(RUNS_DIR / args.run_id).events(), budget.entries())
+    if report:
+        print(verification_scope.detail_report_text(report))
     return 0
 
 

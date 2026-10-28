@@ -96,11 +96,15 @@ APIs at 50% off. A06 is batched only while `loops.max_reextractions` is 0. Each 
    determined, the paper is not validated.
 2. **Probe.** One real paper per model runs interactively first. If the model refuses, nothing is
    submitted, and the stage stops at the cost of one paper.
-3. **Reservation.** The batch's worst-case cost (every item at the configured `max_tokens`, every
-   Anthropic item paying a cache write) is reserved under a lock before submission and held until the
-   batch settles. If it does not fit under `spend_cap_usd` after spend and every other reservation,
-   nothing is submitted: the run refuses rather than asks. Expect it to refuse batches that would have
-   fit. Interactive calls also count held reservations. `litreview costs` shows what is reserved.
+3. **Chunks and reservations.** Items go in chunks of `batch.chunk_size` (20), each its own batch with
+   its own fingerprint and reservation. A chunk's worst-case cost (every item at the configured
+   `max_tokens`, the same limit as an interactive call, and every Anthropic item paying a cache write) is
+   reserved under a lock before submission and held until the chunk settles, when its actual cost replaces
+   the reservation and frees room for the next. For A05 a chunk reserves about $7. At most
+   `max_chunks_in_flight` (1) chunks are outstanding. A chunk that does not fit waits for an outstanding
+   one to settle; if it does not fit with nothing outstanding, the stage stops: the run refuses rather than
+   asks. Batching never lowers `max_tokens`: a batched call may produce exactly what an interactive one
+   may. Interactive calls also count held reservations. `litreview costs` shows what is reserved.
 4. **Fingerprint.** Before the batch is created, the run records an intent with a fingerprint: run ID,
    stage, a submission ID, the request IDs (each step plus the submission's nonce) and the SHA-256 of the
    frozen request manifest (`data/batches/manifests/`).
@@ -134,7 +138,14 @@ contexts and source passages. Every other finding goes in a contradiction index:
 (A06's plain-language limit) and disposition, about 53 tokens a line against 514 for a full record
 (run 20261025-100039). A finding that contradicts a claim is not cited by it, so it must stay visible.
 A10 lists index entries that seem to bear on a claim in `detail_requests`; one detail round sends those
-records in full (at most 40), and its output replaces the first.
+records in full (at most 40), and its output replaces the first. `litreview costs`, the final
+`provenance_summary.json` and an `a10_detail` notification after a run's first A10 pass report how often A10
+asks, how many records, how often it hits the cap, and first-call against detail-call cost and size. Passes
+that routinely ask for 40 mean one large call has become two medium ones, and the scoping may not pay.
+
+A10 also runs off every vendor that actually produced the manuscript: the producer of every A09-WRI and
+A12-EDI output in the run, checked before each call, not only in the configuration. If those cannot be
+determined, A10 does not run.
 
 ## 4. Databases — `config/sources.yaml`
 

@@ -760,6 +760,7 @@ class Run:
                 "refusals": [{"agent": e["agent"], "model": e["model"], "step": e["step"]}
                              for e in ev if e["type"] == "agent_call" and e["status"] == "REFUSED"],
                 "human_decisions": [e for e in ev if e["type"] == "human_decision"],
+                "a10_detail_rounds": self._a10_detail_report(),
                 "verification_statement": self.load("rv_final.json", {}).get("verification_statement")}
 
     def _job_report(self, tag: str, pkg: dict) -> dict:
@@ -911,22 +912,45 @@ class Run:
         verification_scope.MAX_DETAIL), and that round's output replaces the first."""
         plan, pkg = self.load("manuscript_plan.json"), self.load("synthesis_approved.json")
         findings = self.load("validated_findings.json")
+        prose = self._prose_vendors()
         full, index, stats = verification_scope.scope(manuscript, plan, pkg, findings)
         payload = {"pass": pass_, "manuscript": manuscript, "manuscript_plan": plan, "synthesis_package": pkg,
                    "validated_findings": full, "contradiction_index": index,
                    "deterministic_report": self._deterministic_report(manuscript), "changed_passages": changed}
-        rv = self.agent("A10-RV", payload, step=step)
+        rv = self.agent("A10-RV", payload, step=step, exclude_providers=prose)
         wanted, ignored = verification_scope.requested(rv, index)
+        first_pass = not any(e["type"] == "tool_run" and e["tool"] == "verification_scope" for e in self.prov.events())
         self.prov.tool_run("verification_scope", step, {**stats, "detail_requested": len(wanted) + len(ignored),
-                                                        "detail_ignored": ignored})
-        if not wanted:
-            return rv
-        by_id = {f["finding_id"]: f for f in findings}
-        return self.agent("A10-RV", {**payload, "validated_findings": full + [by_id[f] for f in wanted],
-                                     "contradiction_index": [i for i in index if i["finding_id"] not in wanted],
-                                     "detail_round": {"requested": rv.get("detail_requests"),
-                                                      "first_round_findings": rv.get("findings")}},
-                          step=f"{step}_detail")
+                                                        "detail_sent": len(wanted), "detail_ignored": ignored,
+                                                        "prose_vendors": sorted(prose)})
+        if wanted:
+            by_id = {f["finding_id"]: f for f in findings}
+            rv = self.agent("A10-RV", {**payload, "validated_findings": full + [by_id[f] for f in wanted],
+                                       "contradiction_index": [i for i in index if i["finding_id"] not in wanted],
+                                       "detail_round": {"requested": rv.get("detail_requests"),
+                                                        "first_round_findings": rv.get("findings")}},
+                            step=f"{step}_detail", exclude_providers=prose)
+        if first_pass:   # the first look at whether scoping pays: how often A10 asks, and for how much
+            notify.send("a10_detail", f"Run {self.id}: first A10 pass, detail requests",
+                        verification_scope.detail_report_text(self._a10_detail_report()))
+        return rv
+
+    def _a10_detail_report(self) -> dict | None:
+        return verification_scope.detail_report(self.prov.events(), self.budget.entries())
+
+    def _prose_vendors(self) -> frozenset:
+        """Vendors that actually produced the manuscript A10 is about to verify: the producer (last call
+        logged) of every A09-WRI and A12-EDI step of this run that produced output. Every draft and edit is in
+        the manuscript's lineage, so all count. Unknown -> stop: the vendor rule cannot be checked."""
+        last: dict[str, str] = {}
+        for e in self.budget.entries():
+            if e["agent"] in ("A09-WRI", "A12-EDI"):
+                last[e["step"]] = e["provider"]
+        produced = {p for s, p in last.items() if (self.dir / "outputs" / f"{s}.json").exists()}
+        if not produced:
+            raise AgentError("A10-RV: cannot tell which vendor produced the manuscript (no A09-WRI or A12-EDI "
+                             "output with a logged call), so vendor separation cannot be enforced; not verifying.")
+        return frozenset(produced)
 
     def _maybe_verify(self, manuscript: dict, pass_: str, step: str, previous: dict,
                       changed: list | None = None) -> dict:
@@ -1095,7 +1119,8 @@ class Run:
         notify.send("complete", f"Run {self.id}: review draft complete",
                     f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
                     f"Main text: {comp['main_text_words']} words, {comp['references']} references\n\n"
-                    f"{self.budget.summary_text()}",
+                    f"{self.budget.summary_text()}\n\n"
+                    f"{verification_scope.detail_report_text(self._a10_detail_report())}",
                     attachments=[final_dir / "manuscript.docx", final_dir / "manuscript.md", final_dir / "compliance.json",
                                  final_dir / "provenance_summary.json"])
         return "done"

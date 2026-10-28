@@ -157,7 +157,7 @@ def test_projected_cost_at_max_tokens_over_the_cap_is_refused_not_asked(run, mon
     install(monkeypatch, fake)
     fake_interactive(monkeypatch, calls)
     run.budget.cap = 0.50          # 4 items x 64k max output x $5/M = $1.28 projected
-    with pytest.raises(BudgetExceeded, match="batch of 4 not submitted: projected"):
+    with pytest.raises(BudgetExceeded, match="chunk of 4 not submitted: projected"):
         run.run_many("A05-KE", items(), lambda s, o: None)
     assert fake.created == [] and not run.data("batches/A05-KE.json").exists()   # no intent, no batch
     assert run.budget.reservations() == {}
@@ -426,3 +426,59 @@ def test_cache_savings_are_reported_apart_from_the_batch_discount(run):
     std = (1000 * 2 + 2000 * 10 + 10000 * 0.10 + 10000 * 4.00) / 1e6
     assert v["batch_discount"] == pytest.approx(std / 2, abs=1e-4)
     assert "Batch discount, separately" in b.summary_text()
+
+
+# --- chunks ----------------------------------------------------------------------------------------
+STEPS7 = [f"A05-KE_R000{i}" for i in range(1, 8)]
+
+
+def _chunk_run(run, monkeypatch, cap, in_flight):
+    fake, events = FakeVendor(), []
+    install(monkeypatch, fake)
+    fake_interactive(monkeypatch, [])
+    monkeypatch.setitem(run.cfg["batch"], "chunk_size", 2)
+    monkeypatch.setitem(run.cfg["batch"], "max_chunks_in_flight", in_flight)
+    run.budget.cap = cap
+    create, finish = fake.create, batch_stage.BatchStage._finish
+
+    def spy_create(*a, **k):
+        events.append(("create", round(run.budget.reserved(), 2)))
+        return create(*a, **k)
+
+    def spy_finish(self, rec):
+        events.append(("settle", None))
+        finish(self, rec)
+    monkeypatch.setattr(batch_stage.batch, "create", spy_create)
+    monkeypatch.setattr(batch_stage.BatchStage, "_finish", spy_finish)
+    got = {}
+    run.run_many("A05-KE", items(STEPS7), lambda s, o: got.__setitem__(s, o))
+    return fake, events, got
+
+
+def test_chunks_each_reserve_their_worst_case_and_settle_before_the_next(run, monkeypatch):
+    # a chunk of 2 reserves about $0.64 (2 x 64k at $5/M): one fits under $1.00, two do not
+    fake, events, got = _chunk_run(run, monkeypatch, cap=1.00, in_flight=2)
+    assert [[step_of(c) for c in b] for b in fake.created] == [STEPS7[1:3], STEPS7[3:5], STEPS7[5:7]]
+    assert [e[0] for e in events] == ["create", "settle"] * 3              # waits instead of refusing
+    assert sorted(got) == STEPS7 and run.budget.reservations() == {}
+    recs = state(run)
+    assert len({r["submission_id"] for r in recs}) == 3                    # own fingerprint per chunk
+    assert len({r["fingerprint"]["manifest_sha256"] for r in recs}) == 3
+
+
+def test_chunks_run_side_by_side_when_headroom_and_config_allow(run, monkeypatch):
+    fake, events, _ = _chunk_run(run, monkeypatch, cap=5.00, in_flight=2)
+    assert [e[0] for e in events][:3] == ["create", "create", "settle"]
+    assert events[1][1] > 0.6                                              # the first chunk's reservation still held
+
+
+def test_a_chunk_that_cannot_fit_alone_stops_the_stage(run, monkeypatch):
+    fake = FakeVendor()
+    install(monkeypatch, fake)
+    fake_interactive(monkeypatch, [])
+    monkeypatch.setitem(run.cfg["batch"], "chunk_size", 2)
+    run.budget.cap = 0.30
+    with pytest.raises(BudgetExceeded, match="chunk of 2 not submitted"):
+        run.run_many("A05-KE", items(STEPS7), lambda s, o: None)
+    assert fake.created == [] and run.budget.reservations() == {}
+    assert not (run.data("batches") / "manifests").exists() or not any((run.data("batches") / "manifests").iterdir())

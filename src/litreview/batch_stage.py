@@ -12,10 +12,14 @@ Order of operations, each step there for a failure it prevents:
    each group is its own batch on its own provider. The rule is checked again before anything is uploaded.
 3. Probe. One real item per model goes interactively first. A refusal costs one paper's input, not the
    batch's, and stops the stage before anything is submitted; its output is kept like any other.
-4. Reservation. A batch commits its whole cost at submission and cannot be stopped. Its worst-case cost
-   (every item at the configured max_tokens) is reserved under the budget lock before submission and held
-   until the batch settles; if it does not fit under the cap with every other reservation, nothing is
-   submitted (BudgetExceeded). Refused, not asked.
+4. Chunks and reservations. A batch commits its whole cost at submission and cannot be stopped. Items are
+   submitted in chunks (batch.chunk_size, each a batch with its own fingerprint and reservation). A chunk's
+   worst-case cost (every item at the configured max_tokens, the same as an interactive call: batching
+   never changes what a call may produce) is reserved under the budget lock before submission and held
+   until the chunk settles, when its actual cost has replaced the reservation and frees room for the next.
+   At most batch.max_chunks_in_flight chunks are outstanding. A chunk that does not fit waits for an
+   outstanding one to settle; one that does not fit with nothing outstanding stops the stage
+   (BudgetExceeded). Refused, not asked.
 5. Fingerprint, intent, create. The fingerprint (run ID, stage, submission ID, custom_ids, SHA-256 of the
    frozen request manifest) and the intent record are written before the batch is created; then the ID.
 6. Ingest. Each result is logged at batch rates, validated, and saved as it is read; ingested items are
@@ -50,6 +54,10 @@ CREATE_WINDOW = 900   # seconds after the intent within which a create can have 
 
 class VendorSeparationError(AgentError):
     pass
+
+
+class ReservationRefused(BudgetExceeded):
+    """A chunk's worst case does not fit under the cap right now. Nothing was uploaded or created."""
 
 
 class BatchStage:
@@ -109,11 +117,27 @@ class BatchStage:
                     steps = steps[1:]
                 if len(steps) < int(self.cfg.get("min_items", 3)):
                     continue
-                self._finish(self._submit(m, steps))
+                self._run_chunks(m, steps)
                 submitted = True
             if not submitted:
                 break
         self._interactive(self._pending())
+
+    def _run_chunks(self, m, steps: list[str]) -> None:
+        size = max(1, int(self.cfg.get("chunk_size", 20)))
+        in_flight = max(1, int(self.cfg.get("max_chunks_in_flight", 1)))
+        queue = [steps[i:i + size] for i in range(0, len(steps), size)]
+        outstanding: list[dict] = []
+        while queue or outstanding:
+            if queue and len(outstanding) < in_flight:
+                try:
+                    outstanding.append(self._submit(m, queue[0]))
+                    queue.pop(0)
+                    continue
+                except ReservationRefused:
+                    if not outstanding:
+                        raise
+            self._finish(outstanding.pop(0))   # settles: its actual cost replaces its reservation
 
     def _interactive(self, steps: list[str]) -> None:
         for step in steps:
@@ -169,20 +193,20 @@ class BatchStage:
         reqs, shape = self._requests(m, ids)
         data = batch.manifest(reqs)
         digest = batch.sha256(data)
-        manifest_file = self.state_path.parent / "manifests" / f"{sub_id}.jsonl"
-        manifest_file.parent.mkdir(parents=True, exist_ok=True)
-        manifest_file.write_bytes(data)
         est = self.project(m, steps, shape)
         b = self.run.budget
         ok, available = b.reserve(sub_id, est["projected_usd"], self.agent_id,
                                   note=f"{len(steps)} items on {m.model}")
         est["available_usd"] = round(available, 4)
         if not ok:
-            raise BudgetExceeded(
-                f"{self.agent_id}: batch of {len(steps)} not submitted: projected ${est['projected_usd']:.2f} "
+            raise ReservationRefused(
+                f"{self.agent_id}: batch chunk of {len(steps)} not submitted: projected ${est['projected_usd']:.2f} "
                 f"(every item at max_tokens {m.max_tokens}) exceeds the ${available:.2f} available under the cap "
                 "after spend and reservations held by unsettled batches (a submitted batch cannot be stopped). "
-                "Raise run.spend_cap_usd to continue.")
+                "Raise run.spend_cap_usd, or lower batch.chunk_size, to continue.")
+        manifest_file = self.state_path.parent / "manifests" / f"{sub_id}.jsonl"
+        manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        manifest_file.write_bytes(data)
         try:
             file_id = batch.upload(m.provider, data)   # OpenAI only; creates no batch
         except Exception:

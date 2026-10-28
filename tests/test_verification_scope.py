@@ -2,6 +2,8 @@
 detail round for the records A10 asks to see."""
 import json
 
+import pytest
+
 from litreview import model_record
 from litreview import orchestrator as orch
 from litreview.tools import verification_scope as vs
@@ -67,10 +69,12 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     run.save("synthesis_approved.json", PACKAGE)
     run.save("validated_findings.json", FINDINGS)
     monkeypatch.setattr(run, "_deterministic_report", lambda m: {})
+    _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
     sent = []
 
     def agent(agent_id, payload, step, **kw):
         sent.append((step, payload))
+        assert kw["exclude_providers"] == frozenset({"anthropic"})
         if len(sent) == 1:
             return {"findings": [], "detail_requests": [{"finding_id": "R0004:F1", "reason": "null result"}]}
         return {"findings": [{"code": "UNCITED_CONFLICT"}], "detail_requests": []}
@@ -84,3 +88,52 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     assert rv["findings"] == [{"code": "UNCITED_CONFLICT"}]                  # the detail round replaces the first
     prov = [json.loads(line) for line in (run.dir / "provenance.jsonl").read_text(encoding="utf-8").splitlines()]
     assert any(p.get("tool") == "verification_scope" or "verification_scope" in json.dumps(p) for p in prov)
+
+
+
+def _wrote(run, agent, step, provider):
+    run.budget.record(agent, provider, "m", 10, 10, step=step)
+    (run.dir / "outputs").mkdir(parents=True, exist_ok=True)
+    (run.dir / "outputs" / f"{step}.json").write_text("{}")
+
+
+def _run(tmp_path, monkeypatch):
+    monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
+    run = orch.Run("t")
+    run.save_state({"stage": "draft", "status": "READY", "counters": {}})
+    (run.dir / "input").mkdir(parents=True, exist_ok=True)
+    (run.dir / "input" / "topic_family.txt").write_text("onc", encoding="utf-8")
+    return run
+
+
+def test_a10_stays_off_every_vendor_that_produced_the_manuscript(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
+    run.budget.record("A12-EDI", "anthropic", "claude-sonnet-5-5", 10, 10, step="A12-EDI_rev1")  # refused...
+    _wrote(run, "A12-EDI", "A12-EDI_rev1", "openai")                       # ...and an OpenAI fallback edited it
+    run.budget.record("A12-EDI", "openai", "x", 10, 10, step="A12-EDI_rev2")   # no output: not in the lineage
+    assert run._prose_vendors() == frozenset({"anthropic", "openai"})
+    assert run.route("A10-RV").provider == "openai"                        # configuration alone: GPT-6.1
+    m = run.route("A10-RV", run._prose_vendors())                          # what produced the prose: not GPT-6.1
+    assert m.provider == "kimi"                                            # same price, so the cost gate passes
+
+
+def test_a10_with_no_known_producer_does_not_run(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    with pytest.raises(orch.AgentError, match="cannot tell which vendor produced the manuscript"):
+        run._prose_vendors()
+
+
+def test_detail_report_flags_routine_requests_at_the_cap():
+    ev = [{"type": "tool_run", "tool": "verification_scope", "step": f"A10-RV_{i}",
+           "summary": {"detail_requested": n, "detail_sent": min(n, vs.MAX_DETAIL), "bound_in_full": 200,
+                       "contradiction_index": 271}} for i, n in enumerate([45, 40, 3])]
+    entries = [{"agent": "A10-RV", "step": "A10-RV_0", "input_tokens": 150000, "cost_usd": 0.4},
+               {"agent": "A10-RV", "step": "A10-RV_0_detail", "input_tokens": 170000, "cost_usd": 0.45}]
+    r = vs.detail_report(ev, entries)
+    assert (r["passes"], r["passes_with_requests"], r["passes_at_cap"], r["verdict"]) == (3, 3, 2, "ROUTINELY_AT_CAP")
+    assert r["detail_calls"]["calls"] == 1 and r["first_calls"]["input_tokens_avg"] == 150000
+    assert "scoping may not pay" in vs.detail_report_text(r)
+    ev2 = [{**e, "summary": {"detail_requested": 0, "detail_sent": 0}} for e in ev[:2]] + [ev[2]]
+    assert vs.detail_report(ev2, [])["verdict"] == "RARE"
