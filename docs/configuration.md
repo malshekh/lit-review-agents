@@ -142,10 +142,15 @@ records in full (at most 40), and its output replaces the first. `litreview cost
 `provenance_summary.json` and an `a10_detail` notification after a run's first A10 pass report how often A10
 asks, how many records, how often it hits the cap, and first-call against detail-call cost and size. Passes
 that routinely ask for 40 mean one large call has become two medium ones, and the scoping may not pay.
+Every request also says why, and the report breaks requests down by reason and by the check that
+triggered them: `UNCITED_CONFLICT` (the contradiction index working as designed) or `MISSING_FROM_SCOPE`
+(a record A10 needed for a bound claim, meaning the scoping rule draws the line in the wrong place; if
+these are half or more of the requests, the verdict says so). It also counts requests for findings from
+papers the manuscript cites, independently of A10's own label.
 
-A10 also runs off every vendor that actually produced the manuscript: the producer of every A09-WRI and
-A12-EDI output in the run, checked before each call, not only in the configuration. If those cannot be
-determined, A10 does not run.
+A10 and A11 also run off every vendor that actually produced the manuscript: the producer of every
+A09-WRI and A12-EDI output in the run, checked before each call, not only in the configuration. If those
+cannot be determined, neither runs.
 
 ## 4. Databases — `config/sources.yaml`
 

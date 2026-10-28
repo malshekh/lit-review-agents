@@ -76,7 +76,8 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
         sent.append((step, payload))
         assert kw["exclude_providers"] == frozenset({"anthropic"})
         if len(sent) == 1:
-            return {"findings": [], "detail_requests": [{"finding_id": "R0004:F1", "reason": "null result"}]}
+            return {"findings": [], "detail_requests": [{"finding_id": "R0004:F1", "kind": "UNCITED_CONFLICT",
+                                                         "check": "COUNTER_EVIDENCE", "reason": "null result"}]}
         return {"findings": [{"code": "UNCITED_CONFLICT"}], "detail_requests": []}
     monkeypatch.setattr(run, "agent", agent)
     rv = run._verify(manuscript("Claim ⟦P1⟧."), "DRAFT", "A10-RV_draft1")
@@ -86,6 +87,9 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     assert "R0004:F1" in {f["finding_id"] for f in second["validated_findings"]}
     assert "R0004:F1" not in {i["finding_id"] for i in second["contradiction_index"]}
     assert rv["findings"] == [{"code": "UNCITED_CONFLICT"}]                  # the detail round replaces the first
+    scope_ev = [e for e in run.prov.events() if e["type"] == "tool_run" and e["tool"] == "verification_scope"]
+    assert scope_ev[0]["summary"]["detail_items"] == [{"finding_id": "R0004:F1", "kind": "UNCITED_CONFLICT",
+                                                       "check": "COUNTER_EVIDENCE", "paper_cited": False}]
     prov = [json.loads(line) for line in (run.dir / "provenance.jsonl").read_text(encoding="utf-8").splitlines()]
     assert any(p.get("tool") == "verification_scope" or "verification_scope" in json.dumps(p) for p in prov)
 
@@ -113,16 +117,16 @@ def test_a10_stays_off_every_vendor_that_produced_the_manuscript(tmp_path, monke
     run.budget.record("A12-EDI", "anthropic", "claude-sonnet-5-5", 10, 10, step="A12-EDI_rev1")  # refused...
     _wrote(run, "A12-EDI", "A12-EDI_rev1", "openai")                       # ...and an OpenAI fallback edited it
     run.budget.record("A12-EDI", "openai", "x", 10, 10, step="A12-EDI_rev2")   # no output: not in the lineage
-    assert run._prose_vendors() == frozenset({"anthropic", "openai"})
+    assert run._prose_vendors("A10-RV") == frozenset({"anthropic", "openai"})
     assert run.route("A10-RV").provider == "openai"                        # configuration alone: GPT-6.1
-    m = run.route("A10-RV", run._prose_vendors())                          # what produced the prose: not GPT-6.1
+    m = run.route("A10-RV", run._prose_vendors("A10-RV"))                          # what produced the prose: not GPT-6.1
     assert m.provider == "kimi"                                            # same price, so the cost gate passes
 
 
 def test_a10_with_no_known_producer_does_not_run(tmp_path, monkeypatch):
     run = _run(tmp_path, monkeypatch)
     with pytest.raises(orch.AgentError, match="cannot tell which vendor produced the manuscript"):
-        run._prose_vendors()
+        run._prose_vendors("A10-RV")
 
 
 def test_detail_report_flags_routine_requests_at_the_cap():
@@ -137,3 +141,35 @@ def test_detail_report_flags_routine_requests_at_the_cap():
     assert "scoping may not pay" in vs.detail_report_text(r)
     ev2 = [{**e, "summary": {"detail_requested": 0, "detail_sent": 0}} for e in ev[:2]] + [ev[2]]
     assert vs.detail_report(ev2, [])["verdict"] == "RARE"
+
+
+def test_a11_stays_off_every_vendor_that_produced_the_manuscript(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
+    _wrote(run, "A12-EDI", "A12-EDI_rev1", "kimi")                         # A12 fell back to Kimi mid-run
+    assert run.route("A11-RC").provider == "kimi"                          # configuration alone: Kimi
+    assert run.route("A11-RC", run._prose_vendors("A11-RC")).provider == "openai"   # would critique its own prose
+
+
+def test_detail_report_breaks_requests_down_by_reason_and_check():
+    def ev(items):
+        return {"type": "tool_run", "tool": "verification_scope", "step": "s",
+                "summary": {"detail_requested": len(items), "detail_sent": len(items), "detail_items": items}}
+    conflict = {"finding_id": "R0001:F1", "kind": "UNCITED_CONFLICT", "check": "COUNTER_EVIDENCE", "paper_cited": False}
+    missing = {"finding_id": "R0002:F1", "kind": "MISSING_FROM_SCOPE", "check": "CITATION", "paper_cited": True}
+    r = vs.detail_report([ev([conflict, conflict, missing]), ev([])], [])
+    assert r["by_kind"] == {"UNCITED_CONFLICT": 2, "MISSING_FROM_SCOPE": 1} and r["verdict"] == "FREQUENT"
+    assert r["by_check"] == {"COUNTER_EVIDENCE": {"UNCITED_CONFLICT": 2}, "CITATION": {"MISSING_FROM_SCOPE": 1}}
+    assert r["from_cited_papers"] == 1
+    text = vs.detail_report_text(r)
+    assert "CITATION (MISSING_FROM_SCOPE 1)" in text and "1 from papers the manuscript cites" in text
+    r = vs.detail_report([ev([missing, missing, conflict])], [])
+    assert r["verdict"] == "SCOPE_LINE_MISPLACED" and "wrong place" in vs.detail_report_text(r)
+
+
+def test_classify_reads_a10_labels_and_checks_citations_itself():
+    rv = {"detail_requests": [{"finding_id": "R0003:F1", "kind": "MISSING_FROM_SCOPE", "check": "CITATION"},
+                              {"finding_id": "R0004:F1"}]}
+    out = vs.classify(rv, ["R0003:F1", "R0004:F1"], manuscript("Claim [@R0003] ⟦P1⟧."), FINDINGS)
+    assert out == [{"finding_id": "R0003:F1", "kind": "MISSING_FROM_SCOPE", "check": "CITATION", "paper_cited": True},
+                   {"finding_id": "R0004:F1", "kind": "UNSPECIFIED", "check": "UNSPECIFIED", "paper_cited": False}]

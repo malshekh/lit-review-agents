@@ -62,10 +62,21 @@
           },
           "reason": {
             "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "UNCITED_CONFLICT",
+              "MISSING_FROM_SCOPE"
+            ]
+          },
+          "check": {
+            "type": "string"
           }
         },
         "required": [
-          "finding_id"
+          "finding_id",
+          "kind",
+          "check"
         ]
       }
     }

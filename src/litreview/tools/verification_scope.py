@@ -107,9 +107,32 @@ def scope(manuscript: dict, plan: dict, package: dict, findings: list[dict]) -> 
     return full, index, stats
 
 
+KINDS = ("UNCITED_CONFLICT", "MISSING_FROM_SCOPE")
+
+
+def classify(rv: dict, ids: list[str], manuscript: dict, findings: list[dict]) -> list[dict]:
+    """Each requested record with why A10 asked: `kind` (UNCITED_CONFLICT: an uncited finding that may
+    contradict or narrow a claim, the index doing its job; MISSING_FROM_SCOPE: a record A10 needed for a
+    check of a bound claim, the scoping rule drawing the line in the wrong place), the `check` that
+    triggered it, and, independently of A10's own label, whether the finding's paper is cited in the
+    manuscript (citation-support checks reach records the tag chain does not)."""
+    asked = {r.get("finding_id"): r for r in rv.get("detail_requests") or [] if isinstance(r, dict)}
+    cited = set(tags.cited_records(json.dumps(manuscript, ensure_ascii=False)))
+    record_of = {f["finding_id"]: f.get("record_id") for f in findings}
+    out = []
+    for fid in ids:
+        r = asked.get(fid, {})
+        kind = r.get("kind") if r.get("kind") in KINDS else "UNSPECIFIED"
+        out.append({"finding_id": fid, "kind": kind, "check": r.get("check") or "UNSPECIFIED",
+                    "paper_cited": record_of.get(fid) in cited})
+    return out
+
+
 def detail_report(events: list[dict], entries: list[dict]) -> dict | None:
-    """How often A10 asks for detail and for how much, so it can be seen whether scoping pays. If most passes
-    ask for the full MAX_DETAIL, one large call has become two medium ones."""
+    """How often A10 asks for detail, for how much, and why, so it can be seen whether scoping pays. Requests
+    mostly for UNCITED_CONFLICT candidates: the contradiction index is working and worth its cost. Requests
+    for MISSING_FROM_SCOPE records: the scoping rule draws the line in the wrong place. Most passes at
+    MAX_DETAIL: one large call has become two medium ones."""
     passes = [e for e in events if e.get("type") == "tool_run" and e.get("tool") == "verification_scope"]
     if not passes:
         return None
@@ -124,8 +147,18 @@ def detail_report(events: list[dict], entries: list[dict]) -> dict | None:
                 "input_tokens_avg": round(sum(tokens) / len(tokens)) if tokens else None}
     at_cap = sum(n >= MAX_DETAIL for n in sent)
     with_requests = sum(n > 0 for n in asked)
+    items = [i for p in passes for i in p["summary"].get("detail_items") or []]
+    by_kind: dict[str, int] = {}
+    by_check: dict[str, dict[str, int]] = {}
+    for i in items:
+        by_kind[i["kind"]] = by_kind.get(i["kind"], 0) + 1
+        c = by_check.setdefault(i["check"], {})
+        c[i["kind"]] = c.get(i["kind"], 0) + 1
+    missing = by_kind.get("MISSING_FROM_SCOPE", 0)
     if not with_requests:
         verdict = "NO_REQUESTS"
+    elif items and missing * 2 >= len(items):
+        verdict = "SCOPE_LINE_MISPLACED"   # A10 mostly needs records the scoping rule left out
     elif at_cap * 2 >= len(passes):
         verdict = "ROUTINELY_AT_CAP"      # scoping may not pay: two medium calls instead of one large
     elif with_requests * 2 >= len(passes):
@@ -134,6 +167,8 @@ def detail_report(events: list[dict], entries: list[dict]) -> dict | None:
         verdict = "RARE"
     return {"passes": len(passes), "passes_with_requests": with_requests, "records_requested": asked,
             "records_sent": sent, "passes_at_cap": at_cap, "cap": MAX_DETAIL, "verdict": verdict,
+            "by_kind": by_kind, "by_check": by_check,
+            "from_cited_papers": sum(bool(i.get("paper_cited")) for i in items),
             "first_calls": calls(False), "detail_calls": calls(True),
             "scope": [{"step": p["step"], "bound_in_full": p["summary"].get("bound_in_full"),
                        "contradiction_index": p["summary"].get("contradiction_index")} for p in passes]}
@@ -144,6 +179,8 @@ def detail_report_text(r: dict | None) -> str:
         return "A10 detail rounds: A10 has not run yet."
     f, d = r["first_calls"], r["detail_calls"]
     note = {"NO_REQUESTS": "A10 has not asked for any record in full.",
+            "SCOPE_LINE_MISPLACED": "Mostly records A10 needed for bound claims: the scoping rule draws the line "
+                                    "in the wrong place.",
             "RARE": "Rare requests: scoping is working as intended.",
             "FREQUENT": "Frequent requests: watch the detail-call cost against the first-call saving.",
             "ROUTINELY_AT_CAP": "Routinely at the cap: one large call has become two medium ones; scoping may "
@@ -152,7 +189,12 @@ def detail_report_text(r: dict | None) -> str:
             f"records requested per pass {r['records_requested']} (cap {r['cap']}, reached {r['passes_at_cap']}x). "
             f"First calls: {f['calls']}, ${f['cost_usd']:.2f}, ~{f['input_tokens_avg'] or 0:,d} input tokens each. "
             f"Detail calls: {d['calls']}, ${d['cost_usd']:.2f}"
-            + (f", ~{d['input_tokens_avg']:,d} input tokens each" if d["input_tokens_avg"] else "") + f". {note}")
+            + (f", ~{d['input_tokens_avg']:,d} input tokens each" if d["input_tokens_avg"] else "") + ". "
+            + (f"Why: {', '.join(f'{k} {v}' for k, v in sorted(r['by_kind'].items()))}; by check: "
+               + "; ".join(f"{c} ({', '.join(f'{k} {v}' for k, v in sorted(ks.items()))})"
+                           for c, ks in sorted(r["by_check"].items()))
+               + f"; {r['from_cited_papers']} from papers the manuscript cites. " if r["by_kind"] else "")
+            + note)
 
 
 def requested(rv: dict, index: list[dict]) -> tuple[list[str], list[str]]:

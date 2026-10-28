@@ -120,7 +120,10 @@ batch:
   min_items: 3                 # fewer items left after the probe: run them interactively
   chunk_size: 20               # items per batch; each chunk reserves its worst case (A05: 20 x 64k output
                                #   at $5/M + input, about $7) and releases it when it settles
-  max_chunks_in_flight: 1      # chunks outstanding at once; each still holds its own reservation
+  max_chunks_in_flight: 1      # chunks outstanding at once. Above 1 the cap stays strict (each chunk holds its
+                               #   own reservation) but the back-pressure goes: one chunk's actual cost no
+                               #   longer frees room before the next is reserved. Keep 1 until chunk
+                               #   turnaround is measured on a real run; raise it then for throughput.
   poll_seconds: 60
   max_wait_hours: 24.5         # past this the run pauses; rerunning reattaches (results kept 29-30 days)
   cache_ttl: 1h                # Anthropic: batch items run concurrently, often beyond 5 minutes

@@ -1,6 +1,6 @@
 # A10-RV — Verification Agent
 
-Version: 0.2 (draft) · Role: AUDITOR · Runs: after A9-WRI (DRAFT pass), after A12-EDI (REVISION pass), and over the complete manuscript (FINAL pass)
+Version: 0.3 (draft) · Role: AUDITOR · Runs: after A9-WRI (DRAFT pass), after A12-EDI (REVISION pass), and over the complete manuscript (FINAL pass)
 Recommended model: the opposite vendor to A9-WRI.
 Source lineage: distilled from A12-RV v0.1. Kept: claim-and-evidence verification with coverage accounting (§2); decompose into atomic assertions, priority decides scrutiny not whether to check (§6); typed checks and honesty about what was checked (§7); traceability and entailment with failure codes (§8–§9); thesis verification by type (§9.4); four-level citation verification (§12); quantitative fidelity (§13); coverage realization (§14); counter-evidence at equivalent strength (§15); claims beyond prose (§16); implied relationships and double-counting (§17); cross-section consistency (§18); reporting-standard claims (§19); severity, responsible stage and upstream escalation (§21); release disposition (§22). Removed: plan-review pass (the researcher approves the plan at Checkpoint 3), condensate boundary checks, artifact-semantics checks. Moved to code: deterministic checks (§3).
 
@@ -95,6 +95,10 @@ For every counter-evidence, conflict, limitation and gap item, compare the prose
 
 **Uncited conflicts.** Read the `contradiction_index` against the critical and high-priority assertions. Where an index line appears to contradict or narrow an assertion (opposite direction, a null result against a claimed effect, a narrower system or population), do not judge from the line: list it in `detail_requests` with the assertion it bears on. On the detail round, assess each requested record; if it does contradict or narrow the assertion and nothing in the plan accounts for it, record `UNCITED_CONFLICT` (check `COUNTER_EVIDENCE`), severity by §5, responsible stage `A7-SYN` (the synthesis left it out) unless the plan dropped it (`A8-OL`). Request only records you have a specific reason to see, at most 40.
 
+Every request names its `kind` and the `check` (§7 values) that triggered it:
+- `UNCITED_CONFLICT` — an index line that may contradict or narrow an assertion, as above.
+- `MISSING_FROM_SCOPE` — a record you need to complete a check of a bound claim that is not in `validated_findings` (for example, a finding from a cited paper needed to judge citation support, §4.6). Use it honestly: these requests are counted to decide whether the scoping rule needs to change.
+
 ### 4.8 Beyond prose
 Title, headings, abstract sentences, legends and table captions are assertions and get the same checks. A descriptive heading may not carry a claim ("X reverses disease" over a section showing a marker change in one cell line: `HEADING_OVERCLAIM`). A schematic legend must distinguish established from proposed steps.
 
@@ -154,7 +158,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
     }
   ],
   "upstream_reviews": [{ "type": "ADVISORY | REQUIRED", "description": "string", "records": ["string"] }],
-  "detail_requests": [{ "finding_id": "R0001:F3", "assertion_excerpt": "string", "reason": "string" }],
+  "detail_requests": [{ "finding_id": "R0001:F3", "kind": "UNCITED_CONFLICT | MISSING_FROM_SCOPE", "check": "TRACEABILITY | ENTAILMENT | THESIS | CITATION | COUNTER_EVIDENCE | BEYOND_PROSE | CONSISTENCY | STANDARD", "assertion_excerpt": "string", "reason": "string" }],
   "systemic_failure": false,
   "verification_execution": "string",
   "finding_severity": "string",
