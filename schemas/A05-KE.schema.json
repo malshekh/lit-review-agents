@@ -49,7 +49,140 @@
       "type": "array"
     },
     "findings": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "subject_entity_id",
+          "predicate",
+          "polarity",
+          "modality",
+          "direction",
+          "assertion_type",
+          "span"
+        ],
+        "properties": {
+          "predicate": {
+            "enum": [
+              "ASSOCIATED_WITH",
+              "CORRELATES_WITH",
+              "PREDICTS",
+              "DETECTS",
+              "EXPRESSED_IN",
+              "LOCALIZES_TO",
+              "COLOCALIZES_WITH",
+              "INTERACTS_WITH",
+              "BINDS",
+              "TARGETS",
+              "INHIBITS",
+              "ACTIVATES",
+              "CATALYZES",
+              "IS_SUBSTRATE_OF",
+              "METABOLIZES",
+              "INCREASES",
+              "DECREASES",
+              "REGULATES",
+              "REQUIRED_FOR",
+              "CAUSES",
+              "PREVENTS",
+              "IMPROVES_OUTCOME",
+              "WORSENS_OUTCOME",
+              "NO_EFFECT_ON",
+              "NO_SIGNIFICANT_DIFFERENCE",
+              "SYNERGIZES_WITH",
+              "ANTAGONIZES",
+              "ADDITIVE_WITH",
+              "POTENTIATES",
+              "SENSITIZES_TO",
+              "REVERSES_EFFECT_OF",
+              "ACTIVE_AGAINST",
+              "MORE_EFFECTIVE_THAN",
+              "SIMILAR_TO",
+              "DETECTED_IN",
+              "CROSSES",
+              "CONVERTED_TO",
+              "EXPLAINED_BY",
+              "PRECEDES",
+              "DISTINCT_FROM",
+              "USED_FOR",
+              "UNDER_INVESTIGATION_FOR",
+              "OBSERVED_OUTCOME",
+              "TOLERATED",
+              "MAXIMUM_TOLERATED_DOSE",
+              "HALF_LIFE",
+              "OTHER_SPECIFIED"
+            ]
+          },
+          "predicate_detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "object_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "predicate": {
+                  "const": "OTHER_SPECIFIED"
+                }
+              },
+              "required": [
+                "predicate"
+              ]
+            },
+            "then": {
+              "required": [
+                "predicate_detail"
+              ],
+              "properties": {
+                "predicate_detail": {
+                  "type": "string",
+                  "minLength": 3
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "predicate": {
+                  "not": {
+                    "enum": [
+                      "HALF_LIFE",
+                      "MAXIMUM_TOLERATED_DOSE",
+                      "OBSERVED_OUTCOME",
+                      "TOLERATED"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "predicate"
+              ]
+            },
+            "then": {
+              "required": [
+                "object_entity_id"
+              ],
+              "properties": {
+                "object_entity_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
     },
     "author_stated_limitations": {
       "type": "array"

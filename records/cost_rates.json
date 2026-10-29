@@ -1,0 +1,28 @@
+{
+ "reference_run": "20261025-100039",
+ "measured_at": "2026-10-28",
+ "per_paper": {
+  "ABSTRACT": {
+   "papers": 17,
+   "mean_usd": 0.429,
+   "p90_usd": 0.6314,
+   "max_usd": 0.7841,
+   "findings_mean": 10.71,
+   "findings_p90": 18.4
+  },
+  "FULL_TEXT": {
+   "papers": 11,
+   "mean_usd": 1.1463,
+   "p90_usd": 1.9877,
+   "max_usd": 2.1372,
+   "findings_mean": 26.27,
+   "findings_p90": 41.0
+  }
+ },
+ "per_theme": {
+  "themes": 65,
+  "mean_usd": 0.0529,
+  "p90_usd": 0.0926
+ },
+ "themes_per_paper": 2.321
+}

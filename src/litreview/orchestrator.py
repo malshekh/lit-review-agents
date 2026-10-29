@@ -19,7 +19,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import checkpoints, config, evidence, model_record, notify
+from . import checkpoints, config, evidence, handoff, model_record, notify, publication
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
@@ -29,6 +29,7 @@ from . import synthesis_input, theme_framework
 from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
 from .synthesis_job import JobStopped, SynthesisJob
+from .tools import cost_projection
 from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
                     verification_scope)
 from .tools.fulltext import fetch_sections
@@ -191,8 +192,22 @@ class Run:
                                  "approved routing to a costlier alternate after a refusal")
         return pending
 
+    def _require_projection(self) -> None:
+        """No agent call after CP2 without a cost projection within the cap (cost_projection.py). Spend is
+        decided at CP2, where changing the selection is cheap; `litreview project RUN` re-projects."""
+        stage = self.state().get("stage")
+        if stage not in STAGES or STAGES.index(stage) <= STAGES.index("cp2"):
+            return
+        proj = self.load("cost_projection.json")
+        if proj is None:
+            raise Pause(f"no cost projection for this run: run `litreview project {self.id}` before any further spend")
+        if proj.get("verdict") != "WITHIN_CAP":
+            raise Pause(f"cost projection ${proj.get('projected_total_usd')} exceeds the ${proj.get('cap_usd')} cap "
+                        "(data/cost_projection.json): deselect papers or raise the cap, then re-project")
+
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset()) -> dict:
+        self._require_projection()
         m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
@@ -250,8 +265,28 @@ class Run:
             st = self.state()
             st["status"] = f"FAILED: {e}"
             notify.send("failure", f"Run {self.id} failed", str(e))
+        except publication.EvaluationOnly as e:
+            st = self.state()
+            st["status"] = f"REFUSED_EVALUATION_ONLY: {e}"
         self.save_state(st)
         return st["status"]
+
+    def mark_evaluation_only(self, reason: str) -> dict:
+        """Mark the run evaluation-only: every synthesis it produces is stamped in its data, and no
+        publication stage accepts a stamped synthesis (publication.py). Logged as the researcher's decision."""
+        st = self.state()
+        st["evaluation_only"] = {"reason": reason, "marked_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        self.save_state(st)
+        for name in ("synthesis_package.json", "synthesis_approved.json"):
+            doc = self.load(name)
+            if doc is not None and not doc.get(publication.MARK):
+                self.save(name, publication.stamp(doc, reason, self.id))
+        self.prov.human_decision("evaluation_only", {"reason": reason})
+        return st["evaluation_only"]
+
+    def _publishable(self, name: str):
+        """A synthesis artifact for a publication stage; refused if stamped evaluation-only."""
+        return publication.refuse(self.load(name), f"{name} of run {self.id}")
 
     def pause_for_checkpoint(self, cp: str) -> None:
         notify.send("checkpoint", f"Run {self.id}: {cp} ready for your review",
@@ -483,6 +518,7 @@ class Run:
             checkpoints.write_cp2(self.dir, self.load("records.json"), quals, self.load("bias_report.json"),
                                   emerging=theme_framework.emerging(quals, "record_id"),
                                   framework=self.load("theme_framework.json"))
+            self._cp2_costs(quals)
             self.pause_for_checkpoint("CP2")
         self._framework_update(decision, "CP2")
         by_id = {r["record_id"]: r for r in self.load("records.json")}
@@ -494,8 +530,37 @@ class Run:
                            "subthemes": q.get("subthemes", []),
                            "tier": decision["tier_overrides"].get(rid) or q.get("proposed_tier"),
                            "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence")})
+        # the projection decides here, where changing the selection is still cheap
+        proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
+                                             self.cfg)
+        self.save("cost_projection.json", proj)
+        self.prov.tool_run("cost_projection", "cp2", {k: proj[k] for k in ("projected_total_usd", "cap_usd", "verdict", "papers")})
+        if proj["verdict"] != "WITHIN_CAP":
+            raise Pause(f"CP2 selection of {len(corpus)} papers is projected at ${proj['projected_total_usd']:.2f}, over "
+                        f"the ${proj['cap_usd']:.2f} cap (data/cost_projection.json). Deselect papers or raise the cap, "
+                        "then approve CP2 again.")
         self.save("selected_corpus.json", corpus)
         return "extract"
+
+    def _cp2_costs(self, quals: list[dict]) -> None:
+        """Cost lines in CP2_review.md: the projection for every qualified paper, and per paper by level."""
+        try:
+            rates = cost_projection.load_rates()
+        except FileNotFoundError as e:
+            note = f"\n\n## Cost projection\n\nNot available: {e}. CP2 approval will refuse without it.\n"
+        else:
+            by_id = {r["record_id"]: r for r in self.load("records.json")}
+            qualified = [by_id[q["record_id"]] for q in quals if q.get("disposition") == "QUALIFIED" and q["record_id"] in by_id]
+            proj = cost_projection.for_selection(rates, qualified, self.dir, self.budget, self.route, self.cfg)
+            per = rates["per_paper"]
+            note = ("\n\n## Cost projection\n\nEach selected paper adds about "
+                    f"${per['ABSTRACT']['p90_usd']:.2f} (abstract only) or ${per['FULL_TEXT']['p90_usd']:.2f} (full text) "
+                    f"for extraction and validation (90th percentile, {rates['reference_run']}), plus its share of "
+                    "theme validation and of the worst-case synthesis and writing stages. If every qualified paper "
+                    f"were selected:\n\n```\n{cost_projection.text(proj)}\n```\n\nApproval refuses a selection "
+                    "projected over the cap.\n")
+        p = checkpoints.cp_dir(self.dir) / "CP2_review.md"
+        p.write_text(p.read_text(encoding="utf-8") + note, encoding="utf-8")
 
     def run_many(self, agent_id: str, items: list[tuple[str, dict]], on_output, exclude=None) -> None:
         """Independent calls of one agent (step, payload), each output passed to on_output(step, output) as
@@ -547,6 +612,54 @@ class Run:
         if audits:
             self.save("normalization_audit.json", self.load("normalization_audit.json", []) + audits)
 
+    def _review_items(self, rid: str) -> dict[str, dict]:
+        return {i["local_id"]: i for i in self.load("validation_review.json", []) if i["record_id"] == rid}
+
+    def _record_review(self, rid: str, items: list[dict]) -> None:
+        """Replace this paper's undecided review items with `items`; human decisions already made stay."""
+        keep = [i for i in self.load("validation_review.json", []) if i["record_id"] != rid or i.get("decision")]
+        decided = {i["finding_id"] for i in keep}
+        self.save("validation_review.json", keep + [i for i in items if i["finding_id"] not in decided])
+
+    def review_revalidations(self, notes: dict[str, str] | None = None) -> list[dict]:
+        """Apply the revalidation review rule to every paper revalidated in this run, against the validations
+        and extractions archived before it (data/renormalization/). `notes`: reviewer notes by finding ID."""
+        items = []
+        for p in sorted((self.dir / "outputs").glob("A06-SV_*_reval*.json")):
+            rid = p.stem.split("_")[1]
+            if ".raw" in p.name or any(i["record_id"] == rid for i in items):
+                continue
+            old_val = self.load(f"renormalization/validations_before/{rid}.json")
+            old_ext = self.load(f"renormalization/extractions_before/{rid}.json")
+            if old_val is None or old_ext is None:
+                continue
+            new = evidence.review_changes(rid, old_val, old_ext, self.load(f"validations/{rid}.json"),
+                                          self.load(f"extractions/{rid}.json"))
+            for i in new:
+                if (notes or {}).get(i["finding_id"]):
+                    i["reviewer_note"] = notes[i["finding_id"]]
+            self._record_review(rid, new)
+            items += new
+        findings = self._validated_findings(self.load("selected_corpus.json"))
+        self.save("validated_findings.json", findings)
+        self._save_held(findings)
+        self.prov.tool_run("validation_review", "revalidate",
+                           {"changes": len(items), "quarantined": sum(i["action"] == "QUARANTINED" for i in items)})
+        return items
+
+    def decide_review(self, finding_id: str, decision: str, note: str) -> dict:
+        """A human's decision on a quarantined change: KEEP_OLD or ACCEPT_NEW. Logged as a human decision."""
+        items = self.load("validation_review.json", [])
+        item = next((i for i in items if i["finding_id"] == finding_id and i["action"] == "QUARANTINED"), None)
+        if item is None:
+            raise ValueError(f"{finding_id} has no quarantined change")
+        item.update(decision=decision, decision_note=note, decided_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
+        self.save("validation_review.json", items)
+        self.prov.human_decision("validation_review", {"finding_id": finding_id, "decision": decision, "note": note})
+        findings = self._validated_findings(self.load("selected_corpus.json"))
+        self.save("validated_findings.json", findings)
+        return item
+
     def _save_validation(self, rid: str, val: dict) -> None:
         """Save an A06 PER_PAPER validation. A conflict A06 reports between a code-attached identity and the
         source mention is applied here: the identity is stripped from the entity (CONFLICT), recorded in the
@@ -567,6 +680,13 @@ class Run:
             self._audit_normalization(audits)
             self.save(f"extractions/{rid}.json", ext)
         val["_entity_identities"] = evidence.identity_snapshot(ext)
+        val["_finding_fingerprints"] = evidence.finding_fingerprints(ext)
+        previous = self.load(f"validations/{rid}.json")
+        if previous is not None:
+            # a revalidation: a changed disposition with nothing in the input to explain it is not applied
+            # (evidence.review_changes); the previous extraction is the archived one if identities moved since
+            prev_ext = self.load(f"renormalization/extractions_before/{rid}.json") or ext
+            self._record_review(rid, evidence.review_changes(rid, previous, prev_ext, val, ext))
         self.save(f"validations/{rid}.json", val)
 
     def _extraction_vendor(self, rid: str, entries: list[dict] | None = None) -> str:
@@ -682,14 +802,14 @@ class Run:
             ext = self.load(f"extractions/{rid}.json", {})
             val_doc = self.load(f"validations/{rid}.json", {})
             val = {v["finding_id"]: v for v in val_doc.get("validations", [])}
-            elig = evidence.annotate_paper(ext, val_doc)
+            elig = evidence.annotate_paper(ext, val_doc, self._review_items(rid))
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
                 out.append({"finding_id": f"{rid}:{f['finding_id']}", "record_id": rid,
                             **self._finding_themes(f, rec),
-                            "subject": f.get("subject_entity_id"), "predicate": f.get("predicate"),
-                            "object": f.get("object_entity_id"), "polarity": f.get("polarity"),
+                            # the handoff contract (handoff.py): relation, direction, hedging, attribution
+                            **handoff.project(f, v, ext.get("prompt_version")),
                             "span": f.get("span"), "quantities": f.get("quantities", []),
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
@@ -798,11 +918,11 @@ class Run:
         from the extractions and validations (deterministic, no agent call) and saved, so every consumer
         sees it."""
         findings = self.load("validated_findings.json")
-        if findings and any("eligibility" not in f for f in findings):
+        if findings and any(k not in f for f in findings for k in handoff.CONTRACT):
             rebuilt = {f["finding_id"]: f for f in self._validated_findings(self.load("selected_corpus.json", []))}
-            findings = [f if "eligibility" in f else
-                        {**f, "eligibility": (rebuilt.get(f["finding_id"]) or {}).get("eligibility")
-                         or evidence.classify({}, {"disposition": f.get("disposition")}, [], set())}
+            findings = [rebuilt.get(f["finding_id"]) or
+                        (f if "eligibility" in f else
+                         {**f, "eligibility": evidence.classify({}, {"disposition": f.get("disposition")}, [], set())})
                         for f in findings]
             self.save("validated_findings.json", findings)
             self._save_held(findings)
@@ -863,6 +983,10 @@ class Run:
             raise Pause(f"{len(stale)} theme records predate a revalidation (data/theme_records_stale.json); "
                         f"rebuild them with `litreview revalidate {self.id} --themes` before synthesis")
         theme_records = self.load("theme_records.json")
+        problems = handoff.contract_problems(self._findings())
+        if problems:
+            raise Pause(f"{len(problems)} validated findings break the A07 handoff contract (handoff.py), e.g. "
+                        + "; ".join(problems[:5]))
         findings, theme_records_for_a07 = self._consolidate_themes(self._findings(), theme_records)
         manifest = synthesis_input.build_manifest(corpus, theme_records, self._inconsistency_items(corpus))
         self.save("coverage_manifest.json", manifest)
@@ -898,7 +1022,12 @@ class Run:
         except JobStopped as e:
             self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
             raise Pause(f"synthesis job stopped cleanly — {e}. `litreview run` resumes from the last committed turn.")
-        self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, pkg))
+        report = self._job_report(tag, pkg)
+        ev_only = self.state().get("evaluation_only")
+        if ev_only:   # stamped in the data itself, so the restriction travels with any copy
+            pkg = publication.stamp(pkg, ev_only["reason"], self.id)
+            report = publication.stamp(report, ev_only["reason"], self.id)
+        self.save(f"synthesis_job_{tag}/report.json", report)
         self.save("synthesis_package.json", pkg)
         # which model produced which turns: the source for the AI-use disclosure (provenance_summary.json)
         self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
@@ -1016,13 +1145,13 @@ class Run:
     def stage_cp3(self, st: dict) -> str:
         decision = checkpoints.approved(self.dir, "CP3")
         if not decision:
-            pkg = self.load("synthesis_package.json")
+            pkg = self._publishable("synthesis_package.json")
             checkpoints.write_cp3(self.dir, pkg,
                                   emerging=theme_framework.emerging(self.load("validated_findings.json", []), "finding_id"),
                                   framework=self.load("theme_framework.json"))
             self.pause_for_checkpoint("CP3")
         self._framework_update(decision, "CP3")
-        pkg = self.load("synthesis_package.json")
+        pkg = self._publishable("synthesis_package.json")
         pkg["researcher_decision"] = decision
         adopted = set(decision.get("adopted_interpretations", []))
         pkg["author_interpretations"] = [{**p, "type": "AUTHOR_INTERPRETATION", "id": p["pi_id"].replace("PI", "AI")}
@@ -1032,7 +1161,7 @@ class Run:
         return "outline"
 
     def stage_outline(self, st: dict) -> str:
-        plan = self.agent("A08-OL", {"synthesis_package": self.load("synthesis_approved.json"),
+        plan = self.agent("A08-OL", {"synthesis_package": self._publishable("synthesis_approved.json"),
                                      "selected_corpus": self.load("selected_corpus.json"),
                                      "journal_profile": config.load("journal_scirev"),
                                      "display_preference": (self.cfg.get("outline") or {}).get("display_preference")},
@@ -1050,7 +1179,7 @@ class Run:
         if out_dir.exists():
             shutil.rmtree(out_dir)   # a new plan replaces every item
         incons = self.load("inconsistencies.json", [])
-        built = display_items.build_all(plan, self.load("synthesis_approved.json"),
+        built = display_items.build_all(plan, self._publishable("synthesis_approved.json"),
                                         self._findings() or [],
                                         self.load("selected_corpus.json", []), out_dir, incons)
         self.save("display_items.json", built)
@@ -1074,7 +1203,7 @@ class Run:
         every other validated finding only as a contradiction-index line (ID, assertion, disposition), enough
         to flag a conflict and ask for the record. Requested records are sent in one detail round (at most
         verification_scope.MAX_DETAIL), and that round's output replaces the first."""
-        plan, pkg = self.load("manuscript_plan.json"), self.load("synthesis_approved.json")
+        plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
         findings = self._findings()
         prose = self._prose_vendors("A10-RV")
         full, index, stats = verification_scope.scope(manuscript, plan, pkg, findings)
@@ -1192,7 +1321,7 @@ class Run:
         return "review_loop"
 
     def stage_review_loop(self, st: dict) -> str:
-        plan, pkg = self.load("manuscript_plan.json"), self.load("synthesis_approved.json")
+        plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
         for cycle in range(1, int(self.cfg["loops"]["max_critique_cycles"]) + 1):
             m, rv = self._current(), self.load("rv_latest.json")
             rc = self.agent("A11-RC", {"manuscript": m, "manuscript_plan": plan, "synthesis_package": pkg,

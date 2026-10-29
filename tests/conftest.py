@@ -31,3 +31,17 @@ def fake_get(monkeypatch):
         monkeypatch.setattr(requests, method, _fake)
         return calls
     return install
+
+
+@pytest.fixture(autouse=True)
+def _projection_guard(request, monkeypatch):
+    """Tests drive runs past CP2 with fake models: the spend guard (Run._require_projection) is off unless a
+    test is marked `projection_guard`, which tests the guard itself."""
+    if request.node.get_closest_marker("projection_guard"):
+        return
+    from litreview import orchestrator
+    monkeypatch.setattr(orchestrator.Run, "_require_projection", lambda self: None)
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "projection_guard: run with the CP2 cost-projection spend guard on")

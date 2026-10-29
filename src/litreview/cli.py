@@ -177,6 +177,49 @@ def cmd_gate2_report(args) -> int:
     return 0
 
 
+def cmd_review_validation(args) -> int:
+    run = Run(args.run_id)
+    if args.rescan:
+        items = run.review_revalidations()
+        print(f"{len(items)} changed dispositions; {sum(i['action'] == 'QUARANTINED' for i in items)} quarantined.")
+    if args.finding_id:
+        if not (args.keep_old or args.accept_new) or not args.note:
+            print("Give --keep-old or --accept-new, and --note with what you checked.")
+            return 1
+        item = run.decide_review(args.finding_id, "KEEP_OLD" if args.keep_old else "ACCEPT_NEW", args.note)
+        print(f"{args.finding_id}: {item['decision']} recorded as your decision.")
+    pending = [i for i in run.load("validation_review.json", []) if i["action"] == "QUARANTINED" and not i.get("decision")]
+    for i in pending:
+        print(f"  QUARANTINED {i['finding_id']:10s} {i['old_disposition']} -> {i['new_disposition']} ({i['direction']})"
+              + (f"  note: {i['reviewer_note']}" if i.get("reviewer_note") else ""))
+    print(f"{len(pending)} awaiting your decision.")
+    return 0
+
+
+def cmd_cost_rates(args) -> int:
+    from .tools import cost_projection
+    rates = cost_projection.measured_rates(RUNS_DIR / args.run_id)
+    cost_projection.rates_path().write_text(json.dumps(rates, indent=1) + "\n", encoding="utf-8")
+    print(json.dumps(rates, indent=1))
+    print(f"Saved {cost_projection.rates_path()}")
+    return 0
+
+
+def cmd_project(args) -> int:
+    from .tools import cost_projection
+    run = Run(args.run_id)
+    proj = cost_projection.remaining_for_run(run)
+    run.save("cost_projection.json", proj)
+    print(cost_projection.text(proj))
+    return 0 if proj["verdict"] == "WITHIN_CAP" else 2
+
+
+def cmd_mark_evaluation_only(args) -> int:
+    Run(args.run_id).mark_evaluation_only(args.reason)
+    print(f"Run {args.run_id} is evaluation-only: its synthesis is stamped and refused by every publication stage.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(REPO_ROOT / ".env")
     for stream in (sys.stdout, sys.stderr):   # piped output on Windows may be cp1252: never crash on ✓/✗
@@ -233,6 +276,24 @@ def main(argv: list[str] | None = None) -> int:
     g2 = sub.add_parser("gate2-report", help="recovery and new error after a normalization correction")
     g2.add_argument("run_id")
     g2.set_defaults(fn=cmd_gate2_report)
+    rq = sub.add_parser("review-validation", help="list or decide revalidation changes held for human review")
+    rq.add_argument("run_id")
+    rq.add_argument("finding_id", nargs="?")
+    rq.add_argument("--keep-old", action="store_true")
+    rq.add_argument("--accept-new", action="store_true")
+    rq.add_argument("--note")
+    rq.add_argument("--rescan", action="store_true", help="apply the review rule to this run's revalidations")
+    rq.set_defaults(fn=cmd_review_validation)
+    cr = sub.add_parser("cost-rates", help="measure per-paper and per-theme costs from a run (records/cost_rates.json)")
+    cr.add_argument("run_id")
+    cr.set_defaults(fn=cmd_cost_rates)
+    pj = sub.add_parser("project", help="project what a run still has to spend; required before spend after CP2")
+    pj.add_argument("run_id")
+    pj.set_defaults(fn=cmd_project)
+    me = sub.add_parser("mark-evaluation-only", help="stamp a run's synthesis so no publication stage accepts it")
+    me.add_argument("run_id")
+    me.add_argument("--reason", required=True)
+    me.set_defaults(fn=cmd_mark_evaluation_only)
     args = p.parse_args(argv)
     return args.fn(args)
 

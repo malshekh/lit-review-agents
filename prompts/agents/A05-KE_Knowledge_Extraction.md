@@ -1,6 +1,6 @@
 # A5-KE — Knowledge Extraction Agent
 
-Version: 0.4 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
+Version: 0.5 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
 Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check). Added in v0.3: primary themes from the approved framework, free subthemes, an emerging flag. Added in v0.4: the table-cell span rule in the self-check (§11).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -167,7 +167,22 @@ A finding without its context is not a finding. "Compound X reduced Y" means dif
 Each finding is one atomic relation: one subject, one predicate, one object. A sentence asserting three relations yields three findings.
 
 ### 9.1 Predicates
-`ASSOCIATED_WITH` · `CORRELATES_WITH` · `PREDICTS` · `DETECTS` · `EXPRESSED_IN` · `LOCALIZES_TO` · `COLOCALIZES_WITH` · `INTERACTS_WITH` · `BINDS` · `TARGETS` · `INHIBITS` · `ACTIVATES` · `CATALYZES` · `IS_SUBSTRATE_OF` · `METABOLIZES` · `INCREASES` · `DECREASES` · `REGULATES` · `REQUIRED_FOR` · `CAUSES` · `PREVENTS` · `IMPROVES_OUTCOME` · `WORSENS_OUTCOME` · `NO_EFFECT_ON` · `OTHER_SPECIFIED`.
+`ASSOCIATED_WITH` · `CORRELATES_WITH` · `PREDICTS` · `DETECTS` · `EXPRESSED_IN` · `LOCALIZES_TO` · `COLOCALIZES_WITH` · `INTERACTS_WITH` · `BINDS` · `TARGETS` · `INHIBITS` · `ACTIVATES` · `CATALYZES` · `IS_SUBSTRATE_OF` · `METABOLIZES` · `INCREASES` · `DECREASES` · `REGULATES` · `REQUIRED_FOR` · `CAUSES` · `PREVENTS` · `IMPROVES_OUTCOME` · `WORSENS_OUTCOME` · `NO_EFFECT_ON` · `OTHER_SPECIFIED`, and:
+
+| Predicate | Use for |
+|---|---|
+| `NO_SIGNIFICANT_DIFFERENCE` | A comparison whose test did not reach significance ("no significant difference", P = .26). It records non-significance, not absence of effect: never `NO_EFFECT_ON` unless the paper itself claims no effect. Polarity `NULL`; the test, p-value and interval go in `quantities`. |
+| `SYNERGIZES_WITH` · `ANTAGONIZES` · `ADDITIVE_WITH` | A drug-interaction call between the subject and the object, as the paper names it (combination index, isobologram, Bliss). Antagonism is never recorded as a synergy with a different polarity. |
+| `POTENTIATES` · `SENSITIZES_TO` | The subject enhances the object's effect ("copper potentiates DSF activity") or makes cells responsive to it. |
+| `REVERSES_EFFECT_OF` | The subject abolishes or reverses the object's effect (a chelator reversing DSF–Cu toxicity). |
+| `ACTIVE_AGAINST` | Activity against a target, cell population or disease where the readout is not stated. |
+| `MORE_EFFECTIVE_THAN` · `SIMILAR_TO` | A comparison between two agents or conditions, with the measure in `predicate_detail`. |
+| `DETECTED_IN` · `CROSSES` · `CONVERTED_TO` | An analyte found in a tissue or fluid; passage across a barrier; conversion into a metabolite or complex. |
+| `EXPLAINED_BY` · `PRECEDES` · `DISTINCT_FROM` | The authors' causal or mechanistic explanation (always `AUTHORS_INTERPRETATION`); a temporal sequence; a stated distinction. |
+| `USED_FOR` · `UNDER_INVESTIGATION_FOR` | Clinical use; a stated trial aim (no outcome). |
+| `OBSERVED_OUTCOME` · `TOLERATED` · `MAXIMUM_TOLERATED_DOSE` · `HALF_LIFE` | **Intrinsic**: a property of the subject itself (a single-arm median PFS, an MTD, a half-life, tolerability). These may have no object: leave `object_entity_id` null rather than inventing one. Every other predicate needs a real object. |
+
+**`OTHER_SPECIFIED` always names its relation.** Write the relation in `predicate_detail` ("reverses the anti-proliferative effect of", "biphasic change in"), in the paper's terms. A finding with `OTHER_SPECIFIED` and no `predicate_detail` is rejected. Use it only when no predicate above fits; if two findings would share `OTHER_SPECIFIED` but assert different relations, their `predicate_detail` must say so.
 
 **Never strengthen a predicate.** `CORRELATES_WITH` does not become `CAUSES`. `ASSOCIATED_WITH` does not become `REGULATES`. `COLOCALIZES_WITH` does not become `BINDS`. `TARGETS` does not become `INHIBITS`. `PREDICTS` (in silico) does not become `BINDS` (measured). A docking score is a prediction, never a demonstrated interaction.
 
@@ -225,6 +240,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "finding_id": "F1",
       "subject_entity_id": "E1",
       "predicate": "string",
+      "predicate_detail": "string|null — required with OTHER_SPECIFIED",
       "object_entity_id": "E2",
       "polarity": "string",
       "modality": "string",

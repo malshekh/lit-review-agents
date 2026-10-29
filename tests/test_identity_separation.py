@@ -4,6 +4,7 @@ An identifier never decides whether a finding is supported; a conflicting identi
 (kept only in the audit record); an identity change after validation sends the finding back to A06; and an
 abbreviation resolves only through the source's own expansion of it."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -228,3 +229,82 @@ def test_code_names_are_not_abbreviations_and_self_expanded_mentions_use_their_h
     _route(monkeypatch, ols_docs=[{"obo_id": "MONDO:0018177", "label": "glioblastoma", "synonym": ["GBM"]}])
     r = n.normalize_one({"type": "DISEASE", "mention": "glioblastoma (GBM)"})
     assert r["normalized_id"] == "MONDO:0018177" and r["resolved_from"] == "MENTION_HEAD"
+
+
+# ------------------------------------------------------------------ revalidation review rule
+def _doc(*pairs, **extra):
+    return {"validations": [{"finding_id": f, "disposition": d, "gate2": "ALIGNED"} for f, d in pairs], **extra}
+
+
+EXT = {"entities": [{"entity_id": "E1", "mention": "DS/Cu", "type": "OTHER_SPECIFIED", "normalization_state": "NOT_APPLICABLE"},
+                    {"entity_id": "E2", "mention": "gemcitabine", "type": "APPROVED_DRUG", "normalization_state": "UNRESOLVED"}],
+       "findings": [{"finding_id": f"F{i}", "subject_entity_id": "E1", "object_entity_id": "E2", "span": f"s{i}"}
+                    for i in range(1, 6)], "contexts": []}
+
+
+def test_unexplained_changes_are_quarantined_in_both_directions_and_narrowing_is_applied():
+    old = _doc(("F1", "BLOCKED_ALIGNMENT"), ("F2", "SUPPORTED_FOR_OBSERVATION"), ("F3", "SUPPORTED"),
+               ("F4", "DOES_NOT_ESTABLISH"), ("F5", "SUPPORTED"))
+    new = _doc(("F1", "SUPPORTED_WITH_CONSTRAINTS"), ("F2", "DOES_NOT_ESTABLISH"), ("F3", "SUPPORTED_WITH_CONSTRAINTS"),
+               ("F4", "SUPPORTED_FOR_OBSERVATION"), ("F5", "SUPPORTED"))
+    items = {i["local_id"]: i for i in ev.review_changes("R0042", old, EXT, new, EXT)}
+    assert {k: (v["direction"], v["action"]) for k, v in items.items()} == {
+        "F1": ("IMPROVED", "QUARANTINED"),        # the R0042 F7 case: blocked -> supported, nothing changed
+        "F2": ("LOST_ROLE", "QUARANTINED"),       # the R0112 F18 case
+        "F3": ("NARROWED", "APPLIED"),
+        "F4": ("IMPROVED", "QUARANTINED")}
+    status = ev.annotate_paper(EXT, new, items)
+    assert status["F1"]["status"] == status["F2"]["status"] == "QUARANTINED"
+    assert status["F3"]["status"] == "SUPPORTING"
+    # a human decision settles it either way
+    items["F1"]["decision"], items["F2"]["decision"] = "KEEP_OLD", "ACCEPT_NEW"
+    status = ev.annotate_paper(EXT, new, items)
+    assert status["F1"]["status"] == "REJECTED" and status["F2"]["status"] == "NOT_ESTABLISHED"
+
+
+def test_a_change_the_input_explains_is_applied():
+    held_old = {"validations": [{"finding_id": "F1", "disposition": "BLOCKED_ALIGNMENT", "gate2": "ENTITY_MISMATCH"}],
+                "defect_reports": [
+        {"finding_id": "F1", "defect_type": "ENTITY_MISMATCH", "cause": "NORMALIZATION"}],
+        "_entity_identities": {"E2": {"normalized_id": "CHEBI:1", "approved_name": "wrong", "normalization_state": "RESOLVED"}}}
+    fixed = {**EXT, "entities": [EXT["entities"][0], {**EXT["entities"][1], "normalization_state": "RESOLVED",
+                                                      "normalized_id": "CHEMBL888", "approved_name": "GEMCITABINE"}]}
+    item = ev.review_changes("R1", held_old, EXT, _doc(("F1", "SUPPORTED")), fixed)[0]
+    assert item["action"] == "APPLIED" and "identity" in item["explained_by"]
+    reextracted = {**EXT, "findings": [{**EXT["findings"][0], "span": "a different span"}] + EXT["findings"][1:]}
+    item = ev.review_changes("R1", _doc(("F1", "BLOCKED_ALIGNMENT")), EXT, _doc(("F1", "SUPPORTED")), reextracted)[0]
+    assert item["action"] == "APPLIED" and item["explained_by"] == "the extraction of this finding changed"
+
+
+def test_saving_a_revalidation_applies_the_rule(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    run._save_validation("R0001", _validation("BLOCKED_ALIGNMENT"))
+    run._save_validation("R0001", _validation("SUPPORTED"))            # same input, different reading
+    review = run.load("validation_review.json")
+    assert [(i["finding_id"], i["action"]) for i in review] == [("R0001:F1", "QUARANTINED")]
+    assert run._validated_findings(run.load("selected_corpus.json"))[0]["eligibility"]["status"] == "QUARANTINED"
+    run.decide_review("R0001:F1", "ACCEPT_NEW", "checked the span: the relation is stated")
+    assert run._validated_findings(run.load("selected_corpus.json"))[0]["eligibility"]["status"] == "SUPPORTING"
+
+
+LIVE = Path(__file__).resolve().parents[1] / "runs" / "20261025-100039" / "data"
+
+
+@pytest.mark.skipif(not (LIVE / "renormalization" / "a06_probes.json").exists(), reason="live probe not present")
+def test_live_a06_conflict_output_strips_the_identity_and_keeps_the_findings(tmp_path, monkeypatch):
+    """Replays A06's real output on R0045 with a deliberately conflicting DSF identifier."""
+    probe = json.loads((LIVE / "renormalization" / "a06_probes.json").read_text(encoding="utf-8"))["A06-SV_conflictprobe_R0045"]
+    assert probe["normalization_conflicts"][0]["attached_id"] == "CHEBI:81585"
+    assert {v["gate2"] for v in probe["validations"]} == {"ALIGNED"}       # judged against the mention, not blocked
+    ext = json.loads((LIVE / "extractions" / "R0045.json").read_text(encoding="utf-8"))
+    ext["findings"] = [f for f in ext["findings"] if f["finding_id"] in ("F1", "F7", "F8")]
+    next(e for e in ext["entities"] if e["entity_id"] == "E1").update(WRONG)
+    monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(model_record, "RECORD", tmp_path / "mr.jsonl")
+    run = orch.Run("live")
+    run.save("selected_corpus.json", [{"record_id": "R0045"}])
+    run.save("extractions/R0045.json", ext)
+    run._save_validation("R0045", probe)
+    vf = run._validated_findings(run.load("selected_corpus.json"))
+    assert {f["eligibility"]["status"] for f in vf} == {"SUPPORTING"}
+    assert "CHEBI:81585" not in json.dumps(vf) and run.load("normalization_audit.json")[0]["raised_by"] == "A06-SV"

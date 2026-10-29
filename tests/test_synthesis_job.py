@@ -225,7 +225,11 @@ def test_stage_synthesize_sends_a_byte_identical_corpus_every_call(tmp_path, mon
     r.save("selected_corpus.json", [{"record_id": "R1", "tier": "CORE"}, {"record_id": "R2", "tier": "SUPPORTING"},
                                     {"record_id": "R3", "tier": "SUPPORTING"}])
     r.save("validated_findings.json", [{"finding_id": f, "record_id": f.split(":")[0], "themes": ["T2"],
-                                        "context_id": f"{f.split(':')[0]}:C1", "context": {"s": 1}, "span": "q", "disposition": "SUPPORTED"}
+                                        "context_id": f"{f.split(':')[0]}:C1", "context": {"s": 1}, "span": "q", "disposition": "SUPPORTED",
+                                        **dict.fromkeys(("subject", "predicate_detail", "object", "polarity", "direction",
+                                                         "modality", "assertion_type", "attributed_to", "origin",
+                                                         "alignment_disposition", "plain_language_limit")),
+                                        "predicate": "DECREASES", "constraints": [], "eligibility": {"status": "SUPPORTING"}}
                                        for f in FINDINGS])
     r.save("theme_records.json", {"T2": {"conflicts": [{"x": 1}], "evidence_reach": {"systems_missing": ["HUMAN"]}}})
     sent = []

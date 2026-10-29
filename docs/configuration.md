@@ -190,6 +190,35 @@ revalidation with the cost of their last A06 call. `litreview revalidate RUN --r
 synthesis waits for `litreview revalidate RUN --themes`. `litreview gate2-report RUN` reports recovery and
 new error side by side.
 
+**Revalidation review** (`evidence.review_changes`). When a paper is revalidated, a disposition that changes
+with no change to the finding's extraction, and no correction of an identity A06 had objected to, is not
+applied: an improvement, or a finding losing the role it had, is `QUARANTINED` (usable in no role) until you
+decide it with `litreview review-validation RUN FINDING --keep-old|--accept-new --note "..."`. A narrowing
+that changes no role is applied and noted. A06 is not deterministic at temperature 0.0 (run 20261025-100039:
+one of three findings changed disposition between two byte-identical calls), so a revalidation result is a
+second reading, not a correction, unless the input changed.
+
+**Handoff contract** (`src/litreview/handoff.py`). Every validated finding carries `predicate` and
+`predicate_detail`, `polarity`, `direction`, `modality`, `assertion_type`, `attributed_to`, `origin`,
+`alignment_disposition` and its eligibility, and synthesis does not start if any is missing. A07 receives
+them as fields (it gets no spans). A05-KE v0.5 adds predicates for interactions (`SYNERGIZES_WITH`,
+`ANTAGONIZES`, `ADDITIVE_WITH`, `POTENTIATES`), `NO_SIGNIFICANT_DIFFERENCE` (non-significance, not absence of
+effect) and intrinsic predicates that may have no object (`OBSERVED_OUTCOME`, `TOLERATED`,
+`MAXIMUM_TOLERATED_DOSE`, `HALF_LIFE`); `OTHER_SPECIFIED` must name its relation in `predicate_detail`
+(schema and code). Older extractions keep `OTHER_SPECIFIED` with the relation in the warrant note, marked
+`LEGACY_WARRANT_NOTE`.
+
+**Cost projection at CP2** (`src/litreview/tools/cost_projection.py`). `litreview cost-rates RUN` measures
+per-paper (A05 + A06, by content level, 90th percentile) and per-theme costs into `records/cost_rates.json`.
+CP2_review.md shows the projection; approving CP2 refuses a selection projected over the cap, with A07 to
+A12 priced at worst case (configured max_tokens, A07 paying a cache write on every call). After CP2, no
+agent call runs without a projection within the cap in `data/cost_projection.json`; `litreview project RUN`
+re-projects what a run still has to spend.
+
+**Evaluation-only runs** (`src/litreview/publication.py`). `litreview mark-evaluation-only RUN --reason ...`
+stamps the run's synthesis in its own data; CP3, the outline, display tables, verification, critique and
+every later stage refuse a stamped synthesis, in that run or any run it is copied into.
+
 ## 4. Databases — `config/sources.yaml`
 
 Enabled: PubMed, Europe PMC, PubTator3, OpenAlex, Semantic Scholar, ClinicalTrials.gov.

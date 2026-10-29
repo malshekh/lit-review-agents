@@ -13,6 +13,9 @@ correcting an identifier never promotes a finding by itself.
   HELD_FOR_CORRECTION    BLOCKED_ALIGNMENT caused only by a code-attached       nothing
                          identity (kept recoverable, never rejected)
   REVALIDATION_REQUIRED  any: an entity identity changed after validation       nothing, until A06 revalidates
+  QUARANTINED            a revalidation changed the disposition with no change  nothing, until a human decides
+                         to the extraction and no identity correction to
+                         explain it (see review_changes)
   REJECTED               BLOCKED_PROVENANCE; BLOCKED_ALIGNMENT (extraction)     nothing
   UNRESOLVED             HUMAN_REVIEW_REQUIRED, UNRESOLVED_SOURCE_ACCESS, none  nothing
 
@@ -33,8 +36,8 @@ import json
 import re
 
 USABLE = frozenset({"SUPPORTED", "SUPPORTED_WITH_CONSTRAINTS", "SUPPORTED_FOR_OBSERVATION", "PARTIALLY_SUPPORTED"})
-STATUSES = ("SUPPORTING", "NOT_ESTABLISHED", "HELD_FOR_CORRECTION", "REVALIDATION_REQUIRED", "REJECTED",
-            "UNRESOLVED")
+STATUSES = ("SUPPORTING", "NOT_ESTABLISHED", "HELD_FOR_CORRECTION", "REVALIDATION_REQUIRED", "QUARANTINED",
+            "REJECTED", "UNRESOLVED")
 ROLES = ("SUPPORTING", "CONFLICTING", "SUBJECT_OF_APPRAISAL")
 ALLOWED_ROLES = {"SUPPORTING": {"SUPPORTING", "CONFLICTING"}, "NOT_ESTABLISHED": {"SUBJECT_OF_APPRAISAL"}}
 FINDING_RE = re.compile(r"\bR\d+:F\d+\b")
@@ -50,7 +53,7 @@ def status_of(finding: dict) -> str:
     status can only lower it (held, revalidation required), never raise it."""
     stored = (finding.get("eligibility") or {}).get("status")
     d = finding.get("disposition")
-    if stored in ("HELD_FOR_CORRECTION", "REVALIDATION_REQUIRED", "REJECTED", "UNRESOLVED"):
+    if stored in ("HELD_FOR_CORRECTION", "REVALIDATION_REQUIRED", "QUARANTINED", "REJECTED", "UNRESOLVED"):
         return stored
     if can_cite(d):
         return "SUPPORTING"
@@ -146,10 +149,21 @@ def classify(finding: dict, validation: dict | None, defects: list[dict], implic
     return {"status": "UNRESOLVED", "disposition": d, "reason": f"disposition {d or 'missing'}"}
 
 
-def annotate_paper(extraction: dict, validation_doc: dict) -> dict[str, dict]:
+def annotate_paper(extraction: dict, validation_doc: dict, review: dict[str, dict] | None = None) -> dict[str, dict]:
     """finding_id (paper-local, F3) -> eligibility, for one paper. A validation records the identities A06
-    saw (`_entity_identities`); one without that record predates it and is taken to match the extraction."""
+    saw (`_entity_identities`); one without that record predates it and is taken to match the extraction.
+    `review`: this paper's review items (review_changes), keyed by local finding ID. A quarantined change is
+    not applied until a human decides: KEEP_OLD restores the previous validation's entry, ACCEPT_NEW applies
+    the new one, and while undecided the finding is QUARANTINED."""
     vals = {v["finding_id"]: v for v in validation_doc.get("validations", [])}
+    quarantined = {}
+    for fid, item in (review or {}).items():
+        if item.get("action") != "QUARANTINED":
+            continue
+        if item.get("decision") == "KEEP_OLD":
+            vals[fid] = item["old_validation"]
+        elif item.get("decision") != "ACCEPT_NEW":
+            quarantined[fid] = item
     defects: dict[str, list] = {}
     for x in validation_doc.get("defect_reports") or []:
         defects.setdefault(x.get("finding_id"), []).append(x)
@@ -158,9 +172,94 @@ def annotate_paper(extraction: dict, validation_doc: dict) -> dict[str, dict]:
     changed = {eid for eid, ident in (snap or {}).items() if ident.get("normalized_id")
                and ident.get("normalized_id") != (now.get(eid) or {}).get("normalized_id")}
     implicated = normalization_entities(validation_doc, extraction.get("entities", []), snap)
-    return {f["finding_id"]: classify(f, vals.get(f["finding_id"]), defects.get(f["finding_id"], []), implicated,
-                                      changed)
-            for f in extraction.get("findings", [])}
+    out = {f["finding_id"]: classify(f, vals.get(f["finding_id"]), defects.get(f["finding_id"], []), implicated,
+                                     changed)
+           for f in extraction.get("findings", [])}
+    for fid, item in quarantined.items():
+        if fid in out:
+            out[fid] = {"status": "QUARANTINED", "disposition": item["new_disposition"],
+                        "previous_disposition": item["old_disposition"], "direction": item["direction"],
+                        "reason": item["reason"] + "; awaiting human review (litreview review-validation)"}
+    return out
+
+
+# ------------------------------------------------------------------ revalidation review
+SOURCE_ENTITY_FIELDS = ("mention", "type", "subtype", "roles", "molecule_species", "measured_at",
+                        "identity_relation", "construct")
+RANK = {"SUPPORTED": 6, "SUPPORTED_WITH_CONSTRAINTS": 5, "PARTIALLY_SUPPORTED": 4, "SUPPORTED_FOR_OBSERVATION": 4,
+        "DOES_NOT_ESTABLISH": 2, "HUMAN_REVIEW_REQUIRED": 1, "UNRESOLVED_SOURCE_ACCESS": 1}
+
+
+def usability(disposition: str | None) -> int:
+    """2: may support or conflict; 1: may be appraised; 0: no role."""
+    return 2 if can_cite(disposition) else 1 if disposition == "DOES_NOT_ESTABLISH" else 0
+
+
+def finding_fingerprints(extraction: dict) -> dict[str, str]:
+    """What A05 recorded for each finding, with the source fields (never the code-attached identity) of its
+    subject, object and context: a change here is a change to the extraction."""
+    import hashlib
+    ents = {e["entity_id"]: {k: e.get(k) for k in SOURCE_ENTITY_FIELDS} for e in extraction.get("entities", [])}
+    ctx = {c["context_id"]: c for c in extraction.get("contexts", [])}
+    out = {}
+    for f in extraction.get("findings", []):
+        blob = {"finding": f, "subject": ents.get(f.get("subject_entity_id")),
+                "object": ents.get(f.get("object_entity_id")), "context": ctx.get(f.get("context_id"))}
+        out[f["finding_id"]] = hashlib.sha256(json.dumps(blob, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    return out
+
+
+def review_changes(record_id: str, old_val: dict, old_ext: dict, new_val: dict, new_ext: dict) -> list[dict]:
+    """Every disposition a revalidation changed, and whether the change is explained.
+
+    Explained: the finding's extraction changed, or it was HELD_FOR_CORRECTION and an identity it rests on
+    was corrected. Anything else is the same input read differently and is not applied automatically:
+    - an improvement (a higher disposition, or a role the finding lacked) is QUARANTINED;
+    - a lost role (usable -> unusable, appraisable -> nothing) is QUARANTINED too: instability in that
+      direction silently removes evidence;
+    - a narrowing that changes no role (SUPPORTED -> SUPPORTED_WITH_CONSTRAINTS) is applied and noted.
+    A human decides each quarantined item with `litreview review-validation`."""
+    old = {v["finding_id"]: v for v in old_val.get("validations", [])}
+    seen = old_val.get("_entity_identities") or identity_snapshot(old_ext)
+    # the old status as of that validation: against the identities A06 saw then, not today's
+    as_seen = {**old_ext, "entities": [{**e, **(seen.get(e["entity_id"]) or {})} for e in old_ext.get("entities", [])]}
+    old_status = annotate_paper(as_seen, old_val)
+    old_fp = old_val.get("_finding_fingerprints") or finding_fingerprints(old_ext)
+    new_fp = finding_fingerprints(new_ext)
+    now = identity_snapshot(new_ext)
+    by_id = {f["finding_id"]: f for f in new_ext.get("findings", [])}
+    items = []
+    for v in new_val.get("validations", []):
+        fid = v["finding_id"]
+        od, nd = (old.get(fid) or {}).get("disposition"), v.get("disposition")
+        if fid not in old or od == nd:
+            continue
+        f = by_id.get(fid, {})
+        ents = {f.get("subject_entity_id"), f.get("object_entity_id")} - {None}
+        moved = {e for e in ents if (seen.get(e) or {}).get("normalized_id") != (now.get(e) or {}).get("normalized_id")}
+        st = old_status.get(fid) or {}
+        if old_fp.get(fid) != new_fp.get(fid):
+            explained = "the extraction of this finding changed"
+        elif st.get("status") == "HELD_FOR_CORRECTION" and moved & set(st.get("entities") or ents):
+            explained = "held for a code-attached identity, which was corrected (" + ", ".join(sorted(moved)) + ")"
+        else:
+            explained = None
+        uo, un = usability(od), usability(nd)
+        if un > uo or (un == uo and RANK.get(nd, 0) > RANK.get(od, 0)):
+            direction = "IMPROVED"
+        elif un < uo:
+            direction = "LOST_ROLE"
+        else:
+            direction = "NARROWED"
+        action = "APPLIED" if explained or direction == "NARROWED" else "QUARANTINED"
+        why = ("explained: " + explained) if explained else             "with no change to the extraction and no identity correction to explain it"
+        items.append({"finding_id": f"{record_id}:{fid}", "record_id": record_id, "local_id": fid,
+                      "old_disposition": od, "new_disposition": nd, "old_gate2": (old.get(fid) or {}).get("gate2"),
+                      "new_gate2": v.get("gate2"), "direction": direction, "explained_by": explained,
+                      "identity_changed": sorted(moved), "action": action,
+                      "reason": f"revalidation changed {od} -> {nd} ({direction}) {why}",
+                      "old_validation": old.get(fid), "decision": None})
+    return items
 
 
 def summary(findings: list[dict]) -> dict:
