@@ -20,7 +20,7 @@ loops:
   max_critique_cycles: 2        # A11 critique -> A12 revision cycles
   cq_batch_size: 20             # records per A04 call
   max_redrafts: 1               # A10 blocking findings on the first draft -> A09 redraft
-  verification: draft_and_final # A10 checks: all (after every draft and edit) | draft_and_final
+  verification: draft_and_final # legacy preference; version-bound A10 rechecks changed text via its cache
 
 retrieval:
   max_records_total: 300        # across all query families and sources (A03-LM budget)
@@ -103,6 +103,15 @@ outline:
 # roles is quarantined for human review. Priced in the CP2 projection.
 validation:
   instability_test: true
+
+# A10: conservative serialized-byte admission stays below the 272k pricing threshold.
+scientific_verification:
+  context_ceiling_tokens: 240000
+  max_occurrences_per_packet: 12
+  max_global_entries_per_page: 128
+  output_limits: { LOCAL: 10000, GLOBAL: 8000 }
+  retrieval_limit: 12
+  max_retrieval_rounds: 2
 
 # A07-SYN runs as one logical synthesis job; packet boundaries are not manuscript sections.
 # Registry-backed PLAN, bounded GROUP/retrieval, global RECONCILE, compact FINAL.

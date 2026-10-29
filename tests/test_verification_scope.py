@@ -71,27 +71,29 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     monkeypatch.setattr(run, "_deterministic_report", lambda m: {})
     _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
     sent = []
+    from test_verification_job import ScriptedVerifier, response
+    base = ScriptedVerifier()
 
     def agent(agent_id, payload, step, **kw):
         sent.append((step, payload))
         assert kw["exclude_providers"] == frozenset({"anthropic"})
         if len(sent) == 1:
-            return {"findings": [], "detail_requests": [{"finding_id": "R0004:F1", "kind": "UNCITED_CONFLICT",
-                                                         "check": "COUNTER_EVIDENCE", "reason": "null result"}]}
-        return {"findings": [{"code": "UNCITED_CONFLICT"}], "detail_requests": []}
+            return {**response('LOCAL'),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+        out = base(payload['mode'],payload,step)
+        if payload['mode']=='LOCAL':
+            out['issues']=[{'occurrence_ids':[payload['occurrences'][0]['occurrence_id']],
+                'finding_ids':['R0004:F1'],'code':'UNCITED_CONFLICT','severity':'MAJOR',
+                'rationale':'Supplied contradiction','correction':'Qualify statement'}]
+        return out
     monkeypatch.setattr(run, "agent", agent)
     rv = run._verify(manuscript("Claim ⟦P1⟧."), "DRAFT", "A10-RV_draft1")
-    assert [s for s, _ in sent] == ["A10-RV_draft1", "A10-RV_draft1_detail"]
+    assert len(sent)==3 and sent[-1][1]['mode']=='GLOBAL'
     first, second = sent[0][1], sent[1][1]
-    assert "R0004:F1" in {i["finding_id"] for i in first["contradiction_index"]}
-    assert "R0004:F1" in {f["finding_id"] for f in second["validated_findings"]}
-    assert "R0004:F1" not in {i["finding_id"] for i in second["contradiction_index"]}
-    assert rv["findings"] == [{"code": "UNCITED_CONFLICT"}]                  # the detail round replaces the first
-    scope_ev = [e for e in run.prov.events() if e["type"] == "tool_run" and e["tool"] == "verification_scope"]
-    assert scope_ev[0]["summary"]["detail_items"] == [{"finding_id": "R0004:F1", "kind": "UNCITED_CONFLICT",
-                                                       "check": "COUNTER_EVIDENCE", "paper_cited": False}]
+    assert 'synthesis_package' not in first
+    assert "R0004:F1" in {f["finding_id"] for f in second['retrieved_evidence']['findings']}
+    assert 'UNCITED_CONFLICT' in {f['code'] for f in rv['findings']}
     prov = [json.loads(line) for line in (run.dir / "provenance.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert any(p.get("tool") == "verification_scope" or "verification_scope" in json.dumps(p) for p in prov)
+    assert any(p.get('tool')=='bounded_verification' for p in prov)
 
 
 

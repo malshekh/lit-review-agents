@@ -29,9 +29,16 @@ def run(tmp_path, monkeypatch):
                       "text_markdown": "X matters [@R0002] {{F1}}. ⟦P1⟧"},
                      {"section_id": "S2", "heading": "Rodent studies",
                       "text_markdown": "In rodents X lowered Y [@R0001] {{T1}}. ⟦P1⟧"}],
-        "figure_legends": [{"display_id": "F1", "legend": "Evidence map. ⟦P1⟧"}],
+        "figure_legends": [{"display_id": "F1", "legend": "Evidence map [@R0001]. ⟦P1⟧"}],
         "table_captions": [{"display_id": "T1", "caption": "Rodent studies of X."}]})
     r._build_display_items(plan)
+    from litreview.verification_job import VerificationJob
+    from litreview.synthesis_registry import offline_tokens
+    from test_verification_job import ScriptedVerifier
+    pkg=r.load('synthesis_approved.json')
+    job=VerificationJob(tmp_path/'verification',r._current(),plan,pkg,r._verification_registry(pkg),
+        r.load('display_items.json'),r.cfg['scientific_verification'],ScriptedVerifier(),offline_tokens,{'fixture':True})
+    r.save('rv_final.json',job.run())
     return r
 
 
@@ -53,3 +60,20 @@ def test_finalize_writes_docx_with_tables_and_numbered_citations(run):
 def test_table_only_citations_count_as_cited(run):
     rep = run._deterministic_report(run._current())
     assert "R0003" not in rep["selected_papers_not_cited"]
+
+
+@pytest.mark.parametrize('change',['text','table','synthesis','evidence','missing_report','blocking'])
+def test_release_requires_current_verified_version(run,change):
+    if change=='text':
+        m=run._current();m['abstract']='Changed assertion';run.save('manuscripts/m04_proof.json',m)
+    elif change=='table':
+        tables=run.load('display_items.json');tables[-1]['caption']='Changed scientific caption';run.save('display_items.json',tables)
+    elif change=='synthesis':
+        pkg=run.load('synthesis_approved.json');pkg['propositions'][0]['assertion']='Changed conclusion';run.save('synthesis_approved.json',pkg)
+    elif change=='evidence':
+        fs=run.load('validated_findings.json');fs[0]['span']='Changed source';run.save('validated_findings.json',fs)
+    elif change=='missing_report':run.save('rv_final.json',{})
+    else:
+        rv=run.load('rv_final.json');rv['findings']=[{'severity':'BLOCKING'}];run.save('rv_final.json',rv)
+    with pytest.raises(orch.Pause,match='current complete A10'):
+        run.stage_finalize(run.state())

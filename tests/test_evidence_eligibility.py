@@ -295,18 +295,20 @@ def test_verify_merges_the_code_flags_whatever_a10_concludes(tmp_path, monkeypat
     (run.dir / "outputs").mkdir(parents=True, exist_ok=True)
     (run.dir / "outputs" / "A09-WRI_draft1.json").write_text("{}")
     sent = []
+    from test_verification_job import ScriptedVerifier
+    base=ScriptedVerifier()
 
     def agent(agent_id, payload, step, **kw):
         sent.append(payload)
-        return {"findings": [], "detail_requests": [], "finding_severity": "NONE", "release_disposition": "APPROVED"}
+        out=base(payload['mode'],payload,step)
+        for verdict in out['verdicts']:
+            for appraisal in verdict['appraisal_checks']:appraisal['preserved']=False
+        return out
     monkeypatch.setattr(run, "agent", agent)
     rv = run._verify(manuscript("Only blocked ⟦P1⟧. " + SENTENCE), "FINAL", "A10-RV_final")
-    report = sent[0]["deterministic_report"]
-    assert report["claims_on_ineligible_evidence"][0]["item_ids"] == ["P1"]
-    assert [b["finding_id"] for b in report["appraisal_bindings"]] == ["R0002:F2"]
-    status = {f["finding_id"]: f["eligibility"]["status"] for f in sent[0]["validated_findings"]}
+    status = {f["finding_id"]: f["eligibility"]["status"] for f in sent[0]["findings"]}
     assert status == {"R0001:F2": "REJECTED", "R0001:F1": "SUPPORTING", "R0002:F2": "NOT_ESTABLISHED"}
-    assert rv["release_disposition"] == "HOLD_FOR_UPSTREAM_REVIEW"
-    assert {f["code"] for f in rv["findings"]} == {"SUPPORTED_ONLY_BY_INELIGIBLE_EVIDENCE", "APPRAISAL_UNCHECKED"}
+    assert rv["release_disposition"] == "HOLD_FOR_REVISION"
+    assert {"INELIGIBLE_EVIDENCE_CITED", "APPRAISED_CLAIM_PROMOTED"} <= {f["code"] for f in rv["findings"]}
     saved = json.loads((run.dir / "data" / "validated_findings.json").read_text(encoding="utf-8"))
     assert all("eligibility" in f for f in saved)

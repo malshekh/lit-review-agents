@@ -23,7 +23,7 @@ from . import checkpoints, config, evidence, handoff, model_record, notify, publ
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
 from .budget import BatchGateRefused, BudgetExceeded, BudgetTracker, UnpricedModel
-from .paths import RUNS_DIR
+from .paths import RUNS_DIR, SCHEMAS_DIR
 from .provenance import ProvenanceLog
 from . import synthesis_input, theme_framework
 from .agents.base import build_system_prompt, user_parts
@@ -1454,47 +1454,100 @@ class Run:
 
     # --- writing and review ------------------------------------------
     def _verify(self, manuscript: dict, pass_: str, step: str, changed: list | None = None) -> dict:
-        """A10 sees, in full, the findings the manuscript's claims are bound to (through its tags and the
-        plan's title, abstract, heading and display propositions), with their contexts and source passages;
-        every other validated finding only as a contradiction-index line (ID, assertion, disposition), enough
-        to flag a conflict and ask for the record. Requested records are sent in one detail round (at most
-        verification_scope.MAX_DETAIL), and that round's output replaces the first."""
-        plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
-        findings = self._findings()
+        """Bounded occurrence verification; A07 registry remains the evidence authority."""
+        from .verification_job import VerificationJob
+        from .synthesis_registry import fingerprint, offline_tokens
+        from .synthesis_job import JobStopped
+        plan, pkg = self.load("manuscript_plan.json", {}), self._publishable("synthesis_approved.json")
+        registry = self._verification_registry(pkg)
         prose = self._prose_vendors("A10-RV")
-        full, index, stats = verification_scope.scope(manuscript, plan, pkg, findings)
-        # evidence used in a role it may not serve, and appraised claims A10 must check: found by code, shown
-        # to A10, and merged into its output whatever it concludes (evidence.apply_to_verification)
-        ineligible, appraisals = evidence.verification_bindings(manuscript, pkg, findings)
-        payload = {"pass": pass_, "manuscript": manuscript, "manuscript_plan": plan, "synthesis_package": pkg,
-                   "validated_findings": full, "contradiction_index": index,
-                   "deterministic_report": {**self._deterministic_report(manuscript),
-                                            "claims_on_ineligible_evidence": ineligible,
-                                            "appraisal_bindings": appraisals},
-                   "changed_passages": changed}
-        rv = self.agent("A10-RV", payload, step=step, exclude_providers=prose)
-        wanted, ignored = verification_scope.requested(rv, index)
-        first_pass = not any(e["type"] == "tool_run" and e["tool"] == "verification_scope" for e in self.prov.events())
-        self.prov.tool_run("verification_scope", step, {
-            **stats, "detail_requested": len(wanted) + len(ignored), "detail_sent": len(wanted),
-            "detail_ignored": ignored, "prose_vendors": sorted(prose),
-            "detail_items": verification_scope.classify(rv, wanted + ignored, manuscript, findings)})
-        if wanted:
-            by_id = {f["finding_id"]: f for f in findings}
-            rv = self.agent("A10-RV", {**payload, "validated_findings": full + [by_id[f] for f in wanted],
-                                       "contradiction_index": [i for i in index if i["finding_id"] not in wanted],
-                                       "detail_round": {"requested": rv.get("detail_requests"),
-                                                        "first_round_findings": rv.get("findings")}},
-                            step=f"{step}_detail", exclude_providers=prose)
-        if first_pass:   # the first look at whether scoping pays: how often A10 asks, and for how much
-            notify.send("a10_detail", f"Run {self.id}: first A10 pass, detail requests",
-                        verification_scope.detail_report_text(self._a10_detail_report()))
-        if ineligible or appraisals:
-            self.prov.tool_run("evidence_roles_check", step,
-                               {"ineligible_claims": len(ineligible),
-                                "blocking": sum(x["severity"] == "BLOCKING" for x in ineligible),
-                                "appraisal_bindings": len(appraisals)})
-        return evidence.apply_to_verification(rv, ineligible, pass_, appraisals)
+        cfg = self.cfg['scientific_verification']
+        system = build_system_prompt('A10-RV')
+        count = lambda p: offline_tokens(system)+offline_tokens(user_parts(p))
+        execution = {'model':dataclasses.asdict(self.route('A10-RV',prose)), 'prices':self.budget.prices,
+                     'prompt':system,'schema':(SCHEMAS_DIR/'A10-RV.bounded.schema.json').read_text()}
+        def call(mode, payload, name):
+            cap = cfg['output_limits'][mode]
+            model = self.route('A10-RV',prose)
+            # No hit assumed; reserve all input at the configured cache-write rate.
+            usd = self.budget.cost(model.model,0,cap,0,count(payload))
+            if usd is None:raise UnpricedModel(model.model)
+            key = 'a10-'+fingerprint([execution,mode,payload])[:32]
+            if key in self.budget.reservations():raise Pause('unsettled A10 reservation: reconcile provider billing before retry '+key)
+            if not self.budget.reserve(key,usd,'A10-RV','bounded verification pre-call reservation')[0]:
+                raise BudgetExceeded('A10 request exceeds remaining budget')
+            dispatch = step+'_'+key+'_'+name
+            try:
+                out = self.agent('A10-RV',payload,step=dispatch,exclude_providers=prose,
+                    overrides={'max_tokens':cap,'cache_payload':()},schema_file='A10-RV.bounded.schema.json',reservation_key=key)
+            except AgentError:
+                if any(e['step']==dispatch for e in self.budget.entries()):self.budget.release(key)
+                raise
+            except (Pause,BudgetExceeded,UnpricedModel):
+                self.budget.release(key);raise
+            self.budget.release(key)
+            return out
+        tables = self.load('display_items.json', [])
+        from .verification_job import version
+        digest = fingerprint([version(manuscript,plan,pkg,registry,tables),execution,cfg])[:24]
+        job = VerificationJob(self.data('verification_jobs')/digest,manuscript,plan,pkg,registry,tables,
+            cfg,call,count,execution,cache_directory=self.data('verification_cache'),prior_report=self.load('rv_latest.json',{}))
+        try:rv = job.run(pass_)
+        except (JobStopped,AgentError) as exc:
+            self.save('verification_jobs/'+digest+'/report.json',{
+                'verification_execution':'INCOMPLETE','verification_fingerprint':job.digest,
+                'error':str(exc),'occurrence_inventory':job.occurrences,'request_metrics':job.metrics})
+            self._supersede_projection('A10 stopped: '+str(exc))
+            raise Pause('A10 verification incomplete: '+str(exc)) from exc
+        self.prov.tool_run('bounded_verification',step,{'fingerprint':rv['verification_fingerprint'],
+            'coverage':rv['coverage'],'calls_this_execution':len(job.metrics),'execution':job.identity})
+        self.save('verification_jobs/'+digest+'/report.json',rv)
+        return rv
+
+    def _verification_registry(self, pkg):
+        from .synthesis_registry import EvidenceRegistry
+        from .synthesis_input import build_corpus
+        if not pkg:raise Pause('approved synthesis missing for A10 verification')
+        findings = self._findings()
+        if pkg.get('registry_fingerprint'):
+            for path in (self.dir/'data').glob('synthesis_job_*/registry.json'):
+                registry = EvidenceRegistry(json.loads(path.read_text(encoding='utf-8')))
+                if registry.digest == pkg['registry_fingerprint']:
+                    if registry.findings != {f['finding_id']:{k:v for k,v in f.items() if k!='context'} for f in findings}:
+                        raise Pause('approved A07 registry is stale relative to current A06 findings')
+                    if any(f.get('context') != registry.contexts.get(f.get('context_id')) for f in findings if f.get('context_id')):
+                        raise Pause('approved A07 contexts changed; upstream synthesis review required')
+                    for rec in self.load('selected_corpus.json',[]):
+                        source=registry.records.get(rec['record_id'],{})
+                        if any(rec.get(k)!=source.get(k) for k in ('title','authors','year','venue','doi','pmid') if k in rec):
+                            raise Pause('approved A07 source citation metadata changed')
+                    extractions={}
+                    for key,attrs in registry.corpus.get('source_entities',{}).items():
+                        rid,eid=key.split(':',1)
+                        if rid not in extractions:extractions[rid]=self.load('extractions/'+rid+'.json')
+                        ext=extractions[rid]
+                        if ext:
+                            ent=next((e for e in ext.get('entities',[]) if e['entity_id']==eid),{})
+                            if any(ent.get(k)!=v for k,v in attrs.items()):
+                                raise Pause('approved A07 molecular source identity changed')
+                    return registry
+            raise Pause('approved A07 registry snapshot is missing; cannot verify from an unproven replacement')
+        # Legacy artifacts: an in-memory view of the same validated records, never a new evidence DB.
+        records = self.load('selected_corpus.json', []) or [{'record_id':r} for r in sorted({f['record_id'] for f in findings})]
+        frozen = build_corpus({},records,findings,self.load('theme_records.json',{}),[],pkg.get('theme_framework'))
+        frozen['selected_corpus'] = records
+        frozen['validated_findings'] = [{k:v for k,v in f.items() if k!='context'} for f in findings]
+        frozen['source_entities'] = {}
+        for r in records:
+            for ent in self.load('extractions/'+r['record_id']+'.json',{}).get('entities',[]):
+                frozen['source_entities'][r['record_id']+':'+ent['entity_id']] = ent
+        return EvidenceRegistry(frozen)
+
+    def _verification_current(self, report, manuscript):
+        from .verification_job import current, version, policy_hash
+        pkg = self._publishable('synthesis_approved.json')
+        digest = version(manuscript,self.load('manuscript_plan.json',{}),pkg,self._verification_registry(pkg),self.load('display_items.json',[]))
+        return current(report,digest,policy_hash(self.cfg['scientific_verification']))
 
     def _a10_detail_report(self) -> dict | None:
         return verification_scope.detail_report(self.prov.events(), self.budget.entries())
@@ -1516,13 +1569,9 @@ class Run:
 
     def _maybe_verify(self, manuscript: dict, pass_: str, step: str, previous: dict,
                       changed: list | None = None) -> dict:
-        """An intermediate A10 check (after a redraft, a revision or the line edit). With
-        loops.verification: draft_and_final only the first-draft and final checks run; a skipped check is
-        logged, and the previous findings are passed on, marked as describing an earlier version."""
-        if self.cfg["loops"].get("verification", "all") != "draft_and_final":
-            return self._verify(manuscript, pass_, step, changed)
-        self.prov.tool_run("verification_skipped", step, {"reason": "loops.verification: draft_and_final"})
-        return {**previous, "stale": f"{step} skipped; these findings describe an earlier version"}
+        """Reuse an exact current report; otherwise selectively reverify through the local cache."""
+        if self._verification_current(previous,manuscript):return previous
+        return self._verify(manuscript, pass_, step, changed)
 
     def _deterministic_report(self, m: dict) -> dict:
         plan = self.load("manuscript_plan.json", {})
@@ -1580,12 +1629,19 @@ class Run:
         plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
         for cycle in range(1, int(self.cfg["loops"]["max_critique_cycles"]) + 1):
             m, rv = self._current(), self.load("rv_latest.json")
+            if not self._verification_current(rv or {},m):
+                rv = self._verify(m,'REVISION',f'A10-RV_precritique{cycle}')
+                self.save('rv_latest.json',rv)
             rc = self.agent("A11-RC", {"manuscript": m, "manuscript_plan": plan, "synthesis_package": pkg,
-                                       "a10_findings": rv, "journal_profile": config.load("journal_scirev"),
+                                       "a10_findings": {k:v for k,v in rv.items() if k not in
+                                           ('occurrence_inventory','verdicts','global_index_ids_reviewed','request_metrics','correction_trace')},
+                                       "journal_profile": config.load("journal_scirev"),
                                        "previous_critique": self.load("rc_latest.json")},
                             step=f"A11-RC_cycle{cycle}", exclude_providers=self._prose_vendors("A11-RC"))
             self.save("rc_latest.json", rc)
             if rc["decision"] == "ACCEPT":
+                if any(f.get('severity')=='BLOCKING' for f in rv.get('findings',[])):
+                    raise Pause('A11 ACCEPT cannot override unresolved A10 BLOCKING defects')
                 return "finish_edit"
             if rc["decision"] == "HOLD_FOR_UPSTREAM_REVIEW":
                 raise Pause("A11-RC requests upstream review (see data/rc_latest.json)")
@@ -1604,10 +1660,11 @@ class Run:
                           step="A12-EDI_line")
         self._save_manuscript(line, "m03_line")
         rv = self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log"))
-        if rv.get("finding_severity") == "BLOCKING":
-            self.save("rv_latest.json", rv)
-            raise Pause("blocking findings after line edit (see data/rv_latest.json)")
-        proof = self.agent("A12-EDI", {"mode": "PROOF", "manuscript": line, "manuscript_plan": plan},
+        self.save("rv_latest.json", rv)
+        if rv.get("finding_severity") in ("MAJOR", "BLOCKING"):
+            raise Pause("scientific findings after line edit require correction (see data/rv_latest.json)")
+        proof = self.agent("A12-EDI", {"mode": "PROOF", "manuscript": line, "manuscript_plan": plan,
+                                      "verification_findings":rv.get('findings',[])},
                            step="A12-EDI_proof")
         self._save_manuscript(proof, "m04_proof")
         final = self._verify(proof, "FINAL", "A10-RV_final")
@@ -1618,6 +1675,10 @@ class Run:
 
     def stage_finalize(self, st: dict) -> str:
         m = self._current()
+        report = self.load('rv_final.json',{})
+        defects = any(f.get('severity') in ('MAJOR','BLOCKING') for f in report.get('findings',[]))
+        if defects or not self._verification_current(report,m) or report.get('release_disposition') not in ('APPROVED','APPROVED_WITH_MINOR_FINDINGS'):
+            raise Pause('final release requires current complete A10 approval with no unresolved major/blocking findings')
         plan = self.load("manuscript_plan.json")
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json")}
         tables = self._built_tables()

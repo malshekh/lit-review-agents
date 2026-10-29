@@ -118,8 +118,6 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> 
     re-projected from actual spend rather than assumed. a07_done: turns already committed."""
     loops, syn = cfg["loops"], cfg["synthesis"]
     groups = max(1, math.ceil(n_findings / int(syn["max_findings_per_group"])))
-    a10_passes = 2 if loops.get("verification") == "draft_and_final" else \
-        1 + int(loops["max_redrafts"]) + int(loops["max_critique_cycles"]) + 2
     cycles = int(loops["max_critique_cycles"])
     from ..synthesis_registry import projected_a07
     envelope = projected_a07(syn, n_findings)
@@ -128,10 +126,27 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> 
     a07 = {"stage": "A07-SYN", "basis": "ESTIMATED_ENVELOPE", "calls": max(0, envelope["calls"] - a07_done),
            "usd": round((budget.cost(m.model, envelope["input_tokens"], envelope["output_tokens"]) or 0) * fraction, 4),
            "detail": "bounded registry call envelope including retrieval; no cache savings; per-call admission required"}
+    # A10 now has many bounded calls, not four unbounded whole-corpus calls. This is an
+    # intentionally conservative planning scenario, NOT a hard bound on a future manuscript.
+    # Include optional revisions and retrieval; exact requests reserve individually at dispatch.
+    vc = cfg.get('scientific_verification', {})
+    candidates = min(320,max(24,n_findings))  # manuscript not yet available; pilot/full-run estimate only
+    local = math.ceil(candidates / max(1, vc.get('max_occurrences_per_packet',12)//2))
+    global_pages = max(1,math.ceil(n_findings*1.5/vc.get('max_global_entries_per_page',128)))
+    versions = 3 + int(loops['max_redrafts']) + cycles
+    local_calls = local + (versions-1)*math.ceil(local*.2)
+    factor = 1+vc.get('max_retrieval_rounds',2)
+    limits = vc.get('output_limits',{'LOCAL':10000,'GLOBAL':8000})
+    vm = route('A10-RV')
+    a10 = {'stage':'A10-RV','basis':'ESTIMATED_ENVELOPE',
+           'calls':factor*(local_calls+versions*global_pages),
+           'usd':round(factor*((budget.cost(vm.model,60000,limits['LOCAL']) or 0)*local_calls
+                              +(budget.cost(vm.model,60000,limits['GLOBAL']) or 0)*versions*global_pages),4),
+           'detail':f'{candidates} estimated candidate occurrences (24-320, corpus-based before manuscript exists); half-full local packets; 1.5 index entries/finding; 20% edited locals; all global pages rechecked; 60k input/call, full output caps and retrieval; no cache savings; actual reservation required'}
     return [a07,
         _worst(budget, route, "A08-OL", 1, FIXED_INPUT["A08-OL"] + n_findings * 300),
         _worst(budget, route, "A09-WRI", 1 + int(loops["max_redrafts"]), FIXED_INPUT["A09-WRI"]),
-        _worst(budget, route, "A10-RV", a10_passes * 2, FIXED_INPUT["A10-RV"] + n_findings * A10_TOKENS_PER_FINDING),
+        a10,
         _worst(budget, route, "A11-RC", cycles, FIXED_INPUT["A11-RC"] + n_findings * 300),
         _worst(budget, route, "A12-EDI", cycles + 2, FIXED_INPUT["A12-EDI"]),
     ]

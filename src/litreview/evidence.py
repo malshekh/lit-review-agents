@@ -476,18 +476,16 @@ def verification_bindings(manuscript: dict, package: dict, findings: list[dict])
     from .tools import tags
     by_id = {f["finding_id"]: f for f in findings}
     idx = _named(package or {})
-    flags, bindings, done = [], [], set()
-    for sec in manuscript.get("sections") or []:
-        for sentence, ids in tags.bindings(sec.get("text_markdown") or ""):
+    from .verification_job import inventory
+    flags, bindings = [], []
+    for occurrence in inventory(manuscript):
+        for sentence, ids in [(occurrence['text'], occurrence['item_ids'])]:
             ids = [i for i in ids if i != "ORG"]
             if not ids:
                 continue
-            key = (tuple(sorted(ids)), sec.get("section_id"))
-            if key in done:
-                continue
-            done.add(key)
             links = [x for i in ids for x in _links_behind(i, idx)]
-            loc = {"item_ids": sorted(ids), "section_id": sec.get("section_id"), "sentence_excerpt": sentence[:200]}
+            loc = {"item_ids": sorted(ids), "section_id": str(occurrence['path']),
+                   "occurrence_id":occurrence['occurrence_id'], "sentence_excerpt": sentence[:200]}
             bad = [x for x in links if not role_allowed(by_id.get(x["finding_id"]), x.get("role"))]
             sup = [x for x in links if x.get("role") == "SUPPORTING"]
             bad_sup = [x for x in bad if x.get("role") == "SUPPORTING"]

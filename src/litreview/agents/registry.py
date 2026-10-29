@@ -21,7 +21,7 @@ _SPECS = [
     AgentSpec("A07-SYN", "Synthesis & Gap Analysis", "STAGE", "A07-SYN_Synthesis.md", "A07-SYN.schema.json"),
     AgentSpec("A08-OL", "Outline & Display Planning", "STAGE", "A08-OL_Outline.md", "A08-OL.schema.json"),
     AgentSpec("A09-WRI", "Writing", "STAGE", "A09-WRI_Writing.md", "A09-WRI.schema.json", True),
-    AgentSpec("A10-RV", "Verification", "AUDITOR", "A10-RV_Verification.md", "A10-RV.schema.json", True),
+    AgentSpec("A10-RV", "Verification", "AUDITOR", "A10-RV_Verification.md", "A10-RV.bounded.schema.json", True),
     AgentSpec("A11-RC", "Critique & Readability", "AUDITOR", "A11-RC_Critique.md", "A11-RC.schema.json", True),
     AgentSpec("A12-EDI", "Editing", "STAGE", "A12-EDI_Editing.md", "A12-EDI.schema.json", True),
 ]

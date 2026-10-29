@@ -92,13 +92,16 @@ def test_run_until_stops_before_the_stage(run):
     assert run.run(until="synthesize") == "PAUSED: stopped before synthesize (--until)"
 
 
-def test_draft_and_final_skips_intermediate_checks_and_logs_it(run, monkeypatch):
+def test_changed_manuscripts_are_reverified_even_under_draft_and_final(run, monkeypatch):
     calls = []
     monkeypatch.setattr(run, "_verify", lambda *a, **k: calls.append(a) or {"findings": ["new"]})
+    monkeypatch.setattr(run, '_verification_current', lambda *a:False)
     run.cfg = {**run.cfg, "loops": {**run.cfg["loops"], "verification": "draft_and_final"}}
     out = run._maybe_verify({}, "REVISION", "A10-RV_revision1", {"findings": ["old"]})
-    assert not calls and out["findings"] == ["old"] and "skipped" in out["stale"]
-    assert run.prov.events()[-1]["tool"] == "verification_skipped"
+    assert calls and out['findings']==['new']
+    monkeypatch.setattr(run,'_verification_current',lambda *a:True)
+    assert run._maybe_verify({},'REVISION','same',{'findings':['old']})['findings']==['old']
+    monkeypatch.setattr(run,'_verification_current',lambda *a:False)
     run.cfg["loops"]["verification"] = "all"
     assert run._maybe_verify({}, "REVISION", "A10-RV_revision1", {})["findings"] == ["new"]
 

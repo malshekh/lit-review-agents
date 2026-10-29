@@ -1,0 +1,43 @@
+{
+  "first": {
+    "uncached_output25pct": 8.654356666666668,
+    "uncached_output50pct": 10.064356666666669,
+    "input2to4bytes_output25to50pct_sensitivity": [
+      6.8432675,
+      13.686535
+    ],
+    "global_prefix_bytes": 165354,
+    "global_prefix_ideal_cache_saving": 2.2763733999999998,
+    "ideal_cache_output25pct": 6.377983266666669,
+    "every_input_byte_cache_write_full_output": 32.8063375,
+    "finite_30pct_retrieval_10pct_retry_output50pct": 14.090099333333335,
+    "caveat": "3 bytes/token; generated output fractions include reasoning; cache model assumes one write then hits; not billed measurements"
+  },
+  "one_edit": {
+    "uncached_output25pct": 4.001816,
+    "uncached_output50pct": 4.486816,
+    "input2to4bytes_output25to50pct_sensitivity": [
+      3.122612,
+      6.245224
+    ],
+    "global_prefix_bytes": 165368,
+    "global_prefix_ideal_cache_saving": 2.276566133333333,
+    "ideal_cache_output25pct": 1.7252498666666667,
+    "every_input_byte_cache_write_full_output": 15.12806,
+    "finite_30pct_retrieval_10pct_retry_output50pct": 6.2815424,
+    "caveat": "3 bytes/token; generated output fractions include reasoning; cache model assumes one write then hits; not billed measurements"
+  },
+  "other_stages_excluding_A07_A10": 99.80125085714288,
+  "pipeline_two_full25pct_A07_30_39": [
+    147.1099641904762,
+    156.1099641904762
+  ],
+  "pipeline_first_plus_edit25pct_A07_30_39": [
+    142.45742352380955,
+    151.45742352380955
+  ],
+  "pipeline_first_plus_five_edits25pct_A07_30_39": [
+    158.46468752380954,
+    167.46468752380954
+  ]
+}
