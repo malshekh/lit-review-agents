@@ -1,0 +1,299 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "const": "A07-SYN"
+    },
+    "prompt_version": {
+      "const": "1.0"
+    },
+    "mode": {
+      "const": "GROUP"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_EVIDENCE"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "propositions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "SOURCE_GROUNDED",
+              "CLAIM_APPRAISAL",
+              "THEME_GROUNDED",
+              "REPORTING_ONLY_INTEGRATION"
+            ]
+          },
+          "assertion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "finding_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "role": {
+                  "enum": [
+                    "SUPPORTING",
+                    "CONFLICTING",
+                    "SUBJECT_OF_APPRAISAL"
+                  ]
+                },
+                "appraisal": {
+                  "type": "object",
+                  "properties": {
+                    "statement": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 600
+                    },
+                    "claim_source_record_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "a06_rationale": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 1200
+                    }
+                  },
+                  "required": [
+                    "statement",
+                    "claim_source_record_id",
+                    "a06_rationale"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "finding_id",
+                "role"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 24
+          },
+          "source_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 8
+          },
+          "satisfies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 8
+          },
+          "prominence": {
+            "enum": [
+              "HEADLINE",
+              "NARRATIVE_PRIMARY",
+              "NARRATIVE_SUPPORTING",
+              "DISPLAY",
+              "SUPPLEMENTARY"
+            ]
+          }
+        },
+        "required": [
+          "type",
+          "assertion",
+          "evidence",
+          "source_item_ids",
+          "satisfies",
+          "prominence"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 12
+    },
+    "knowledge_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "source_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 8
+          },
+          "established_by": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 24
+          },
+          "satisfies": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 8
+          }
+        },
+        "required": [
+          "type",
+          "statement",
+          "source_item_ids",
+          "established_by",
+          "satisfies"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    },
+    "findings_not_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "finding_id",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 24
+    },
+    "retrieval_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 12
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "maxItems": 4
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "mode",
+    "status",
+    "warnings",
+    "limitations",
+    "propositions",
+    "knowledge_gaps",
+    "findings_not_used",
+    "retrieval_requests"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "NEEDS_EVIDENCE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "propositions": {
+            "maxItems": 0
+          },
+          "knowledge_gaps": {
+            "maxItems": 0
+          },
+          "findings_not_used": {
+            "maxItems": 0
+          },
+          "retrieval_requests": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "retrieval_requests": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

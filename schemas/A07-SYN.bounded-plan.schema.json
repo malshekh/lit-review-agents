@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "const": "A07-SYN"
+    },
+    "prompt_version": {
+      "const": "1.0"
+    },
+    "mode": {
+      "const": "PLAN"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_EVIDENCE"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "theme_change_proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "proposal": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 12
+          }
+        },
+        "required": [
+          "proposal",
+          "rationale",
+          "finding_ids"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    },
+    "scope_drift": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 480
+      },
+      "maxItems": 8
+    },
+    "fivew1h": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "theme_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "unresolved": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          }
+        },
+        "required": [
+          "theme_id",
+          "unresolved"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 9
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "mode",
+    "status",
+    "warnings",
+    "limitations",
+    "theme_change_proposals",
+    "scope_drift",
+    "fivew1h"
+  ],
+  "additionalProperties": false
+}

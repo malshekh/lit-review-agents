@@ -180,6 +180,35 @@ def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, fram
 
 
 # ---------------------------------------------------------------- approval
+def write_synthesis_alignment(run_dir: Path, digest: str, alignment: dict) -> None:
+    """Compact human review; full evidence-linked planning stays machine-readable internally."""
+    d = cp_dir(run_dir)
+    (d / "CP_SYN_alignment.json").write_text(json.dumps(alignment, ensure_ascii=False, indent=2), encoding="utf-8")
+    lines = ["# A07 thematic alignment approval", "", f"Input fingerprint: `{digest}`", "",
+             "Structural counts are not scientific validation. Unknown independence stays unknown.", "",
+             "| Approved primary theme | Findings | Explicit study IDs | Unknown identity findings | Subthemes |",
+             "|---|---:|---:|---:|---|"]
+    for t in alignment["themes"]:
+        ind = t["independence"]
+        lines.append(f"| {t['theme_id']}: {t.get('name', '')} | {t['findings']} | {len(ind['known_study_ids'])} | "
+                     f"{len(ind['identity_unknown_findings'])} | {', '.join(t['subthemes'])} |")
+    lines += ["", f"Unmapped: {len(alignment['unmapped'])}; emerging: {len(alignment['emerging'])}; "
+              f"mandatory items: {alignment['mandatory_items']}; bounded packets: {alignment['packets']}.",
+              "Full IDs, source-linked conflicts and planning are in CP_SYN_alignment.json.", "", "## Proposed changes"]
+    planning = alignment["planning"]
+    for n, p in enumerate(planning["theme_change_proposals"], 1):
+        lines += [f"{n}. {p['proposal']} — {p['rationale']} ({', '.join(p['finding_ids'])})"]
+    lines += ["", "## Potential scope drift", *planning["scope_drift"], "", "## Important conflict source IDs",
+              *alignment["conflicts"], "", "Approve the existing framework only after reviewing every proposal.",
+              "To adopt a change, revise the upstream framework and regenerate affected evidence before replanning.",
+              "Set approve_alignment and keep_approved_framework true, then run `litreview approve RUN CP_SYN`."]
+    (d / "CP_SYN_review.md").write_text("\n".join(lines), encoding="utf-8")
+    decision = d / "CP_SYN_decision.json"
+    if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
+        decision.write_text(json.dumps({"fingerprint": digest, "approve_alignment": False,
+                                        "keep_approved_framework": False, "proposal_review_notes": "", "notes": ""}, indent=2), encoding="utf-8")
+
+
 def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
     d = cp_dir(run_dir)
     decision = json.loads((d / f"{cp}_decision.json").read_text(encoding="utf-8"))
@@ -192,7 +221,20 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
         decision.update(read_cp2_selection(run_dir))
         if not decision["selected_record_ids"]:
             raise DecisionIncomplete("CP2: mark at least one paper with Y in CP2_records.csv.")
+    elif cp == "CP_SYN":
+        alignment = json.loads((d / "CP_SYN_alignment.json").read_text(encoding="utf-8"))
+        if decision.get("fingerprint") != alignment["fingerprint"]:
+            raise DecisionIncomplete("CP_SYN: stale planning fingerprint")
+        if decision.get("approve_alignment") is not True or decision.get("keep_approved_framework") is not True:
+            raise DecisionIncomplete("CP_SYN: approve alignment and explicitly retain the approved framework")
+        if alignment["planning"]["theme_change_proposals"] and not decision.get("proposal_review_notes", "").strip():
+            raise DecisionIncomplete("CP_SYN: record the decision on proposed changes")
     elif cp == "CP3":
+        pkg_path = Path(run_dir) / "data" / "synthesis_package.json"
+        if pkg_path.exists():
+            pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
+            if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
+                raise DecisionIncomplete("CP3: incomplete synthesis cannot be approved")
         if not decision.get("selected_thesis"):
             raise DecisionIncomplete("CP3: set selected_thesis.")
     provenance.human_decision(cp, decision, decision.get("notes", ""))

@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "const": "A07-SYN"
+    },
+    "prompt_version": {
+      "const": "1.0"
+    },
+    "mode": {
+      "const": "FINAL"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_EVIDENCE"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "thesis_options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "type": {
+            "enum": [
+              "CONCLUSION_THESIS",
+              "ORGANIZING_THESIS"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "title_draft": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "contribution_statement_draft": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 320
+          },
+          "proposition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 24
+          }
+        },
+        "required": [
+          "option_id",
+          "type",
+          "text",
+          "title_draft",
+          "contribution_statement_draft",
+          "proposition_ids"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 3
+    },
+    "proposed_interpretations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pi_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "what_it_goes_beyond": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          },
+          "premise_proposition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 24
+          }
+        },
+        "required": [
+          "pi_id",
+          "kind",
+          "statement",
+          "what_it_goes_beyond",
+          "premise_proposition_ids"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    },
+    "beyond_prose_bindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "surface": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "proposition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 24
+          }
+        },
+        "required": [
+          "surface",
+          "proposition_ids"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 8
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "mode",
+    "status",
+    "warnings",
+    "limitations",
+    "thesis_options",
+    "proposed_interpretations",
+    "beyond_prose_bindings"
+  ],
+  "additionalProperties": false
+}

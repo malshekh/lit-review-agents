@@ -104,16 +104,20 @@ outline:
 validation:
   instability_test: true
 
-# A07-SYN runs as one synthesis job over bounded calls: PLAN, one GROUP call per group, FINAL.
-# Every call resends the frozen corpus as a cached prefix; no conversation history is kept.
+# A07-SYN runs as one logical synthesis job; packet boundaries are not manuscript sections.
+# Registry-backed PLAN, bounded GROUP/retrieval, global RECONCILE, compact FINAL.
 synthesis:
-  theme_merge_max: 40            # string-level theme merging is skipped if it leaves this many or more
-  max_tokens_per_turn: 48000     # output cap per call (thinking included)
-  max_findings_per_group: 40     # larger groups are split mechanically (same kind and basis)
+  theme_merge_max: 40            # legacy helper only; registry synthesis never merges approved themes
+  max_tokens_per_turn: 12000     # compatibility default; mode limits below include thinking
+  max_findings_per_group: 24     # deterministic packets within approved primary themes
+  max_items_per_group: 8
+  max_propositions_per_group: 12
+  reconcile_page_size: 32
+  max_retrieval_rounds: 2
+  retrieval_limit: 12
+  output_limits: { PLAN: 4000, GROUP: 12000, RECONCILE: 6000, FINAL: 6000 }
   context_ceiling_tokens: 900000 # stop cleanly if projected input + max output would exceed this (window 1M)
-  cache_ttl: 1h                  # 5m or 1h. Calls must start within the TTL of the previous call to hit.
-                                 #   1h: a long GROUP call (thinking at effort high) can exceed 5 minutes
-                                 #   start to start, and one miss re-writes the whole ~440k-token corpus.
+  cache_ttl: 1h                  # cache the small shared system prompt, not the raw corpus
 
 # Vendor batch APIs (50% off) for stages of independent calls: A05 and A06 per paper (A06 only while
 # loops.max_reextractions is 0). Before a batch: one real item runs interactively (a refusal stops the stage

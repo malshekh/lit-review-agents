@@ -89,7 +89,8 @@ def user_parts(payload: dict, cache_keys: tuple[str, ...] = ()) -> list[dict]:
 
 def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
               budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None,
-              schema_file: str | None = None) -> dict:
+              schema_file: str | None = None, reservation_key: str | None = None,
+              repair_limit: int | None = None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
     `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
     overrides its output schema (A07 job turns)."""
@@ -98,6 +99,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     m = model or config.agent_model(agent_id)
     budget.check_priced(m.model)
     max_repairs = int(config.load("pipeline")["loops"].get("max_json_repair_attempts", 1))
+    if repair_limit is not None:
+        max_repairs = repair_limit
 
     system = build_system_prompt(agent_id)
     user = user_parts(payload, m.cache_payload)
@@ -107,7 +110,10 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
 
     last_error = ""
     for attempt in range(max_repairs + 1):
-        budget.ensure_headroom()
+        if reservation_key:
+            budget.ensure_headroom(reservation_key)
+        else:
+            budget.ensure_headroom()
         started = time.time()
         # a repair appends a new block, so the cached blocks before it stay byte-identical
         message = user if attempt == 0 else user + [{

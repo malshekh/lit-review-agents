@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
     vf.set_defaults(fn=cmd_verify)
     a = sub.add_parser("approve")
     a.add_argument("run_id")
-    a.add_argument("checkpoint", choices=["CP1", "CP2", "CP3"])
+    a.add_argument("checkpoint", choices=["CP1", "CP2", "CP_SYN", "CP3"])
     a.set_defaults(fn=cmd_approve)
     aa = sub.add_parser("approve-alternate", help="accept a costlier alternate model after a refusal (this run only)")
     aa.add_argument("run_id")

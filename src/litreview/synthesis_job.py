@@ -16,6 +16,7 @@ propositions is not duplicate coverage. SATISFIED means structural coverage only
 from __future__ import annotations
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -53,9 +54,14 @@ class Ledger:
             return [json.loads(x) for x in fh if x.strip()]
 
     def append(self, *events: dict) -> None:
-        with open(self.path, "a", encoding="utf-8") as fh:
-            for e in events:
-                fh.write(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), **e}, ensure_ascii=False) + "\n")
+        # Logically append-only, physically replace atomically so a crash cannot leave half a commit
+        # line. A synthesis job has one writer; historical event contents are retained byte for byte.
+        previous = self.path.read_text(encoding="utf-8") if self.path.exists() else ""
+        added = "".join(json.dumps({"time": time.strftime("%Y-%m-%dT%H:%M:%S"), **e}, ensure_ascii=False) + "\n"
+                        for e in events)
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(previous + added, encoding="utf-8")
+        os.replace(tmp, self.path)
 
     def state(self) -> dict:
         st = {"items": {}, "satisfied_by": {}, "committed": [], "propositions": [], "duplicates_rejected": 0,
@@ -66,7 +72,13 @@ class Ledger:
             if t == "JOB_STARTED":
                 st["items"] = {i: "PENDING" for i in e["mandatory_item_ids"]}
             elif t == "TURN_STAGED":
+                pending = [p for p in pending if p["turn"] != e["turn"]]
                 pending.append(e)
+            elif t == "TURN_ACCEPTED":
+                if e["turn"] not in st["committed"]:
+                    self._apply(st, e)
+                    st["committed"].append(e["turn"])
+                    st["models_by_turn"][e["turn"]] = e.get("model")
             elif t == "TURN_COMMITTED":   # a turn counts only once its commit marker is written
                 for p in pending:
                     if p["turn"] == e["turn"]:

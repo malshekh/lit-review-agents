@@ -56,11 +56,12 @@ def test_cp2_refuses_a_selection_projected_over_the_cap(tmp_path, monkeypatch):
     assert run.load("selected_corpus.json") is None                  # nothing proceeds
     proj = run.load("cost_projection.json")
     assert proj["verdict"] == "OVER_CAP" and proj["by_level"] == {"ABSTRACT": 0, "FULL_TEXT": 12}
-    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "WORST_CASE"}
+    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "WORST_CASE", "ESTIMATED_ENVELOPE"}
 
 
 def test_cp2_passes_a_selection_within_the_cap_and_records_the_projection(tmp_path, monkeypatch):
     run = _cp2(tmp_path, monkeypatch, 2, pmcid=False)
+    run.budget.cap = 100.0  # exercise admission independently of the old $35 pilot cap
     assert run.stage_cp2(run.state()) == "extract"
     proj = run.load("cost_projection.json")
     assert proj["verdict"] == "WITHIN_CAP" and proj["projected_total_usd"] <= proj["cap_usd"]

@@ -212,50 +212,41 @@ def test_corpus_sends_each_context_once_without_spans_or_process_notes():
                        "theme_records", "coverage_manifest"]                       # fixed order: stable cached prefix
 
 
-def test_stage_synthesize_sends_a_byte_identical_corpus_every_call(tmp_path, monkeypatch):
-    from litreview import model_record
+def test_stage_synthesize_uses_bounded_packets_and_requires_alignment(tmp_path, monkeypatch):
+    from litreview import model_record, handoff, checkpoints
     from litreview import orchestrator as orch
-    from litreview.agents.base import user_parts
-    from litreview.llm import anthropic_client
+    from litreview.synthesis_registry import EvidenceRegistry
+    from test_synthesis_bounded import corpus, FixtureModel
     monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
     monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
     r = orch.Run("t")
     r.save_state({"stage": "synthesize", "status": "READY", "counters": {}})
-    r.save("spec_approved.json", {"x": 1})
-    r.save("selected_corpus.json", [{"record_id": "R1", "tier": "CORE"}, {"record_id": "R2", "tier": "SUPPORTING"},
-                                    {"record_id": "R3", "tier": "SUPPORTING"}])
-    r.save("validated_findings.json", [{"finding_id": f, "record_id": f.split(":")[0], "themes": ["T2"],
-                                        "context_id": f"{f.split(':')[0]}:C1", "context": {"s": 1}, "span": "q", "disposition": "SUPPORTED",
-                                        **dict.fromkeys(("subject", "predicate_detail", "object", "polarity", "direction",
-                                                         "modality", "assertion_type", "attributed_to", "origin",
-                                                         "alignment_disposition", "plain_language_limit")),
-                                        "predicate": "DECREASES", "constraints": [], "eligibility": {"status": "SUPPORTING"}}
-                                       for f in FINDINGS])
-    r.save("theme_records.json", {"T2": {"conflicts": [{"x": 1}], "evidence_reach": {"systems_missing": ["HUMAN"]}}})
-    sent = []
-
-    def fake_run_agent(agent_id, payload, run_dir, step, budget, prov, model=None, schema_file=None):
-        sent.append((step, schema_file, model.cache_payload, user_parts(payload, model.cache_payload)[0]["text"]))
-        name = step.split("_", 2)[2]
-        out = {**OUT, "GROUP_G2": {**G2, "propositions": [prop("G2.P1", "Marker Y is unchanged in vivo", sup=["R2:F1"],
-                                                              con=["R1:F1"], satisfies=["PAPER:R2", "CONFLICT:T2:1", "REACH:T2"])]},
-               "GROUP_G3": {**G1, "propositions": [prop("G3.P1", "R3 alone", sup=["R3:F1"], satisfies=["PAPER:R3"])]},
-               "PLAN": {**PLAN, "findings_not_used": [], "groups": PLAN["groups"] + [
-                   {"group_id": "G3", "kind": "EVIDENCE_GROUNDED_GROUP", "name": "C", "basis": "b",
-                    "finding_ids": ["R3:F1"], "manifest_item_ids": ["PAPER:R3"]}]}}[name]
-        return json.loads(json.dumps(out))
+    data = corpus()
+    findings = [{**dict.fromkeys(handoff.CONTRACT), **f, "context":data["contexts"][f["context_id"]]}
+                for f in data["validated_findings"]]
+    for name, value in [("spec_approved.json",data["review_spec"]), ("theme_framework.json",data["theme_framework"]),
+                        ("selected_corpus.json",data["selected_corpus"]), ("theme_records.json",data["theme_records"]),
+                        ("validated_findings.json",findings)]:r.save(name,value)
+    model = FixtureModel(EvidenceRegistry(data))
+    def fake_run_agent(agent_id, payload, run_dir, step, budget, prov, **kwargs):
+        assert kwargs["reservation_key"] in budget.reservations()
+        assert kwargs["repair_limit"] == 0
+        return model(payload["mode"], payload, step.split("_",2)[2])
     monkeypatch.setattr(orch, "run_agent", fake_run_agent)
-    monkeypatch.setattr(anthropic_client, "count_tokens", lambda *a, **k: 1000)
+    with pytest.raises(orch.Pause, match="alignment"):
+        r.stage_synthesize(r.state())
+    assert [m for m,_,_ in model.calls] == ["PLAN"]
+    path = r.dir / "checkpoints/CP_SYN_decision.json"
+    decision = json.loads(path.read_text())
+    decision.update(approve_alignment=True, keep_approved_framework=True)
+    path.write_text(json.dumps(decision))
+    checkpoints.approve(r.dir, "CP_SYN", r.prov)
     assert r.stage_synthesize(r.state()) == "cp3"
-    assert len({s[3] for s in sent}) == 1                          # corpus block identical on every call
-    assert [s[1] for s in sent] == ["A07-SYN.plan.schema.json", "A07-SYN.group.schema.json",
-                                    "A07-SYN.group.schema.json", "A07-SYN.group.schema.json", "A07-SYN.final.schema.json"]
-    assert all(s[2] == ("corpus",) for s in sent)
-    pkg = r.load("synthesis_package.json")
-    assert pkg["status"] == "COMPLETE", pkg["coverage_incomplete_item_ids"]
-    tag = sent[0][0].split("_")[1][3:]
-    rep = r.load(f"synthesis_job_{tag}/report.json")
-    assert rep["status"] == "COMPLETE" and rep["propositions_valid"] == 3
+    assert r.load("synthesis_package.json")["status"] == "COMPLETE"
+    assert all("corpus" not in payload for _,payload,_ in model.calls)
+    final = next(p for m,p,_ in model.calls if m == "FINAL")
+    assert "propositions" not in final and "proposition_index" in final
+    assert not r.budget.reservations()
 
 
 def test_job_resumed_on_an_alternate_after_a_refusal_names_both_models(tmp_path):

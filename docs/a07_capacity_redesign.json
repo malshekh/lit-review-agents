@@ -1,0 +1,168 @@
+{
+  "method": "OFFLINE: existing evaluation records replicated with synthetic approved theme IDs; actual production payload builders and schemas; one-token-per-UTF8-byte upper estimates; no APIs, no model reasoning, no claim of scientific accuracy",
+  "rows": [
+    {
+      "papers": 40,
+      "findings": 642,
+      "mandatory_items": 347,
+      "propositions": 107,
+      "legacy_same_workload_plan_input_upper": 2011640,
+      "legacy_same_workload_final_input_upper": 2873888,
+      "status": "COMPLETE",
+      "unaccounted": 0,
+      "pending": 0,
+      "by_mode": {
+        "PLAN": {
+          "calls": 1,
+          "input_upper_tokens": 313223,
+          "output_upper_tokens": 1192,
+          "output_cap_tokens": 4000,
+          "max_input_plus_output_cap": 317223
+        },
+        "GROUP": {
+          "calls": 62,
+          "input_upper_tokens": 3048601,
+          "output_upper_tokens": 194705,
+          "output_cap_tokens": 744000,
+          "max_input_plus_output_cap": 97435
+        },
+        "RECONCILE": {
+          "calls": 4,
+          "input_upper_tokens": 279356,
+          "output_upper_tokens": 19942,
+          "output_cap_tokens": 24000,
+          "max_input_plus_output_cap": 77722
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_upper_tokens": 92139,
+          "output_upper_tokens": 1403,
+          "output_cap_tokens": 6000,
+          "max_input_plus_output_cap": 98139
+        }
+      },
+      "all_requests_admitted": true,
+      "a07_fixture_output_upper_cost_usd": 24.1,
+      "a07_all_output_caps_cache_miss_usd": 56.78,
+      "pipeline_scenario_usd": 107.99,
+      "planning_scenario_a07_usd": 12.9,
+      "planning_scenario_assumptions": "3 UTF-8 bytes/token; raw fixture outputs plus reasoning equal to 25% of total output caps; no retrieval; unmeasured, not a budget guarantee",
+      "pipeline_assumptions": {
+        "pre_cp2_usd": 4,
+        "paper_costs": "historical mean /2 batch approximation",
+        "repeat_costs": "historical p90 /2, every paper repeated",
+        "theme_costs": "historical means scaled by paper count",
+        "A08_A12": "existing projection, untouched and not proven to fit context"
+      }
+    },
+    {
+      "papers": 80,
+      "findings": 1353,
+      "mandatory_items": 474,
+      "propositions": 224,
+      "legacy_same_workload_plan_input_upper": 3667050,
+      "legacy_same_workload_final_input_upper": 5423795,
+      "status": "COMPLETE",
+      "unaccounted": 0,
+      "pending": 0,
+      "by_mode": {
+        "PLAN": {
+          "calls": 1,
+          "input_upper_tokens": 598715,
+          "output_upper_tokens": 1192,
+          "output_cap_tokens": 4000,
+          "max_input_plus_output_cap": 602715
+        },
+        "GROUP": {
+          "calls": 94,
+          "input_upper_tokens": 5432804,
+          "output_upper_tokens": 329469,
+          "output_cap_tokens": 1128000,
+          "max_input_plus_output_cap": 100882
+        },
+        "RECONCILE": {
+          "calls": 7,
+          "input_upper_tokens": 858854,
+          "output_upper_tokens": 40117,
+          "output_cap_tokens": 42000,
+          "max_input_plus_output_cap": 128783
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_upper_tokens": 143928,
+          "output_upper_tokens": 1403,
+          "output_cap_tokens": 6000,
+          "max_input_plus_output_cap": 149928
+        }
+      },
+      "all_requests_admitted": true,
+      "a07_fixture_output_upper_cost_usd": 44.48,
+      "a07_all_output_caps_cache_miss_usd": 99.84,
+      "pipeline_scenario_usd": 188.88,
+      "planning_scenario_a07_usd": 22.2,
+      "planning_scenario_assumptions": "3 UTF-8 bytes/token; raw fixture outputs plus reasoning equal to 25% of total output caps; no retrieval; unmeasured, not a budget guarantee",
+      "pipeline_assumptions": {
+        "pre_cp2_usd": 4,
+        "paper_costs": "historical mean /2 batch approximation",
+        "repeat_costs": "historical p90 /2, every paper repeated",
+        "theme_costs": "historical means scaled by paper count",
+        "A08_A12": "existing projection, untouched and not proven to fit context"
+      }
+    },
+    {
+      "papers": 120,
+      "findings": 1996,
+      "mandatory_items": 688,
+      "propositions": 325,
+      "legacy_same_workload_plan_input_upper": 5601041,
+      "legacy_same_workload_final_input_upper": 8202678,
+      "status": "COMPLETE",
+      "unaccounted": 0,
+      "pending": 0,
+      "by_mode": {
+        "PLAN": {
+          "calls": 1,
+          "input_upper_tokens": 858995,
+          "output_upper_tokens": 1192,
+          "output_cap_tokens": 4000,
+          "max_input_plus_output_cap": 862995
+        },
+        "GROUP": {
+          "calls": 136,
+          "input_upper_tokens": 8135772,
+          "output_upper_tokens": 481713,
+          "output_cap_tokens": 1632000,
+          "max_input_plus_output_cap": 123252
+        },
+        "RECONCILE": {
+          "calls": 11,
+          "input_upper_tokens": 1841743,
+          "output_upper_tokens": 59207,
+          "output_cap_tokens": 66000,
+          "max_input_plus_output_cap": 174413
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_upper_tokens": 202589,
+          "output_upper_tokens": 1403,
+          "output_cap_tokens": 6000,
+          "max_input_plus_output_cap": 208589
+        }
+      },
+      "all_requests_admitted": true,
+      "a07_fixture_output_upper_cost_usd": 68.78,
+      "a07_all_output_caps_cache_miss_usd": 153.09,
+      "pipeline_scenario_usd": 278.45,
+      "planning_scenario_a07_usd": 33.6,
+      "planning_scenario_assumptions": "3 UTF-8 bytes/token; raw fixture outputs plus reasoning equal to 25% of total output caps; no retrieval; unmeasured, not a budget guarantee",
+      "pipeline_assumptions": {
+        "pre_cp2_usd": 4,
+        "paper_costs": "historical mean /2 batch approximation",
+        "repeat_costs": "historical p90 /2, every paper repeated",
+        "theme_costs": "historical means scaled by paper count",
+        "A08_A12": "existing projection, untouched and not proven to fit context"
+      }
+    }
+  ],
+  "original_capacity_record": "records/a07_capacity_20261029.json"
+}

@@ -28,7 +28,7 @@ from .provenance import ProvenanceLog
 from . import synthesis_input, theme_framework
 from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
-from .synthesis_job import JobStopped, SynthesisJob
+from .synthesis_job import JobStopped
 from .tools import cost_projection
 from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
                     verification_scope)
@@ -283,15 +283,17 @@ class Run:
             self.save("cost_projection.json", proj)
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
-              schema_file: str | None = None, exclude_providers: frozenset = frozenset()) -> dict:
+              schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
+              reservation_key: str | None = None) -> dict:
         self._require_projection()
         self._check_worst_case_line(agent_id)
         m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
         try:
+            extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
             out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
-                            schema_file=schema_file)
+                            schema_file=schema_file, **extra)
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
@@ -1183,68 +1185,108 @@ class Run:
         return out
 
     def stage_synthesize(self, st: dict) -> str:
-        """A07 as one logical job over bounded calls (synthesis_job.py). The frozen corpus is the cached
-        prefix of every call; the runtime keeps the coverage and finding ledgers."""
+        """Bounded registry-backed A07 with a human alignment stop before detailed synthesis."""
+        from .synthesis_registry import EvidenceRegistry, fingerprint, offline_tokens
+        from .synthesis_bounded import RegistrySynthesisJob, AlignmentRequired
+        from .paths import SCHEMAS_DIR
         corpus = self.load("selected_corpus.json")
-        stale = self.load("theme_records_stale.json", [])
-        if stale:
-            raise Pause(f"{len(stale)} theme records predate a revalidation (data/theme_records_stale.json); "
-                        f"rebuild them with `litreview revalidate {self.id} --themes` before synthesis")
-        theme_records = self.load("theme_records.json")
-        problems = handoff.contract_problems(self._findings())
+        if self.load("theme_records_stale.json", []):
+            raise Pause("theme records are stale; rebuild them before synthesis")
+        findings = self._findings()
+        if not (self.load("theme_framework.json") or {}).get("primary_themes"):
+            raise Pause("A07 requires a researcher-approved primary theme framework before planning")
+        problems = handoff.contract_problems(findings)
         if problems:
-            raise Pause(f"{len(problems)} validated findings break the A07 handoff contract (handoff.py), e.g. "
-                        + "; ".join(problems[:5]))
-        findings, theme_records_for_a07 = self._consolidate_themes(self._findings(), theme_records)
-        manifest = synthesis_input.build_manifest(corpus, theme_records, self._inconsistency_items(corpus))
+            raise Pause("A07 handoff contract: " + "; ".join(problems[:5]))
+        manifest = synthesis_input.build_manifest(corpus, self.load("theme_records.json"), self._inconsistency_items(corpus))
         self.save("coverage_manifest.json", manifest)
-        feedback = self.load("cp3_feedback.json")
-        frozen = {**synthesis_input.build_corpus(self.load("spec_approved.json"), corpus, findings,
-                                                 theme_records_for_a07, manifest, self.load("theme_framework.json")),
-                  "revision_feedback": feedback}
+        frozen = synthesis_input.build_corpus(self.load("spec_approved.json"), corpus, findings,
+                                              self.load("theme_records.json"), manifest, self.load("theme_framework.json"))
+        # Registry retains full evidence and source identifiers. No A05/A06 scientific rule changes.
+        frozen["selected_corpus"] = corpus
+        frozen["source_entities"] = {}
+        for rec in corpus:
+            ext = self.load(f"extractions/{rec['record_id']}.json", {})
+            registration = (ext.get("study_profile") or {}).get("registration_id")
+            if registration and not rec.get("nct_id"):
+                rec["registration_id"] = registration
+            for ent in ext.get("entities", []):
+                frozen["source_entities"][f"{rec['record_id']}:{ent['entity_id']}"] = {
+                    k: ent.get(k) for k in ("mention", "type", "subtype", "molecule_species", "measured_at", "identity_relation", "construct")}
+        frozen["validated_findings"] = [{k: v for k, v in f.items() if k != "context"} for f in findings]
+        frozen["revision_feedback"] = self.load("cp3_feedback.json")
+        registry = EvidenceRegistry(frozen)
         scfg = self.cfg["synthesis"]
-        # a CP3 revision starts a new job; an interrupted job resumes in the same directory
-        tag = hashlib.sha256(json.dumps(feedback, sort_keys=True).encode()).hexdigest()[:8]
-        overrides = {"cache_system": True, "cache_payload": ("corpus",), "cache_ttl": scfg.get("cache_ttl", "5m"),
-                     "max_tokens": int(scfg["max_tokens_per_turn"])}
+        identity = {"prompt": build_system_prompt("A07-SYN"),
+                    "schemas": {p.name: p.read_text(encoding="utf-8") for p in sorted(SCHEMAS_DIR.glob("A07-SYN*.json"))},
+                    "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices}
+        tag = fingerprint({"corpus": registry.digest, "execution": identity, "settings": scfg})[:16]
+        system = build_system_prompt("A07-SYN")
 
-        def call(mode: str, turn: dict, name: str) -> dict:
-            return self.agent("A07-SYN", {"corpus": frozen, "turn": turn}, step=f"A07-SYN_job{tag}_{name}",
-                              overrides=overrides, schema_file=f"A07-SYN.{mode.lower()}.schema.json")
+        def count(payload):
+            return offline_tokens(system) + offline_tokens(user_parts(payload))
 
-        def count(turn: dict) -> int:
+        def call(mode, payload, name):
+            limit = int(scfg["output_limits"][mode])
+            tokens = count(payload)
+            if tokens + limit > scfg["context_ceiling_tokens"]:
+                raise JobStopped("A07 context admission refused before dispatch")
             m = self.route("A07-SYN")
-            parts = user_parts({"corpus": frozen, "turn": turn}, ("corpus",))
-            if m.provider != "anthropic":   # no counting endpoint: conservative estimate (2.5 chars/token)
-                return int(sum(len(p["text"]) for p in parts) / 2.5) + 20000
-            from .llm import anthropic_client
-            return anthropic_client.count_tokens(build_system_prompt("A07-SYN"), parts, m.model, True,
-                                                 overrides["cache_ttl"])
+            # No cache hit assumed. Charge the entire prefix as a 1h write for a conservative bound.
+            usd = self.budget.cost(m.model, 0, limit, 0, 0, tokens)
+            if usd is None:
+                raise UnpricedModel(m.model)
+            key = f"a07-{tag}-{name}"
+            if key in self.budget.reservations():
+                raise Pause("unsettled A07 call reservation: reconcile provider usage before retrying " + key)
+            ok, available = self.budget.reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation")
+            if not ok:
+                raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
+            try:
+                out = self.agent("A07-SYN", payload, step=f"A07-SYN_job{tag}_{name}",
+                                 overrides={"cache_system": True, "cache_payload": (), "cache_ttl": scfg.get("cache_ttl", "1h"),
+                                            "max_tokens": limit},
+                                 schema_file=f"A07-SYN.bounded-{mode.lower()}.schema.json", reservation_key=key)
+            except AgentError as exc:
+                # Known responses are logged, including refusal/truncation; unknown API billing stays held.
+                if any(e["step"] == f"A07-SYN_job{tag}_{name}" for e in self.budget.entries()):
+                    self.budget.release(key)
+                raise
+            except (Pause, BudgetExceeded, UnpricedModel):
+                self.budget.release(key)
+                raise
+            self.budget.release(key)
+            return out
 
-        job = SynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", synthesis_input.mandatory_items(manifest),
-                           [f["finding_id"] for f in findings], {f["finding_id"]: f["record_id"] for f in findings},
-                           call, count, scfg, served_by=lambda: self.last_model,
-                           findings={f["finding_id"]: f for f in findings})
+        def approve(digest, alignment):
+            decision = checkpoints.approved(self.dir, "CP_SYN")
+            if decision and decision.get("fingerprint") == digest and decision.get("approve_alignment") is True:
+                return True
+            checkpoints.write_synthesis_alignment(self.dir, digest, alignment)
+            return False
+
+        job = RegistrySynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
+                                   identity, approve, served_by=lambda: self.last_model)
         try:
             pkg = job.run()
-        except JobStopped as e:
+        except AlignmentRequired as exc:
             self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            # the stopped turn was paid and a resume pays for it again: the CP2 projection no longer holds
-            self._supersede_projection(f"A07 job stopped: {e}")
-            raise Pause(f"synthesis job stopped cleanly — {e}. The stopped turn was paid, and resuming pays for it "
-                        f"again: re-project with `litreview project {self.id}`, then `litreview run` resumes from "
-                        "the last committed turn.")
+            raise Pause(str(exc)) from exc
+        except JobStopped as exc:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            self._supersede_projection(f"A07 stopped: {exc}")
+            raise Pause(f"A07 stopped: {exc}; inspect the report and re-project before resuming") from exc
+        if pkg["status"] != "COMPLETE":
+            raise Pause("incomplete synthesis cannot proceed to CP3")
         report = self._job_report(tag, pkg)
-        ev_only = self.state().get("evaluation_only")
-        if ev_only:   # stamped in the data itself, so the restriction travels with any copy
-            pkg = publication.stamp(pkg, ev_only["reason"], self.id)
-            report = publication.stamp(report, ev_only["reason"], self.id)
+        ev = self.state().get("evaluation_only")
+        if ev:
+            pkg = publication.stamp(pkg, ev["reason"], self.id)
+            report = publication.stamp(report, ev["reason"], self.id)
         self.save(f"synthesis_job_{tag}/report.json", report)
         self.save("synthesis_package.json", pkg)
-        # which model produced which turns: the source for the AI-use disclosure (provenance_summary.json)
         self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
-                           {"models": pkg["models"], "mixed_models": len(pkg["models"]) > 1,
-                            "models_by_turn": pkg["models_by_turn"]})
+                           {"models": pkg["models"], "models_by_turn": pkg["models_by_turn"], "identity": tag})
         return "cp3"
 
     def _provenance_summary(self) -> dict:
@@ -1364,6 +1406,8 @@ class Run:
             self.pause_for_checkpoint("CP3")
         self._framework_update(decision, "CP3")
         pkg = self._publishable("synthesis_package.json")
+        if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
+            raise Pause("incomplete synthesis cannot proceed to A08")
         pkg["researcher_decision"] = decision
         adopted = set(decision.get("adopted_interpretations", []))
         pkg["author_interpretations"] = [{**p, "type": "AUTHOR_INTERPRETATION", "id": p["pi_id"].replace("PI", "AI")}

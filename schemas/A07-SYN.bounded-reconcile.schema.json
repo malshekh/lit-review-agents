@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "const": "A07-SYN"
+    },
+    "prompt_version": {
+      "const": "1.0"
+    },
+    "mode": {
+      "const": "RECONCILE"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_EVIDENCE"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240
+      },
+      "maxItems": 8
+    },
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "proposition_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "outcome": {
+            "enum": [
+              "NO_CONFLICT_IDENTIFIED",
+              "ISSUES_IDENTIFIED"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "proposition_id",
+          "outcome",
+          "rationale"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 32
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "enum": [
+              "UNRESOLVED_CONTRADICTION",
+              "CONTEXT_DEPENDENT",
+              "SHARED_EVIDENCE",
+              "DUPLICATE_PUBLICATION",
+              "UNSUPPORTED_INTERPRETATION"
+            ]
+          },
+          "proposition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 12
+          },
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 24
+          },
+          "limitation": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 480
+          }
+        },
+        "required": [
+          "kind",
+          "proposition_ids",
+          "finding_ids",
+          "limitation"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 32
+    },
+    "retrieval_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "maxItems": 12
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 160
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "maxItems": 4
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "mode",
+    "status",
+    "warnings",
+    "limitations",
+    "reviews",
+    "issues",
+    "retrieval_requests"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "NEEDS_EVIDENCE"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "reviews": {
+            "maxItems": 0
+          },
+          "issues": {
+            "maxItems": 0
+          },
+          "retrieval_requests": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "retrieval_requests": {
+            "maxItems": 0
+          }
+        }
+      }
+    }
+  ]
+}

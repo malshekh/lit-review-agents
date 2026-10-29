@@ -3,9 +3,9 @@
 Per-paper and per-theme stages (A05 extraction, A06 per-paper and per-theme validation) use rates measured
 on a reference run (`records/cost_rates.json`, written by `litreview cost-rates RUN`): the 90th percentile
 of the measured cost per paper, by content level (an abstract-only paper costs a fraction of a full text).
-Stages no run has measured end to end (A07 to A12) are priced at worst case: every call at its configured
-max_tokens, A07 paying a full cache write on every call, input sizes from the measured tokens per finding.
-Every line says which basis it uses. The projection overstates rather than understates.
+A07 uses an explicitly estimated bounded-call envelope, including retrieval. A08 to A12 retain their
+existing maximum-output projections. A07 reserves each actual serialized request before dispatch;
+the planning envelope is not a strict bound on arbitrarily large scientific source strings.
 
 The pipeline refuses to pass CP2 when the projection exceeds the spend cap, and refuses any agent call after
 CP2 without a projection within the cap (orchestrator.Run.agent): spend is decided where changing the
@@ -19,7 +19,8 @@ import re
 import time
 from pathlib import Path
 
-# A07: input of the largest call of the job (FINAL: the frozen corpus plus every committed proposition body) per
+# Legacy full-corpus benchmark, retained for historical comparisons only (not current projections).
+# A07: input of the largest call of the old job per
 # validated finding. Measured 2026-10-29 with the real payload builder and the token-counting endpoint over
 # workloads of 28 to 120 papers built from run 20261025-100039's records: at most 1,297 tokens per finding
 # above the fixed part (system prompt ~12.0k + review spec ~10.8k). Was 821, measured before the handoff
@@ -120,10 +121,14 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> 
     a10_passes = 2 if loops.get("verification") == "draft_and_final" else \
         1 + int(loops["max_redrafts"]) + int(loops["max_critique_cycles"]) + 2
     cycles = int(loops["max_critique_cycles"])
-    corpus = FIXED_INPUT["A07-SYN"] + n_findings * A07_TOKENS_PER_FINDING
-    return [
-        _worst(budget, route, "A07-SYN", max(1, groups + 2 - a07_done), corpus, cache_write_1h=True,
-               max_tokens=int(syn["max_tokens_per_turn"])),
+    from ..synthesis_registry import projected_a07
+    envelope = projected_a07(syn, n_findings)
+    m = route("A07-SYN")
+    fraction = max(0, envelope["calls"] - a07_done) / max(1, envelope["calls"])
+    a07 = {"stage": "A07-SYN", "basis": "ESTIMATED_ENVELOPE", "calls": max(0, envelope["calls"] - a07_done),
+           "usd": round((budget.cost(m.model, envelope["input_tokens"], envelope["output_tokens"]) or 0) * fraction, 4),
+           "detail": "bounded registry call envelope including retrieval; no cache savings; per-call admission required"}
+    return [a07,
         _worst(budget, route, "A08-OL", 1, FIXED_INPUT["A08-OL"] + n_findings * 300),
         _worst(budget, route, "A09-WRI", 1 + int(loops["max_redrafts"]), FIXED_INPUT["A09-WRI"]),
         _worst(budget, route, "A10-RV", a10_passes * 2, FIXED_INPUT["A10-RV"] + n_findings * A10_TOKENS_PER_FINDING),

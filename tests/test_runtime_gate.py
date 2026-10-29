@@ -117,11 +117,14 @@ def test_the_projection_covers_every_stage_still_ahead(run):
     assert cp.remaining_for_run(run)["lines"] == []
 
 
-def test_a07_is_priced_at_its_largest_call_on_the_current_payload():
+def test_a07_projection_covers_bounded_calls_and_retrieval_without_cache_assumptions(tmp_path):
     from litreview import config
     from litreview.budget import BudgetTracker
-    import tempfile
-    from pathlib import Path
-    b, cfg = BudgetTracker(Path(tempfile.mkdtemp())), config.load("pipeline")
-    line = cp.downstream(b, lambda a, ex=frozenset(): config.agent_candidates(a)[0], cfg, 100)[0]
-    assert "155,000 input tokens" in line["detail"]                     # 25,000 + 100 x 1,300
+    from litreview.synthesis_registry import projected_a07
+    b, cfg = BudgetTracker(tmp_path), config.load("pipeline")
+    route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]
+    line = cp.downstream(b, route, cfg, 100)[0]
+    env = projected_a07(cfg["synthesis"], 100)
+    assert line["calls"] == env["calls"]
+    assert line["basis"] == "ESTIMATED_ENVELOPE"
+    assert line["usd"] == pytest.approx(b.cost(route("A07-SYN").model, env["input_tokens"], env["output_tokens"]), abs=.001)

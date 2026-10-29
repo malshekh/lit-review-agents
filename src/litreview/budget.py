@@ -150,9 +150,14 @@ class BudgetTracker:
     def spent(self) -> float:
         return sum(e["cost_usd"] or 0.0 for e in self.entries())
 
-    def ensure_headroom(self) -> None:
+    def ensure_headroom(self, reservation_key: str | None = None) -> None:
         """Raise before a call if the cap is already reached, counting spend reserved by unsettled batches."""
         held = self.reserved()
+        if reservation_key:
+            own = self.reservations().get(reservation_key)
+            if own is None:
+                raise BudgetExceeded("pre-call reservation missing")
+            held -= own["usd"]
         if self.spent() + held >= self.cap:
             raise BudgetExceeded(f"Spend cap ${self.cap:.2f} reached (${self.spent():.2f} spent"
                                  + (f", ${held:.2f} reserved by unsettled batches" if held else "") + ").")
