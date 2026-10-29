@@ -1,0 +1,2178 @@
+[
+  {
+    "papers": 120,
+    "turn": "GROUP_G0001_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31626,
+    "output_allowance": 12000,
+    "byte_input_bound": 81056,
+    "fixture_output_byte_bound": 4660,
+    "request_sha256": "b9e6808a653fe888e65b5c7f894ba5eaa465a1d3ba425768308aa8abf61ca64b",
+    "group": {
+      "id": "G0001",
+      "theme": "T1",
+      "findings": 24,
+      "items": 6
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0002_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29508,
+    "output_allowance": 12000,
+    "byte_input_bound": 75313,
+    "fixture_output_byte_bound": 5935,
+    "request_sha256": "f5c5fe94b0f136312e4d9cdbd852012944a60fb081fd69db1062719e3cc6b306",
+    "group": {
+      "id": "G0002",
+      "theme": "T1",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0003_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31092,
+    "output_allowance": 12000,
+    "byte_input_bound": 77452,
+    "fixture_output_byte_bound": 3979,
+    "request_sha256": "ad254e301cc820d29fc6e11761368319796656f77cac24502bc268320eb3e23a",
+    "group": {
+      "id": "G0003",
+      "theme": "T1",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0004_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27822,
+    "output_allowance": 12000,
+    "byte_input_bound": 71239,
+    "fixture_output_byte_bound": 4251,
+    "request_sha256": "a2672511c8da748b8cdf0f695efe44ebb37cc45a8ca58fdddc404b0ad384efd2",
+    "group": {
+      "id": "G0004",
+      "theme": "T1",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0005_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31689,
+    "output_allowance": 12000,
+    "byte_input_bound": 82136,
+    "fixture_output_byte_bound": 4322,
+    "request_sha256": "0a39512ed789c8d5d24c29514d4e0a3f959b191780d54ca8a6685f89e0110d90",
+    "group": {
+      "id": "G0005",
+      "theme": "T1",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0006_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28569,
+    "output_allowance": 12000,
+    "byte_input_bound": 72703,
+    "fixture_output_byte_bound": 4504,
+    "request_sha256": "9b94dd585d08249ec53408f5507837e2077f96a847ddd82117b247b50701c123",
+    "group": {
+      "id": "G0006",
+      "theme": "T1",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0007_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30556,
+    "output_allowance": 12000,
+    "byte_input_bound": 77710,
+    "fixture_output_byte_bound": 5872,
+    "request_sha256": "1e39f2cbfbe6accf1f0e50e7a84d1c2a093b0e99f6882c07170d9d9d0d807ca8",
+    "group": {
+      "id": "G0007",
+      "theme": "T1",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0008_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28113,
+    "output_allowance": 12000,
+    "byte_input_bound": 70498,
+    "fixture_output_byte_bound": 4184,
+    "request_sha256": "6875fdeb103bd39c1c1a074a2ef17f85a1faedbc44f392b5b37f3d9cb25944b8",
+    "group": {
+      "id": "G0008",
+      "theme": "T1",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0009_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30974,
+    "output_allowance": 12000,
+    "byte_input_bound": 79748,
+    "fixture_output_byte_bound": 4317,
+    "request_sha256": "4bf02b16e43f18d4f0cdfaf6bcde5207ed690ce15f7d92d87c0be7ea1a309b92",
+    "group": {
+      "id": "G0009",
+      "theme": "T1",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0010_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25737,
+    "output_allowance": 12000,
+    "byte_input_bound": 66730,
+    "fixture_output_byte_bound": 3655,
+    "request_sha256": "6d93a98c62739f070d0f6f3a2034a2811744b02847b0421f678ba0154580b920",
+    "group": {
+      "id": "G0010",
+      "theme": "T1",
+      "findings": 20,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0011_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 32861,
+    "output_allowance": 12000,
+    "byte_input_bound": 85435,
+    "fixture_output_byte_bound": 5383,
+    "request_sha256": "c28a1be972774f3429d45428dab8af0dfb560212ac4917ed7972270146df90b7",
+    "group": {
+      "id": "G0011",
+      "theme": "T2",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0012_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31758,
+    "output_allowance": 12000,
+    "byte_input_bound": 81567,
+    "fixture_output_byte_bound": 4821,
+    "request_sha256": "c9159027126d2435643cb23ce3653904728ad8f438a4cbcde450bc600daf299b",
+    "group": {
+      "id": "G0012",
+      "theme": "T2",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0013_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 35415,
+    "output_allowance": 12000,
+    "byte_input_bound": 88882,
+    "fixture_output_byte_bound": 5554,
+    "request_sha256": "8db89c5781f1b5da818930650558befc9d710e15053666c1b3a239ec1ec4a4d3",
+    "group": {
+      "id": "G0013",
+      "theme": "T2",
+      "findings": 24,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0014_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31074,
+    "output_allowance": 12000,
+    "byte_input_bound": 79665,
+    "fixture_output_byte_bound": 4341,
+    "request_sha256": "6c3837bd81a3c71c9bb82f615f7990c9f25a961fb631519726e7c4ae51f040ea",
+    "group": {
+      "id": "G0014",
+      "theme": "T2",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0015_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 33491,
+    "output_allowance": 12000,
+    "byte_input_bound": 85112,
+    "fixture_output_byte_bound": 5201,
+    "request_sha256": "d1935b10edfeed1de99ed34a7680c37d6151fc473c8931bb138e3f18e42fc4d3",
+    "group": {
+      "id": "G0015",
+      "theme": "T2",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0016_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31039,
+    "output_allowance": 12000,
+    "byte_input_bound": 79588,
+    "fixture_output_byte_bound": 4545,
+    "request_sha256": "814281b436c7938dcb9500c288d18fc155504297bf96e947ac64273263c3fc2c",
+    "group": {
+      "id": "G0016",
+      "theme": "T2",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0017_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 33673,
+    "output_allowance": 12000,
+    "byte_input_bound": 84737,
+    "fixture_output_byte_bound": 5692,
+    "request_sha256": "62d02681874e88b28864e84bd22feeb641a4ff4de77473a81dbfd7f830729ee1",
+    "group": {
+      "id": "G0017",
+      "theme": "T2",
+      "findings": 24,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0018_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30628,
+    "output_allowance": 12000,
+    "byte_input_bound": 79674,
+    "fixture_output_byte_bound": 5443,
+    "request_sha256": "8654589fde696a427958f586689199619dcce601cceb9c03d3e19899a7d6bc0b",
+    "group": {
+      "id": "G0018",
+      "theme": "T2",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0019_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11610,
+    "output_allowance": 12000,
+    "byte_input_bound": 31586,
+    "fixture_output_byte_bound": 1930,
+    "request_sha256": "e262e0fc55cf295ff04739598b6732f5140a964022dcf0ce9b94c390a4c472dd",
+    "group": {
+      "id": "G0019",
+      "theme": "T2",
+      "findings": 6,
+      "items": 0
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0020_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28865,
+    "output_allowance": 12000,
+    "byte_input_bound": 70971,
+    "fixture_output_byte_bound": 4080,
+    "request_sha256": "3aa3e3f92c97a53905291542c0acb30d5adcfd285bd74f0fca9369268d27a052",
+    "group": {
+      "id": "G0020",
+      "theme": "T3",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0021_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 32771,
+    "output_allowance": 12000,
+    "byte_input_bound": 82616,
+    "fixture_output_byte_bound": 3653,
+    "request_sha256": "55f1faaf2198b0819697f21bbe7711f8bcf45847ed8502d3598226c57ad7b67c",
+    "group": {
+      "id": "G0021",
+      "theme": "T3",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0022_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30639,
+    "output_allowance": 12000,
+    "byte_input_bound": 77423,
+    "fixture_output_byte_bound": 4242,
+    "request_sha256": "263b98c04047fafea9e716bde82342b8406f6b369175f4510f8db5ab5ec3023f",
+    "group": {
+      "id": "G0022",
+      "theme": "T3",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0023_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29870,
+    "output_allowance": 12000,
+    "byte_input_bound": 73772,
+    "fixture_output_byte_bound": 3329,
+    "request_sha256": "9c384c79a110abe6f14eaf919881862acb2c71b7fab09889a9b755dbe2b3c7f3",
+    "group": {
+      "id": "G0023",
+      "theme": "T3",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0024_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27082,
+    "output_allowance": 12000,
+    "byte_input_bound": 67824,
+    "fixture_output_byte_bound": 3278,
+    "request_sha256": "c33c89877634ea582183f97ddb5905c3a3ace99880875067194f44241e9e9f20",
+    "group": {
+      "id": "G0024",
+      "theme": "T3",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0025_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27187,
+    "output_allowance": 12000,
+    "byte_input_bound": 67890,
+    "fixture_output_byte_bound": 4362,
+    "request_sha256": "2b59cf1cf82da029d072d3c3b662d3a9f8aeae3d28977c1d0df081ec3005bda6",
+    "group": {
+      "id": "G0025",
+      "theme": "T3",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0026_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27561,
+    "output_allowance": 12000,
+    "byte_input_bound": 67902,
+    "fixture_output_byte_bound": 3984,
+    "request_sha256": "22fb144d44241ac3de5a0ace7370e17dccf115a4c0af909cce4a33e193f20535",
+    "group": {
+      "id": "G0026",
+      "theme": "T3",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0027_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 32330,
+    "output_allowance": 12000,
+    "byte_input_bound": 81852,
+    "fixture_output_byte_bound": 3598,
+    "request_sha256": "908985204b32b468c9410ca555e50d7aaddb42983ae267fd3694cef6377c1b8c",
+    "group": {
+      "id": "G0027",
+      "theme": "T3",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0028_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30784,
+    "output_allowance": 12000,
+    "byte_input_bound": 77345,
+    "fixture_output_byte_bound": 4242,
+    "request_sha256": "8da5b1b2eb03ca7473d32127cb73d70c8687e2018c6e1ba8708437cb4c0a1991",
+    "group": {
+      "id": "G0028",
+      "theme": "T3",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0029_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29377,
+    "output_allowance": 12000,
+    "byte_input_bound": 72978,
+    "fixture_output_byte_bound": 3329,
+    "request_sha256": "ff79cf3797b82d62fb78a7a230c116dae721063fee5f14a8e4a6c44ebdaa0c8d",
+    "group": {
+      "id": "G0029",
+      "theme": "T3",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0030_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 26217,
+    "output_allowance": 12000,
+    "byte_input_bound": 65621,
+    "fixture_output_byte_bound": 3280,
+    "request_sha256": "737615fb6366edcc23a80b7bbdd6baad5ef6f3bea4fd69ef4eeab22cc619eefe",
+    "group": {
+      "id": "G0030",
+      "theme": "T3",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0031_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28577,
+    "output_allowance": 12000,
+    "byte_input_bound": 71324,
+    "fixture_output_byte_bound": 4557,
+    "request_sha256": "af9c649158939301d7d6d29dff4a03c1897ac754856e87b3cec955a8c9659549",
+    "group": {
+      "id": "G0031",
+      "theme": "T3",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0032_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 26597,
+    "output_allowance": 12000,
+    "byte_input_bound": 65608,
+    "fixture_output_byte_bound": 3842,
+    "request_sha256": "3272336036f19a04489fcdc7c460ccaf2564769b51759c341395ab4c7ff2f276",
+    "group": {
+      "id": "G0032",
+      "theme": "T3",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0033_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11917,
+    "output_allowance": 12000,
+    "byte_input_bound": 31325,
+    "fixture_output_byte_bound": 1912,
+    "request_sha256": "f4b2f14dd9288870bac23ae45903fff4d9b40a0c2a3cdead95d599c07ab8a09c",
+    "group": {
+      "id": "G0033",
+      "theme": "T3",
+      "findings": 6,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0034_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28943,
+    "output_allowance": 12000,
+    "byte_input_bound": 74814,
+    "fixture_output_byte_bound": 4872,
+    "request_sha256": "51b889a0cd12a929c3c9686bbd06bc1cfac29666b9009acb882070876ab3d722",
+    "group": {
+      "id": "G0034",
+      "theme": "T4",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0035_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25483,
+    "output_allowance": 12000,
+    "byte_input_bound": 62950,
+    "fixture_output_byte_bound": 3385,
+    "request_sha256": "a4dde8e77cabfc5da4fbe2e32b68b81131e38537ae61ea20d6ea7b93f12bc63b",
+    "group": {
+      "id": "G0035",
+      "theme": "T4",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0036_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 23526,
+    "output_allowance": 12000,
+    "byte_input_bound": 58107,
+    "fixture_output_byte_bound": 3523,
+    "request_sha256": "4ab8db867f95e733b5d25eed6a1c66b0e288a0e518a303888beeb427f1a8a41e",
+    "group": {
+      "id": "G0036",
+      "theme": "T4",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0037_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31159,
+    "output_allowance": 12000,
+    "byte_input_bound": 78451,
+    "fixture_output_byte_bound": 4629,
+    "request_sha256": "956b1ac24ca23c35998d9b531e3cedadf095d4b62341c2c4be91f477127ccbd0",
+    "group": {
+      "id": "G0037",
+      "theme": "T4",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0038_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29849,
+    "output_allowance": 12000,
+    "byte_input_bound": 77468,
+    "fixture_output_byte_bound": 4865,
+    "request_sha256": "a822a47cc96779485d17c1081cf54170bdce28840c3f2a09b29b33143f612e71",
+    "group": {
+      "id": "G0038",
+      "theme": "T4",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0039_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29451,
+    "output_allowance": 12000,
+    "byte_input_bound": 75579,
+    "fixture_output_byte_bound": 4270,
+    "request_sha256": "fd931026b835d1804b8ce2047d69103952a04f6448895b2a1059d63ee3b19095",
+    "group": {
+      "id": "G0039",
+      "theme": "T4",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0040_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25766,
+    "output_allowance": 12000,
+    "byte_input_bound": 64657,
+    "fixture_output_byte_bound": 4151,
+    "request_sha256": "f315af9f560328353961e4ba6c2d24d0f51f67f368189008c458dca50dcc5e1e",
+    "group": {
+      "id": "G0040",
+      "theme": "T4",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0041_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 23537,
+    "output_allowance": 12000,
+    "byte_input_bound": 57969,
+    "fixture_output_byte_bound": 3381,
+    "request_sha256": "d4fb204fe6b227adb93402ef654c131835fb07a521ce477522c76bc9dbbd40ae",
+    "group": {
+      "id": "G0041",
+      "theme": "T4",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0042_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 26684,
+    "output_allowance": 12000,
+    "byte_input_bound": 66516,
+    "fixture_output_byte_bound": 4627,
+    "request_sha256": "ea2aab69492c37304e1095ef78638249eec1d7016e0467c21cf2ceb12bf2cd84",
+    "group": {
+      "id": "G0042",
+      "theme": "T4",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0043_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31064,
+    "output_allowance": 12000,
+    "byte_input_bound": 79943,
+    "fixture_output_byte_bound": 3746,
+    "request_sha256": "5e70265247de8e40f359a9539e16045b8a62bf0c8cb0089e4dc738127a332514",
+    "group": {
+      "id": "G0043",
+      "theme": "T4",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0044_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 26917,
+    "output_allowance": 12000,
+    "byte_input_bound": 69982,
+    "fixture_output_byte_bound": 4649,
+    "request_sha256": "12d8bf2ace16cd39d6f1c8d99c1e78e9f0d583888cb27692a550532584bd3c79",
+    "group": {
+      "id": "G0044",
+      "theme": "T4",
+      "findings": 23,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0045_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30015,
+    "output_allowance": 12000,
+    "byte_input_bound": 77650,
+    "fixture_output_byte_bound": 3980,
+    "request_sha256": "ad659f0e6ba7947b1579530c11cf1991aaecd768d950a97248188f5a4f772a6c",
+    "group": {
+      "id": "G0045",
+      "theme": "T5",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0046_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 33204,
+    "output_allowance": 12000,
+    "byte_input_bound": 85327,
+    "fixture_output_byte_bound": 4398,
+    "request_sha256": "8f07c7aab8b6236eeac2fea2eb282da7a3a1b2c5c021b72b8b56832664ab31db",
+    "group": {
+      "id": "G0046",
+      "theme": "T5",
+      "findings": 24,
+      "items": 7
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0047_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28522,
+    "output_allowance": 12000,
+    "byte_input_bound": 72831,
+    "fixture_output_byte_bound": 5542,
+    "request_sha256": "f8cfdc5a3e700b2c6002441f697e19272f0004575a1c7ffa3d9ecd39f4840c22",
+    "group": {
+      "id": "G0047",
+      "theme": "T5",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0048_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31189,
+    "output_allowance": 12000,
+    "byte_input_bound": 78297,
+    "fixture_output_byte_bound": 4594,
+    "request_sha256": "3e0c8f8a530acf3196806b42c5278439d72fa70cc0ea898fc0ee6081433b1b81",
+    "group": {
+      "id": "G0048",
+      "theme": "T5",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0049_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29104,
+    "output_allowance": 12000,
+    "byte_input_bound": 73800,
+    "fixture_output_byte_bound": 4588,
+    "request_sha256": "66dd1d337ee76f0c8c5cde43febdb4bddf2d7a49f1086d0556690ce22533fe11",
+    "group": {
+      "id": "G0049",
+      "theme": "T5",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0050_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30044,
+    "output_allowance": 12000,
+    "byte_input_bound": 77357,
+    "fixture_output_byte_bound": 3899,
+    "request_sha256": "32e74232aa881e8a9af9b66427b6f05518f7afb031eb381cddf4ee8724d59cdb",
+    "group": {
+      "id": "G0050",
+      "theme": "T5",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0051_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30262,
+    "output_allowance": 12000,
+    "byte_input_bound": 77932,
+    "fixture_output_byte_bound": 4756,
+    "request_sha256": "d46d3c3f81926a990ddaee5382cb4f75a65e5033afb36dfff16ad9ad7e9f84d0",
+    "group": {
+      "id": "G0051",
+      "theme": "T5",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0052_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29696,
+    "output_allowance": 12000,
+    "byte_input_bound": 75570,
+    "fixture_output_byte_bound": 5713,
+    "request_sha256": "27952169b352bfcdad82bd4fd7dcddc2f69b19dd15a846bcabbd3934b686c155",
+    "group": {
+      "id": "G0052",
+      "theme": "T5",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0053_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30179,
+    "output_allowance": 12000,
+    "byte_input_bound": 75238,
+    "fixture_output_byte_bound": 3980,
+    "request_sha256": "2655b8cc729c856ec0a8ecd182f8d4653ba5b32294e0822c17f5d63c8dc65ade",
+    "group": {
+      "id": "G0053",
+      "theme": "T5",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0054_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27109,
+    "output_allowance": 12000,
+    "byte_input_bound": 69509,
+    "fixture_output_byte_bound": 4151,
+    "request_sha256": "be0cd9997fdca01a8321dfd41bc5aedeac15b6be4603ce7feef155107e74f35d",
+    "group": {
+      "id": "G0054",
+      "theme": "T5",
+      "findings": 23,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0055_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31979,
+    "output_allowance": 12000,
+    "byte_input_bound": 80818,
+    "fixture_output_byte_bound": 5301,
+    "request_sha256": "bdbff2f02104cac0005ee2d253f459c0d60ce47bc8eb31946f9674057650d7ae",
+    "group": {
+      "id": "G0055",
+      "theme": "T6",
+      "findings": 24,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0056_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30659,
+    "output_allowance": 12000,
+    "byte_input_bound": 79588,
+    "fixture_output_byte_bound": 5245,
+    "request_sha256": "1ea739e9037d30dda814163a9b27360f816b51edebcba36d7d0e6953233b5327",
+    "group": {
+      "id": "G0056",
+      "theme": "T6",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0057_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31421,
+    "output_allowance": 12000,
+    "byte_input_bound": 80138,
+    "fixture_output_byte_bound": 4069,
+    "request_sha256": "1370b1d0919e8ce74068ebb062a5c6983d837807d0aa0c5bdbd93b91bf03906b",
+    "group": {
+      "id": "G0057",
+      "theme": "T6",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0058_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 33782,
+    "output_allowance": 12000,
+    "byte_input_bound": 86036,
+    "fixture_output_byte_bound": 5911,
+    "request_sha256": "89a89e91dfd726aba4427ad92fec3cf84e2bbac2b37c23515e08f4295846c13c",
+    "group": {
+      "id": "G0058",
+      "theme": "T6",
+      "findings": 24,
+      "items": 6
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0059_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30198,
+    "output_allowance": 12000,
+    "byte_input_bound": 76394,
+    "fixture_output_byte_bound": 4657,
+    "request_sha256": "1184dc3c82653d8fdc303d8ff8256e4437047c1ed01fe38e3e283c4779163fd1",
+    "group": {
+      "id": "G0059",
+      "theme": "T6",
+      "findings": 24,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0060_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 32861,
+    "output_allowance": 12000,
+    "byte_input_bound": 85435,
+    "fixture_output_byte_bound": 5383,
+    "request_sha256": "fff4ded0bb64462a94b804f76b47795a550988f028185bbee656d2b2ba0f4c2c",
+    "group": {
+      "id": "G0060",
+      "theme": "T6",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0061_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31758,
+    "output_allowance": 12000,
+    "byte_input_bound": 81567,
+    "fixture_output_byte_bound": 4821,
+    "request_sha256": "d3d6dcdd1bdd8d65f486ef426f43d7289c4dee52bd9fca58f2d263830b59abe0",
+    "group": {
+      "id": "G0061",
+      "theme": "T6",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0062_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 22242,
+    "output_allowance": 12000,
+    "byte_input_bound": 56551,
+    "fixture_output_byte_bound": 3456,
+    "request_sha256": "0968ca2e3f0f8c9f49fc22b5447d9d4fb0241dace06f99f93d2203000750cbbd",
+    "group": {
+      "id": "G0062",
+      "theme": "T6",
+      "findings": 15,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0063_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31244,
+    "output_allowance": 12000,
+    "byte_input_bound": 77266,
+    "fixture_output_byte_bound": 3815,
+    "request_sha256": "76cfa53ac7aa0fca867c74a71eb32eaa3615ac94ff270fcccd7018dee8bc8a1c",
+    "group": {
+      "id": "G0063",
+      "theme": "T7",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0064_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28951,
+    "output_allowance": 12000,
+    "byte_input_bound": 72431,
+    "fixture_output_byte_bound": 3365,
+    "request_sha256": "114d432ba82f1367ba7b08ad948ca2b2af8d21d3ff7924c5fd32b9e3e1043cc0",
+    "group": {
+      "id": "G0064",
+      "theme": "T7",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0065_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25666,
+    "output_allowance": 12000,
+    "byte_input_bound": 64263,
+    "fixture_output_byte_bound": 4323,
+    "request_sha256": "abec4ed96e45910c9a3c806d9e9ab2900799342f0faf2a3fb1743d01bc3a2c30",
+    "group": {
+      "id": "G0065",
+      "theme": "T7",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0066_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29246,
+    "output_allowance": 12000,
+    "byte_input_bound": 71862,
+    "fixture_output_byte_bound": 3657,
+    "request_sha256": "7afd1ef10fabc7f3debc0ff868fb82f5669e98923ab3c99a40d287f1cbb02d2f",
+    "group": {
+      "id": "G0066",
+      "theme": "T7",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0067_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29860,
+    "output_allowance": 12000,
+    "byte_input_bound": 74696,
+    "fixture_output_byte_bound": 3819,
+    "request_sha256": "cea141dab8cedd65c6d2712795e49a9ae16b993513e15ac11d900a2a79e726ae",
+    "group": {
+      "id": "G0067",
+      "theme": "T7",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0068_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 32773,
+    "output_allowance": 12000,
+    "byte_input_bound": 83387,
+    "fixture_output_byte_bound": 4445,
+    "request_sha256": "8845d037bd75b969ec5b26598c142d3322467ff0068c16e090057c7702e840b1",
+    "group": {
+      "id": "G0068",
+      "theme": "T7",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0069_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29011,
+    "output_allowance": 12000,
+    "byte_input_bound": 71438,
+    "fixture_output_byte_bound": 3187,
+    "request_sha256": "98369dc22590f1457b217729c08acafcc5962d27faf2a7aa880fc1894a4977f5",
+    "group": {
+      "id": "G0069",
+      "theme": "T7",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0070_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 29182,
+    "output_allowance": 12000,
+    "byte_input_bound": 72944,
+    "fixture_output_byte_bound": 3365,
+    "request_sha256": "e1052e286caf6eb59a0cdec7c4bbd2c158fdea1b83682626653f573da7b43da7",
+    "group": {
+      "id": "G0070",
+      "theme": "T7",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0071_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25201,
+    "output_allowance": 12000,
+    "byte_input_bound": 63223,
+    "fixture_output_byte_bound": 4321,
+    "request_sha256": "c57c1355227ae087b16161f6ea3e6e9352b714018d209c28ca7b18cff7c8d25b",
+    "group": {
+      "id": "G0071",
+      "theme": "T7",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0072_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28895,
+    "output_allowance": 12000,
+    "byte_input_bound": 71169,
+    "fixture_output_byte_bound": 4026,
+    "request_sha256": "0e6da3b0b4be4796eb7fc340f795ae954e6a5ab51964847d09e68383066fc99a",
+    "group": {
+      "id": "G0072",
+      "theme": "T7",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0073_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31443,
+    "output_allowance": 12000,
+    "byte_input_bound": 78784,
+    "fixture_output_byte_bound": 3512,
+    "request_sha256": "df7dc962f746c72d71bb14d05fae25e1533d0d183876456c31ee4642fc6a78b9",
+    "group": {
+      "id": "G0073",
+      "theme": "T7",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0074_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31445,
+    "output_allowance": 12000,
+    "byte_input_bound": 79973,
+    "fixture_output_byte_bound": 4437,
+    "request_sha256": "fe88f9c5113d75e4130eac576395f089d55fec49b080f774cb45df3907047a45",
+    "group": {
+      "id": "G0074",
+      "theme": "T7",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0075_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12060,
+    "output_allowance": 12000,
+    "byte_input_bound": 31504,
+    "fixture_output_byte_bound": 1883,
+    "request_sha256": "87b2122fb47e37750cc53d2221cca7a171542b132c71b379a6c537e6ddac8e4f",
+    "group": {
+      "id": "G0075",
+      "theme": "T7",
+      "findings": 7,
+      "items": 0
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0076_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31064,
+    "output_allowance": 12000,
+    "byte_input_bound": 79943,
+    "fixture_output_byte_bound": 3746,
+    "request_sha256": "1adef499e8a3b00c6eaf6c4c41bf09f9edf4b67f5d2d23bfa3c905ece254fe9d",
+    "group": {
+      "id": "G0076",
+      "theme": "T8",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0077_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 28150,
+    "output_allowance": 12000,
+    "byte_input_bound": 72626,
+    "fixture_output_byte_bound": 4561,
+    "request_sha256": "07f624f26a749aaa0c88b1128f5ccfbdf0218074cd3ed5b8f0b8dac56b5b5f7c",
+    "group": {
+      "id": "G0077",
+      "theme": "T8",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0078_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27533,
+    "output_allowance": 12000,
+    "byte_input_bound": 70262,
+    "fixture_output_byte_bound": 4445,
+    "request_sha256": "8dfe532225716885bd2e5d173c4e92a05d2c12808654a5f371f4dec21d21cba6",
+    "group": {
+      "id": "G0078",
+      "theme": "T8",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0079_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 23464,
+    "output_allowance": 12000,
+    "byte_input_bound": 57706,
+    "fixture_output_byte_bound": 3523,
+    "request_sha256": "b24d1561fed0a62653eafffeb8ff3e9a1d8d1a55161c7d3780e59561c2dfab13",
+    "group": {
+      "id": "G0079",
+      "theme": "T8",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0080_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 24042,
+    "output_allowance": 12000,
+    "byte_input_bound": 59970,
+    "fixture_output_byte_bound": 4213,
+    "request_sha256": "787438bbb6dc9549a2a37cab1b63a1ca3688d257e44b7fd34cf1bb939030c3df",
+    "group": {
+      "id": "G0080",
+      "theme": "T8",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0081_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 31633,
+    "output_allowance": 12000,
+    "byte_input_bound": 80512,
+    "fixture_output_byte_bound": 4143,
+    "request_sha256": "8c53ada9490e3e88c33da90a59e284f90ae701ec66a5c1c30be7b0b18e6cd6e2",
+    "group": {
+      "id": "G0081",
+      "theme": "T8",
+      "findings": 24,
+      "items": 5
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0082_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27858,
+    "output_allowance": 12000,
+    "byte_input_bound": 71413,
+    "fixture_output_byte_bound": 4246,
+    "request_sha256": "9b822c84554076a9ee85c656ad795f2be7d15e1637e072a64e5ccf14c641fd4b",
+    "group": {
+      "id": "G0082",
+      "theme": "T8",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0083_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 27473,
+    "output_allowance": 12000,
+    "byte_input_bound": 71048,
+    "fixture_output_byte_bound": 4917,
+    "request_sha256": "20522b276330cf68b763d10bffe3af96c6fe25a177fb9a2530ee0abc0bbe56a6",
+    "group": {
+      "id": "G0083",
+      "theme": "T8",
+      "findings": 24,
+      "items": 2
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0084_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 25450,
+    "output_allowance": 12000,
+    "byte_input_bound": 62783,
+    "fixture_output_byte_bound": 3529,
+    "request_sha256": "c946ddbd9c48dc19af308c02eb4a49fa2aff145fb749262a91e51362a7d1efd0",
+    "group": {
+      "id": "G0084",
+      "theme": "T8",
+      "findings": 24,
+      "items": 3
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0085_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 23198,
+    "output_allowance": 12000,
+    "byte_input_bound": 57436,
+    "fixture_output_byte_bound": 3381,
+    "request_sha256": "48a8e0eba208c07b648d100faec03010a7ee9e64e614d48f74580b1bc748e465",
+    "group": {
+      "id": "G0085",
+      "theme": "T8",
+      "findings": 24,
+      "items": 1
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0086_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 30636,
+    "output_allowance": 12000,
+    "byte_input_bound": 77029,
+    "fixture_output_byte_bound": 4432,
+    "request_sha256": "c021421c899f2df35304ddb72b217b1cf057ae2edf9cf484c7c5f2594ad733f0",
+    "group": {
+      "id": "G0086",
+      "theme": "T8",
+      "findings": 24,
+      "items": 4
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0087_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 7127,
+    "output_allowance": 12000,
+    "byte_input_bound": 21454,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "837d609c0fd778960906c657c2f3b13ffc41378aecc84b304030cf2ec09decfd",
+    "group": {
+      "id": "G0087",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0088_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 7011,
+    "output_allowance": 12000,
+    "byte_input_bound": 21175,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "8dc75658f17a9ca2e302f6edd81839e25e9871bd5583b17628d2cdf83717f078",
+    "group": {
+      "id": "G0088",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0089_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 20317,
+    "output_allowance": 12000,
+    "byte_input_bound": 50298,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "b00154841fc9639b2ba09b8c4a5bdfa10d12bf2821fe203dfab586c234c07f10",
+    "group": {
+      "id": "G0089",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0090_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 26057,
+    "output_allowance": 12000,
+    "byte_input_bound": 64982,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "21dd80de296e63d5563639b11623e0870fa86af058131198e6b111e77a988806",
+    "group": {
+      "id": "G0090",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0091_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 44967,
+    "output_allowance": 12000,
+    "byte_input_bound": 102878,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "635ecee413f3a2245ecbd3879e388a69aac467428adde66141ab3c76049b2344",
+    "group": {
+      "id": "G0091",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0092_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12483,
+    "output_allowance": 12000,
+    "byte_input_bound": 34588,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "506de0a9f959f47a2bf5c46136aeb05b912cf5cde26c86ca13e9391fc44c0e1e",
+    "group": {
+      "id": "G0092",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0093_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12449,
+    "output_allowance": 12000,
+    "byte_input_bound": 35538,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "072bfa9fc1a260147deb49bcb89aa438300ff49974eeeeb90454a164be30235f",
+    "group": {
+      "id": "G0093",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0094_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12515,
+    "output_allowance": 12000,
+    "byte_input_bound": 36008,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "ba58cca572b4e9e8cc49ee9811716721eaa784204d1e864dfb1240c72b855671",
+    "group": {
+      "id": "G0094",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0095_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 47829,
+    "output_allowance": 12000,
+    "byte_input_bound": 111252,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "2a43e257e70624dabdf69ea2c28add0530b40d3406e656888263bd2ff9427078",
+    "group": {
+      "id": "G0095",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0096_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 37205,
+    "output_allowance": 12000,
+    "byte_input_bound": 85594,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "fc24f3a014801e6c2bf9b154e977d178637ae8fd42d906c57a7f0e5feb7584d8",
+    "group": {
+      "id": "G0096",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0097_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12697,
+    "output_allowance": 12000,
+    "byte_input_bound": 35432,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "9555908f8d4fdfbfb69668b23b1b6d57dbce70ac8cdea90c27c0478bc2001b55",
+    "group": {
+      "id": "G0097",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0098_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12411,
+    "output_allowance": 12000,
+    "byte_input_bound": 34132,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "803dd8f778ae2c94174cbd3f04e7bd2d4d274fa96a0f9655791913c4d0ff03cf",
+    "group": {
+      "id": "G0098",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0099_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11829,
+    "output_allowance": 12000,
+    "byte_input_bound": 32898,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "f799af20b2d5741af13642959db77319d30e4ab3bfd497742034272c55ee765f",
+    "group": {
+      "id": "G0099",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0100_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 13115,
+    "output_allowance": 12000,
+    "byte_input_bound": 37974,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "dc60e87dc5f302b6990f1b66686aa5769a309ea56435acc5d7015fe60513464c",
+    "group": {
+      "id": "G0100",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0101_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 13181,
+    "output_allowance": 12000,
+    "byte_input_bound": 37900,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "b9c50d65836299548dc31554d2aac11ca686da6f84a9536d92442e25a6e8b58c",
+    "group": {
+      "id": "G0101",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0102_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11485,
+    "output_allowance": 12000,
+    "byte_input_bound": 32506,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "19a66351d7a15b050c525e2c3c7bb8c5bdfe33c256431eea1ab4fb9cd5dafab7",
+    "group": {
+      "id": "G0102",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0103_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10995,
+    "output_allowance": 12000,
+    "byte_input_bound": 30992,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "19e4c92aeb5d0a319fe86bdbc9525897d5137c6625ad51a943c290abc33748e6",
+    "group": {
+      "id": "G0103",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0104_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10935,
+    "output_allowance": 12000,
+    "byte_input_bound": 31420,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "6c8fc41d868c974b294c68f78972716af918de7d2ae7759d66dcc359b7a844c2",
+    "group": {
+      "id": "G0104",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0105_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 12941,
+    "output_allowance": 12000,
+    "byte_input_bound": 36660,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "ff88dd2bb02e41186342bc544497a9153c2d2a58ad58fe14073344ef56ff7804",
+    "group": {
+      "id": "G0105",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0106_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 16983,
+    "output_allowance": 12000,
+    "byte_input_bound": 46585,
+    "fixture_output_byte_bound": 2350,
+    "request_sha256": "5abaec4b3db5ef4a4cad6dfabd5713e154419fb24b0748d9aaf275e72813d419",
+    "group": {
+      "id": "G0106",
+      "theme": "UNMAPPED",
+      "findings": 2,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0107_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10021,
+    "output_allowance": 12000,
+    "byte_input_bound": 30926,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "d0d0a1030127c8cb92eb004e84e5bafcba1ea3f3b3c0bcee132570ee581e8679",
+    "group": {
+      "id": "G0107",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0108_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10193,
+    "output_allowance": 12000,
+    "byte_input_bound": 30742,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "4cdac96080baeb743fa3590ea0dafb46bf2b0a452c2fbb5f3ba8423925cf0036",
+    "group": {
+      "id": "G0108",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0109_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11598,
+    "output_allowance": 12000,
+    "byte_input_bound": 34396,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "e4abf1fd0a0ea915835a68ead0b6a93f99a5591ba2d6699aa6434ac738a2d8b6",
+    "group": {
+      "id": "G0109",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0110_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10582,
+    "output_allowance": 12000,
+    "byte_input_bound": 31854,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "3fc15e7523e37a781b7a9f9bab7e29a398a67284761aaa51b751edc829e83655",
+    "group": {
+      "id": "G0110",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0111_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10416,
+    "output_allowance": 12000,
+    "byte_input_bound": 31510,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "5e06c1530b7c51154bf511f3c53ebf73a7b03e3aa18609fbc583e6e4933aebf0",
+    "group": {
+      "id": "G0111",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0112_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10199,
+    "output_allowance": 12000,
+    "byte_input_bound": 31276,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "b79087921129e80c7d7f4236b833b0c5ba0e395c0c2e8857f867d11d5f56a71a",
+    "group": {
+      "id": "G0112",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0113_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10310,
+    "output_allowance": 12000,
+    "byte_input_bound": 31756,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "3a91a5f1edc229085aedb36273e00addae8168c30d21821c7c7a59a7eecbc57d",
+    "group": {
+      "id": "G0113",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0114_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10273,
+    "output_allowance": 12000,
+    "byte_input_bound": 30795,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "0beef10d8e53b7b5601e07a8b0187cf5593b3cebfc36abef622ff792f17f5fe4",
+    "group": {
+      "id": "G0114",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0115_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11347,
+    "output_allowance": 12000,
+    "byte_input_bound": 33847,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "759d5de935f6ab8baff63a80ab22e6275ccdf217b264f2022d627cdc617411a6",
+    "group": {
+      "id": "G0115",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0116_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10336,
+    "output_allowance": 12000,
+    "byte_input_bound": 31161,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "d5e05ae7e83b60f176994e15d94dedd227c080c49b933b09951209219a32348a",
+    "group": {
+      "id": "G0116",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0117_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10620,
+    "output_allowance": 12000,
+    "byte_input_bound": 32023,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "3f2845116275df9b7d317a7401e0fe2d5e7c1cb2fdc0ba1a891095fc104ff641",
+    "group": {
+      "id": "G0117",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0118_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10137,
+    "output_allowance": 12000,
+    "byte_input_bound": 31208,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "cd7a7aab9f2117b8ece0ba6b42836f140311e7641460af30994c19fa404336d3",
+    "group": {
+      "id": "G0118",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0119_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10832,
+    "output_allowance": 12000,
+    "byte_input_bound": 32790,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "9843df8869df434def3ee83f89d93304af22694127f4458e3afd3e796f0b794f",
+    "group": {
+      "id": "G0119",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0120_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11091,
+    "output_allowance": 12000,
+    "byte_input_bound": 33147,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "a4ae952dcb7e85efb2ed1c8e2f9e877aef09fd010f6951bbfba17b87e3f4a20e",
+    "group": {
+      "id": "G0120",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0121_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11113,
+    "output_allowance": 12000,
+    "byte_input_bound": 33127,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "d7f51169525be97e497743f33e79a2029d47ede1916ecb1a254c9c9566436d6d",
+    "group": {
+      "id": "G0121",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0122_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10718,
+    "output_allowance": 12000,
+    "byte_input_bound": 32497,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "0fd2dce292968f49776ae45762c6cd8c9d0bd7b51110089be4a8a3e134f8fcb4",
+    "group": {
+      "id": "G0122",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0123_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10649,
+    "output_allowance": 12000,
+    "byte_input_bound": 32271,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "146596c6853e8dec363cc521023a6b5147d5295c588ce89e3ee378cfef8e8e21",
+    "group": {
+      "id": "G0123",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0124_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 9772,
+    "output_allowance": 12000,
+    "byte_input_bound": 30122,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "af5bc048c6052d1ff4b7b0c9c21cade237d0a15b55e024a0c298862a356929f9",
+    "group": {
+      "id": "G0124",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0125_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10339,
+    "output_allowance": 12000,
+    "byte_input_bound": 31281,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "f5cc66eca51c95c0036e4f89a9f567dcf1689fc2fed6bfe0bdf92c0723a4c902",
+    "group": {
+      "id": "G0125",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0126_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11426,
+    "output_allowance": 12000,
+    "byte_input_bound": 34112,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "90eed948100e242f158b5e0d3141f5110ce58678bc8ed4043c451f9a1e6ca5e6",
+    "group": {
+      "id": "G0126",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0127_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10597,
+    "output_allowance": 12000,
+    "byte_input_bound": 31813,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "52eb89b15529a53c4a2a778b5b9f7f79afe9a4b1686460e0c289da0a2922abbe",
+    "group": {
+      "id": "G0127",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0128_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10416,
+    "output_allowance": 12000,
+    "byte_input_bound": 31510,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "0390f54761a87ca133cbd6b23fb796c1a54bf6fae201ab076333700d4b4aefaa",
+    "group": {
+      "id": "G0128",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0129_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10895,
+    "output_allowance": 12000,
+    "byte_input_bound": 32842,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "f9e722b0cbfb0f038a36fb79b5fe4d29474d1a9f137ffc2ebf476d8d82a40755",
+    "group": {
+      "id": "G0129",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0130_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 9772,
+    "output_allowance": 12000,
+    "byte_input_bound": 30122,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "cd940782aed2f4b57f167053fb13269c2f074d292303ab771439caf05c727eb6",
+    "group": {
+      "id": "G0130",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0131_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10618,
+    "output_allowance": 12000,
+    "byte_input_bound": 32144,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "0cfc88e4e6128b4c290b8e68dfb18a8227ed624d5beb40f39d4b0771e1e0a8c3",
+    "group": {
+      "id": "G0131",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0132_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11048,
+    "output_allowance": 12000,
+    "byte_input_bound": 33087,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "805036c4d86e733e7865901876b3701e8086d212c4257a46765bbfa15f233805",
+    "group": {
+      "id": "G0132",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0133_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 11443,
+    "output_allowance": 12000,
+    "byte_input_bound": 33935,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "783d99753213c2d803778792f34998abcdf988dc897b81d94f2a4e2a0895f54b",
+    "group": {
+      "id": "G0133",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0134_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10495,
+    "output_allowance": 12000,
+    "byte_input_bound": 31423,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "0f3c02c96c5f7c00f56d4015be8b41778347873231c155ce56fb8d135bc107cb",
+    "group": {
+      "id": "G0134",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0135_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10595,
+    "output_allowance": 12000,
+    "byte_input_bound": 32078,
+    "fixture_output_byte_bound": 2355,
+    "request_sha256": "1a9a2c213a9ec25a500675040f7d1210f17227b652b977947b40e2bf3d4f2336",
+    "group": {
+      "id": "G0135",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 8
+    }
+  },
+  {
+    "papers": 120,
+    "turn": "GROUP_G0136_LOOKUP0",
+    "mode": "GROUP",
+    "input_tokens": 10115,
+    "output_allowance": 12000,
+    "byte_input_bound": 30287,
+    "fixture_output_byte_bound": 2213,
+    "request_sha256": "dee1902186d63c96bff2d232e44273b85418f8c3bf7f9b8dd4b2b0846b22fa1b",
+    "group": {
+      "id": "G0136",
+      "theme": "UNMAPPED",
+      "findings": 0,
+      "items": 7
+    }
+  }
+]

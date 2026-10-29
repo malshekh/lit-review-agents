@@ -284,6 +284,10 @@ class RegistrySynthesisJob(SynthesisJob):
                 anchors = set(issue["finding_ids"])
                 if not anchors or anchors - retrieved:
                     raise JobStopped("reconciliation issue lacks evidence anchors")
+                for pid in related:
+                    linked = {e["finding_id"] for e in props[pid].get("evidence", [])}
+                    if linked and not anchors & linked:
+                        raise JobStopped("reconciliation issue lacks referenced proposition evidence")
                 if issue["kind"] == "UNSUPPORTED_INTERPRETATION":
                     raise JobStopped("unsupported interpretation: human/upstream review required")
                 issue["issue_id"] = "RC-" + fingerprint({"kind": issue["kind"], "propositions": sorted(related),
