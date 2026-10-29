@@ -112,7 +112,7 @@ class EvidenceRegistry:
     def item_findings(self, iid):
         return set(re.findall(r"\bR\d+:F\d+\b", canonical(self.item_source(iid)))) & set(self.findings)
 
-    def packets(self, size=24, item_size=8):
+    def packets(self, size=24, item_size=8, source_item_size=16):
         by_theme = defaultdict(list)
         for fid, f in sorted(self.findings.items()):
             by_theme[self.theme_of(f)].append(fid)
@@ -134,11 +134,25 @@ class EvidenceRegistry:
                     status_of(self.findings[f]) in ("SUPPORTING", "NOT_ESTABLISHED") for f in p["finding_ids"]))
             if not candidates and item.get("theme_record") in self.themes:
                 candidates = [p for p in packets if p["primary_theme_id"] == item["theme_record"]]
-            if candidates and len(candidates[0]["manifest_item_ids"]) < item_size:
-                candidates[0]["manifest_item_ids"].append(iid)
+            available = next((p for p in candidates if len(p["manifest_item_ids"]) < item_size), None)
+            if available is not None:
+                available["manifest_item_ids"].append(iid)
             else:
                 extra.append(iid)
-        for part in chunks(extra, item_size):
+        # Source-only analysis has no finding propositions/unused-finding output. It can carry
+        # more source units under the same output cap, without skipping any scientific analysis.
+        # Keep papers needing finding anchors out of these packets. Source theme IDs stay on
+        # every item; UNMAPPED is an administrative bucket, never a new scientific theme.
+        anchored, source_only = [], []
+        for iid in extra:
+            item = self.items[iid]
+            usable = item["kind"] == "SELECTED_PAPER" and any(
+                self.record_of[f] == item["record_id"] and status_of(self.findings[f]) in
+                ("SUPPORTING", "NOT_ESTABLISHED") for f in self.findings)
+            (anchored if usable else source_only).append(iid)
+        parts = [(part, False) for part in chunks(anchored, item_size)]
+        parts += [(part, True) for part in chunks(source_only, source_item_size)]
+        for part, only_sources in parts:
             paper_anchors = []
             for iid in part:
                 item = self.items[iid]
@@ -148,7 +162,8 @@ class EvidenceRegistry:
                     paper_anchors.extend(eligible[:1])
             packets.append({"group_id": f"G{len(packets)+1:04d}", "primary_theme_id": "UNMAPPED",
                             "name": "Mandatory evidence records", "kind": "REPORTING_ONLY_THEME",
-                            "basis": "explicit mandatory source records", "finding_ids": sorted(set(paper_anchors)), "manifest_item_ids": part})
+                            "basis": "explicit mandatory source records", "source_only": only_sources,
+                            "finding_ids": sorted(set(paper_anchors)), "manifest_item_ids": part})
         return packets
 
     def plan_payload(self, packets):
@@ -184,8 +199,17 @@ class EvidenceRegistry:
                              for f in ids if self.findings[f].get("context_id")}}
 
     def packet_payload(self, packet):
+        sources = {}
+        for iid in packet["manifest_item_ids"]:
+            unit = self.item_source(iid)
+            # Alias reversal remains in the registry/final package. A SYSTEM_GAP's source
+            # is the item itself: serialize its full content once, not twice.
+            item = {k: v for k, v in unit["item"].items() if k != "original_item_id"}
+            sources[iid] = {"item": item}
+            if unit["item"]["kind"] != "SYSTEM_GAP":
+                sources[iid]["source"] = unit["source"]
         return {"mode": "GROUP", "group": packet, **self.details(packet["finding_ids"]),
-                "source_items": {i: self.item_source(i) for i in packet["manifest_item_ids"]},
+                "source_items": sources,
                 "theme_definition": self.themes.get(packet["primary_theme_id"]),
                 "retrieval": {"available": True, "operations": ["finding_ids", "query"],
                               "note": "search the complete registry; all results retain their IDs"}}

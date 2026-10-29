@@ -34,6 +34,8 @@ def main():
     model = config.agent_model('A07-SYN')
     system = build_system_prompt('A07-SYN')
     outdir = ROOT / 'docs/a07_validation'
+    if '--output-dir' in sys.argv:
+        outdir = ROOT / sys.argv[sys.argv.index('--output-dir')+1]
     if '--retrieval' in sys.argv:
         outdir = outdir / 'retrieval'
     outdir.mkdir(exist_ok=True, parents=True)

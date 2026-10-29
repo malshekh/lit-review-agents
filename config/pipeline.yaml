@@ -111,6 +111,7 @@ synthesis:
   max_tokens_per_turn: 12000     # compatibility default; mode limits below include thinking
   max_findings_per_group: 24     # deterministic packets within approved primary themes
   max_items_per_group: 8
+  max_items_per_source_group: 16 # source-only analysis; no findings removed, same 12k output cap
   max_propositions_per_group: 12
   reconcile_page_size: 32
   max_retrieval_rounds: 2

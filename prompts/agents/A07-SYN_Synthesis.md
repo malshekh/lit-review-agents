@@ -59,7 +59,13 @@ No generic CONTEXT accounting; no inconvenient omission. Never invent a claim to
 Gaps: type, statement, source_item_ids, established_by (eligible finding IDs), satisfies. A paper with
 no eligible findings can be an explicit insufficient-evidence gap bound to its PAPER source item.
 Contrary CORE findings, conflicts and evidence reach retain narrative visibility. Maximum output:
-12 propositions, 8 gaps, 24 unused findings. If impossible, stop for human review; do not truncate.
+12 propositions, 8 gaps, 24 unused findings. A group marked source_only has no initial findings and
+allows up to 16 gaps under the SAME output cap; retain separate source-item bindings and theme_record
+identities. Co-location is not a scientific relationship or permission to merge themes. Every conflict,
+reach record and gap still needs scientific assessment; do not convert lack of findings into absence
+of a biological effect. For SYSTEM_GAP, item contains the full source, serialized once. Original long
+manifest IDs are restored by code; use the supplied aliases. If impossible, stop for human review;
+do not truncate or omit required analyses.
 
 ## RECONCILE
 

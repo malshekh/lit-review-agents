@@ -44,7 +44,9 @@ class RegistrySynthesisJob(SynthesisJob):
         self.packets = self._packets()
 
     def _packets(self):
-        queue = self.registry.packets(self.cfg.get("max_findings_per_group", 24), self.cfg.get("max_items_per_group", 8))
+        queue = self.registry.packets(self.cfg.get("max_findings_per_group", 24),
+                                      self.cfg.get("max_items_per_group", 8),
+                                      self.cfg.get("max_items_per_source_group", 16))
         out = []
         while queue:
             p = queue.pop(0)
@@ -219,6 +221,9 @@ class RegistrySynthesisJob(SynthesisJob):
         if self._committed(turn):
             return
         out, retrieved = self._with_retrieval("GROUP", turn, self.registry.packet_payload(packet))
+        gap_limit = 16 if packet.get("source_only") else 8
+        if len(out["knowledge_gaps"]) > gap_limit:
+            raise JobStopped("packet knowledge-gap output bound exceeded")
         visible = set(packet["finding_ids"]) | retrieved
         for gap in out["knowledge_gaps"]:
             if (set(gap["source_item_ids"]) | set(gap["satisfies"])) - set(packet["manifest_item_ids"]):

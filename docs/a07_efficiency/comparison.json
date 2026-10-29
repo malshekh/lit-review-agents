@@ -1,0 +1,4794 @@
+{
+  "method": "free provider-counted input; mocked output; same scientific corpus, no historical mutation",
+  "baseline_unique_count_requests": 320,
+  "optimized_unique_count_requests": 262,
+  "prefix_calibration": 3956,
+  "old_empty_item_kinds": {
+    "CONFLICT": 16,
+    "SYSTEM_GAP": 136,
+    "EVIDENCE_REACH": 239
+  },
+  "other_stage_scenario": {
+    "discovery_assumption": 4,
+    "A05_A06_batch_mean": 42.64778571428572,
+    "repeat_A06_batch_p90_all_papers": 25.34935714285714,
+    "thematic_validation": 14.733708000000004,
+    "A08_A12": [
+      {
+        "stage": "A08-OL",
+        "basis": "WORST_CASE",
+        "usd": 2.9552,
+        "calls": 1,
+        "detail": "1 calls x (618,800 input tokens + 32,000 output at max_tokens) on gpt-6.1-sol"
+      },
+      {
+        "stage": "A09-WRI",
+        "basis": "WORST_CASE",
+        "usd": 3.8,
+        "calls": 2,
+        "detail": "2 calls x (60,000 input tokens + 64,000 output at max_tokens) on claude-opus-5"
+      },
+      {
+        "stage": "A10-RV",
+        "basis": "WORST_CASE",
+        "usd": 25.5552,
+        "calls": 4,
+        "detail": "4 calls x (1,477,200 input tokens + 32,000 output at max_tokens) on gpt-6.1-sol"
+      },
+      {
+        "stage": "A11-RC",
+        "basis": "WORST_CASE",
+        "usd": 3.2752,
+        "calls": 2,
+        "detail": "2 calls x (658,800 input tokens + 32,000 output at max_tokens) on kimi-k3.1-pro"
+      },
+      {
+        "stage": "A12-EDI",
+        "basis": "WORST_CASE",
+        "usd": 3.04,
+        "calls": 4,
+        "detail": "4 calls x (60,000 input tokens + 64,000 output at max_tokens) on claude-sonnet-5-5"
+      }
+    ],
+    "total": 125.35645085714287,
+    "a07_allowance_under_150": 24.643549142857125
+  },
+  "rows": [
+    {
+      "papers": 40,
+      "before": {
+        "papers": 40,
+        "calls": 68,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 146639,
+            "output_cap": 4000,
+            "max_input": 146639,
+            "max_input_plus_output": 150639,
+            "max_byte_input_plus_output": 317223
+          },
+          "GROUP": {
+            "calls": 62,
+            "input": 1158483,
+            "output_cap": 744000,
+            "max_input": 33204,
+            "max_input_plus_output": 45204,
+            "max_byte_input_plus_output": 97435
+          },
+          "RECONCILE": {
+            "calls": 4,
+            "input": 129044,
+            "output_cap": 24000,
+            "max_input": 33194,
+            "max_input_plus_output": 39194,
+            "max_byte_input_plus_output": 77722
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 40197,
+            "output_cap": 6000,
+            "max_input": 40197,
+            "max_input_plus_output": 46197,
+            "max_byte_input_plus_output": 98139
+          }
+        },
+        "input": 1474363,
+        "output_cap": 778000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 31,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31626,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29508,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31092,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27822,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32861,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31758,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T2",
+            "findings": 15,
+            "items": 1,
+            "input_tokens": 22242,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28865,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32771,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30639,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T3",
+            "findings": 5,
+            "items": 0,
+            "input_tokens": 9928,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28943,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25483,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23526,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31159,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T4",
+            "findings": 3,
+            "items": 0,
+            "input_tokens": 7193,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30015,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33204,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T5",
+            "findings": 14,
+            "items": 0,
+            "input_tokens": 16276,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31979,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T6",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 30659,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T6",
+            "findings": 11,
+            "items": 2,
+            "input_tokens": 17505,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31244,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28951,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25666,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29246,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29860,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31064,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28150,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T8",
+            "findings": 18,
+            "items": 1,
+            "input_tokens": 20908,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 7027,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10739,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 13957,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 14801,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 15985,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8677,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8709,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8517,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 32933,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8713,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8873,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8625,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8485,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9281,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8641,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8637,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0047",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 8329,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0048",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9113,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0049",
+            "theme": "UNMAPPED",
+            "findings": 1,
+            "items": 8,
+            "input_tokens": 12815,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0050",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9772,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0051",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10339,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0052",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11426,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0053",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10461,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0054",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10435,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0055",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11102,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0056",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9687,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0057",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10608,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0058",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11205,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0059",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11292,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0060",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10582,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0061",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10176,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0062",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 5,
+            "input_tokens": 8398,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 24,
+            "15": 1,
+            "5": 1,
+            "3": 1,
+            "14": 1,
+            "11": 1,
+            "18": 1,
+            "0": 31,
+            "1": 1
+          },
+          "items": {
+            "6": 1,
+            "4": 4,
+            "2": 5,
+            "3": 8,
+            "1": 3,
+            "5": 5,
+            "0": 3,
+            "7": 1,
+            "8": 32
+          },
+          "input_min": 7027,
+          "input_median": 14379.0,
+          "input_max": 33204
+        },
+        "costs": {
+          "input_only": 7.371815,
+          "25pct_cap": 12.234315,
+          "50pct_cap": 17.096815,
+          "full_caps": 26.821815,
+          "fixture_bytes_div3_plus_25pct_cap": 14.044665,
+          "full_caps_40pct_proportional_retry_retrieval": 37.550540999999996,
+          "all_input_as_cache_write_full_caps": 34.19363,
+          "all_system_miss_input_premium": 1.34504,
+          "ideal_system_cache_input_saving": 1.172954
+        },
+        "all_admitted": true
+      },
+      "after": {
+        "papers": 40,
+        "calls": 52,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 146814,
+            "output_cap": 4000,
+            "max_input": 146814,
+            "max_input_plus_output": 150814,
+            "max_byte_input_plus_output": 317774
+          },
+          "GROUP": {
+            "calls": 46,
+            "input": 1026646,
+            "output_cap": 552000,
+            "max_input": 33186,
+            "max_input_plus_output": 45186,
+            "max_byte_input_plus_output": 97745
+          },
+          "RECONCILE": {
+            "calls": 4,
+            "input": 129014,
+            "output_cap": 24000,
+            "max_input": 33223,
+            "max_input_plus_output": 39223,
+            "max_byte_input_plus_output": 77979
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 40226,
+            "output_cap": 6000,
+            "max_input": 40226,
+            "max_input_plus_output": 46226,
+            "max_byte_input_plus_output": 98504
+          }
+        },
+        "input": 1342700,
+        "output_cap": 586000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 16,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31624,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29574,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31222,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27713,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32935,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31863,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T2",
+            "findings": 15,
+            "items": 1,
+            "input_tokens": 22401,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28906,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32823,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30745,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T3",
+            "findings": 5,
+            "items": 0,
+            "input_tokens": 10103,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29038,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25602,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23629,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31206,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T4",
+            "findings": 3,
+            "items": 0,
+            "input_tokens": 7368,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29855,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33186,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T5",
+            "findings": 14,
+            "items": 0,
+            "input_tokens": 16451,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31952,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31914,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T6",
+            "findings": 11,
+            "items": 2,
+            "input_tokens": 17624,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31350,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29025,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25812,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29287,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29953,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31099,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28254,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T8",
+            "findings": 18,
+            "items": 1,
+            "input_tokens": 21035,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 10956,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 14134,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12073,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 8419,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 20602,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 8546,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 8607,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 8354,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 8417,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 14161,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17465,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16663,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16286,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17327,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17398,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 12,
+            "input_tokens": 13689,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 24,
+            "15": 1,
+            "5": 1,
+            "3": 1,
+            "14": 1,
+            "11": 1,
+            "18": 1,
+            "0": 16
+          },
+          "items": {
+            "6": 1,
+            "4": 4,
+            "2": 4,
+            "3": 9,
+            "1": 3,
+            "5": 4,
+            "0": 3,
+            "7": 1,
+            "8": 1,
+            "16": 15,
+            "12": 1
+          },
+          "input_min": 7368,
+          "input_median": 24615.5,
+          "input_max": 33186
+        },
+        "costs": {
+          "input_only": 6.7135,
+          "25pct_cap": 10.376,
+          "50pct_cap": 14.0385,
+          "full_caps": 21.3635,
+          "fixture_bytes_div3_plus_25pct_cap": 12.020833333333332,
+          "full_caps_40pct_proportional_retry_retrieval": 29.908899999999996,
+          "all_input_as_cache_write_full_caps": 28.077,
+          "all_system_miss_input_premium": 1.02856,
+          "ideal_system_cache_input_saving": 0.888122
+        },
+        "all_admitted": true
+      },
+      "scientific_input_equivalent": true,
+      "mandatory_units": 347,
+      "findings": 642
+    },
+    {
+      "papers": 80,
+      "before": {
+        "papers": 80,
+        "calls": 103,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 287568,
+            "output_cap": 4000,
+            "max_input": 287568,
+            "max_input_plus_output": 291568,
+            "max_byte_input_plus_output": 602715
+          },
+          "GROUP": {
+            "calls": 94,
+            "input": 2097085,
+            "output_cap": 1128000,
+            "max_input": 35415,
+            "max_input_plus_output": 47415,
+            "max_byte_input_plus_output": 100882
+          },
+          "RECONCILE": {
+            "calls": 7,
+            "input": 410036,
+            "output_cap": 42000,
+            "max_input": 58604,
+            "max_input_plus_output": 64604,
+            "max_byte_input_plus_output": 128783
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 64934,
+            "output_cap": 6000,
+            "max_input": 64934,
+            "max_input_plus_output": 70934,
+            "max_byte_input_plus_output": 149928
+          }
+        },
+        "input": 2859623,
+        "output_cap": 1180000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 34,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31626,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29508,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31092,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27822,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31689,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28569,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T1",
+            "findings": 23,
+            "items": 4,
+            "input_tokens": 28937,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32861,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31758,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 35415,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31074,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 33491,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T2",
+            "findings": 10,
+            "items": 0,
+            "input_tokens": 14153,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28865,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32771,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30639,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29870,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27082,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27187,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27561,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32330,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T3",
+            "findings": 4,
+            "items": 0,
+            "input_tokens": 7970,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28943,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25483,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23526,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31159,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29849,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29451,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25766,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T4",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23537,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "T4",
+            "findings": 22,
+            "items": 3,
+            "input_tokens": 24350,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30015,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33204,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28522,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31189,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29104,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "T5",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 27582,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31979,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "T6",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 30659,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31421,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "T6",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 33782,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 30198,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31244,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28951,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25666,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29246,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0047",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29860,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0048",
+            "theme": "T7",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32773,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0049",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 29011,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0050",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29182,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0051",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25201,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0052",
+            "theme": "T7",
+            "findings": 2,
+            "items": 0,
+            "input_tokens": 6081,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0053",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31064,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0054",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28150,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0055",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27533,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0056",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23464,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0057",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 24042,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0058",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31633,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0059",
+            "theme": "T8",
+            "findings": 21,
+            "items": 2,
+            "input_tokens": 23542,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0060",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 14733,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0061",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 18089,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0062",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 29555,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0063",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9983,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0064",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9913,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0065",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9999,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0066",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 31189,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0067",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 24829,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0068",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10105,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0069",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9903,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0070",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9557,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0071",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10415,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0072",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10493,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0073",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9405,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0074",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9411,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0075",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9559,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0076",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10799,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0077",
+            "theme": "UNMAPPED",
+            "findings": 1,
+            "items": 8,
+            "input_tokens": 12491,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0078",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10775,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0079",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10583,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0080",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11221,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0081",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10313,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0082",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10666,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0083",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9703,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0084",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10401,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0085",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10998,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0086",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11056,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0087",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10232,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0088",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11227,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0089",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9772,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0090",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10660,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0091",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11425,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0092",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11072,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0093",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10435,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0094",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 4,
+            "input_tokens": 7486,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 52,
+            "23": 2,
+            "10": 1,
+            "4": 1,
+            "22": 1,
+            "2": 1,
+            "21": 1,
+            "0": 34,
+            "1": 1
+          },
+          "items": {
+            "6": 2,
+            "4": 8,
+            "2": 12,
+            "3": 18,
+            "5": 9,
+            "8": 37,
+            "0": 3,
+            "1": 4,
+            "7": 1
+          },
+          "input_min": 6081,
+          "input_median": 27134.5,
+          "input_max": 35415
+        },
+        "costs": {
+          "input_only": 14.298115,
+          "25pct_cap": 21.673115,
+          "50pct_cap": 29.048115,
+          "full_caps": 43.798115,
+          "fixture_bytes_div3_plus_25pct_cap": 24.77462333333333,
+          "full_caps_40pct_proportional_retry_retrieval": 61.317361,
+          "all_input_as_cache_write_full_caps": 58.09623,
+          "all_system_miss_input_premium": 2.03734,
+          "ideal_system_cache_input_saving": 1.796024
+        },
+        "all_admitted": true
+      },
+      "after": {
+        "papers": 80,
+        "calls": 86,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 287743,
+            "output_cap": 4000,
+            "max_input": 287743,
+            "max_input_plus_output": 291743,
+            "max_byte_input_plus_output": 603266
+          },
+          "GROUP": {
+            "calls": 77,
+            "input": 1940921,
+            "output_cap": 924000,
+            "max_input": 35400,
+            "max_input_plus_output": 47400,
+            "max_byte_input_plus_output": 100997
+          },
+          "RECONCILE": {
+            "calls": 7,
+            "input": 410093,
+            "output_cap": 42000,
+            "max_input": 58633,
+            "max_input_plus_output": 64633,
+            "max_byte_input_plus_output": 129040
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 64963,
+            "output_cap": 6000,
+            "max_input": 64963,
+            "max_input_plus_output": 70963,
+            "max_byte_input_plus_output": 150304
+          }
+        },
+        "input": 2703720,
+        "output_cap": 976000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 18,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31624,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29574,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31222,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27713,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31754,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28610,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T1",
+            "findings": 23,
+            "items": 4,
+            "input_tokens": 29003,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32935,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31863,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 35400,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31153,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 33594,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T2",
+            "findings": 10,
+            "items": 0,
+            "input_tokens": 14328,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28906,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32823,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30745,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29980,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27205,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27279,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27656,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32382,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T3",
+            "findings": 4,
+            "items": 0,
+            "input_tokens": 8145,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29038,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25602,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23629,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31206,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29878,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29546,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25885,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T4",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23672,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "T4",
+            "findings": 22,
+            "items": 3,
+            "input_tokens": 24440,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29855,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33186,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28619,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31288,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28995,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "T5",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 27690,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31952,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31914,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31524,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "T6",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 33825,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 30163,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31350,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29025,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25812,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29287,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0047",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29953,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0048",
+            "theme": "T7",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32838,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0049",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 29170,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0050",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29256,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0051",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25347,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0052",
+            "theme": "T7",
+            "findings": 2,
+            "items": 0,
+            "input_tokens": 6256,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0053",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31099,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0054",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28254,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0055",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27644,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0056",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23559,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0057",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 24158,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0058",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31668,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0059",
+            "theme": "T8",
+            "findings": 21,
+            "items": 2,
+            "input_tokens": 23662,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0060",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16179,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0061",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 19491,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0062",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9765,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0063",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 27776,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0064",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9807,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0065",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9748,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0066",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9647,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0067",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9167,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0068",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12751,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0069",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17052,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0070",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16964,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0071",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16296,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0072",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17097,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0073",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16963,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0074",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16518,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0075",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17859,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0076",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17180,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0077",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 3,
+            "input_tokens": 6522,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 52,
+            "23": 2,
+            "10": 1,
+            "4": 1,
+            "22": 1,
+            "2": 1,
+            "21": 1,
+            "0": 18
+          },
+          "items": {
+            "6": 2,
+            "4": 7,
+            "2": 11,
+            "3": 20,
+            "5": 9,
+            "8": 3,
+            "0": 3,
+            "1": 4,
+            "7": 1,
+            "16": 17
+          },
+          "input_min": 6256,
+          "input_median": 28610,
+          "input_max": 35400
+        },
+        "costs": {
+          "input_only": 13.5186,
+          "25pct_cap": 19.6186,
+          "50pct_cap": 25.7186,
+          "full_caps": 37.9186,
+          "fixture_bytes_div3_plus_25pct_cap": 22.54443333333333,
+          "full_caps_40pct_proportional_retry_retrieval": 53.08604,
+          "all_input_as_cache_write_full_caps": 51.4372,
+          "all_system_miss_input_premium": 1.70108,
+          "ideal_system_cache_input_saving": 1.49339
+        },
+        "all_admitted": true
+      },
+      "scientific_input_equivalent": true,
+      "mandatory_units": 474,
+      "findings": 1353
+    },
+    {
+      "papers": 120,
+      "before": {
+        "papers": 120,
+        "calls": 149,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 416539,
+            "output_cap": 4000,
+            "max_input": 416539,
+            "max_input_plus_output": 420539,
+            "max_byte_input_plus_output": 862995
+          },
+          "GROUP": {
+            "calls": 136,
+            "input": 3141588,
+            "output_cap": 1632000,
+            "max_input": 47829,
+            "max_input_plus_output": 59829,
+            "max_byte_input_plus_output": 123252
+          },
+          "RECONCILE": {
+            "calls": 11,
+            "input": 889034,
+            "output_cap": 66000,
+            "max_input": 81294,
+            "max_input_plus_output": 87294,
+            "max_byte_input_plus_output": 174413
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 92253,
+            "output_cap": 6000,
+            "max_input": 92253,
+            "max_input_plus_output": 98253,
+            "max_byte_input_plus_output": 208589
+          }
+        },
+        "input": 4539414,
+        "output_cap": 1708000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 49,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31626,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29508,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31092,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27822,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31689,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28569,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30556,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 28113,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30974,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T1",
+            "findings": 20,
+            "items": 3,
+            "input_tokens": 25737,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32861,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31758,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 35415,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31074,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 33491,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T2",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31039,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 33673,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30628,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T2",
+            "findings": 6,
+            "items": 0,
+            "input_tokens": 11610,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28865,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32771,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30639,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29870,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27082,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27187,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27561,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32330,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30784,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29377,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 26217,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28577,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "T3",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 26597,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "T3",
+            "findings": 6,
+            "items": 1,
+            "input_tokens": 11917,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28943,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25483,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23526,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31159,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29849,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29451,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25766,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "T4",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23537,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "T4",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 26684,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31064,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "T4",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 26917,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30015,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33204,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0047",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28522,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0048",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31189,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0049",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29104,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0050",
+            "theme": "T5",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30044,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0051",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30262,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0052",
+            "theme": "T5",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29696,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0053",
+            "theme": "T5",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 30179,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0054",
+            "theme": "T5",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 27109,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0055",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31979,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0056",
+            "theme": "T6",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 30659,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0057",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31421,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0058",
+            "theme": "T6",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 33782,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0059",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 30198,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0060",
+            "theme": "T6",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32861,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0061",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31758,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0062",
+            "theme": "T6",
+            "findings": 15,
+            "items": 1,
+            "input_tokens": 22242,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0063",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31244,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0064",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28951,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0065",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25666,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0066",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29246,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0067",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29860,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0068",
+            "theme": "T7",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32773,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0069",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 29011,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0070",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29182,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0071",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25201,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0072",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28895,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0073",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31443,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0074",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31445,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0075",
+            "theme": "T7",
+            "findings": 7,
+            "items": 0,
+            "input_tokens": 12060,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0076",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31064,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0077",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28150,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0078",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27533,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0079",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23464,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0080",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 24042,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0081",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31633,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0082",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27858,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0083",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27473,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0084",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 25450,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0085",
+            "theme": "T8",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23198,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0086",
+            "theme": "T8",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30636,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0087",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 7127,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0088",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 7011,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0089",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 20317,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0090",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 26057,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0091",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 44967,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0092",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12483,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0093",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12449,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0094",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12515,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0095",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 47829,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0096",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 37205,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0097",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12697,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0098",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12411,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0099",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11829,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0100",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 13115,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0101",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 13181,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0102",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11485,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0103",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10995,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0104",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10935,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0105",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 12941,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0106",
+            "theme": "UNMAPPED",
+            "findings": 2,
+            "items": 8,
+            "input_tokens": 16983,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0107",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10021,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0108",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10193,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0109",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11598,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0110",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10582,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0111",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10416,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0112",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10199,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0113",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10310,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0114",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10273,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0115",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11347,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0116",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10336,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0117",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10620,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0118",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10137,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0119",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10832,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0120",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11091,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0121",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11113,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0122",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10718,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0123",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10649,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0124",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9772,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0125",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10339,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0126",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11426,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0127",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10597,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0128",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10416,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0129",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10895,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0130",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 9772,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0131",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10618,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0132",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11048,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0133",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 11443,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0134",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10495,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0135",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 8,
+            "input_tokens": 10595,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0136",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 7,
+            "input_tokens": 10115,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 79,
+            "20": 1,
+            "6": 2,
+            "23": 2,
+            "15": 1,
+            "7": 1,
+            "0": 49,
+            "2": 1
+          },
+          "items": {
+            "6": 2,
+            "4": 16,
+            "2": 17,
+            "3": 24,
+            "5": 12,
+            "8": 53,
+            "0": 2,
+            "1": 8,
+            "7": 2
+          },
+          "input_min": 7011,
+          "input_median": 27148.0,
+          "input_max": 47829
+        },
+        "costs": {
+          "input_only": 22.69707,
+          "25pct_cap": 33.37207,
+          "50pct_cap": 44.04707,
+          "full_caps": 65.39707,
+          "fixture_bytes_div3_plus_25pct_cap": 37.901361666666666,
+          "full_caps_40pct_proportional_retry_retrieval": 91.555898,
+          "all_input_as_cache_write_full_caps": 88.09414,
+          "all_system_miss_input_premium": 2.94722,
+          "ideal_system_cache_input_saving": 2.614916
+        },
+        "all_admitted": true
+      },
+      "after": {
+        "papers": 120,
+        "calls": 124,
+        "by_mode": {
+          "PLAN": {
+            "calls": 1,
+            "input": 416714,
+            "output_cap": 4000,
+            "max_input": 416714,
+            "max_input_plus_output": 420714,
+            "max_byte_input_plus_output": 863546
+          },
+          "GROUP": {
+            "calls": 111,
+            "input": 2905938,
+            "output_cap": 1332000,
+            "max_input": 42284,
+            "max_input_plus_output": 54284,
+            "max_byte_input_plus_output": 109989
+          },
+          "RECONCILE": {
+            "calls": 11,
+            "input": 889123,
+            "output_cap": 66000,
+            "max_input": 81316,
+            "max_input_plus_output": 87316,
+            "max_byte_input_plus_output": 174657
+          },
+          "FINAL": {
+            "calls": 1,
+            "input": 92275,
+            "output_cap": 6000,
+            "max_input": 92275,
+            "max_input_plus_output": 98275,
+            "max_byte_input_plus_output": 209005
+          }
+        },
+        "input": 4304050,
+        "output_cap": 1408000,
+        "status": "COMPLETE",
+        "pending": 0,
+        "unaccounted": 0,
+        "empty_groups": 25,
+        "groups": [
+          {
+            "id": "G0001",
+            "theme": "T1",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 31624,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0002",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29574,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0003",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31222,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0004",
+            "theme": "T1",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27713,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0005",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31754,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0006",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28610,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0007",
+            "theme": "T1",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30622,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0008",
+            "theme": "T1",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 28243,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0009",
+            "theme": "T1",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30814,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0010",
+            "theme": "T1",
+            "findings": 20,
+            "items": 3,
+            "input_tokens": 25853,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0011",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32935,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0012",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31863,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0013",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 35400,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0014",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31153,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0015",
+            "theme": "T2",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 33594,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0016",
+            "theme": "T2",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 31160,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0017",
+            "theme": "T2",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 33646,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0018",
+            "theme": "T2",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31860,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0019",
+            "theme": "T2",
+            "findings": 6,
+            "items": 0,
+            "input_tokens": 11785,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0020",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28906,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0021",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32823,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0022",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30745,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0023",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29980,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0024",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27205,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0025",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27279,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0026",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27656,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0027",
+            "theme": "T3",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32382,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0028",
+            "theme": "T3",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 30890,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0029",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 29487,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0030",
+            "theme": "T3",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 26340,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0031",
+            "theme": "T3",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28631,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0032",
+            "theme": "T3",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 26730,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0033",
+            "theme": "T3",
+            "findings": 6,
+            "items": 1,
+            "input_tokens": 12055,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0034",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29038,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0035",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25602,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0036",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23629,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0037",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31206,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0038",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29878,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0039",
+            "theme": "T4",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29546,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0040",
+            "theme": "T4",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 25885,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0041",
+            "theme": "T4",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23672,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0042",
+            "theme": "T4",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 26758,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0043",
+            "theme": "T4",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31099,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0044",
+            "theme": "T4",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 27011,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0045",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 29855,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0046",
+            "theme": "T5",
+            "findings": 24,
+            "items": 7,
+            "input_tokens": 33186,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0047",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28619,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0048",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31288,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0049",
+            "theme": "T5",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28995,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0050",
+            "theme": "T5",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30136,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0051",
+            "theme": "T5",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 30276,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0052",
+            "theme": "T5",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29762,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0053",
+            "theme": "T5",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 30309,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0054",
+            "theme": "T5",
+            "findings": 23,
+            "items": 3,
+            "input_tokens": 27000,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0055",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 31952,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0056",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31914,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0057",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31524,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0058",
+            "theme": "T6",
+            "findings": 24,
+            "items": 6,
+            "input_tokens": 33825,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0059",
+            "theme": "T6",
+            "findings": 24,
+            "items": 8,
+            "input_tokens": 30163,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0060",
+            "theme": "T6",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 32935,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0061",
+            "theme": "T6",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31863,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0062",
+            "theme": "T6",
+            "findings": 15,
+            "items": 1,
+            "input_tokens": 22401,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0063",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 31350,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0064",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29025,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0065",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25812,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0066",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 29287,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0067",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29953,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0068",
+            "theme": "T7",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 32838,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0069",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 29170,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0070",
+            "theme": "T7",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 29256,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0071",
+            "theme": "T7",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 25347,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0072",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 28936,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0073",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31520,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0074",
+            "theme": "T7",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 31526,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0075",
+            "theme": "T7",
+            "findings": 7,
+            "items": 0,
+            "input_tokens": 12235,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0076",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31099,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0077",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 28254,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0078",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27644,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0079",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 23559,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0080",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 24158,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0081",
+            "theme": "T8",
+            "findings": 24,
+            "items": 5,
+            "input_tokens": 31668,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0082",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 27962,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0083",
+            "theme": "T8",
+            "findings": 24,
+            "items": 2,
+            "input_tokens": 27584,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0084",
+            "theme": "T8",
+            "findings": 24,
+            "items": 3,
+            "input_tokens": 25529,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0085",
+            "theme": "T8",
+            "findings": 24,
+            "items": 1,
+            "input_tokens": 23341,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0086",
+            "theme": "T8",
+            "findings": 24,
+            "items": 4,
+            "input_tokens": 30709,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0087",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 9766,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0088",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 22955,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0089",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 28447,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0090",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12291,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0091",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 42284,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0092",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12357,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0093",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12234,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0094",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 12031,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0095",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 10619,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0096",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 13710,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0097",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16812,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0098",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17137,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0099",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16017,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0100",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17005,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0101",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16899,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0102",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16600,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0103",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17891,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0104",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17180,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0105",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16125,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0106",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17280,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0107",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16617,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0108",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 16496,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0109",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17195,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0110",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 16,
+            "input_tokens": 17650,
+            "output_cap": 12000
+          },
+          {
+            "id": "G0111",
+            "theme": "UNMAPPED",
+            "findings": 0,
+            "items": 13,
+            "input_tokens": 14717,
+            "output_cap": 12000
+          }
+        ],
+        "group_distribution": {
+          "findings": {
+            "24": 79,
+            "20": 1,
+            "6": 2,
+            "23": 2,
+            "15": 1,
+            "7": 1,
+            "0": 25
+          },
+          "items": {
+            "6": 2,
+            "4": 17,
+            "2": 16,
+            "3": 24,
+            "5": 12,
+            "8": 4,
+            "0": 2,
+            "1": 8,
+            "7": 1,
+            "16": 24,
+            "13": 1
+          },
+          "input_min": 9766,
+          "input_median": 28631,
+          "input_max": 42284
+        },
+        "costs": {
+          "input_only": 21.52025,
+          "25pct_cap": 30.32025,
+          "50pct_cap": 39.12025,
+          "full_caps": 56.72025,
+          "fixture_bytes_div3_plus_25pct_cap": 34.59220833333334,
+          "full_caps_40pct_proportional_retry_retrieval": 79.40835,
+          "all_input_as_cache_write_full_caps": 78.2405,
+          "all_system_miss_input_premium": 2.45272,
+          "ideal_system_cache_input_saving": 2.169866
+        },
+        "all_admitted": true
+      },
+      "scientific_input_equivalent": true,
+      "mandatory_units": 688,
+      "findings": 1996
+    }
+  ]
+}

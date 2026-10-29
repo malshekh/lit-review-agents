@@ -1,0 +1,6 @@
+{
+  "without_system": 10,
+  "with_system": 3966,
+  "system_prefix_delta": 3956,
+  "method": "free input-count difference; estimated cacheable prefix, not cache usage"
+}
