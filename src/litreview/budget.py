@@ -19,6 +19,11 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+class BatchGateRefused(BudgetExceeded):
+    """The runtime gate (batch.gate_usd) stopped a batch before submission: spent + committed + projected +
+    the batch's worst case would exceed it. The stage stops; it does not wait for room."""
+
+
 class UnpricedModel(RuntimeError):
     pass
 

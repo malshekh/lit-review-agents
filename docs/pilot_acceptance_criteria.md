@@ -1,8 +1,8 @@
 # Pilot acceptance criteria
 
-Status: **PROPOSED, not yet agreed.** The pilot does not start until the researcher has agreed these
-criteria and they are committed. The result is judged against this file as committed, not against what
-the run produces.
+Status: **AGREED** by the researcher on 2026-10-29, with the revisions of that date to criteria 2 and 7, and
+committed before the run. The result is judged against this file as committed, not against what the run
+produces.
 
 ## What the pilot tests
 
@@ -88,9 +88,10 @@ For each entity, the check asks whether the identifier names what the paper's me
 ### 2. A06 disagreement on repeated whole-paper validation
 
 **Recorded** (from `data/instability_test.json`):
-- Disposition agreement and role agreement for the blocked findings, and for every finding in the repeated papers, as counts.
+- Disposition agreement and role agreement as counts, for every finding in the repeated papers, with the blocked findings also reported on their own.
 - The channel of each call (batch or interactive).
 - Any paper skipped because its conditions changed.
+- Any comparison invalidated by a replay input that does not match its hash.
 
 **The comparison is controlled.** It is whole paper against whole paper, with:
 - the identical saved input (prompt, paper text, extraction, entity identities, Gate 1 results);
@@ -98,13 +99,20 @@ For each entity, the check asks whether the identifier names what the paper's me
 
 No single-finding call is part of it.
 
+**Replay inputs are verified by hash.** Each saved input is re-hashed against the hash taken at the original
+call, before the repeat and again before the comparison. A mismatch invalidates that paper's comparison. It
+is reported under `invalid` and counted in no agreement figure, and it produces no review item.
+
 **Pass:** no paper is skipped for changed conditions; under the freeze, a skip means the freeze broke.
 
-**Decision rule, agreed in advance:**
-- **Repeated validation becomes standard** for blocked findings before any scale-up (two readings, and a role disagreement quarantined) if role agreement on blocked findings is below 95%.
-- **Otherwise it doesn't**, and disagreements are addressed by prompt work on the disposition boundaries involved.
+**Every role-changing disagreement is held for adjudication.** No reading is accepted by default. Each held
+finding is decided against the source, the extraction and both readings, with its cause recorded (criterion 3).
 
-With an expected 20 to 40 blocked findings, full agreement can rule out high instability but cannot show it is rare: 30 of 30 still leaves a 95% interval of roughly 88 to 100%. The report gives the counts.
+**No threshold, and no change of procedure on this evidence.** The pilot reports agreement as counts. It does
+not make repeated validation standard, whatever the agreement. The repeated papers are those with a blocked
+finding, a sample enriched for problematic papers, and four papers cannot estimate how reliable A06 is in
+general. With 20 to 40 blocked findings, even full agreement leaves a wide interval (30 of 30 gives roughly
+88 to 100%).
 
 ### 3. Quarantine frequency, by cause
 
@@ -181,17 +189,37 @@ A stopped job is re-projected before it resumes; that is recorded, and does not 
 - Total spend stays at or under both the cap and the projected total.
 - No WORST_CASE line is exceeded. Exceeding one means the worst case is wrong, which is a defect.
 
+**Any WORST_CASE line overrun triggers re-projection before the next call.** This happens when an agent's
+spend since the projection exceeds its line, or when a call would go beyond the line's number of calls. Code
+then supersedes the projection, and no further call is made until the run is re-projected from actual spend
+(`Run._check_worst_case_line`). The overrun still counts against this criterion.
+
+**The $35.00 cap is absolute.** Re-projection never raises it.
+
 A MEASURED_P90 line may be exceeded by chance; each time it is, the excess and its cause are reported.
 
 ## Budget
 
-These projections come from `litreview project` arithmetic, measured on run 20261025-100039:
+These projections come from `litreview project` arithmetic, with per-paper rates measured on run
+20261025-100039. A07 is priced on the corrected basis of 2026-10-29: 25,000 + 1,300 tokens per finding per
+call. That is the largest call (FINAL) measured with the real payload builder and the token-counting
+endpoint. The earlier basis was 821 per finding, which understated the current payload by about 35%.
 
-| Selection | Projected after CP2 | Status |
-|---|---|---|
-| 2 full texts + 2 abstracts | $30.83 | Within the cap |
-| 2 full texts + 3 abstracts | $35.33 | Over the cap before any pre-CP2 spend; refused at CP2 |
+| Selection | Projected after CP2 | With pre-CP2 at worst case | Status |
+|---|---|---|---|
+| 2 full texts + 1 abstract | $31.49 | $34.62 | Within the cap |
+| 1 full text + 3 abstracts | $30.49 | $33.64 | Within the cap |
+| 2 full texts + 2 abstracts | $33.93 | $37.08 | Within the cap only if pre-CP2 spend is $1.07 or less |
+| 2 full texts + 3 abstracts | $39.60 | $42.77 | Over the cap; refused at CP2 |
 
-Each projection includes one whole-paper repeat per paper ($1.90 or $2.13) and A07 at worst case (5 or 6 calls).
+Each projection includes:
+- one whole-paper repeat per paper;
+- A07 at worst case (5 or 6 calls, each a full 1-hour cache write plus 48,000 output tokens).
 
-Spend before CP2 (scope, search, qualification) comes on top. It cost $2.07 in the earlier run, on different models. On the current models it is estimated at $0.50 to $2.70 at worst case.
+Spend before CP2 (scope, search, qualification) is priced here at worst case on the current routes: every
+call at max_tokens, with the earlier run's call counts and input sizes. That comes to $3.13 to $3.17. The
+earlier run actually spent $2.07 there, on different models. CP2 adds the actual pre-CP2 spend to the
+projection and refuses any selection over the cap.
+
+The runtime gate (`batch.gate_usd`, $150) is checked before every batch. In the pilot the $35 cap binds
+first.

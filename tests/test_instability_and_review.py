@@ -140,6 +140,34 @@ def test_a_paper_whose_conditions_changed_is_skipped_not_compared(tmp_path, monk
     assert "system_prompt_sha256" in run.load("instability_test.json")["skipped"]["R0001"]
 
 
+def test_a_replay_input_that_no_longer_matches_its_hash_is_never_replayed(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    run._save_a06_input("R0001", "A06-SV_R0001_v1", {"mode": "PER_PAPER", "paper_text": {"Abstract": "original"}})
+    saved = run.load("a06_inputs/R0001.json")
+    run.save("a06_inputs/R0001.json", {**saved, "payload": {**saved["payload"], "paper_text": {"Abstract": "edited"}}})
+    run._save_validation("R0001", _doc(_v("F1", "BLOCKED_ALIGNMENT")))
+    monkeypatch.setattr(run, "agent", lambda *a, **k: pytest.fail("a mismatched input is not the original input"))
+    run._instability_test(run.load("selected_corpus.json"))
+    report = run.load("instability_test.json")
+    assert "comparison invalid" in report["invalid"]["R0001"] and report["papers"] == {}
+
+
+def test_a_mismatch_found_after_the_repeat_invalidates_the_comparison(tmp_path, monkeypatch):
+    run = _run(tmp_path, monkeypatch)
+    run._save_a06_input("R0001", "A06-SV_R0001_v1", {"mode": "PER_PAPER", "paper_text": {"Abstract": "original"}})
+    run._save_validation("R0001", _doc(_v("F1", "BLOCKED_ALIGNMENT"), _v("F2", "SUPPORTED")))
+    run.save("validation_repeats/R0001.json", _doc(_v("F1", "SUPPORTED"), _v("F2", "SUPPORTED")))   # repeat already ran
+    saved = run.load("a06_inputs/R0001.json")
+    run.save("a06_inputs/R0001.json", {**saved, "payload": {"mode": "PER_PAPER"}})                # then the input changed
+    monkeypatch.setattr(run, "agent", lambda *a, **k: pytest.fail("no call"))
+    run._instability_test(run.load("selected_corpus.json"))
+    report = run.load("instability_test.json")
+    assert "R0001" in report["invalid"] and report["papers"] == {}
+    assert report["agreement"]["all_findings"]["role"]["n"] == 0                 # nothing counted
+    assert not [i for i in run.load("validation_review.json", []) if i.get("kind") == "REPEAT"]
+    assert ev.status_of(_finding(run, "F1")) != "QUARANTINED"                  # no review item from an invalid pair
+
+
 def test_papers_with_no_blocked_finding_are_not_repeated(tmp_path, monkeypatch):
     run = _run(tmp_path, monkeypatch)
     run._save_a06_input("R0001", "A06-SV_R0001_v1", {"mode": "PER_PAPER"})

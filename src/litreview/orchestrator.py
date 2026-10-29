@@ -22,7 +22,7 @@ from pathlib import Path
 from . import checkpoints, config, evidence, handoff, model_record, notify, publication
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
-from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
+from .budget import BatchGateRefused, BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR
 from .provenance import ProvenanceLog
 from . import synthesis_input, theme_framework
@@ -226,6 +226,53 @@ class Run:
             raise Pause(f"cost projection ${proj.get('projected_total_usd')} exceeds the ${proj.get('cap_usd')} cap "
                         "(data/cost_projection.json): deselect papers or raise the cap, then re-project")
 
+    def _check_worst_case_line(self, agent_id: str) -> None:
+        """A WORST_CASE line of the projection is a bound, not an estimate: once an agent's spend since the
+        projection exceeds its line, or the next call would exceed the line's number of calls, the projection is
+        superseded and nothing more is called until the run is re-projected from actual spend."""
+        stage = self.state().get("stage")
+        if stage not in STAGES or STAGES.index(stage) <= STAGES.index("cp2"):
+            return
+        proj = self.load("cost_projection.json")
+        if not proj or proj.get("verdict") != "WITHIN_CAP":
+            return   # _require_projection has already stopped the call
+        line = next((x for x in proj.get("lines", []) if x.get("basis") == "WORST_CASE" and x["stage"] == agent_id), None)
+        if line is None:
+            return
+        since = [e for e in self.budget.entries() if e["agent"] == agent_id and e["time"] >= proj["created"]]
+        usd = sum(e["cost_usd"] or 0 for e in since)
+        reason = (f"{agent_id} has spent ${usd:.2f} since the projection, over its worst-case line "
+                  f"(${line['usd']:.2f})" if usd > line["usd"] else
+                  f"{agent_id} has made {len(since)} calls since the projection, all its worst-case line "
+                  f"({line['calls']}) allows" if len(since) >= int(line["calls"]) else None)
+        if reason:
+            self._supersede_projection(f"worst-case line overrun: {reason}")
+            raise Pause(f"worst-case line overrun: {reason}. Re-project with `litreview project {self.id}` "
+                        "before the next call.")
+
+    def _batch_gate(self, agent_id: str, steps: list[str], reserve_usd: float) -> dict:
+        """The runtime gate before any batch (pipeline.yaml -> batch.gate_usd), recorded in provenance whatever
+        the verdict. Steps held by unsettled batches are committed spend, not projected spend."""
+        limit = (self.cfg.get("batch") or {}).get("gate_usd")
+        if limit is None:
+            raise BatchGateRefused(f"{agent_id}: batch.gate_usd is not set; no batch is submitted without the gate")
+        in_flight = {s for f in self.dir.glob("data/batches/*.json")
+                     for rec in json.loads(f.read_text(encoding="utf-8"))
+                     if rec["status"] in ("INTENT", "SUBMITTED", "UNRESOLVED") for s in rec["steps"]}
+        try:
+            g = cost_projection.batch_gate(self, agent_id, steps, reserve_usd, float(limit), frozenset(in_flight))
+        except FileNotFoundError as e:   # no measured rates: the rest of the run cannot be projected
+            raise BatchGateRefused(f"{agent_id}: batch not submitted: the runtime gate cannot project the rest "
+                                   f"of the run ({e})") from e
+        self.prov.tool_run("batch_gate", agent_id, {k: v for k, v in g.items() if k != "projection_lines"})
+        if g["verdict"] != "PASS":
+            raise BatchGateRefused(
+                f"{agent_id}: batch of {len(steps)} not submitted: spent ${g['spent_usd']:.2f} + committed "
+                f"${g['committed_usd']:.2f} + projected ${g['projected_usd']:.2f} + this batch's worst case "
+                f"${g['reserve_usd']:.2f} = ${g['total_usd']:.2f}, over the ${g['limit_usd']:.2f} gate. Revise "
+                f"the scope and re-project (`litreview project {self.id}`); scientific checks are not cut to fit.")
+        return g
+
     def _supersede_projection(self, reason: str) -> None:
         """Spend the projection did not plan for (a paid turn that produced nothing) makes it stale: the next
         agent call requires a new one, priced from what has actually been spent."""
@@ -238,6 +285,7 @@ class Run:
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset()) -> dict:
         self._require_projection()
+        self._check_worst_case_line(agent_id)
         m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
@@ -837,20 +885,34 @@ class Run:
     def _save_a06_input(self, rid: str, step: str, payload: dict) -> None:
         """The exact A06 PER_PAPER input, saved as the call is made. The instability test replays it as is:
         a conflict stripped or an identity corrected afterwards changes the extraction file, not this."""
-        blob = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        self.save(f"a06_inputs/{rid}.json", {"step": step, "payload_sha256": hashlib.sha256(blob.encode()).hexdigest(),
+        self.save(f"a06_inputs/{rid}.json", {"step": step, "payload_sha256": self._payload_sha256(payload),
                                              **self._a06_conditions(rid), "payload": payload})
+
+    @staticmethod
+    def _payload_sha256(payload: dict) -> str:
+        return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+
+    def _replay_mismatch(self, rid: str) -> str | None:
+        """The saved replay input, re-hashed now against the hash taken at the original call. A mismatch means
+        the replay would not be the input the original reading saw, so that comparison is invalid."""
+        saved = self.load(f"a06_inputs/{rid}.json") or {}
+        now = self._payload_sha256(saved.get("payload"))
+        return None if now == saved.get("payload_sha256") else (
+            f"replay input hash {now[:12]} does not match the hash at the original call "
+            f"{str(saved.get('payload_sha256'))[:12]}: comparison invalid")
 
     def _instability_test(self, corpus: list[dict]) -> None:
         """pipeline.yaml -> validation.instability_test. Every paper with a blocked finding is validated once
         more, whole paper against whole paper: the input saved at its original call is replayed unchanged
         (prompt, paper text, extraction, entity identities, Gate 1 results) under the same model settings, and
-        a paper whose conditions changed since is skipped, never compared. Agreement goes to
+        a paper whose conditions changed since is skipped, never compared. The replay input is re-hashed against
+        the hash taken at the original call, before the repeat and again before the comparison; a mismatch
+        invalidates that paper's comparison (reported under `invalid`, never counted). Agreement goes to
         data/instability_test.json. A finding whose two readings give it different roles is QUARANTINED for
         human review; where the roles agree, the more cautious reading stands (evidence.compare_repeat)."""
         if not (self.cfg.get("validation") or {}).get("instability_test"):
             return
-        steps, skipped = {}, {}
+        steps, skipped, invalid = {}, {}, {}
         for rec in corpus:
             rid = rec["record_id"]
             val = self.load(f"validations/{rid}.json") or {}
@@ -864,6 +926,10 @@ class Run:
             changed = [k for k, v in now.items() if saved.get(k) != v]
             if changed:
                 skipped[rid] = "conditions changed since the original call: " + ", ".join(changed)
+                continue
+            bad = self._replay_mismatch(rid)
+            if bad:
+                invalid[rid] = bad
                 continue
             steps[f"A06-SV_{rid}_repeat"] = (rid, saved)
         todo = [(s, saved["payload"]) for s, (rid, saved) in steps.items()
@@ -885,6 +951,10 @@ class Run:
             rep = self.load(f"validation_repeats/{rid}.json")
             if rep is None:
                 continue
+            bad = self._replay_mismatch(rid)   # the saved input may have changed since the repeat ran
+            if bad:
+                invalid[rid] = bad
+                continue
             orig = self.load(f"validations/{rid}.json")
             r, review = evidence.compare_repeat(rid, orig, rep)
             self._record_review(rid, review)
@@ -895,11 +965,12 @@ class Run:
                            "rows": r}
         report = {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "granularity": "whole paper vs whole paper",
                   "agreement": evidence.repeat_agreement(rows), "papers": papers, "skipped": skipped,
+                  "invalid": invalid,
                   "by_cause": evidence.review_by_cause([i for i in self.load("validation_review.json", [])
                                                         if i.get("kind") == "REPEAT"])}
         self.save("instability_test.json", report)
         self.prov.tool_run("instability_test", "validate", {"papers": len(papers), "skipped": len(skipped),
-                                                            **report["agreement"]})
+                                                            "invalid": len(invalid), **report["agreement"]})
 
     def _theme_pass(self, corpus: list[dict], findings: list[dict], only: set[str] | None = None,
                     label: str = "") -> dict:

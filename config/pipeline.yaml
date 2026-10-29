@@ -123,6 +123,9 @@ synthesis:
 # allow 24 hours; throughput at full scale is unmeasured (records/batch_tests.jsonl: compatibility only).
 batch:
   enabled: true
+  gate_usd: 150.00             # runtime gate before ANY batch: spent + committed (unsettled batches) + projected
+                               #   (rest of the run) + this batch's worst case must not exceed it, or the stage
+                               #   stops. Separate from run.spend_cap_usd, which stays absolute.
   agents: [A05-KE, A06-SV]
   min_items: 3                 # fewer items left after the probe: run them interactively
   chunk_size: 20               # items per batch; each chunk reserves its worst case (A05: 20 x 64k output

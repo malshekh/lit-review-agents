@@ -105,6 +105,15 @@ APIs at 50% off. A06 is batched only while `loops.max_reextractions` is 0. Each 
    one to settle; if it does not fit with nothing outstanding, the stage stops: the run refuses rather than
    asks. Batching never lowers `max_tokens`: a batched call may produce exactly what an interactive one
    may. Interactive calls also count held reservations. `litreview costs` shows what is reserved.
+   **Runtime gate** (`batch.gate_usd`, $150). Before any chunk is reserved, four amounts are added:
+   - spent;
+   - committed (held by unsettled batches);
+   - projected (the rest of the run, without this chunk's items or any in flight);
+   - this chunk's worst case.
+
+   If the total exceeds the gate, the stage stops instead of waiting: scope is revised, scientific checks
+   are not cut. Every check is recorded in provenance (`batch_gate`). A run with no measured rates, or no
+   gate configured, submits no batch. The gate is separate from `run.spend_cap_usd`, which stays absolute.
 4. **Fingerprint.** Before the batch is created, the run records an intent with a fingerprint: run ID,
    stage, a submission ID, the request IDs (each step plus the submission's nonce) and the SHA-256 of the
    frozen request manifest (`data/batches/manifests/`).
@@ -210,8 +219,10 @@ disposition, constraints and limit as well as eligibility (`evidence.effective_v
 paper with a blocked finding is validated once more, whole paper against whole paper: the input saved at the
 original call (`data/a06_inputs/`) is replayed unchanged (prompt, paper text, extraction, entity identities,
 Gate 1 results) under the same model settings, and a paper whose conditions changed since is skipped, never
-compared. `data/instability_test.json` records agreement for the blocked findings and for every finding in the
-repeated papers, as counts, with the channel (batch or interactive) of each call. A finding whose two readings
+compared. The replay input is re-hashed against the hash taken at the original call, before the repeat and
+again before the comparison; a mismatch invalidates that paper's comparison (`invalid`, counted nowhere).
+`data/instability_test.json` records agreement for every finding in the repeated papers and for the blocked
+findings on their own, as counts, with the channel (batch or interactive) of each call. A finding whose two readings
 give it different roles is quarantined for human review; where the roles agree, the more cautious reading
 stands. The original validation file is never replaced. One repeat per paper is priced in the CP2 projection.
 
@@ -228,9 +239,14 @@ effect) and intrinsic predicates that may have no object (`OBSERVED_OUTCOME`, `T
 **Cost projection at CP2** (`src/litreview/tools/cost_projection.py`). `litreview cost-rates RUN` measures
 per-paper (A05 + A06, by content level, 90th percentile) and per-theme costs into `records/cost_rates.json`.
 CP2_review.md shows the projection; approving CP2 refuses a selection projected over the cap, with A07 to
-A12 priced at worst case (configured max_tokens, A07 paying a cache write on every call). After CP2, no
+A12 priced at worst case (configured max_tokens, A07 paying a cache write on every call). A07's input per
+call is its largest call, FINAL: 25,000 + 1,300 tokens per finding, measured with the real payload builder and
+the token-counting endpoint (the earlier 821 understated the current payload by about 35%). After CP2, no
 agent call runs without a projection within the cap in `data/cost_projection.json`; `litreview project RUN`
-re-projects what a run still has to spend. Each A07 turn is priced as one attempt: a truncated turn is paid,
+re-projects what a run still has to spend: the per-paper work not yet done or in flight, and every
+downstream agent whose last stage is still ahead. A WORST_CASE line is a bound. Once an agent's spend since the
+projection exceeds its line, or its next call would go beyond the line's number of calls, the projection is
+superseded and nothing more is called until the run is re-projected. Each A07 turn is priced as one attempt: a truncated turn is paid,
 produces nothing and stops the job, so it supersedes the projection, and resuming requires a new one priced
 from actual spend (turns already committed are not priced again).
 

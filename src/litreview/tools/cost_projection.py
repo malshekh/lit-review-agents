@@ -19,9 +19,14 @@ import re
 import time
 from pathlib import Path
 
-A07_TOKENS_PER_FINDING = 821          # run 20261025-100039 audit: A07 input per validated finding
+# A07: input of the largest call of the job (FINAL: the frozen corpus plus every committed proposition body) per
+# validated finding. Measured 2026-10-29 with the real payload builder and the token-counting endpoint over
+# workloads of 28 to 120 papers built from run 20261025-100039's records: at most 1,297 tokens per finding
+# above the fixed part (system prompt ~12.0k + review spec ~10.8k). Was 821, measured before the handoff
+# contract added entities, eligibility and plain-language limits to every finding: it understated by ~35%.
+A07_TOKENS_PER_FINDING = 1300
 A10_TOKENS_PER_FINDING = 700          # bound records in full (514 each) for about half, index lines (53) for the rest
-FIXED_INPUT = {"A07-SYN": 20000, "A08-OL": 20000, "A09-WRI": 60000, "A10-RV": 80000, "A11-RC": 60000, "A12-EDI": 60000}
+FIXED_INPUT = {"A07-SYN": 25000, "A08-OL": 20000, "A09-WRI": 60000, "A10-RV": 80000, "A11-RC": 60000, "A12-EDI": 60000}
 
 
 def _pct(xs: list[float], p: float) -> float:
@@ -157,16 +162,62 @@ def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, rou
     return _total(lines, budget, {"papers": len(selection), "by_level": by_level, "findings_assumed": n_findings})
 
 
-def remaining_for_run(run, rates: dict | None = None) -> dict:
-    """Projection of what a run past CP2 still has to spend, from its current stage. Stale theme records are
-    priced from what those same theme calls cost when they last ran (measured), and at worst case."""
-    from ..orchestrator import STAGES
+def _per_paper_remaining(run, rates: dict, in_flight: frozenset) -> tuple[list[dict], int]:
+    """Extraction and validation in progress: per-paper lines for the work neither done nor `in_flight` (steps
+    held by unsettled batches or about to be submitted, which are counted as reservations instead), and the
+    findings to expect (actual where extracted, the 90th percentile by level where not)."""
+    lines, n_findings = [], 0
+    usd = {"A05-KE + A06-SV per paper": [0, 0.0], "A06-SV per paper (extracted, not validated)": [0, 0.0],
+           "A06-SV whole-paper repeat (instability test)": [0, 0.0]}
+    repeat_on = bool((run.cfg.get("validation") or {}).get("instability_test"))
+    for rec in run.load("selected_corpus.json") or []:
+        rid = rec["record_id"]
+        r = rates["per_paper"][content_level(rec, run.dir)]
+        a06 = r.get("a06_p90_usd", r["p90_usd"])
+        ext = run.load(f"extractions/{rid}.json")
+        val = run.load(f"validations/{rid}.json")
+        n_findings += len(ext.get("findings", [])) if ext else math.ceil(r["findings_p90"])
+        if ext is None and f"A05-KE_{rid}" not in in_flight:
+            usd["A05-KE + A06-SV per paper"][0] += 1
+            usd["A05-KE + A06-SV per paper"][1] += r["p90_usd"]
+        elif val is None and not any(s.startswith(f"A06-SV_{rid}_v") for s in in_flight):
+            usd["A06-SV per paper (extracted, not validated)"][0] += 1
+            usd["A06-SV per paper (extracted, not validated)"][1] += a06
+        blocked = val is None or any(str(v.get("disposition") or "").startswith("BLOCKED")
+                                     for v in val.get("validations", []))
+        if repeat_on and blocked and not run.data(f"validation_repeats/{rid}.json").exists() \
+                and f"A06-SV_{rid}_repeat" not in in_flight:
+            usd["A06-SV whole-paper repeat (instability test)"][0] += 1
+            usd["A06-SV whole-paper repeat (instability test)"][1] += a06
+    for stage, (n, x) in usd.items():
+        if n:
+            lines.append({"stage": stage, "basis": "MEASURED_P90", "calls": n, "usd": round(x, 4),
+                          "detail": f"{n} papers at the 90th percentile by content level ({rates['reference_run']})"})
+    if not run.data("theme_records.json").exists():
+        themes = max(1, math.ceil(len(run.load("selected_corpus.json") or []) * rates["themes_per_paper"]))
+        lines.append({"stage": "A06-SV per theme", "basis": "MEASURED_P90", "calls": themes,
+                      "usd": round(themes * rates["per_theme"]["p90_usd"], 4),
+                      "detail": f"{themes} themes ({rates['themes_per_paper']} per paper measured) x "
+                                f"${rates['per_theme']['p90_usd']:.4f}"})
+    return lines, n_findings
+
+
+def remaining_for_run(run, rates: dict | None = None, in_flight: frozenset = frozenset()) -> dict:
+    """Projection of what a run still has to spend, from its current stage: the CP2 projection up to CP2; then
+    only the work not yet done (per paper while extracting and validating; every downstream agent whose last
+    stage is still ahead). Stale theme records are priced from what those same theme calls cost when they last
+    ran (measured), and at worst case. in_flight: steps held by unsettled batches or about to be submitted."""
+    from ..orchestrator import AGENT_LAST_STAGE, STAGES
     stage = run.state().get("stage")
-    lines = []
-    findings = run.load("validated_findings.json") or []
-    if STAGES.index(stage) <= STAGES.index("validate"):
+    at = STAGES.index(stage)
+    if at <= STAGES.index("cp2"):
         rates = rates or load_rates()
         return for_selection(rates, run.load("selected_corpus.json") or [], run.dir, run.budget, run.route, run.cfg)
+    lines = []
+    n_findings = len(run.load("validated_findings.json") or [])
+    if at <= STAGES.index("validate"):
+        per_paper, n_findings = _per_paper_remaining(run, rates or load_rates(), frozenset(in_flight))
+        lines += per_paper
     stale = run.load("theme_records_stale.json", []) or []
     if stale:
         entries = run.budget.entries()
@@ -181,14 +232,31 @@ def remaining_for_run(run, rates: dict | None = None) -> dict:
         worst = _worst(run.budget, run.route, "A06-SV", len(stale), 60000)
         usd = worst.pop("usd")
         lines.append({**worst, "stage": "A06-SV theme rebuild, worst case (not added to the total)", "usd_not_added": usd})
-    if STAGES.index(stage) <= STAGES.index("synthesize"):
-        done = 0
-        if stage == "synthesize":   # turns of the current job already committed are not paid again
-            from ..synthesis_job import Ledger
-            jobs = sorted(run.dir.glob("data/synthesis_job_*/ledger.jsonl"), key=lambda p: p.stat().st_mtime)
-            done = len(Ledger(jobs[-1]).state()["committed"]) if jobs else 0
-        lines += downstream(run.budget, run.route, run.cfg, len(findings), a07_done=done)
-    return _total(lines, run.budget, {"stage": stage, "findings": len(findings)})
+    done = 0
+    if stage == "synthesize":   # turns of the current job already committed are not paid again
+        from ..synthesis_job import Ledger
+        jobs = sorted(run.dir.glob("data/synthesis_job_*/ledger.jsonl"), key=lambda p: p.stat().st_mtime)
+        done = len(Ledger(jobs[-1]).state()["committed"]) if jobs else 0
+    # every downstream agent whose last stage is still ahead (A10 verifies through finalize)
+    lines += [x for x in downstream(run.budget, run.route, run.cfg, n_findings, a07_done=done)
+              if STAGES.index(AGENT_LAST_STAGE[x["stage"]]) >= at]
+    return _total(lines, run.budget, {"stage": stage, "findings": n_findings})
+
+
+def batch_gate(run, agent_id: str, steps: list[str], reserve_usd: float, limit_usd: float,
+               in_flight: frozenset = frozenset()) -> dict:
+    """The runtime gate before a batch is submitted: spent + committed (held by unsettled batches) + projected
+    (the rest of the run, without the steps in this batch or in flight) + reserve (this batch's worst case) must
+    not exceed limit_usd. The batch is counted once, at its worst case."""
+    p = remaining_for_run(run, in_flight=frozenset(in_flight) | frozenset(steps))
+    spent, committed = run.budget.spent(), run.budget.reserved()
+    total = spent + committed + p["projected_remaining_usd"] + reserve_usd
+    return {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "agent": agent_id, "items": len(steps),
+            "spent_usd": round(spent, 4), "committed_usd": round(committed, 4),
+            "projected_usd": p["projected_remaining_usd"], "reserve_usd": round(reserve_usd, 4),
+            "total_usd": round(total, 2), "limit_usd": limit_usd,
+            "verdict": "PASS" if total <= limit_usd else "STOP",
+            "projection_lines": [{k: x.get(k) for k in ("stage", "basis", "calls", "usd")} for x in p["lines"]]}
 
 
 def _total(lines: list[dict], budget, basis: dict) -> dict:

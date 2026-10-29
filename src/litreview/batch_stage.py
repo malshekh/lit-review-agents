@@ -194,6 +194,7 @@ class BatchStage:
         data = batch.manifest(reqs)
         digest = batch.sha256(data)
         est = self.project(m, steps, shape)
+        self.run._batch_gate(self.agent_id, steps, est["projected_usd"])   # raises BatchGateRefused: stop
         b = self.run.budget
         ok, available = b.reserve(sub_id, est["projected_usd"], self.agent_id,
                                   note=f"{len(steps)} items on {m.model}")
