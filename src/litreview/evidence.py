@@ -149,21 +149,36 @@ def classify(finding: dict, validation: dict | None, defects: list[dict], implic
     return {"status": "UNRESOLVED", "disposition": d, "reason": f"disposition {d or 'missing'}"}
 
 
+def effective_validations(validation_doc: dict, review: dict[str, dict] | None = None) -> dict[str, dict]:
+    """finding_id -> the validation entry in force, used for the disposition, constraints and limit a finding
+    carries as well as for its eligibility (so the two never come from different readings). The current
+    validation's entry, except where a review item decides otherwise: KEEP_OLD restores the previous entry;
+    ACCEPT_NEW of a repeat, and a narrowing a repeat applied, use the repeat's entry (`new_validation`, set
+    only by the instability test, whose reading is not in the validation file). An undecided or held
+    quarantine keeps the current entry; its QUARANTINED status says it may not be used."""
+    vals = {v["finding_id"]: v for v in validation_doc.get("validations", [])}
+    for fid, item in (review or {}).items():
+        alt = item.get("new_validation")
+        if item.get("action") == "QUARANTINED":
+            if item.get("decision") == "KEEP_OLD" and item.get("old_validation"):
+                vals[fid] = item["old_validation"]
+            elif item.get("decision") == "ACCEPT_NEW" and alt:
+                vals[fid] = alt
+        elif item.get("action") == "APPLIED" and alt:
+            vals[fid] = alt
+    return vals
+
+
 def annotate_paper(extraction: dict, validation_doc: dict, review: dict[str, dict] | None = None) -> dict[str, dict]:
     """finding_id (paper-local, F3) -> eligibility, for one paper. A validation records the identities A06
     saw (`_entity_identities`); one without that record predates it and is taken to match the extraction.
-    `review`: this paper's review items (review_changes), keyed by local finding ID. A quarantined change is
-    not applied until a human decides: KEEP_OLD restores the previous validation's entry, ACCEPT_NEW applies
-    the new one, and while undecided the finding is QUARANTINED."""
-    vals = {v["finding_id"]: v for v in validation_doc.get("validations", [])}
-    quarantined = {}
-    for fid, item in (review or {}).items():
-        if item.get("action") != "QUARANTINED":
-            continue
-        if item.get("decision") == "KEEP_OLD":
-            vals[fid] = item["old_validation"]
-        elif item.get("decision") != "ACCEPT_NEW":
-            quarantined[fid] = item
+    `review`: this paper's review items (review_changes, compare_repeat), keyed by local finding ID. A
+    quarantined change is not applied until a human decides: KEEP_OLD restores the previous validation's
+    entry, ACCEPT_NEW applies the new one, and while undecided (or held: KEEP_QUARANTINED) the finding is
+    QUARANTINED."""
+    vals = effective_validations(validation_doc, review)
+    quarantined = {fid: item for fid, item in (review or {}).items()
+                   if item.get("action") == "QUARANTINED" and item.get("decision") not in ("KEEP_OLD", "ACCEPT_NEW")}
     defects: dict[str, list] = {}
     for x in validation_doc.get("defect_reports") or []:
         defects.setdefault(x.get("finding_id"), []).append(x)
@@ -184,6 +199,19 @@ def annotate_paper(extraction: dict, validation_doc: dict, review: dict[str, dic
 
 
 # ------------------------------------------------------------------ revalidation review
+# Why two A06 readings of one finding disagree. The cause decides the fix: an extraction error is A05
+# prompt work, a disagreement over what the evidence warrants is A06 calibration, a demonstrated input
+# change is expected, and unexplained variance calls for repeated validation.
+CAUSES = {
+    "BIOLOGICAL_INTERPRETATION": "the extraction is faithful; the readings differ on what the evidence warrants",
+    "EXTRACTION_ERROR": "the extraction misrepresents the source; the readings differ on whether that blocks it",
+    "CHANGED_CONTEXT": "the readings had different inputs, and a demonstrated input difference accounts for it",
+    "UNEXPLAINED_MODEL_VARIANCE": "identical input, or no input difference that accounts for the change",
+}
+# KEEP_OLD and ACCEPT_NEW settle a quarantined change; KEEP_QUARANTINED is a decision too: neither reading
+# is confirmed, and the finding stays out of every role and every recovery tally.
+DECISIONS = ("KEEP_OLD", "ACCEPT_NEW", "KEEP_QUARANTINED")
+
 SOURCE_ENTITY_FIELDS = ("mention", "type", "subtype", "roles", "molecule_species", "measured_at",
                         "identity_relation", "construct")
 RANK = {"SUPPORTED": 6, "SUPPORTED_WITH_CONSTRAINTS": 5, "PARTIALLY_SUPPORTED": 4, "SUPPORTED_FOR_OBSERVATION": 4,
@@ -260,6 +288,64 @@ def review_changes(record_id: str, old_val: dict, old_ext: dict, new_val: dict, 
                       "reason": f"revalidation changed {od} -> {nd} ({direction}) {why}",
                       "old_validation": old.get(fid), "decision": None})
     return items
+
+
+def compare_repeat(record_id: str, original: dict, repeat: dict) -> tuple[list[dict], list[dict]]:
+    """The instability test: an identical-input, whole-paper repeat of A06 against the original validation.
+    rows: per finding, whether the two readings agree (`blocked`: the original disposition was BLOCKED_*).
+    items: review items for the disagreements. Nothing in the input can explain them (it is identical by
+    construction), so their provisional cause is UNEXPLAINED_MODEL_VARIANCE, which a reviewer may reclassify
+    after reading the source:
+    - a different role (usable, appraisable, nothing): QUARANTINED until a human decides;
+    - the same role, different disposition: the more cautious reading stands (the repeat's entry is APPLIED
+      when it is the narrower one; otherwise the original is KEPT)."""
+    orig = {v["finding_id"]: v for v in original.get("validations", [])}
+    rep = {v["finding_id"]: v for v in repeat.get("validations", [])}
+    rows, items = [], []
+    for fid, o in orig.items():
+        r = rep.get(fid)
+        od, rd = o.get("disposition"), (r or {}).get("disposition")
+        rows.append({"finding_id": f"{record_id}:{fid}", "blocked": str(od or "").startswith("BLOCKED"),
+                     "original": od, "repeat": rd, "original_gate2": o.get("gate2"),
+                     "repeat_gate2": (r or {}).get("gate2"), "same_disposition": r is not None and od == rd,
+                     "same_role": r is not None and usability(od) == usability(rd)})
+        if r is None or od == rd:
+            continue
+        uo, ur = usability(od), usability(rd)
+        if ur != uo:
+            direction, action = ("IMPROVED" if ur > uo else "LOST_ROLE"), "QUARANTINED"
+        elif RANK.get(rd, 0) < RANK.get(od, 0):
+            direction, action = "NARROWED", "APPLIED"
+        else:
+            direction, action = ("IMPROVED" if RANK.get(rd, 0) > RANK.get(od, 0) else "SAME_RANK"), "KEPT"
+        items.append({"finding_id": f"{record_id}:{fid}", "record_id": record_id, "local_id": fid, "kind": "REPEAT",
+                      "old_disposition": od, "new_disposition": rd, "old_gate2": o.get("gate2"),
+                      "new_gate2": r.get("gate2"), "direction": direction, "explained_by": None,
+                      "identity_changed": [], "action": action,
+                      "reason": f"identical-input repeat read {od} as {rd} ({direction})",
+                      "old_validation": o, "new_validation": r, "decision": None,
+                      "cause": "UNEXPLAINED_MODEL_VARIANCE", "cause_by": "code (identical input; provisional)"})
+    return rows, items
+
+
+def repeat_agreement(rows: list[dict]) -> dict:
+    """Agreement between original and repeat readings: counts, never a rate alone (n is small in a pilot)."""
+    def rate(rs: list[dict], key: str) -> dict:
+        agree = sum(1 for r in rs if r[key])
+        return {"n": len(rs), "agree": agree, "rate": round(agree / len(rs), 3) if rs else None}
+    blocked = [r for r in rows if r["blocked"]]
+    return {"blocked_findings": {"disposition": rate(blocked, "same_disposition"), "role": rate(blocked, "same_role")},
+            "all_findings": {"disposition": rate(rows, "same_disposition"), "role": rate(rows, "same_role")}}
+
+
+def review_by_cause(items: list[dict]) -> dict:
+    """Disagreements by cause and action; unclassified ones are counted as such, never guessed."""
+    out: dict[str, dict] = {}
+    for i in items:
+        c = out.setdefault(i.get("cause") or "UNCLASSIFIED", {})
+        key = i["action"] if i["action"] != "QUARANTINED" else f"QUARANTINED_{i.get('decision') or 'UNDECIDED'}"
+        c[key] = c.get(key, 0) + 1
+    return out
 
 
 def summary(findings: list[dict]) -> dict:

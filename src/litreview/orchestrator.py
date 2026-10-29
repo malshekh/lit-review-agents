@@ -64,8 +64,26 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "notes.md").write_text(notes, encoding="utf-8")
     (d / "seeds.txt").write_text("\n".join(seeds or []), encoding="utf-8")
     (d / "topic_family.txt").write_text(family, encoding="utf-8")
+    (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
     Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}})
     return run_id
+
+
+def code_version() -> dict:
+    """The commit a run starts from and whether the working tree was clean: a run that tests a frozen
+    system can show it ran on exactly that code."""
+    import subprocess
+    from .paths import REPO_ROOT
+
+    def git(*args: str) -> str | None:
+        try:
+            return subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True, timeout=20,
+                                  check=True).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            return None
+    status = git("status", "--porcelain", "--untracked-files=no")
+    return {"commit": git("rev-parse", "HEAD"), "clean": None if status is None else status == "",
+            "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
 
 
 class Run:
@@ -201,9 +219,21 @@ class Run:
         proj = self.load("cost_projection.json")
         if proj is None:
             raise Pause(f"no cost projection for this run: run `litreview project {self.id}` before any further spend")
+        if proj.get("verdict") == "SUPERSEDED":
+            raise Pause(f"the cost projection is superseded ({proj.get('superseded_reason')}): re-project with "
+                        f"`litreview project {self.id}` before any further spend")
         if proj.get("verdict") != "WITHIN_CAP":
             raise Pause(f"cost projection ${proj.get('projected_total_usd')} exceeds the ${proj.get('cap_usd')} cap "
                         "(data/cost_projection.json): deselect papers or raise the cap, then re-project")
+
+    def _supersede_projection(self, reason: str) -> None:
+        """Spend the projection did not plan for (a paid turn that produced nothing) makes it stale: the next
+        agent call requires a new one, priced from what has actually been spent."""
+        proj = self.load("cost_projection.json")
+        if proj is not None:
+            proj.update(verdict="SUPERSEDED", superseded_reason=reason[:300],
+                        superseded_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            self.save("cost_projection.json", proj)
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset()) -> dict:
@@ -647,15 +677,41 @@ class Run:
                            {"changes": len(items), "quarantined": sum(i["action"] == "QUARANTINED" for i in items)})
         return items
 
-    def decide_review(self, finding_id: str, decision: str, note: str) -> dict:
-        """A human's decision on a quarantined change: KEEP_OLD or ACCEPT_NEW. Logged as a human decision."""
+    def classify_review(self, finding_id: str, cause: str, note: str, by: str = "human") -> dict:
+        """A classification of why two readings of a finding disagree (evidence.CAUSES). `by` says who made
+        it: the researcher ("human"), or a reviewer proposing it for the researcher to confirm."""
+        if cause not in evidence.CAUSES:
+            raise ValueError(f"cause must be one of {', '.join(evidence.CAUSES)}")
+        items = self.load("validation_review.json", [])
+        item = next((i for i in items if i["finding_id"] == finding_id), None)
+        if item is None:
+            raise ValueError(f"{finding_id} has no recorded disagreement")
+        item.update(cause=cause, cause_by=by, cause_note=note)
+        self.save("validation_review.json", items)
+        self.prov.human_decision("validation_review_cause", {"finding_id": finding_id, "cause": cause, "by": by,
+                                                             "note": note})
+        return item
+
+    def decide_review(self, finding_id: str, decision: str, note: str, cause: str | None = None) -> dict:
+        """A human's decision on a quarantined change, made against the source, the extraction and both A06
+        readings: KEEP_OLD, ACCEPT_NEW, or KEEP_QUARANTINED (neither confirmed). Every decision carries the
+        disagreement's cause (evidence.CAUSES). Logged as a human decision."""
+        if decision not in evidence.DECISIONS:
+            raise ValueError(f"decision must be one of {', '.join(evidence.DECISIONS)}")
         items = self.load("validation_review.json", [])
         item = next((i for i in items if i["finding_id"] == finding_id and i["action"] == "QUARANTINED"), None)
         if item is None:
             raise ValueError(f"{finding_id} has no quarantined change")
+        if cause is None and str(item.get("cause_by") or "code").startswith("code"):
+            raise ValueError(f"classify why the readings of {finding_id} disagree (cause) before deciding")
+        if cause is not None:
+            if cause not in evidence.CAUSES:
+                raise ValueError(f"cause must be one of {', '.join(evidence.CAUSES)}")
+            item.update(cause=cause, cause_by="human")
         item.update(decision=decision, decision_note=note, decided_at=time.strftime("%Y-%m-%dT%H:%M:%S"))
         self.save("validation_review.json", items)
-        self.prov.human_decision("validation_review", {"finding_id": finding_id, "decision": decision, "note": note})
+        self.prov.human_decision("validation_review", {"finding_id": finding_id, "decision": decision,
+                                                       "cause": item["cause"], "note": note})
         findings = self._validated_findings(self.load("selected_corpus.json"))
         self.save("validated_findings.json", findings)
         return item
@@ -717,9 +773,10 @@ class Run:
                 # a paper re-extracted before re-extraction was turned off keeps its label (v2)
                 n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
                 rid_of[f"A06-SV_{rid}_v{n}"] = rid
-                items.append((f"A06-SV_{rid}_v{n}", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                                                    "gate1_results": span_check.check_findings(ext, sections),
-                                                    "paper_text": sections}))
+                payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
+                           "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections}
+                self._save_a06_input(rid, f"A06-SV_{rid}_v{n}", payload)
+                items.append((f"A06-SV_{rid}_v{n}", payload))
             entries = self.budget.entries()
             vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
             self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
@@ -735,9 +792,11 @@ class Run:
             for attempt in range(min(start, max_re), max_re + 1):
                 ext = self.load(f"extractions/{rid}.json")
                 gate1 = span_check.check_findings(ext, sections)
-                val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                                            "gate1_results": gate1, "paper_text": sections},
-                                 step=f"A06-SV_{rid}_v{attempt + 1 + label_offset}",
+                payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext, "gate1_results": gate1,
+                           "paper_text": sections}
+                step = f"A06-SV_{rid}_v{attempt + 1 + label_offset}"
+                self._save_a06_input(rid, step, payload)
+                val = self.agent("A06-SV", payload, step=step,
                                  exclude_providers=frozenset({self._extraction_vendor(rid)}))
                 serious = [d for d in val.get("defect_reports", []) if d.get("severity") in ("CRITICAL", "MAJOR")]
                 if not serious or attempt == max_re:
@@ -759,12 +818,88 @@ class Run:
                     break
                 self.save(f"extractions/{rid}.json", self._normalize(rid, ext))
             self._save_validation(rid, val)
+        self._instability_test(corpus)
         findings = self._validated_findings(corpus)
         theme_records = self._theme_pass(corpus, findings)
         self.save("validated_findings.json", findings)
         self._save_held(findings)
         self.save("theme_records.json", theme_records)
         return "synthesize"
+
+    # --- the A06 instability test ---------------------------------------
+    def _a06_conditions(self, rid: str) -> dict:
+        """What an A06 PER_PAPER call of this paper runs under: prompt and model settings."""
+        m = self.route("A06-SV", frozenset({self._extraction_vendor(rid)}))
+        return {"system_prompt_sha256": hashlib.sha256(build_system_prompt("A06-SV").encode()).hexdigest(),
+                "prompt_version": prompt_version("A06-SV"), "model": m.model, "provider": m.provider,
+                "max_tokens": m.max_tokens, "temperature": m.temperature, "effort": m.effort}
+
+    def _save_a06_input(self, rid: str, step: str, payload: dict) -> None:
+        """The exact A06 PER_PAPER input, saved as the call is made. The instability test replays it as is:
+        a conflict stripped or an identity corrected afterwards changes the extraction file, not this."""
+        blob = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        self.save(f"a06_inputs/{rid}.json", {"step": step, "payload_sha256": hashlib.sha256(blob.encode()).hexdigest(),
+                                             **self._a06_conditions(rid), "payload": payload})
+
+    def _instability_test(self, corpus: list[dict]) -> None:
+        """pipeline.yaml -> validation.instability_test. Every paper with a blocked finding is validated once
+        more, whole paper against whole paper: the input saved at its original call is replayed unchanged
+        (prompt, paper text, extraction, entity identities, Gate 1 results) under the same model settings, and
+        a paper whose conditions changed since is skipped, never compared. Agreement goes to
+        data/instability_test.json. A finding whose two readings give it different roles is QUARANTINED for
+        human review; where the roles agree, the more cautious reading stands (evidence.compare_repeat)."""
+        if not (self.cfg.get("validation") or {}).get("instability_test"):
+            return
+        steps, skipped = {}, {}
+        for rec in corpus:
+            rid = rec["record_id"]
+            val = self.load(f"validations/{rid}.json") or {}
+            if not any(str(v.get("disposition") or "").startswith("BLOCKED") for v in val.get("validations", [])):
+                continue
+            saved = self.load(f"a06_inputs/{rid}.json")
+            if saved is None:
+                skipped[rid] = "no saved input for the original call"
+                continue
+            now = self._a06_conditions(rid)
+            changed = [k for k, v in now.items() if saved.get(k) != v]
+            if changed:
+                skipped[rid] = "conditions changed since the original call: " + ", ".join(changed)
+                continue
+            steps[f"A06-SV_{rid}_repeat"] = (rid, saved)
+        todo = [(s, saved["payload"]) for s, (rid, saved) in steps.items()
+                if not self.data(f"validation_repeats/{rid}.json").exists()]   # each paper repeated once
+        self.run_many("A06-SV", todo,
+                      lambda step, out: self.save(f"validation_repeats/{steps[step][0]}.json", out),
+                      exclude=lambda step: frozenset({self._extraction_vendor(steps[step][0])}))
+        entries = self.budget.entries()
+
+        def how(step: str) -> dict:
+            calls = [e for e in entries if e["step"] == step]
+            return {"step": step, "channel": ("batch" if calls and calls[-1].get("batch_id") else
+                                              "interactive" if calls else "unknown"),
+                    "model": calls[-1]["model"] if calls else None,
+                    "json_repair": (self.dir / "outputs" / f"{step}.raw1.txt").exists()}
+
+        papers, rows = {}, []
+        for step, (rid, saved) in steps.items():
+            rep = self.load(f"validation_repeats/{rid}.json")
+            if rep is None:
+                continue
+            orig = self.load(f"validations/{rid}.json")
+            r, review = evidence.compare_repeat(rid, orig, rep)
+            self._record_review(rid, review)
+            rows += r
+            papers[rid] = {"original": how(saved["step"]), "repeat": how(step), "payload_sha256": saved["payload_sha256"],
+                           "normalization_conflicts": [len(orig.get("normalization_conflicts") or []),
+                                                       len(rep.get("normalization_conflicts") or [])],
+                           "rows": r}
+        report = {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "granularity": "whole paper vs whole paper",
+                  "agreement": evidence.repeat_agreement(rows), "papers": papers, "skipped": skipped,
+                  "by_cause": evidence.review_by_cause([i for i in self.load("validation_review.json", [])
+                                                        if i.get("kind") == "REPEAT"])}
+        self.save("instability_test.json", report)
+        self.prov.tool_run("instability_test", "validate", {"papers": len(papers), "skipped": len(skipped),
+                                                            **report["agreement"]})
 
     def _theme_pass(self, corpus: list[dict], findings: list[dict], only: set[str] | None = None,
                     label: str = "") -> dict:
@@ -801,8 +936,10 @@ class Run:
             rid = rec["record_id"]
             ext = self.load(f"extractions/{rid}.json", {})
             val_doc = self.load(f"validations/{rid}.json", {})
-            val = {v["finding_id"]: v for v in val_doc.get("validations", [])}
-            elig = evidence.annotate_paper(ext, val_doc, self._review_items(rid))
+            review = self._review_items(rid)
+            # the disposition, constraints and limit come from the same reading as the eligibility
+            val = evidence.effective_validations(val_doc, review)
+            elig = evidence.annotate_paper(ext, val_doc, review)
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
@@ -1021,7 +1158,11 @@ class Run:
             pkg = job.run()
         except JobStopped as e:
             self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            raise Pause(f"synthesis job stopped cleanly — {e}. `litreview run` resumes from the last committed turn.")
+            # the stopped turn was paid and a resume pays for it again: the CP2 projection no longer holds
+            self._supersede_projection(f"A07 job stopped: {e}")
+            raise Pause(f"synthesis job stopped cleanly — {e}. The stopped turn was paid, and resuming pays for it "
+                        f"again: re-project with `litreview project {self.id}`, then `litreview run` resumes from "
+                        "the last committed turn.")
         report = self._job_report(tag, pkg)
         ev_only = self.state().get("evaluation_only")
         if ev_only:   # stamped in the data itself, so the restriction travels with any copy

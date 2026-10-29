@@ -193,10 +193,27 @@ new error side by side.
 **Revalidation review** (`evidence.review_changes`). When a paper is revalidated, a disposition that changes
 with no change to the finding's extraction, and no correction of an identity A06 had objected to, is not
 applied: an improvement, or a finding losing the role it had, is `QUARANTINED` (usable in no role) until you
-decide it with `litreview review-validation RUN FINDING --keep-old|--accept-new --note "..."`. A narrowing
-that changes no role is applied and noted. A06 is not deterministic at temperature 0.0 (run 20261025-100039:
-one of three findings changed disposition between two byte-identical calls), so a revalidation result is a
-second reading, not a correction, unless the input changed.
+decide it with `litreview review-validation RUN FINDING --keep-old|--accept-new|--hold --note "..."`, after
+reading the source, the extraction and both A06 readings. `--hold` (KEEP_QUARANTINED) is a decision that
+neither reading is confirmed; the finding stays out of every role and every recovery tally. Every decision
+carries the disagreement's cause (`--cause`, alone or with the decision): `BIOLOGICAL_INTERPRETATION` (the
+extraction is faithful; the readings differ on what the evidence warrants), `EXTRACTION_ERROR` (the extraction
+misrepresents the source; the readings differ on whether that blocks it), `CHANGED_CONTEXT` (a demonstrated
+input difference accounts for it) or `UNEXPLAINED_MODEL_VARIANCE`. The command lists quarantined findings by
+cause, which says whether the fix is prompt work or repeated validation. A narrowing that changes no role is
+applied and noted. A06 is not deterministic at temperature 0.0 (run 20261025-100039: one of three findings
+changed disposition between two byte-identical calls), so a revalidation result is a second reading, not a
+correction, unless the input changed. The reading a decision keeps is the one the finding carries everywhere:
+disposition, constraints and limit as well as eligibility (`evidence.effective_validations`).
+
+**A06 instability test** (`pipeline.yaml -> validation.instability_test`). After per-paper validation, every
+paper with a blocked finding is validated once more, whole paper against whole paper: the input saved at the
+original call (`data/a06_inputs/`) is replayed unchanged (prompt, paper text, extraction, entity identities,
+Gate 1 results) under the same model settings, and a paper whose conditions changed since is skipped, never
+compared. `data/instability_test.json` records agreement for the blocked findings and for every finding in the
+repeated papers, as counts, with the channel (batch or interactive) of each call. A finding whose two readings
+give it different roles is quarantined for human review; where the roles agree, the more cautious reading
+stands. The original validation file is never replaced. One repeat per paper is priced in the CP2 projection.
 
 **Handoff contract** (`src/litreview/handoff.py`). Every validated finding carries `predicate` and
 `predicate_detail`, `polarity`, `direction`, `modality`, `assertion_type`, `attributed_to`, `origin`,
@@ -213,7 +230,9 @@ per-paper (A05 + A06, by content level, 90th percentile) and per-theme costs int
 CP2_review.md shows the projection; approving CP2 refuses a selection projected over the cap, with A07 to
 A12 priced at worst case (configured max_tokens, A07 paying a cache write on every call). After CP2, no
 agent call runs without a projection within the cap in `data/cost_projection.json`; `litreview project RUN`
-re-projects what a run still has to spend.
+re-projects what a run still has to spend. Each A07 turn is priced as one attempt: a truncated turn is paid,
+produces nothing and stops the job, so it supersedes the projection, and resuming requires a new one priced
+from actual spend (turns already committed are not priced again).
 
 **Evaluation-only runs** (`src/litreview/publication.py`). `litreview mark-evaluation-only RUN --reason ...`
 stamps the run's synthesis in its own data; CP3, the outline, display tables, verification, critique and

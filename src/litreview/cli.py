@@ -183,16 +183,27 @@ def cmd_review_validation(args) -> int:
         items = run.review_revalidations()
         print(f"{len(items)} changed dispositions; {sum(i['action'] == 'QUARANTINED' for i in items)} quarantined.")
     if args.finding_id:
-        if not (args.keep_old or args.accept_new) or not args.note:
-            print("Give --keep-old or --accept-new, and --note with what you checked.")
+        decision = "KEEP_OLD" if args.keep_old else "ACCEPT_NEW" if args.accept_new else \
+            "KEEP_QUARANTINED" if args.hold else None
+        if not args.note or not (decision or args.cause):
+            print("Give --cause and/or one of --keep-old, --accept-new, --hold, with --note saying what you checked "
+                  "(the source, the extraction and both A06 readings).")
             return 1
-        item = run.decide_review(args.finding_id, "KEEP_OLD" if args.keep_old else "ACCEPT_NEW", args.note)
-        print(f"{args.finding_id}: {item['decision']} recorded as your decision.")
-    pending = [i for i in run.load("validation_review.json", []) if i["action"] == "QUARANTINED" and not i.get("decision")]
+        try:
+            item = (run.decide_review(args.finding_id, decision, args.note, args.cause) if decision
+                    else run.classify_review(args.finding_id, args.cause, args.note))
+        except ValueError as e:
+            print(e)
+            return 1
+        print(f"{args.finding_id}: {item.get('decision') or 'undecided'}, cause {item.get('cause')}; recorded as your decision.")
+    items = run.load("validation_review.json", [])
+    pending = [i for i in items if i["action"] == "QUARANTINED" and not i.get("decision")]
     for i in pending:
         print(f"  QUARANTINED {i['finding_id']:10s} {i['old_disposition']} -> {i['new_disposition']} ({i['direction']})"
-              + (f"  note: {i['reviewer_note']}" if i.get("reviewer_note") else ""))
+              f"  cause: {i.get('cause') or 'unclassified'}" + (f"  note: {i['reviewer_note']}" if i.get("reviewer_note") else ""))
     print(f"{len(pending)} awaiting your decision.")
+    from .evidence import review_by_cause
+    print("Quarantined, by cause: " + json.dumps(review_by_cause([i for i in items if i["action"] == "QUARANTINED"])))
     return 0
 
 
@@ -281,6 +292,9 @@ def main(argv: list[str] | None = None) -> int:
     rq.add_argument("finding_id", nargs="?")
     rq.add_argument("--keep-old", action="store_true")
     rq.add_argument("--accept-new", action="store_true")
+    rq.add_argument("--hold", action="store_true", help="KEEP_QUARANTINED: neither reading is confirmed")
+    rq.add_argument("--cause", choices=["BIOLOGICAL_INTERPRETATION", "EXTRACTION_ERROR", "CHANGED_CONTEXT",
+                                        "UNEXPLAINED_MODEL_VARIANCE"], help="why the two readings disagree")
     rq.add_argument("--note")
     rq.add_argument("--rescan", action="store_true", help="apply the review rule to this run's revalidations")
     rq.set_defaults(fn=cmd_review_validation)

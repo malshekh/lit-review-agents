@@ -97,6 +97,13 @@ outline:
     One display item: an evidence map across study systems (FIGURE_EVIDENCE_MAP), showing where
     evidence exists and where it stops, which states the preclinical-to-clinical translation gap visually.
 
+# A06 instability test: after per-paper validation, every paper with a blocked finding is validated once
+# more with the identical input (whole paper against whole paper, same prompt, text, identities and model
+# settings). Agreement goes to data/instability_test.json; a finding whose two readings give it different
+# roles is quarantined for human review. Priced in the CP2 projection.
+validation:
+  instability_test: true
+
 # A07-SYN runs as one synthesis job over bounded calls: PLAN, one GROUP call per group, FINAL.
 # Every call resends the frozen corpus as a cached prefix; no conversation history is kept.
 synthesis:

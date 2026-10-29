@@ -1,12 +1,13 @@
 {
  "reference_run": "20261025-100039",
- "measured_at": "2026-10-28",
+ "measured_at": "2026-10-29",
  "per_paper": {
   "ABSTRACT": {
    "papers": 17,
    "mean_usd": 0.429,
    "p90_usd": 0.6314,
    "max_usd": 0.7841,
+   "a06_p90_usd": 0.2305,
    "findings_mean": 10.71,
    "findings_p90": 18.4
   },
@@ -15,6 +16,7 @@
    "mean_usd": 1.1463,
    "p90_usd": 1.9877,
    "max_usd": 2.1372,
+   "a06_p90_usd": 0.7192,
    "findings_mean": 26.27,
    "findings_p90": 41.0
   }

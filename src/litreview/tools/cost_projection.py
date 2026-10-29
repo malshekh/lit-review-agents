@@ -59,8 +59,10 @@ def measured_rates(run_dir: Path) -> dict:
     for level in ("ABSTRACT", "FULL_TEXT"):
         rids = [r for r, lv in levels.items() if lv == level]
         cost = [per["A05-KE"].get(r, 0) + per["A06-SV"].get(r, 0) for r in rids]
+        a06 = [per["A06-SV"].get(r, 0) for r in rids]
         out["per_paper"][level] = {"papers": len(rids), "mean_usd": round(sum(cost) / max(len(cost), 1), 4),
                                    "p90_usd": round(_pct(cost, .9), 4), "max_usd": round(max(cost or [0]), 4),
+                                   "a06_p90_usd": round(_pct(a06, .9), 4),
                                    "findings_mean": round(sum(findings[r] for r in rids) / max(len(rids), 1), 2),
                                    "findings_p90": round(_pct([findings[r] for r in rids], .9), 1)}
     out["per_theme"] = {"themes": len(themes), "mean_usd": round(sum(themes) / max(len(themes), 1), 4),
@@ -104,8 +106,10 @@ def _worst(budget, route, agent: str, calls: int, input_tokens: int, cache_write
                       f"+ {m.max_tokens:,} output at max_tokens) on {m.model}"}
 
 
-def downstream(budget, route, cfg: dict, n_findings: int) -> list[dict]:
-    """A07 to A12 at worst case, for a corpus of n_findings validated findings."""
+def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> list[dict]:
+    """A07 to A12 at worst case, for a corpus of n_findings validated findings. Every A07 turn is one
+    attempt: a truncated turn stops the job and supersedes the projection (orchestrator), so a retry is
+    re-projected from actual spend rather than assumed. a07_done: turns already committed."""
     loops, syn = cfg["loops"], cfg["synthesis"]
     groups = max(1, math.ceil(n_findings / int(syn["max_findings_per_group"])))
     a10_passes = 2 if loops.get("verification") == "draft_and_final" else \
@@ -113,7 +117,7 @@ def downstream(budget, route, cfg: dict, n_findings: int) -> list[dict]:
     cycles = int(loops["max_critique_cycles"])
     corpus = FIXED_INPUT["A07-SYN"] + n_findings * A07_TOKENS_PER_FINDING
     return [
-        _worst(budget, route, "A07-SYN", groups + 2, corpus, cache_write_1h=True,
+        _worst(budget, route, "A07-SYN", max(1, groups + 2 - a07_done), corpus, cache_write_1h=True,
                max_tokens=int(syn["max_tokens_per_turn"])),
         _worst(budget, route, "A08-OL", 1, FIXED_INPUT["A08-OL"] + n_findings * 300),
         _worst(budget, route, "A09-WRI", 1 + int(loops["max_redrafts"]), FIXED_INPUT["A09-WRI"]),
@@ -136,6 +140,14 @@ def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, rou
                           "detail": f"{n} papers x ${r['p90_usd']:.4f} (90th percentile of {r['papers']} papers in "
                                     f"{rates['reference_run']})"})
             n_findings += math.ceil(n * r["findings_p90"])
+    if (cfg.get("validation") or {}).get("instability_test"):
+        # every paper assumed to have a blocked finding, so every paper repeated
+        usd = sum(n * rates["per_paper"][lv].get("a06_p90_usd", rates["per_paper"][lv]["p90_usd"])
+                  for lv, n in by_level.items())
+        lines.append({"stage": "A06-SV whole-paper repeat (instability test)", "basis": "MEASURED_P90",
+                      "calls": len(selection), "usd": round(usd, 4),
+                      "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th "
+                                "percentile of A06 per-paper cost by level"})
     themes = max(1, math.ceil(len(selection) * rates["themes_per_paper"]))
     lines.append({"stage": "A06-SV per theme", "basis": "MEASURED_P90", "calls": themes,
                   "usd": round(themes * rates["per_theme"]["p90_usd"], 4),
@@ -170,7 +182,12 @@ def remaining_for_run(run, rates: dict | None = None) -> dict:
         usd = worst.pop("usd")
         lines.append({**worst, "stage": "A06-SV theme rebuild, worst case (not added to the total)", "usd_not_added": usd})
     if STAGES.index(stage) <= STAGES.index("synthesize"):
-        lines += downstream(run.budget, run.route, run.cfg, len(findings))
+        done = 0
+        if stage == "synthesize":   # turns of the current job already committed are not paid again
+            from ..synthesis_job import Ledger
+            jobs = sorted(run.dir.glob("data/synthesis_job_*/ledger.jsonl"), key=lambda p: p.stat().st_mtime)
+            done = len(Ledger(jobs[-1]).state()["committed"]) if jobs else 0
+        lines += downstream(run.budget, run.route, run.cfg, len(findings), a07_done=done)
     return _total(lines, run.budget, {"stage": stage, "findings": len(findings)})
 
 

@@ -283,7 +283,7 @@ def test_saving_a_revalidation_applies_the_rule(tmp_path, monkeypatch):
     review = run.load("validation_review.json")
     assert [(i["finding_id"], i["action"]) for i in review] == [("R0001:F1", "QUARANTINED")]
     assert run._validated_findings(run.load("selected_corpus.json"))[0]["eligibility"]["status"] == "QUARANTINED"
-    run.decide_review("R0001:F1", "ACCEPT_NEW", "checked the span: the relation is stated")
+    run.decide_review("R0001:F1", "ACCEPT_NEW", "checked the span: the relation is stated", "EXTRACTION_ERROR")
     assert run._validated_findings(run.load("selected_corpus.json"))[0]["eligibility"]["status"] == "SUPPORTING"
 
 
