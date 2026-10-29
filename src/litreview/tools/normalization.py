@@ -16,9 +16,15 @@ lookups and records how each was resolved:
 | DISEASE, PHENOTYPE, CELL_TYPE, TISSUE_OR_ORGAN, | EBI OLS4: MONDO, HP, CL, UBERON, GO,       |
 | BIOLOGICAL_PROCESS, ORGANISM                    | NCBITaxon                                  |
 
-States: RESOLVED · AMBIGUOUS (several candidates; listed) · UNRESOLVED (lookup ran, nothing
-matched) · LOOKUP_FAILED (technical failure — never read as "does not exist") · NOT_APPLICABLE.
-Results are cached per run in data/normalization_cache.json.
+States: RESOLVED · AMBIGUOUS (several plausible candidates; listed) · UNRESOLVED (lookup ran; nothing, or
+only incompatible or weak candidates) · CONFLICT (the source and the identity contradict; the identity is
+stripped and kept only in the run's conflict registry) · LOOKUP_FAILED (technical failure — never read as
+"does not exist") · NOT_APPLICABLE. Results are cached per run in data/normalization_cache.json.
+
+Normalization status says nothing about whether a finding is supported, and a finding's validity says
+nothing about its identifiers: the two are checked separately (evidence.py). An abbreviation resolves only
+through the source's own expansion of it; without one it is never RESOLVED. An unresolved entity keeps its
+source mention and nothing else.
 """
 from __future__ import annotations
 
@@ -265,6 +271,86 @@ def normalize_chemical(entity: dict) -> dict:
     return res
 
 
+# ------------------------------------------------------------------ names and abbreviations
+def _squash(s: str | None) -> str:
+    """Comparison form of a name: case, hyphens, slashes, underscores and spacing ignored."""
+    return " ".join(re.sub(r"[-_/,]+", " ", str(s or "").lower()).split())
+
+
+def _tight(s: str | None) -> str:
+    """Cell-line comparison form: also ignores spaces and dots (U-251 MG == U251MG)."""
+    return re.sub(r"[\s\-_./]+", "", str(s or "").lower())
+
+
+def is_abbreviation(mention: str) -> bool:
+    """A short token written mostly in capitals (DSF, DTC, ORR, CuET): a string an ontology may list as an
+    exact synonym of several unrelated things, so an exact hit on it identifies nothing by itself."""
+    m = (mention or "").strip()
+    letters = [c for c in m if c.isalpha()]
+    upper = sum(c.isupper() for c in letters)
+    if sum(c.isdigit() for c in m) >= 3:     # a code name (BI-2536, LY364947, NCT-501) is an identifier
+        return False
+    return 2 <= len(m) <= 10 and " " not in m and upper >= 2 and upper * 2 >= len(letters)
+
+
+def split_self_expanded(mention: str) -> tuple[str, str] | None:
+    """'glioblastoma (GBM)' -> ('glioblastoma', 'GBM'): a mention that carries its own abbreviation, which
+    abbreviates the head. The head is what gets looked up."""
+    m = re.fullmatch(r"(.+?)\s*\(([^()]+)\)", (mention or "").strip())
+    if not m or not is_abbreviation(m.group(2).strip()):
+        return None
+    head, abbr = m.group(1).strip(), m.group(2).strip()
+    lf = _long_form(abbr, head)
+    return (head, abbr) if lf and _squash(lf) == _squash(head[-len(lf):]) else None
+
+
+def _long_form(sf: str, before: str) -> str | None:
+    """Schwartz-Hearst: the shortest run of words ending at `before` whose characters cover the short form
+    in order, with the first character starting a word."""
+    s, i = len(sf) - 1, len(before) - 1
+    while s >= 0:
+        c = sf[s].lower()
+        if not c.isalnum():
+            s -= 1
+            continue
+        while i >= 0 and (before[i].lower() != c or (s == 0 and i > 0 and before[i - 1].isalnum())):
+            i -= 1
+        if i < 0:
+            return None
+        i -= 1
+        s -= 1
+    lf = before[before.rfind(" ", 0, i + 1) + 1:].strip(" ,;:([")
+    return lf if len(lf) > len(sf) and " " not in sf else None
+
+
+def source_text(sections) -> str:
+    if isinstance(sections, dict):
+        return "\n".join(source_text(v) for v in sections.values())
+    if isinstance(sections, list):
+        return "\n".join(source_text(v) for v in sections)
+    return str(sections or "")
+
+
+def find_expansion(abbr: str, text: str) -> dict | None:
+    """The source's own expansion of an abbreviation, from "long form (ABBR)" patterns. Several different
+    expansions in one paper -> {"conflicting_long_forms": [...]}; none -> None."""
+    found: dict[str, dict] = {}
+    for m in re.finditer(r"\(\s*" + re.escape(abbr) + r"\s*[);,]", text or ""):
+        before = (text[max(0, m.start() - 200):m.start()]).rstrip()
+        words = before.split()[-min(len(abbr) + 5, len(abbr) * 2):]
+        lf = _long_form(abbr, " ".join(words))
+        if lf:
+            f = found.setdefault(_squash(lf), {"long_form": lf, "count": 0,
+                                               "source_span": (text[max(0, m.start() - 80):m.end()]).strip()})
+            f["count"] += 1
+    if not found:
+        return None
+    if len(found) > 1:
+        return {"abbreviation": abbr, "conflicting_long_forms": sorted(f["long_form"] for f in found.values())}
+    f = next(iter(found.values()))
+    return {"abbreviation": abbr, "long_form": f["long_form"], "occurrences": f["count"], "source_span": f["source_span"]}
+
+
 # ------------------------------------------------------------------ cell lines
 def _walk(obj, key):
     """Yield every value stored under `key` anywhere in a nested JSON object."""
@@ -286,88 +372,299 @@ def _primary_acc(line: dict) -> str | None:
     return None
 
 
+def _line_names(line: dict) -> tuple[str | None, list[str]]:
+    names = [n for nl in _walk(line, "name-list") for n in nl if isinstance(n, dict)]
+    ident = next((n.get("value") for n in names if n.get("type") == "identifier"), None)
+    return ident, [n.get("value") for n in names if n.get("value")]
+
+
+def _problems(line: dict) -> list[str]:
+    return [c.get("value") for cl in _walk(line, "comment-list") for c in cl
+            if "problematic" in str(c.get("category", "")).lower()]
+
+
+CELLOSAURUS_ROWS = 200   # derivative lines (-Luc, -GFP, knockouts) outrank their parent; never truncate to a few
+
+
 def cellosaurus(name: str) -> dict:
-    lines: list = []
+    """A cell line by exact name. Every line whose identifier or synonym matches the mention exactly
+    (ignoring case, spaces, hyphens and dots) is a candidate; nothing else is. One candidate -> RESOLVED;
+    several -> AMBIGUOUS, each candidate listed with its own problematic-line note and an overall warning
+    that misidentification is possible (never that the stock was misidentified); none -> UNRESOLVED. A
+    derivative (U251MG-Luc) and its parent (U-251MG) never stand in for each other: their names differ."""
+    lines: dict[str, dict] = {}
     for q in (f'id:"{name}"', f'sy:"{name}"'):
-        data = _get("https://api.cellosaurus.org/search/cell-line", {"q": q, "format": "json", "rows": 3})
-        lines = next(_walk(data, "cell-line-list"), []) if data else []
-        if lines:
-            break
-    if not lines:
-        return _result("UNRESOLVED", "Cellosaurus", normalized_id=None)
-    if len(lines) > 1:
-        return _result("AMBIGUOUS", "Cellosaurus", normalized_id=None,
-                       candidates=[_primary_acc(line) for line in lines])
-    line = lines[0]
-    acc = _primary_acc(line)
-    species = [s.get("label") or s.get("value") for sl in _walk(line, "species-list") for s in sl]
-    problems = [c.get("value") for cl in _walk(line, "comment-list") for c in cl
-                if "problematic" in str(c.get("category", "")).lower()]
-    return _result("RESOLVED", "Cellosaurus", normalized_id=f"RRID:{acc}" if acc else None,
-                   species_of_origin=species, problematic_cell_line=bool(problems),
-                   problem_note=problems[0] if problems else None)
+        data = _get("https://api.cellosaurus.org/search/cell-line",
+                    {"q": q, "format": "json", "rows": CELLOSAURUS_ROWS})
+        for line in (next(_walk(data, "cell-line-list"), []) if data else []):
+            acc = _primary_acc(line)
+            if acc:
+                lines.setdefault(acc, line)
+    want = _tight(name)
+    exact = {acc: line for acc, line in lines.items() if want in {_tight(x) for x in _line_names(line)[1]}}
+    if len(exact) == 1:
+        acc, line = next(iter(exact.items()))
+        problems = _problems(line)
+        species = [s.get("label") or s.get("value") for sl in _walk(line, "species-list") for s in sl]
+        return _result("RESOLVED", "Cellosaurus", normalized_id=f"RRID:{acc}", approved_name=_line_names(line)[0],
+                       species_of_origin=species, problematic_cell_line=bool(problems),
+                       problem_note=problems[0] if problems else None,
+                       identity_warnings=[f"{_line_names(line)[0]} ({acc}) is listed by Cellosaurus as a problematic "
+                                          f"cell line: {problems[0]}"] if problems else [])
+    if len(exact) > 1:
+        details = []
+        for acc, line in sorted(exact.items()):
+            problems = _problems(line)
+            details.append({"accession": acc, "name": _line_names(line)[0], "problematic": bool(problems),
+                            "problem_note": problems[0] if problems else None})
+        warnings = [f"Misidentification possible: candidate {d['name']} ({d['accession']}) is listed by "
+                    f"Cellosaurus as a problematic cell line ({d['problem_note']}). The source does not say which "
+                    f"line was used; this does not establish that the stock was misidentified."
+                    for d in details if d["problematic"]]
+        return _result("AMBIGUOUS", "Cellosaurus", normalized_id=None, candidates=[d["accession"] for d in details],
+                       candidate_details=details, identity_warnings=warnings)
+    return _result("UNRESOLVED", "Cellosaurus", normalized_id=None,
+                   note=f"no line named exactly '{name}'" + (f" among {len(lines)} search hits" if lines else ""))
 
 
 # ------------------------------------------------------------------ ontologies (OLS4)
-def ols(term: str, ontology: str) -> dict:
+def _ols_docs(term: str, ontology: str) -> list[dict]:
+    """Exact hits on a term's label or synonyms only. Descriptions, annotations and cross-references are
+    not searched: they produced matches such as ORR -> 'Exacerbated by opiate medication'."""
     data = _get("https://www.ebi.ac.uk/ols4/api/search",
-                {"q": term, "ontology": ontology, "exact": "true", "rows": 5})
-    docs = ((data or {}).get("response") or {}).get("docs", [])
+                {"q": term, "ontology": ontology, "exact": "true", "queryFields": "label,synonym", "type": "class",
+                 "fieldList": "obo_id,label,synonym,is_defining_ontology", "rows": 25})
+    return ((data or {}).get("response") or {}).get("docs", [])
+
+
+def _native(docs: list[dict], ontology: str) -> list[dict]:
+    """Terms defined by the ontology searched (MONDO imports HP terms, ChEBI is not the source of GO)."""
+    pre = ontology.upper() + ":"
+    return [d for d in docs if (d.get("obo_id") or "").upper().startswith(pre)]
+
+
+def _syns(d: dict) -> set[str]:
+    s = d.get("synonym") or []
+    return {_squash(x) for x in (s if isinstance(s, list) else [s])}
+
+
+def ols(term: str, ontology: str) -> dict:
+    """RESOLVED only for a unique exact label in the ontology's own terms. Exact synonym hits are plausible,
+    not proven (an abbreviation can be an exact synonym of unrelated terms): AMBIGUOUS. Hits outside the
+    ontology only: UNRESOLVED, listed as weak candidates."""
+    docs = _ols_docs(term, ontology)
     src = f"OLS4/{ontology.upper()}"
-    ids = {d.get("obo_id") for d in docs if d.get("obo_id")}
-    label_exact = [d for d in docs if (d.get("label") or "").lower() == term.lower()]
-    # Ontologies import terms from others (MONDO carries HP:0002099 "Asthma"); prefer native IDs.
-    native = [d for d in label_exact if (d.get("obo_id") or "").upper().startswith(ontology.upper() + ":")]
-    if native:
-        label_exact = native
-    pick = docs[0] if len(ids) == 1 else (label_exact[0] if len(label_exact) == 1 else None)
-    if pick:
-        return _result("RESOLVED", src, normalized_id=pick.get("obo_id"), approved_name=pick.get("label"))
-    if ids:
+    t = _squash(term)
+    native = _native(docs, ontology)
+    label = [d for d in native if _squash(d.get("label")) == t]
+    syn = [d for d in native if d not in label and t in _syns(d)]
+    if len(label) == 1:
+        d = label[0]
+        return _result("RESOLVED", src, normalized_id=d.get("obo_id"), approved_name=d.get("label"), match="EXACT_LABEL")
+    if label or syn:
         return _result("AMBIGUOUS", src, normalized_id=None,
-                       candidates=[f"{d.get('obo_id')} {d.get('label')}" for d in docs])
+                       candidates=[f"{d.get('obo_id')} {d.get('label')}" for d in label + syn],
+                       match="EXACT_LABEL" if len(label) > 1 else "EXACT_SYNONYM_ONLY")
+    if docs:
+        return _result("UNRESOLVED", src, normalized_id=None,
+                       weak_candidates=[f"{d.get('obo_id')} {d.get('label')}" for d in docs[:5]],
+                       note="only terms defined outside this ontology matched")
     return _result("UNRESOLVED", src, normalized_id=None)
 
 
+def abbreviation_candidates(abbr: str, entity_type: str) -> list[dict]:
+    """What an ontology says the bare abbreviation could be: terms carrying it as an exact label or synonym."""
+    out = []
+    if entity_type in DRUG_TYPES or entity_type in CHEM_TYPES:
+        ontology = "chebi"
+    elif entity_type in OLS_TYPES:
+        ontology = OLS_TYPES[entity_type]
+    else:
+        return out
+    a = _squash(abbr)
+    for d in _native(_ols_docs(abbr, ontology), ontology):
+        if a == _squash(d.get("label")) or a in _syns(d):
+            out.append({"id": d.get("obo_id"), "label": d.get("label"), "names": sorted(_syns(d) | {_squash(d.get("label"))})})
+    return out
+
+
 # ------------------------------------------------------------------ dispatcher
-def normalize_one(entity: dict) -> dict:
+IDENTITY_FIELDS = ("normalized_id", "approved_name", "approved_symbol", "pubchem", "max_clinical_phase",
+                   "drug_status_verified", "drug_status_conflict", "drugbank_id", "drugbank_groups", "drugbank_state",
+                   "drugbank_candidates", "drugbank_note", "uniprot", "ec_numbers", "ncbi_gene", "species_of_origin",
+                   "problematic_cell_line", "problem_note", "candidates", "candidate_details", "identity_warnings",
+                   "weak_candidates", "match", "expansion", "resolved_from", "abbreviation_candidates_overridden",
+                   "conflict", "note", "normalization_state", "normalization_source")
+ABBR_TYPES = DRUG_TYPES | CHEM_TYPES | set(OLS_TYPES)
+
+
+def _lookup(entity: dict, mention: str) -> dict:
+    t = entity.get("type", "")
+    if t in DRUG_TYPES or t in CHEM_TYPES:
+        return normalize_chemical({**entity, "mention": mention})
+    return ols(mention, OLS_TYPES[t])
+
+
+def _abbreviation(entity: dict, text: str | None) -> dict:
+    """An abbreviation is resolved only through its source-supported expansion; the expansion takes
+    precedence over any ontology hit on the abbreviation itself. Without one it is never RESOLVED."""
+    abbr, t = entity["mention"].strip(), entity.get("type", "")
+    exp = find_expansion(abbr, text or "")
+    if exp and exp.get("long_form"):
+        res = _lookup(entity, exp["long_form"])
+        res = {**res, "expansion": exp, "resolved_from": "SOURCE_EXPANSION"}
+        cands = abbreviation_candidates(abbr, t)
+        lf = _squash(exp["long_form"])
+        if res["normalization_state"] == "RESOLVED":
+            others = [f"{c['id']} {c['label']}" for c in cands if c["id"] != res.get("normalized_id") and lf not in c["names"]]
+            if others:
+                res["abbreviation_candidates_overridden"] = others
+            return res
+        agreeing = [c for c in cands if lf in c["names"]]
+        if len(agreeing) == 1:
+            c = agreeing[0]
+            return _result("RESOLVED", f"OLS4 via source expansion", normalized_id=c["id"], approved_name=c["label"],
+                           expansion=exp, resolved_from="SOURCE_EXPANSION", match="EXPANSION_IS_SYNONYM")
+        contradicting = [c for c in cands if lf not in c["names"]]
+        if contradicting and not agreeing:
+            return _result("CONFLICT", "source expansion vs ontology", normalized_id=None, expansion=exp,
+                           conflict={"raised_by": "CODE", "source_expansion": exp["long_form"],
+                                     "conflicting_ids": [c["id"] for c in contradicting],
+                                     "conflicting_names": [c["label"] for c in contradicting]})
+        return res
+    cands = abbreviation_candidates(abbr, t)
+    reason = ("the source expands it inconsistently: " + "; ".join(exp["conflicting_long_forms"])
+              if exp else "abbreviation without an expansion in the source")
+    if cands:
+        return _result("AMBIGUOUS", "abbreviation", normalized_id=None, note=reason,
+                       candidates=[f"{c['id']} {c['label']}" for c in cands], match="ABBREVIATION_ONLY")
+    return _result("UNRESOLVED", "abbreviation", normalized_id=None, note=reason)
+
+
+def normalize_one(entity: dict, text: str | None = None) -> dict:
     t = entity.get("type", "")
     mention = (entity.get("mention") or "").strip()
     if not mention:
         return _result("UNRESOLVED", "none", normalized_id=None)
     if t in GENE_TYPES:
         return normalize_gene(entity)
-    if t in DRUG_TYPES or t in CHEM_TYPES:
-        return normalize_chemical(entity)
     if t == "CELL_LINE":
         return cellosaurus(mention)
+    if t in ABBR_TYPES and is_abbreviation(mention):
+        return _abbreviation(entity, text)
+    split = split_self_expanded(mention) if t in ABBR_TYPES else None
+    if split:
+        res = _lookup(entity, split[0])
+        return {**res, "expansion": {"abbreviation": split[1], "long_form": split[0], "source_span": mention},
+                "resolved_from": "MENTION_HEAD"}
+    if t in DRUG_TYPES or t in CHEM_TYPES:
+        return normalize_chemical(entity)
     if t in OLS_TYPES:
         return ols(mention, OLS_TYPES[t])
     return _result("NOT_APPLICABLE", "none", normalized_id=None)
 
 
-def _cache_key(e: dict) -> str:
-    return "|".join(str(e.get(k) or "") for k in ("type", "mention", "molecule_species"))
+CACHE_VERSION = "v3"   # earlier entries (exact hit on any field, first three Cellosaurus rows) are never reused
 
 
-def normalize_entities(extraction: dict, cache_path: Path | None = None) -> dict:
-    """Fill normalization fields on every entity of an A05-KE output, in place."""
+def _cache_key(e: dict, text: str | None = None) -> str:
+    exp = ""
+    if e.get("type") in ABBR_TYPES and is_abbreviation(e.get("mention") or ""):
+        x = find_expansion((e.get("mention") or "").strip(), text or "") or {}
+        exp = x.get("long_form") or ("|".join(x.get("conflicting_long_forms") or []))
+    return "|".join([CACHE_VERSION] + [str(e.get(k) or "") for k in ("type", "mention", "molecule_species")] + [exp])
+
+
+def usable_identity(entity: dict) -> dict:
+    """The identity fields a consumer may use: only for a RESOLVED entity. AMBIGUOUS, UNRESOLVED and
+    CONFLICT entities are known by their source mention alone; candidate-level warnings travel with them."""
+    if entity.get("normalization_state") != "RESOLVED":
+        return {k: entity[k] for k in ("identity_warnings",) if entity.get(k)}
+    return {k: entity.get(k) for k in ("normalized_id", "approved_name", "approved_symbol", "drug_status_verified",
+                                       "drug_status_conflict", "drugbank_id", "problematic_cell_line",
+                                       "identity_warnings") if entity.get(k) not in (None, [], "")}
+
+
+def conflict_entity(entity: dict, raised_by: str, reason: str, record_id: str | None,
+                    spans: list[str]) -> dict:
+    """Make a code-attached identity unusable: strip every identity field from the entity, keep its source
+    mention, set CONFLICT. Returns the audit record (the only place the conflicting ID is kept)."""
+    audit = {"record_id": record_id, "entity_id": entity.get("entity_id"), "mention": entity.get("mention"),
+             "type": entity.get("type"),
+             "conflicting_id": entity.get("normalized_id") or (entity.get("conflict") or {}).get("conflicting_ids"),
+             "conflicting_name": entity.get("approved_name") or (entity.get("conflict") or {}).get("conflicting_names"),
+             "normalization_source": entity.get("normalization_source"), "expansion": entity.get("expansion"),
+             "raised_by": raised_by, "reason": reason, "source_spans": spans}
+    for k in IDENTITY_FIELDS:
+        entity.pop(k, None)
+    entity.update(normalization_state="CONFLICT", normalization_source=f"conflict ({raised_by})", normalized_id=None)
+    return audit
+
+
+def _spans_for(extraction: dict, entity_id: str) -> list[str]:
+    return [f.get("span") for f in extraction.get("findings", [])
+            if entity_id in (f.get("subject_entity_id"), f.get("object_entity_id")) and f.get("span")][:10]
+
+
+def load_conflicts(path: Path | None) -> set[str]:
+    if not path or not Path(path).exists():
+        return set()
+    return {str(c.get("conflicting_id")) for c in json.loads(Path(path).read_text(encoding="utf-8"))
+            if c.get("conflicting_id")}
+
+
+def register_conflicts(path: Path | None, audits: list[dict]) -> None:
+    """Append to the run's conflict registry: one row per conflicting ID. Every later normalization in the
+    run rejects these IDs, whatever mention they come back for."""
+    if not path or not audits:
+        return
+    rows = json.loads(Path(path).read_text(encoding="utf-8")) if Path(path).exists() else []
+    for a in audits:
+        ids = a["conflicting_id"] if isinstance(a["conflicting_id"], list) else [a["conflicting_id"]]
+        rows += [{**a, "conflicting_id": i} for i in ids if i]
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(rows, indent=1, ensure_ascii=False), encoding="utf-8")
+
+
+def normalize_entities(extraction: dict, cache_path: Path | None = None, sections=None,
+                       conflicts_path: Path | None = None, record_id: str | None = None) -> dict:
+    """Fill normalization fields on every entity of an A05-KE output, in place. `sections` (the paper text)
+    supplies abbreviation expansions; `conflicts_path` is the run's conflict registry (data/
+    normalization_conflicts.json): an identity in it, or a source-vs-ontology contradiction found here, is
+    stripped (CONFLICT) and recorded there with the mention and its source spans. Re-normalizing replaces
+    every identity field; nothing from an earlier identity survives on the entity."""
     cache: dict = {}
     if cache_path and Path(cache_path).exists():
         cache = json.loads(Path(cache_path).read_text(encoding="utf-8"))
+    text = source_text(sections) if sections is not None else None
+    rejected = load_conflicts(conflicts_path)
+    audits = []
     for e in extraction.get("entities", []):
-        key = _cache_key(e)
+        key = _cache_key(e, text)
         if key not in cache:
             try:
-                cache[key] = normalize_one(e)
+                cache[key] = normalize_one(e, text)
             except (requests.RequestException, ValueError) as exc:
                 # technical failure: not cached, so the next run retries; never read as absence
+                for k in IDENTITY_FIELDS:
+                    e.pop(k, None)
                 e.update(_result("LOOKUP_FAILED", "error", normalized_id=None, note=str(exc)[:200]))
                 continue
+        for k in IDENTITY_FIELDS:
+            e.pop(k, None)
         e.update(cache[key])
         if cache[key].get("drugbank_state") == "LOOKUP_FAILED":
             del cache[key]   # keep the ChEMBL result on the entity, but retry DrugBank next time
+        if e.get("normalization_state") == "CONFLICT":
+            audits.append(conflict_entity(e, "CODE", "source expansion contradicts the ontology's reading of the "
+                                          "abbreviation", record_id, _spans_for(extraction, e.get("entity_id"))))
+        elif e.get("normalized_id") and str(e["normalized_id"]) in rejected:
+            audits.append(conflict_entity(e, "REGISTRY", "identity previously found to contradict a source in this run",
+                                          record_id, _spans_for(extraction, e.get("entity_id"))))
     if cache_path:
         Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
         Path(cache_path).write_text(json.dumps(cache, indent=1), encoding="utf-8")
+    register_conflicts(conflicts_path, [a for a in audits if a["raised_by"] != "REGISTRY"])
+    if audits:
+        extraction.setdefault("_normalization_audit", []).extend(audits)
     return extraction

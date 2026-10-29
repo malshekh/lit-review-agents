@@ -79,6 +79,27 @@
           "check"
         ]
       }
+    },
+    "appraisal_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "binding_id",
+          "preserved"
+        ],
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "preserved": {
+            "type": "boolean"
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "required": [

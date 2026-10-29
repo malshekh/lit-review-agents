@@ -19,6 +19,8 @@ import re
 import textwrap
 from pathlib import Path
 
+from ..evidence import status_of
+
 TABLE_TYPES = {"TABLE_EVIDENCE_SUMMARY", "TABLE_COMPARISON"}
 NOT_REPORTED = "NR"
 TABLE_ROWS_PER_PAGE = 25   # rough fit for one typeset page (journal table_max_pages: 1)
@@ -37,7 +39,8 @@ def _ctx(f: dict, *keys: str) -> str:
 
 def _entity(f: dict, eid: str | None) -> str:
     e = (f.get("entities") or {}).get(eid or "", {})
-    return e.get("approved_symbol") or e.get("mention") or (eid or NOT_REPORTED)
+    symbol = e.get("approved_symbol") if e.get("normalization_state") == "RESOLVED" else None
+    return symbol or e.get("mention") or (eid or NOT_REPORTED)
 
 
 def _relation(f: dict) -> str:
@@ -125,6 +128,9 @@ def evidence_rows(item: dict, synthesis: dict, findings: list[dict], corpus: lis
             if not f:
                 missing.append(fid)
                 continue
+            if status_of(f) != "SUPPORTING":   # never rendered as evidence, whatever the plan says
+                missing.append(f"{fid} (not citable: {status_of(f)}, {f.get('disposition') or 'no disposition'})")
+                continue
             if (fid, role) in seen:
                 continue
             seen.add((fid, role))
@@ -144,7 +150,8 @@ def build_table(item: dict, synthesis: dict, findings: list[dict], corpus: list[
     if unmapped:
         warnings.append(f"Columns with no source field, left blank for the authors: {', '.join(unmapped)}")
     if missing:
-        warnings.append(f"Source IDs not found among validated findings or propositions: {', '.join(sorted(set(missing)))}")
+        warnings.append("Source IDs left out (not found among validated findings or propositions, or not "
+                        f"citable): {', '.join(sorted(set(missing)))}")
     if len(rows) > TABLE_ROWS_PER_PAGE or len(columns) > TABLE_COLS_PER_PAGE:
         warnings.append(f"{len(rows)} rows x {len(columns)} columns may exceed one typeset page; "
                         "split it or move part to Supplementary Information")
@@ -251,7 +258,8 @@ def build_figure(item: dict, synthesis: dict, findings: list[dict], corpus: list
     rows, missing = evidence_rows(item, synthesis, findings, corpus)
     res = {"display_id": did, "kind": "FIGURE", "type": item.get("type"), "status": "BRIEF_ONLY",
            "image": None, "brief": f"{did}_brief.md", "row_finding_ids": [r["finding_id"] for r in rows],
-           "warnings": [f"Source IDs not found: {', '.join(sorted(set(missing)))}"] if missing else []}
+           "warnings": [f"Source IDs left out (not found, or not citable): {', '.join(sorted(set(missing)))}"]
+           if missing else []}
     if item.get("origin") == "ADAPTED_FROM":
         res["warnings"].append(f"Adapted from {item.get('adapted_from_record_id')}: needs copyright permission")
     if item.get("type") == "FIGURE_EVIDENCE_MAP" and rows and item.get("origin") != "ADAPTED_FROM":

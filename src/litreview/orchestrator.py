@@ -19,7 +19,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import checkpoints, config, model_record, notify
+from . import checkpoints, config, evidence, model_record, notify
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
 from .budget import BudgetExceeded, BudgetTracker, UnpricedModel
@@ -35,6 +35,7 @@ from .tools.fulltext import fetch_sections
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
 from .tools.literature.expansion import choose_next_seeds, choose_seeds, expand
+from .tools import normalization
 from .tools.normalization import normalize_entities
 
 STAGES = ["scope", "cp1", "search", "qualify", "expand", "cp2", "extract", "validate", "synthesize", "cp3",
@@ -531,8 +532,42 @@ class Run:
             items.append((f"A05-KE_{rid}", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
                                             "content_level": level, "record": {**rec, "content": sections}}))
         self.run_many("A05-KE", items, lambda step, out: self.save(
-            f"extractions/{rid_of[step]}.json", normalize_entities(out, self.data("normalization_cache.json"))))
+            f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out)))
         return "validate"
+
+    def _normalize(self, rid: str, ext: dict) -> dict:
+        """Normalize a paper's entities against its own text (abbreviation expansions) and the run's conflict
+        registry; conflicts found are kept in data/normalization_audit.json, never on the entity."""
+        normalize_entities(ext, self.data("normalization_cache.json"), sections=self.load(f"fulltext/{rid}.json"),
+                           conflicts_path=self.data("normalization_conflicts.json"), record_id=rid)
+        self._audit_normalization(ext.pop("_normalization_audit", []))
+        return ext
+
+    def _audit_normalization(self, audits: list[dict]) -> None:
+        if audits:
+            self.save("normalization_audit.json", self.load("normalization_audit.json", []) + audits)
+
+    def _save_validation(self, rid: str, val: dict) -> None:
+        """Save an A06 PER_PAPER validation. A conflict A06 reports between a code-attached identity and the
+        source mention is applied here: the identity is stripped from the entity (CONFLICT), recorded in the
+        audit and the run's registry, and so cannot reach any consumer. The validation then records the
+        identities it was made against, so a later identity change sends the finding back for revalidation
+        instead of silently keeping (or gaining) its disposition."""
+        ext = self.load(f"extractions/{rid}.json", {})
+        ents = {e.get("entity_id"): e for e in ext.get("entities", [])}
+        audits = []
+        for c in val.get("normalization_conflicts") or []:
+            e = ents.get(c.get("entity_id"))
+            if e is not None and e.get("normalization_state") == "RESOLVED":
+                audits.append(normalization.conflict_entity(
+                    e, "A06-SV", c.get("reason") or c.get("source_says") or "A06: identity contradicts the source mention",
+                    rid, normalization._spans_for(ext, e.get("entity_id"))))
+        if audits:
+            normalization.register_conflicts(self.data("normalization_conflicts.json"), audits)
+            self._audit_normalization(audits)
+            self.save(f"extractions/{rid}.json", ext)
+        val["_entity_identities"] = evidence.identity_snapshot(ext)
+        self.save(f"validations/{rid}.json", val)
 
     def _extraction_vendor(self, rid: str, entries: list[dict] | None = None) -> str:
         """The vendor that actually produced this paper's current extraction: the provider of the last call
@@ -567,7 +602,7 @@ class Run:
                                                     "paper_text": sections}))
             entries = self.budget.entries()
             vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
-            self.run_many("A06-SV", items, lambda step, out: self.save(f"validations/{rid_of[step]}.json", out),
+            self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
                           exclude=vendor.__getitem__)
         for rec in corpus:
             rid = rec["record_id"]
@@ -602,14 +637,24 @@ class Run:
                                        {"record_id": rid, "error": str(e)[:300],
                                         "kept": "first extraction with its A06 validation"})
                     break
-                self.save(f"extractions/{rid}.json", normalize_entities(ext, self.data("normalization_cache.json")))
-            self.save(f"validations/{rid}.json", val)
-        # theme-level pass
+                self.save(f"extractions/{rid}.json", self._normalize(rid, ext))
+            self._save_validation(rid, val)
         findings = self._validated_findings(corpus)
+        theme_records = self._theme_pass(corpus, findings)
+        self.save("validated_findings.json", findings)
+        self._save_held(findings)
+        self.save("theme_records.json", theme_records)
+        return "synthesize"
+
+    def _theme_pass(self, corpus: list[dict], findings: list[dict], only: set[str] | None = None,
+                    label: str = "") -> dict:
+        """A06 PER_THEME over the validated findings, for every theme or only those in `only`."""
         by_theme: dict[str, list] = defaultdict(list)
         for f in findings:
             for th in f["themes"] or ["(unthemed)"]:
                 by_theme[th].append(f)
+        if only is not None:
+            by_theme = {th: fs for th, fs in by_theme.items() if th in only}
         same_study = {r["record_id"]: [x for x in r.get("flags", []) if "SAME_STUDY" in x] for r in corpus}
         theme_records = {}
         # a theme pass audits findings from many papers: it stays off every vendor that produced any of them
@@ -623,19 +668,21 @@ class Run:
                                                       "same_study_flags": same_study,
                                                       "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")}
                                                                   for r in corpus]},
-                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}",
+                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}",
                                            exclude_providers=theme_exclude)
-        self.save("validated_findings.json", findings)
-        self.save("theme_records.json", theme_records)
-        return "synthesize"
+        return theme_records
 
     def _validated_findings(self, corpus: list[dict]) -> list[dict]:
-        """Join A05 findings with A06 dispositions into one compact list with global IDs (R0001:F3)."""
+        """Join A05 findings with A06 dispositions into one compact list with global IDs (R0001:F3). Each
+        carries its evidence `eligibility` (evidence.py): decided by the disposition alone; the status only
+        says why a non-citable finding is not citable (held for correction vs rejected)."""
         out = []
         for rec in corpus:
             rid = rec["record_id"]
             ext = self.load(f"extractions/{rid}.json", {})
-            val = {v["finding_id"]: v for v in self.load(f"validations/{rid}.json", {}).get("validations", [])}
+            val_doc = self.load(f"validations/{rid}.json", {})
+            val = {v["finding_id"]: v for v in val_doc.get("validations", [])}
+            elig = evidence.annotate_paper(ext, val_doc)
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
@@ -646,16 +693,128 @@ class Run:
                             "span": f.get("span"), "quantities": f.get("quantities", []),
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
-                            "disposition": v.get("disposition"), "constraints": v.get("constraints", []),
+                            "disposition": v.get("disposition"), "eligibility": elig.get(f["finding_id"]),
+                            "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
-                            # only this finding's own subject and object, not the paper's whole entity list
-                            "entities": {e["entity_id"]: {k: e.get(k) for k in (
-                                "mention", "type", "approved_symbol", "normalized_id", "normalization_state",
-                                "drug_status_verified", "drug_status_conflict", "drugbank_id",
-                                "problematic_cell_line") if e.get(k) is not None}
-                                for e in ext.get("entities", [])
-                                if e["entity_id"] in (f.get("subject_entity_id"), f.get("object_entity_id"))}})
+                            # only this finding's own subject and object, not the paper's whole entity list;
+                            # identity fields only for a RESOLVED entity (a CONFLICT, AMBIGUOUS or UNRESOLVED
+                            # entity is known by its source mention alone)
+                            "entities": {e["entity_id"]: {**{k: e.get(k) for k in ("mention", "type",
+                                                                                    "normalization_state")
+                                                             if e.get(k) is not None},
+                                                          **normalization.usable_identity(e)}
+                                         for e in ext.get("entities", [])
+                                         if e["entity_id"] in (f.get("subject_entity_id"), f.get("object_entity_id"))}})
         return out
+
+    # --- normalization correction and revalidation -----------------------
+    def renormalize(self) -> dict:
+        """Re-run entity normalization over every paper with the current rules. No agent call.
+
+        Before anything changes, each validation records the identities its A06 call saw (a validation from
+        before identities were recorded is taken to have seen the extraction as it stands now) and the
+        extraction and validation are archived under data/renormalization/. A finding whose identity then
+        changes is REVALIDATION_REQUIRED: it is not used, and its old disposition is not kept, until A06
+        revalidates it. Returns which papers need revalidation and the measured cost of their last A06 call."""
+        corpus = self.load("selected_corpus.json")
+        changes = {}
+        for rec in corpus:
+            rid = rec["record_id"]
+            ext, val = self.load(f"extractions/{rid}.json"), self.load(f"validations/{rid}.json")
+            if ext is None:
+                continue
+            if val is not None and "_entity_identities" not in val:
+                val["_entity_identities"] = evidence.identity_snapshot(ext)
+                self.save(f"validations/{rid}.json", val)
+            for sub, doc in (("extractions_before", ext), ("validations_before", val)):
+                if doc is not None and not self.data(f"renormalization/{sub}/{rid}.json").exists():
+                    self.save(f"renormalization/{sub}/{rid}.json", doc)
+            # changes are reported against the run as originally validated, however often this is re-run
+            before = evidence.identity_snapshot(self.load(f"renormalization/extractions_before/{rid}.json") or ext)
+            ext = self._normalize(rid, ext)
+            self.save(f"extractions/{rid}.json", ext)
+            after = evidence.identity_snapshot(ext)
+            moved = {eid: {"mention": next((e.get("mention") for e in ext["entities"] if e["entity_id"] == eid), None),
+                           "before": before[eid], "after": after[eid]}
+                     for eid in after if before.get(eid, {}).get("normalized_id") != after[eid]["normalized_id"]
+                     or before.get(eid, {}).get("normalization_state") != after[eid]["normalization_state"]}
+            if moved:
+                changes[rid] = moved
+        findings = self._validated_findings(corpus)
+        self.save("validated_findings.json", findings)
+        self._save_held(findings)
+        need = sorted({f["record_id"] for f in findings
+                       if evidence.status_of(f) in ("REVALIDATION_REQUIRED", "HELD_FOR_CORRECTION")})
+        entries = self.budget.entries()
+        cost = {rid: round(next((e["cost_usd"] or 0 for e in reversed(entries)
+                                 if e["step"].startswith(f"A06-SV_{rid}_")), 0.0), 4) for rid in need}
+        report = {"identity_changes": changes, "eligibility": evidence.summary(findings),
+                  "papers_needing_revalidation": need,
+                  "revalidation_cost_estimate_usd": {"per_paper_last_a06_call": cost, "total": round(sum(cost.values()), 2)}}
+        self.save("renormalization/report.json", report)
+        self.prov.tool_run("renormalize", "validate", {"papers_changed": len(changes), "need": need,
+                                                       "estimate_usd": report["revalidation_cost_estimate_usd"]["total"]})
+        return report
+
+    def revalidate(self, record_ids: list[str]) -> dict:
+        """A fresh A06 PER_PAPER validation of each paper, against the identities now attached. Its previous
+        validation stays archived for the regression report. Theme records built from the old dispositions
+        are marked stale; synthesis does not start until they are rebuilt (`revalidate --themes`)."""
+        corpus = {r["record_id"]: r for r in self.load("selected_corpus.json")}
+        spec = self.load("spec_approved.json")
+        for rid in record_ids:
+            if rid not in corpus:
+                raise ValueError(f"{rid} is not in the selected corpus")
+            if not self.data(f"renormalization/validations_before/{rid}.json").exists():
+                self.save(f"renormalization/validations_before/{rid}.json", self.load(f"validations/{rid}.json"))
+            sections, ext = self.load(f"fulltext/{rid}.json"), self.load(f"extractions/{rid}.json")
+            n = 1 + sum(1 for p in (self.dir / "outputs").glob(f"A06-SV_{rid}_reval*.json") if ".raw" not in p.name)
+            val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
+                                        "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections},
+                             step=f"A06-SV_{rid}_reval{n}", exclude_providers=frozenset({self._extraction_vendor(rid)}))
+            self._save_validation(rid, val)
+        findings = self._validated_findings(list(corpus.values()))
+        self.save("validated_findings.json", findings)
+        self._save_held(findings)
+        stale = set(self.load("theme_records_stale.json", [])) | {th for f in findings if f["record_id"] in record_ids
+                                                                   for th in f.get("themes") or ["(unthemed)"]}
+        self.save("theme_records_stale.json", sorted(stale))
+        return {"revalidated": record_ids, "eligibility": evidence.summary(findings), "themes_stale": sorted(stale)}
+
+    def rebuild_stale_themes(self) -> list[str]:
+        stale = set(self.load("theme_records_stale.json", []))
+        if not stale:
+            return []
+        corpus = self.load("selected_corpus.json")
+        records = self.load("theme_records.json", {})
+        n = 1 + sum(1 for p in (self.dir / "outputs").glob("A06-SV_theme_*_reval*.json") if ".raw" not in p.name)
+        records.update(self._theme_pass(corpus, self._findings(), only=stale, label=f"_reval{n}"))
+        self.save("theme_records.json", records)
+        self.save("theme_records_stale.json", [])
+        return sorted(stale)
+
+    def _findings(self) -> list[dict]:
+        """validated_findings.json with eligibility. A file written before eligibility existed is annotated
+        from the extractions and validations (deterministic, no agent call) and saved, so every consumer
+        sees it."""
+        findings = self.load("validated_findings.json")
+        if findings and any("eligibility" not in f for f in findings):
+            rebuilt = {f["finding_id"]: f for f in self._validated_findings(self.load("selected_corpus.json", []))}
+            findings = [f if "eligibility" in f else
+                        {**f, "eligibility": (rebuilt.get(f["finding_id"]) or {}).get("eligibility")
+                         or evidence.classify({}, {"disposition": f.get("disposition")}, [], set())}
+                        for f in findings]
+            self.save("validated_findings.json", findings)
+            self._save_held(findings)
+            self.prov.tool_run("evidence_eligibility", "annotate", evidence.summary(findings))
+        return findings
+
+    def _save_held(self, findings: list[dict]) -> None:
+        """Findings held for correction (a code-attached identity contradicts the source), kept recoverable:
+        they are not cited until the identity is corrected and the paper revalidated."""
+        held = [{"finding_id": f["finding_id"], **(f.get("eligibility") or {})}
+                for f in findings if (f.get("eligibility") or {}).get("status") == "HELD_FOR_CORRECTION"]
+        self.save("held_for_correction.json", held)
 
     def _consolidate_themes(self, findings: list[dict], theme_records: dict) -> tuple[list[dict], dict]:
         """String-level merge of theme labels (tools/themes.py). Findings keep their original labels in
@@ -699,8 +858,12 @@ class Run:
         """A07 as one logical job over bounded calls (synthesis_job.py). The frozen corpus is the cached
         prefix of every call; the runtime keeps the coverage and finding ledgers."""
         corpus = self.load("selected_corpus.json")
+        stale = self.load("theme_records_stale.json", [])
+        if stale:
+            raise Pause(f"{len(stale)} theme records predate a revalidation (data/theme_records_stale.json); "
+                        f"rebuild them with `litreview revalidate {self.id} --themes` before synthesis")
         theme_records = self.load("theme_records.json")
-        findings, theme_records_for_a07 = self._consolidate_themes(self.load("validated_findings.json"), theme_records)
+        findings, theme_records_for_a07 = self._consolidate_themes(self._findings(), theme_records)
         manifest = synthesis_input.build_manifest(corpus, theme_records, self._inconsistency_items(corpus))
         self.save("coverage_manifest.json", manifest)
         feedback = self.load("cp3_feedback.json")
@@ -728,7 +891,8 @@ class Run:
 
         job = SynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", synthesis_input.mandatory_items(manifest),
                            [f["finding_id"] for f in findings], {f["finding_id"]: f["record_id"] for f in findings},
-                           call, count, scfg, served_by=lambda: self.last_model)
+                           call, count, scfg, served_by=lambda: self.last_model,
+                           findings={f["finding_id"]: f for f in findings})
         try:
             pkg = job.run()
         except JobStopped as e:
@@ -791,7 +955,7 @@ class Run:
 
     # Findings with these A06 dispositions can feed synthesis; the others (DOES_NOT_ESTABLISH, BLOCKED_*,
     # HUMAN_REVIEW_REQUIRED, UNRESOLVED_SOURCE_ACCESS) cannot, so the review does not build on them.
-    _USABLE = {"SUPPORTED", "SUPPORTED_WITH_CONSTRAINTS", "SUPPORTED_FOR_OBSERVATION", "PARTIALLY_SUPPORTED"}
+    _USABLE = evidence.USABLE
 
     @classmethod
     def _inconsistency_visibility(cls, item: dict, rec: dict, usable: set[str]) -> tuple[str, str]:
@@ -887,7 +1051,7 @@ class Run:
             shutil.rmtree(out_dir)   # a new plan replaces every item
         incons = self.load("inconsistencies.json", [])
         built = display_items.build_all(plan, self.load("synthesis_approved.json"),
-                                        self.load("validated_findings.json", []),
+                                        self._findings() or [],
                                         self.load("selected_corpus.json", []), out_dir, incons)
         self.save("display_items.json", built)
         placed = {n["item_id"] for d in built for n in d.get("inconsistency_notes", [])}
@@ -911,12 +1075,18 @@ class Run:
         to flag a conflict and ask for the record. Requested records are sent in one detail round (at most
         verification_scope.MAX_DETAIL), and that round's output replaces the first."""
         plan, pkg = self.load("manuscript_plan.json"), self.load("synthesis_approved.json")
-        findings = self.load("validated_findings.json")
+        findings = self._findings()
         prose = self._prose_vendors("A10-RV")
         full, index, stats = verification_scope.scope(manuscript, plan, pkg, findings)
+        # evidence used in a role it may not serve, and appraised claims A10 must check: found by code, shown
+        # to A10, and merged into its output whatever it concludes (evidence.apply_to_verification)
+        ineligible, appraisals = evidence.verification_bindings(manuscript, pkg, findings)
         payload = {"pass": pass_, "manuscript": manuscript, "manuscript_plan": plan, "synthesis_package": pkg,
                    "validated_findings": full, "contradiction_index": index,
-                   "deterministic_report": self._deterministic_report(manuscript), "changed_passages": changed}
+                   "deterministic_report": {**self._deterministic_report(manuscript),
+                                            "claims_on_ineligible_evidence": ineligible,
+                                            "appraisal_bindings": appraisals},
+                   "changed_passages": changed}
         rv = self.agent("A10-RV", payload, step=step, exclude_providers=prose)
         wanted, ignored = verification_scope.requested(rv, index)
         first_pass = not any(e["type"] == "tool_run" and e["tool"] == "verification_scope" for e in self.prov.events())
@@ -934,7 +1104,12 @@ class Run:
         if first_pass:   # the first look at whether scoping pays: how often A10 asks, and for how much
             notify.send("a10_detail", f"Run {self.id}: first A10 pass, detail requests",
                         verification_scope.detail_report_text(self._a10_detail_report()))
-        return rv
+        if ineligible or appraisals:
+            self.prov.tool_run("evidence_roles_check", step,
+                               {"ineligible_claims": len(ineligible),
+                                "blocking": sum(x["severity"] == "BLOCKING" for x in ineligible),
+                                "appraisal_bindings": len(appraisals)})
+        return evidence.apply_to_verification(rv, ineligible, pass_, appraisals)
 
     def _a10_detail_report(self) -> dict | None:
         return verification_scope.detail_report(self.prov.events(), self.budget.entries())

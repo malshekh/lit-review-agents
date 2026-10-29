@@ -152,6 +152,44 @@ A10 and A11 also run off every vendor that actually produced the manuscript: the
 A09-WRI and A12-EDI output in the run, checked before each call, not only in the configuration. If those
 cannot be determined, neither runs.
 
+**Evidence eligibility and roles** (`src/litreview/evidence.py`). What a validated finding may be used
+for is decided by its A06 disposition alone; entity normalization never decides it. Each use of a finding is
+a link with its own role, so one proposition can cite validated findings as `SUPPORTING` or `CONFLICTING`
+and a `DOES_NOT_ESTABLISH` finding as `SUBJECT_OF_APPRAISAL` ("X reported Y; its evidence does not establish
+it"). Allowed: a supported disposition (status `SUPPORTING`) as support or conflict; `NOT_ESTABLISHED` as an
+appraisal subject only; `REJECTED`, `UNRESOLVED`, `HELD_FOR_CORRECTION` and `REVALIDATION_REQUIRED` in no
+role. An appraisal link must carry its own statement, the record that made the claim, and A06's rationale
+quoted verbatim; an appraised claim never counts as support (a `SOURCE_GROUNDED` proposition needs a
+supporting or conflicting link; `CLAIM_APPRAISAL` propositions are about the claim). Code enforces this
+wherever findings are consumed, each independently: the A07 job rejects any proposition or gap with a link
+its finding may not serve; display tables leave such findings out; and before every A10 pass code lists
+claims resting on unusable evidence and every sentence bound to an appraisal, and merges them into A10's
+output whatever A10 concludes. A claim whose support is entirely unusable is BLOCKING, an appraised claim
+promoted into an established one (`APPRAISED_CLAIM_PROMOTED`) is BLOCKING, and an appraisal binding A10 left
+without a verdict makes a final pass `INCOMPLETE_VERIFICATION`.
+
+**Identities are separate from validity** (`src/litreview/tools/normalization.py`). OLS4 is searched on labels
+and synonyms only; only a unique exact label in the ontology's own terms resolves. An abbreviation resolves
+only through the paper's own expansion ("disulfiram (DSF)"), which takes precedence over any ontology hit on
+the abbreviation; without one it is AMBIGUOUS or UNRESOLVED. When the source's expansion and the ontology
+contradict, the entity is `CONFLICT`. Cellosaurus candidates are lines whose identifier or synonym matches
+the mention exactly (no row cutoff); a derivative and its parent never stand in for each other, and an
+ambiguous result lists each candidate with its own problematic-line note and a warning that
+misidentification is possible. A06 judges alignment against the source mention, and reports a
+code-attached identifier that contradicts it in `normalization_conflicts` instead of blocking. A
+conflicting identifier is stripped from the entity everywhere (only `usable_identity()` of a RESOLVED entity
+is ever passed on), kept in `data/normalization_audit.json` with the mention and source spans, and added
+to `data/normalization_conflicts.json`, which every later normalization in the run checks. Each validation
+records the identities A06 saw; a finding whose identity changes afterwards is `REVALIDATION_REQUIRED`, so
+correcting an identifier never promotes a finding by itself.
+
+`litreview renormalize RUN` re-runs normalization with the current rules (no model calls), archives the
+previous extractions and validations under `data/renormalization/`, and lists the papers needing
+revalidation with the cost of their last A06 call. `litreview revalidate RUN --records ...` (or
+`--all-needed`) runs a fresh A06 validation of those papers; their theme records are then stale and
+synthesis waits for `litreview revalidate RUN --themes`. `litreview gate2-report RUN` reports recovery and
+new error side by side.
+
 ## 4. Databases — `config/sources.yaml`
 
 Enabled: PubMed, Europe PMC, PubTator3, OpenAlex, Semantic Scholar, ClinicalTrials.gov.

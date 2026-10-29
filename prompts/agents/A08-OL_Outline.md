@@ -1,6 +1,6 @@
 # A8-OL — Outline & Display Planning Agent
 
-Version: 0.3 (draft) · Role: STAGE · Follows: Human Checkpoint 3 · Precedes: A9-WRI
+Version: 0.4 (draft) · Role: STAGE · Follows: Human Checkpoint 3 · Precedes: A9-WRI
 Source lineage: new. Takes over the outline stage of A11-SYN v0.1 (§14 templates and common sections, §14.4 never separate a finding from its qualification, §18 claims beyond prose, §19 artifacts are requested from sources, never filled from memory, §20 the writer contract) and fits it to the *Scientific Reviews* format in `config/journal_scirev.yaml`.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -36,6 +36,7 @@ Rules:
 - **Headings are claims.** Keep them descriptive unless a conclusion proposition supports a claim-bearing heading. Every heading is bound to its propositions. Grouping headings follow the group's kind (evidence-grounded, reporting-only, relationship unresolved).
 - **No footnotes.** Anything that would be a footnote goes in the text or is cut.
 - Adopted interpretations are planned as the authors' view and placed where the premises they rest on have already been presented.
+- **Appraised claims.** A proposition with `SUBJECT_OF_APPRAISAL` links (types `CLAIM_APPRAISAL`, or `SOURCE_GROUNDED` with separately attributed appraisals) carries each appraisal into its plan item's `appraisals`, unchanged: the claim's source record, the appraisal statement and A6-SV's rationale. Never place an appraised claim where the plan treats it as established (a heading, the title, the abstract's findings, or a premise of a conclusion).
 
 ## 4. Budgets
 
@@ -118,7 +119,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "heading_proposition_ids": ["string"],
       "purpose": "string",
       "word_budget": 0,
-      "ordered_items": [{ "item_id": "P1 | K1 | AI1", "item_type": "PROPOSITION | GAP | AUTHOR_INTERPRETATION", "note_to_writer": "string|null" }],
+      "ordered_items": [{ "item_id": "P1 | K1 | AI1", "item_type": "PROPOSITION | GAP | AUTHOR_INTERPRETATION", "note_to_writer": "string|null", "appraisals": [{ "finding_id": "string", "claim_source_record_id": "string", "statement": "string", "a06_rationale": "string" }] }],
       "citation_record_ids": ["string"],
       "display_item_ids": ["string"],
       "transition_in": "string",

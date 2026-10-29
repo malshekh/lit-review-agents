@@ -9,6 +9,7 @@ from litreview.synthesis_job import JobStopped, Ledger, SynthesisJob
 
 FINDINGS = ["R1:F1", "R1:F2", "R2:F1", "R2:F2", "R3:F1"]
 RECORD = {f: f.split(":")[0] for f in FINDINGS}
+SUPPORTED = {f: {"disposition": "SUPPORTED"} for f in FINDINGS}
 MANDATORY = {
     "PAPER:R1": {"item_id": "PAPER:R1", "kind": "SELECTED_PAPER", "record_id": "R1", "required_visibility": "CITED"},
     "PAPER:R2": {"item_id": "PAPER:R2", "kind": "SELECTED_PAPER", "record_id": "R2", "required_visibility": "CITED"},
@@ -51,8 +52,8 @@ class Model:
         return json.loads(json.dumps(self.outputs[name]))
 
 
-def job(tmp_path, model, count=lambda t: 1000, cfg=CFG):
-    return SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, model, count, cfg)
+def job(tmp_path, model, count=lambda t: 1000, cfg=CFG, findings=SUPPORTED):
+    return SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, model, count, cfg, findings=findings)
 
 
 OUT = {"PLAN": PLAN, "GROUP_G1": G1, "GROUP_G2": G2, "FINAL": FINAL}
@@ -224,7 +225,7 @@ def test_stage_synthesize_sends_a_byte_identical_corpus_every_call(tmp_path, mon
     r.save("selected_corpus.json", [{"record_id": "R1", "tier": "CORE"}, {"record_id": "R2", "tier": "SUPPORTING"},
                                     {"record_id": "R3", "tier": "SUPPORTING"}])
     r.save("validated_findings.json", [{"finding_id": f, "record_id": f.split(":")[0], "themes": ["T2"],
-                                        "context_id": f"{f.split(':')[0]}:C1", "context": {"s": 1}, "span": "q"}
+                                        "context_id": f"{f.split(':')[0]}:C1", "context": {"s": 1}, "span": "q", "disposition": "SUPPORTED"}
                                        for f in FINDINGS])
     r.save("theme_records.json", {"T2": {"conflicts": [{"x": 1}], "evidence_reach": {"systems_missing": ["HUMAN"]}}})
     sent = []
@@ -260,10 +261,10 @@ def test_job_resumed_on_an_alternate_after_a_refusal_names_both_models(tmp_path)
     m = Model(OUT, fail={"GROUP_G2": RefusalError("declined", "claude-opus-5", "bio")})
     with pytest.raises(RefusalError):        # a refusal is not a clean stop: the run fails and re-routes
         SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, m, lambda t: 1000, CFG,
-                     served_by=lambda: served["model"]).run()
+                     served_by=lambda: served["model"], findings=SUPPORTED).run()
     served["model"] = "claude-sonnet-5-5"   # the next run routes A07 to its alternate and resumes
     pkg = SynthesisJob(tmp_path / "job", MANDATORY, FINDINGS, RECORD, m, lambda t: 1000, CFG,
-                       served_by=lambda: served["model"]).run()
+                       served_by=lambda: served["model"], findings=SUPPORTED).run()
     assert pkg["models_by_turn"] == {"PLAN": "claude-opus-5", "GROUP_G1": "claude-opus-5",
                                      "GROUP_G2": "claude-sonnet-5-5", "FINAL": "claude-sonnet-5-5"}
     assert pkg["models"] == ["claude-opus-5", "claude-sonnet-5-5"] and pkg["warnings"][0].startswith("MIXED_MODELS")

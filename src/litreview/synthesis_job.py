@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Callable
 
 from .agents import AgentError, RefusalError
+from .evidence import FINDING_RE, link_problems, normalized_proposition, status_of
 
 NARRATIVE_PROMINENCE = {"HEADLINE", "NARRATIVE_PRIMARY", "NARRATIVE_SUPPORTING"}
 COVERAGE_NOTE = ("coverage_realization records structural coverage only: an item is SATISFIED when a committed "
@@ -99,16 +100,20 @@ class Ledger:
 class SynthesisJob:
     def __init__(self, job_dir: Path, mandatory: dict[str, dict], finding_ids: list[str], record_of: dict[str, str],
                  call: Callable[[str, dict, str], dict], count: Callable[[dict], int], cfg: dict,
-                 served_by: Callable[[], str | None] = lambda: None):
+                 served_by: Callable[[], str | None] = lambda: None, *, findings: dict[str, dict]):
         """call(mode, turn, step) -> parsed output; raises AgentError (incl. truncation). count(turn) ->
         projected input tokens for that call. served_by() -> the model that served the last call (recorded
         on each turn's commit, so a job resumed on an alternate after a refusal names both models).
+        findings: finding ID -> validated-finding record (disposition, eligibility, plain_language_limit,
+        constraints). Every evidence link is checked against it (evidence.link_problems): a proposition using a
+        finding in a role its disposition does not permit is rejected, whatever the model was told.
         cfg: max_tokens_per_turn, context_ceiling_tokens, max_findings_per_group."""
         self.dir = Path(job_dir)
         self.turns_dir = self.dir / "turns"
         self.turns_dir.mkdir(parents=True, exist_ok=True)
         self.ledger = Ledger(self.dir / "ledger.jsonl")
         self.mandatory, self.finding_ids, self.record_of = mandatory, set(finding_ids), record_of
+        self.records = findings
         self.call, self.count, self.cfg, self.served_by = call, count, cfg, served_by
         self.peak_projected = 0
         if not self.ledger.events():
@@ -146,7 +151,13 @@ class SynthesisJob:
             raise JobStopped(f"{turn}: {e}") from e
 
     # --- validation -----------------------------------------------------
-    def _validate(self, turn: str, propositions: list[dict], gaps: list[dict], extra_uses: list) -> tuple[dict, list[dict]]:
+    def _not_citable(self, ids) -> list[str]:
+        """Findings that may not serve as evidence (a gap's established_by)."""
+        return [f"{f} ({status_of(self.records.get(f) or {})})" for f in ids
+                if f in self.finding_ids and status_of(self.records.get(f) or {}) != "SUPPORTING"]
+
+    def _validate(self, turn: str, propositions: list[dict], gaps: list[dict],
+                  extra_uses: list) -> tuple[dict, list[dict], list[dict]]:
         st = self.ledger.state()
         seen_ids = set(st["propositions"])
         seen_assertions = {_norm(p["assertion"]) for t in st["committed"]
@@ -156,13 +167,13 @@ class SynthesisJob:
         kept = []
         for p in propositions:
             pid = p.get("proposition_id")
-            cited = list(p.get("supporting_finding_ids") or []) + list(p.get("conflicting_finding_ids") or [])
-            unknown = [f for f in cited if f not in self.finding_ids]
+            problems = link_problems(p, {f: self.records.get(f) or {} for f in self.finding_ids}, self.record_of)
+            p = normalized_proposition(p)
+            cited = [x["finding_id"] for x in p["evidence"]]
             reason = ("missing proposition_id" if not pid else
                       "duplicate proposition_id" if pid in seen_ids else
                       "restates a committed proposition" if _norm(p.get("assertion")) in seen_assertions else
-                      f"unknown finding IDs {unknown}" if unknown else
-                      "cites no finding" if not cited and p.get("type") == "SOURCE_GROUNDED" else None)
+                      "; ".join(problems) if problems else None)
             if reason:
                 staged["rejected"].append({"turn": turn, "proposition_id": pid, "reason": reason})
                 staged["duplicates"] += reason.startswith(("duplicate", "restates"))
@@ -171,14 +182,21 @@ class SynthesisJob:
             seen_assertions.add(_norm(p.get("assertion")))
             staged["accepted"].append(pid)
             kept.append(p)
-            staged["finding_uses"] += [(f, "SUPPORTING") for f in p.get("supporting_finding_ids") or []]
-            staged["finding_uses"] += [(f, "CONFLICTING") for f in p.get("conflicting_finding_ids") or []]
+            staged["finding_uses"] += [(x["finding_id"], "APPRAISED" if x["role"] == "SUBJECT_OF_APPRAISAL"
+                                        else x["role"]) for x in p["evidence"]]
             self._claims(p, pid, cited, items, staged, narrative=p.get("prominence") in NARRATIVE_PROMINENCE)
+        kept_gaps = []
         for g in gaps:
-            self._claims(g, g.get("gap_id"), list(g.get("established_by") or []), items, staged, narrative=True,
-                         gap=True)
+            refs = [x for x in g.get("established_by") or [] if isinstance(x, str)]
+            barred = self._not_citable([x for x in refs if FINDING_RE.fullmatch(x)])
+            if barred:
+                staged["rejected"].append({"turn": turn, "proposition_id": g.get("gap_id"),
+                                           "reason": f"gap established by findings that may not be cited: {barred}"})
+                continue
+            kept_gaps.append(g)
+            self._claims(g, g.get("gap_id"), refs, items, staged, narrative=True, gap=True)
         staged["finding_uses"] += extra_uses
-        return staged, kept
+        return staged, kept, kept_gaps
 
     def _claims(self, element: dict, eid: str, cited: list[str], items: dict, staged: dict, narrative: bool,
                 gap: bool = False) -> None:
@@ -210,7 +228,7 @@ class SynthesisJob:
             body = json.loads(self._turn_file(t).read_text(encoding="utf-8"))
             for p in body.get("propositions") or []:
                 out.append({"id": p["proposition_id"], "assertion": (p.get("assertion") or "")[:200],
-                            "findings": (p.get("supporting_finding_ids") or []) + (p.get("conflicting_finding_ids") or []),
+                            "findings": [x["finding_id"] for x in p.get("evidence") or []],
                             "group": body.get("_group_id")})
         return out
 
@@ -253,7 +271,7 @@ class SynthesisJob:
             "prior_propositions": self._index()})
         extra = [(f, "CONTEXT") for f in out.get("findings_context") or [] if f in self.finding_ids]
         extra += [(x["finding_id"], "UNUSED") for x in out.get("findings_not_used") or [] if x.get("finding_id") in self.finding_ids]
-        staged, kept = self._validate(turn, out.get("propositions") or [], [], extra)
+        staged, kept, _ = self._validate(turn, out.get("propositions") or [], [], extra)
         self._commit(turn, {**out, "propositions": kept, "_group_id": g["group_id"]}, staged)
 
     def final(self) -> dict:
@@ -264,8 +282,8 @@ class SynthesisJob:
                   for p in json.loads(self._turn_file(t).read_text(encoding="utf-8")).get("propositions") or []]
         out = self._run_turn("FINAL", "FINAL", {"mode": "FINAL", "propositions": bodies,
                                                 "pending_item_ids": self._pending()})
-        staged, kept = self._validate("FINAL", out.get("propositions") or [], out.get("knowledge_gaps") or [], [])
-        self._commit("FINAL", {**out, "propositions": kept}, staged)
+        staged, kept, gaps = self._validate("FINAL", out.get("propositions") or [], out.get("knowledge_gaps") or [], [])
+        self._commit("FINAL", {**out, "propositions": kept, "knowledge_gaps": gaps}, staged)
         return out
 
     # --- the whole job --------------------------------------------------
@@ -285,7 +303,10 @@ class SynthesisJob:
         coverage = [{"manifest_item_id": i, "status": s, "satisfied_by": st["satisfied_by"].get(i),
                      "required_visibility": self.mandatory[i].get("required_visibility")}
                     for i, s in sorted(st["items"].items())]
-        dispositions = {f: st["findings"].get(f, ["UNACCOUNTED"]) for f in sorted(self.finding_ids)}
+        # a finding that may not be cited is accounted for by that fact; it is never UNACCOUNTED
+        dispositions = {f: st["findings"].get(f, ["UNACCOUNTED" if status_of(self.records.get(f) or {})
+                                                  in ("SUPPORTING", "NOT_ESTABLISHED") else "NOT_CITABLE"])
+                        for f in sorted(self.finding_ids)}
         pending = [c["manifest_item_id"] for c in coverage if c["status"] != "SATISFIED"]
         unaccounted = [f for f, u in dispositions.items() if u == ["UNACCOUNTED"]]
         models = sorted({m for m in st["models_by_turn"].values() if m})

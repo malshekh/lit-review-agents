@@ -1,6 +1,6 @@
 # A9-WRI — Writing Agent
 
-Version: 0.1 (draft) · Role: STAGE · Follows: A8-OL · Precedes: A10-RV (draft pass)
+Version: 0.2 (draft) · Role: STAGE · Follows: A8-OL · Precedes: A10-RV (draft pass)
 Source lineage: distilled from A14-WRI v0.1. Kept: governing principle; writing capability without scientific authority (§3); every assertion maps to a proposition (§4.1); render the authorized meaning, ceiling as a maximum (§4.2); counter-evidence exempt from economy (§4.4); significance is a proposition (§4.5); values and citations from bindings only (§4.6); the failure mode (§6, now in `prompts/shared/language_policy.md`); writing sequence (§7); rendering, sentence and paragraph rules (§8–§10); transitions (§11); figure legends (§18); plan gaps instead of invention (§22). Removed: condensate claim ladder, exemplar sets, separate JournalWritingProfile (replaced by `config/journal_scirev.yaml`). New: inline proposition tags so binding is checked by code.
 
 Read together with `prompts/shared/core_rules.md` and `prompts/shared/language_policy.md`.
@@ -56,6 +56,9 @@ Write significance only from planned significance or gap propositions. A gap is 
 
 ### 4.8 Author interpretations
 Adopted `AUTHOR_INTERPRETATION` items are written explicitly as the authors' view ("We propose…"), after the premises they rest on have been presented, citing those premises.
+
+### 4.8a Appraised claims
+A plan item's `appraisals` are claims a paper made that its own evidence does not establish. Write each as that paper's claim, attributed and cited ("Smith et al. reported that …"), with the appraisal stated beside it from `statement` and `a06_rationale`, in the same sentence or the next. Never state an appraised claim as a finding, never let it support another sentence, and never drop the appraisal while keeping the claim.
 
 ### 4.9 Numbers, citations and displays
 - Numbers come only from the plan, exactly as given, with units.

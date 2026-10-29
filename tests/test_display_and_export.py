@@ -17,7 +17,7 @@ def _finding(fid, system, species, polarity="POSITIVE"):
             "constraints": ["single dose"], "quantities": [{"measured_property": "Y", "raw_value": "-30",
                                                             "raw_unit": "%", "p_value": "0.01", "n": "8"}],
             "context": {"evidence_system": system, "species": species, "dose_or_concentration": "NOT_REPORTED"},
-            "entities": {"E1": {"mention": "compound X"}, "E2": {"mention": "Y", "approved_symbol": "YGENE"}}}
+            "entities": {"E1": {"mention": "compound X"}, "E2": {"mention": "Y", "approved_symbol": "YGENE", "normalization_state": "RESOLVED"}}}
 
 
 FINDINGS = [_finding("R0001:F1", "IN_VIVO", "mouse"), _finding("R0002:F1", "IN_VIVO", "rat"),

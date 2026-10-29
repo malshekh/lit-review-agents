@@ -34,6 +34,7 @@ def test_drug_approval_from_chembl(fake_get):
 def test_cellosaurus_problematic_flag(fake_get):
     fake_get({"cellosaurus": {"Cellosaurus": {"cell-line-list": [{
         "accession-list": [{"type": "primary", "value": "CVCL_0030"}],
+        "name-list": [{"type": "identifier", "value": "HeLa"}],
         "species-list": [{"label": "Homo sapiens"}],
         "comment-list": [{"category": "Problematic cell line", "value": "Contaminated."}]}]}}})
     r = n.normalize_one({"type": "CELL_LINE", "mention": "HeLa"})
@@ -41,7 +42,7 @@ def test_cellosaurus_problematic_flag(fake_get):
 
 
 def test_ols_disease_ambiguous(fake_get):
-    fake_get({"ols4": {"response": {"docs": [{"obo_id": "MONDO:1", "label": "x a"}, {"obo_id": "MONDO:2", "label": "x b"}]}}})
+    fake_get({"ols4": {"response": {"docs": [{"obo_id": "MONDO:1", "label": "x"}, {"obo_id": "MONDO:2", "label": "X"}]}}})
     r = n.normalize_one({"type": "DISEASE", "mention": "x"})
     assert r["normalization_state"] == "AMBIGUOUS" and len(r["candidates"]) == 2
 

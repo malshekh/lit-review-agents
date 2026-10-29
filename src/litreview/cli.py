@@ -138,6 +138,45 @@ def cmd_costs(args) -> int:
     return 0
 
 
+def cmd_renormalize(args) -> int:
+    rep = Run(args.run_id).renormalize()
+    print(f"Identity changes in {len(rep['identity_changes'])} papers. Eligibility now: {rep['eligibility']}")
+    est = rep["revalidation_cost_estimate_usd"]
+    print(f"Papers needing A06 revalidation: {len(rep['papers_needing_revalidation'])} "
+          f"({', '.join(rep['papers_needing_revalidation'])}); last A06 calls for them cost ${est['total']:.2f}")
+    print("Details: data/renormalization/report.json. Nothing was sent to a model.")
+    return 0
+
+
+def cmd_revalidate(args) -> int:
+    run = Run(args.run_id)
+    if args.themes:
+        print("Rebuilt theme records:", ", ".join(run.rebuild_stale_themes()) or "none stale")
+        return 0
+    ids = [r.strip() for r in (args.records or "").split(",") if r.strip()]
+    if args.all_needed:
+        ids = run.load("renormalization/report.json", {}).get("papers_needing_revalidation", [])
+    if not ids:
+        print("Name the papers (--records R0045,R0190) or use --all-needed after `litreview renormalize`.")
+        return 1
+    out = run.revalidate(ids)
+    print(f"Revalidated {len(ids)} papers. Eligibility now: {out['eligibility']}. "
+          f"{len(out['themes_stale'])} theme records are stale: rebuild with --themes before synthesis.")
+    return 0
+
+
+def cmd_gate2_report(args) -> int:
+    from .tools import gate2_report
+    data = RUNS_DIR / args.run_id / "data"
+    rep = gate2_report.build(data)
+    (data / "renormalization").mkdir(parents=True, exist_ok=True)
+    (data / "renormalization" / "gate2_regression.json").write_text(json.dumps(rep, indent=1, ensure_ascii=False),
+                                                                    encoding="utf-8")
+    print(gate2_report.text(rep))
+    print("Details: data/renormalization/gate2_regression.json")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     load_dotenv(REPO_ROOT / ".env")
     for stream in (sys.stdout, sys.stderr):   # piped output on Windows may be cp1252: never crash on ✓/✗
@@ -182,6 +221,18 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("checkpoint", choices=["CP1", "CP3"])
     v.add_argument("--feedback", required=True)
     v.set_defaults(fn=cmd_revise)
+    rn = sub.add_parser("renormalize", help="re-run entity normalization with the current rules (no model calls)")
+    rn.add_argument("run_id")
+    rn.set_defaults(fn=cmd_renormalize)
+    rv = sub.add_parser("revalidate", help="fresh A06 validation of named papers (paid), or rebuild stale themes")
+    rv.add_argument("run_id")
+    rv.add_argument("--records", help="comma-separated record IDs")
+    rv.add_argument("--all-needed", action="store_true", help="every paper renormalize listed as needing it")
+    rv.add_argument("--themes", action="store_true", help="rebuild theme records made stale by a revalidation")
+    rv.set_defaults(fn=cmd_revalidate)
+    g2 = sub.add_parser("gate2-report", help="recovery and new error after a normalization correction")
+    g2.add_argument("run_id")
+    g2.set_defaults(fn=cmd_gate2_report)
     args = p.parse_args(argv)
     return args.fn(args)
 
