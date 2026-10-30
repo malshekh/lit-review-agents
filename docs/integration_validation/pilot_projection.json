@@ -1,0 +1,1005 @@
+{
+  "method": "Part 1: cost_projection.for_selection (the CP2 code path) + pre-CP2 worst case. Part 2: pilot-scale A07/A10 measured with the production builders, bridge envelope by manuscript length. Planning, not a bill; 2026-10-30 architecture",
+  "cap_usd": 35.0,
+  "review_point_usd": 25.0,
+  "uncertainty_margin": 0.3,
+  "pre_cp2": {
+    "A02-SP": {
+      "model": "gpt-6.1-sol",
+      "calls": 5,
+      "input_tokens": 30092,
+      "output_tokens_each": 32000,
+      "usd": 1.6602,
+      "reference_usd": 0.7409
+    },
+    "A03-LM": {
+      "model": "gpt-6.1-sol",
+      "calls": 3,
+      "input_tokens": 116528,
+      "output_tokens_each": 32000,
+      "usd": 1.1931,
+      "reference_usd": 0.9579
+    },
+    "A04-CQ": {
+      "model": "claude-haiku-5-5",
+      "calls": 18,
+      "input_tokens": 391795,
+      "output_tokens_each": 32000,
+      "usd": 0.3272,
+      "reference_usd": 0.368
+    }
+  },
+  "selections": {
+    "2 full texts + 3 abstracts": {
+      "pmids": [
+        "34638842",
+        "29211715",
+        "30771200",
+        "27006494",
+        "26254539"
+      ],
+      "findings_assumed": 138,
+      "after_cp2_usd": 60.49,
+      "pre_cp2_worst_usd": 3.18,
+      "total_usd": 63.67,
+      "within_cap": false,
+      "passes_review_point": true,
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 1.2628,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 2.9815,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 5,
+          "usd": 1.4245,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 12,
+          "usd": 1.1112,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 74,
+          "usd": 8.1259,
+          "baseline_usd": 6.2507,
+          "adverse_usd": 34.4336
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.285,
+          "baseline_usd": 0.2192,
+          "adverse_usd": 0.3891
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 50,
+          "usd": 8.4622,
+          "baseline_usd": 6.5094,
+          "adverse_usd": 44.8794
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 792,
+          "usd": 30.8281,
+          "baseline_usd": 23.7139,
+          "adverse_usd": 282.3834
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.9272,
+          "baseline_usd": 1.4825,
+          "adverse_usd": 2.2629
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 6,
+          "usd": 4.0865,
+          "baseline_usd": 3.1435,
+          "adverse_usd": 6.8391
+        }
+      ]
+    },
+    "2 full texts + 2 abstracts": {
+      "pmids": [
+        "34638842",
+        "29211715",
+        "30771200",
+        "27006494"
+      ],
+      "findings_assumed": 119,
+      "after_cp2_usd": 59.18,
+      "pre_cp2_worst_usd": 3.18,
+      "total_usd": 62.36,
+      "within_cap": false,
+      "passes_review_point": true,
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 0.9471,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 2.9815,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 4,
+          "usd": 1.3093,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 10,
+          "usd": 0.926,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 71,
+          "usd": 7.6661,
+          "baseline_usd": 5.897,
+          "adverse_usd": 32.7674
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.2779,
+          "baseline_usd": 0.2138,
+          "adverse_usd": 0.3827
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 50,
+          "usd": 8.2505,
+          "baseline_usd": 6.3465,
+          "adverse_usd": 44.1194
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 792,
+          "usd": 30.8281,
+          "baseline_usd": 23.7139,
+          "adverse_usd": 282.3834
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.9202,
+          "baseline_usd": 1.4771,
+          "adverse_usd": 2.2566
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 6,
+          "usd": 4.072,
+          "baseline_usd": 3.1323,
+          "adverse_usd": 6.8204
+        }
+      ]
+    },
+    "2 full texts + 1 abstract (trial)": {
+      "pmids": [
+        "34638842",
+        "29211715",
+        "30771200"
+      ],
+      "findings_assumed": 101,
+      "after_cp2_usd": 57.8,
+      "pre_cp2_worst_usd": 3.18,
+      "total_usd": 60.98,
+      "within_cap": false,
+      "passes_review_point": true,
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 1,
+          "usd": 0.6314,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 2.9815,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 1.194,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 7,
+          "usd": 0.6482,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 68,
+          "usd": 7.2199,
+          "baseline_usd": 5.5538,
+          "adverse_usd": 31.1272
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.2712,
+          "baseline_usd": 0.2086,
+          "adverse_usd": 0.3767
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 50,
+          "usd": 8.0499,
+          "baseline_usd": 6.1922,
+          "adverse_usd": 43.3994
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 792,
+          "usd": 30.8281,
+          "baseline_usd": 23.7139,
+          "adverse_usd": 282.3834
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.9139,
+          "baseline_usd": 1.4722,
+          "adverse_usd": 2.2508
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 6,
+          "usd": 4.0583,
+          "baseline_usd": 3.1218,
+          "adverse_usd": 6.803
+        }
+      ]
+    },
+    "1 full text + 2 abstracts": {
+      "pmids": [
+        "34638842",
+        "30771200",
+        "27006494"
+      ],
+      "findings_assumed": 78,
+      "after_cp2_usd": 54.63,
+      "pre_cp2_worst_usd": 3.18,
+      "total_usd": 57.81,
+      "within_cap": false,
+      "passes_review_point": true,
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 0.9471,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 1,
+          "usd": 1.9877,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 0.9497,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 7,
+          "usd": 0.6482,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 65,
+          "usd": 6.7139,
+          "baseline_usd": 5.1645,
+          "adverse_usd": 29.3741
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.2627,
+          "baseline_usd": 0.2021,
+          "adverse_usd": 0.3691
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 50,
+          "usd": 7.7936,
+          "baseline_usd": 5.9951,
+          "adverse_usd": 42.4794
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 774,
+          "usd": 29.3835,
+          "baseline_usd": 22.6027,
+          "adverse_usd": 275.6765
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.9054,
+          "baseline_usd": 1.4657,
+          "adverse_usd": 2.2433
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 6,
+          "usd": 4.0408,
+          "baseline_usd": 3.1083,
+          "adverse_usd": 6.7805
+        }
+      ]
+    },
+    "1 full text + 1 abstract (trial)": {
+      "pmids": [
+        "34638842",
+        "30771200"
+      ],
+      "findings_assumed": 60,
+      "after_cp2_usd": 53.34,
+      "pre_cp2_worst_usd": 3.18,
+      "total_usd": 56.52,
+      "within_cap": false,
+      "passes_review_point": true,
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 1,
+          "usd": 0.6314,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 1,
+          "usd": 1.9877,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 0.8344,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 5,
+          "usd": 0.463,
+          "baseline_usd": null,
+          "adverse_usd": null
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 62,
+          "usd": 6.2704,
+          "baseline_usd": 4.8234,
+          "adverse_usd": 27.7394
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.256,
+          "baseline_usd": 0.1969,
+          "adverse_usd": 0.3631
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 50,
+          "usd": 7.593,
+          "baseline_usd": 5.8408,
+          "adverse_usd": 41.7594
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "calls": 774,
+          "usd": 29.3835,
+          "baseline_usd": 22.6027,
+          "adverse_usd": 275.6765
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.8988,
+          "baseline_usd": 1.4606,
+          "adverse_usd": 2.2373
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 6,
+          "usd": 4.0268,
+          "baseline_usd": 3.0975,
+          "adverse_usd": 6.7625
+        }
+      ]
+    }
+  },
+  "pilot_scale": {
+    "2 full texts + 3 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112",
+        "R0155",
+        "R0060"
+      ],
+      "findings": 159,
+      "by_words": {
+        "5000": {
+          "words": 5000,
+          "a10_occurrences": 257,
+          "a10_calls_first_pass": {
+            "LOCAL": 22,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.62,
+            "A10-RV": 16.2,
+            "A08-OL": 0.23,
+            "A09-WRI": 6.69,
+            "A11-RC": 1.49,
+            "A12-EDI": 3.16
+          },
+          "per_paper_p90_usd": 6.78,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 44.34,
+          "total_with_margin_usd": 54.65,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "3000": {
+          "words": 3000,
+          "a10_occurrences": 177,
+          "a10_calls_first_pass": {
+            "LOCAL": 15,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.62,
+            "A10-RV": 11.41,
+            "A08-OL": 0.23,
+            "A09-WRI": 6.32,
+            "A11-RC": 1.44,
+            "A12-EDI": 3.06
+          },
+          "per_paper_p90_usd": 6.78,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 39.05,
+          "total_with_margin_usd": 47.77,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "2000": {
+          "words": 2000,
+          "a10_occurrences": 137,
+          "a10_calls_first_pass": {
+            "LOCAL": 12,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.62,
+            "A10-RV": 8.98,
+            "A08-OL": 0.23,
+            "A09-WRI": 6.14,
+            "A11-RC": 1.42,
+            "A12-EDI": 3.01
+          },
+          "per_paper_p90_usd": 6.78,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 36.35,
+          "total_with_margin_usd": 44.27,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "1500": {
+          "words": 1500,
+          "a10_occurrences": 117,
+          "a10_calls_first_pass": {
+            "LOCAL": 10,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.62,
+            "A10-RV": 7.81,
+            "A08-OL": 0.23,
+            "A09-WRI": 6.04,
+            "A11-RC": 1.41,
+            "A12-EDI": 2.99
+          },
+          "per_paper_p90_usd": 6.78,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 35.05,
+          "total_with_margin_usd": 42.58,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        }
+      }
+    },
+    "2 full texts + 2 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112",
+        "R0155"
+      ],
+      "findings": 141,
+      "by_words": {
+        "5000": {
+          "words": 5000,
+          "a10_occurrences": 257,
+          "a10_calls_first_pass": {
+            "LOCAL": 22,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.5,
+            "A10-RV": 15.71,
+            "A08-OL": 0.22,
+            "A09-WRI": 6.54,
+            "A11-RC": 1.48,
+            "A12-EDI": 3.15
+          },
+          "per_paper_p90_usd": 6.16,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 42.94,
+          "total_with_margin_usd": 53.02,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "3000": {
+          "words": 3000,
+          "a10_occurrences": 177,
+          "a10_calls_first_pass": {
+            "LOCAL": 15,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.5,
+            "A10-RV": 11.09,
+            "A08-OL": 0.22,
+            "A09-WRI": 6.17,
+            "A11-RC": 1.44,
+            "A12-EDI": 3.05
+          },
+          "per_paper_p90_usd": 6.16,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 37.81,
+          "total_with_margin_usd": 46.34,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "2000": {
+          "words": 2000,
+          "a10_occurrences": 137,
+          "a10_calls_first_pass": {
+            "LOCAL": 12,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.5,
+            "A10-RV": 8.76,
+            "A08-OL": 0.22,
+            "A09-WRI": 5.98,
+            "A11-RC": 1.41,
+            "A12-EDI": 3.0
+          },
+          "per_paper_p90_usd": 6.16,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 35.22,
+          "total_with_margin_usd": 42.99,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "1500": {
+          "words": 1500,
+          "a10_occurrences": 117,
+          "a10_calls_first_pass": {
+            "LOCAL": 10,
+            "GLOBAL": 4
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.5,
+            "A10-RV": 7.62,
+            "A08-OL": 0.22,
+            "A09-WRI": 5.89,
+            "A11-RC": 1.4,
+            "A12-EDI": 2.98
+          },
+          "per_paper_p90_usd": 6.16,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 33.95,
+          "total_with_margin_usd": 41.33,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        }
+      }
+    },
+    "2 full texts + 1 abstract (trial)": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112"
+      ],
+      "findings": 122,
+      "by_words": {
+        "5000": {
+          "words": 5000,
+          "a10_occurrences": 257,
+          "a10_calls_first_pass": {
+            "LOCAL": 22,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.15,
+            "A10-RV": 14.22,
+            "A08-OL": 0.21,
+            "A09-WRI": 6.37,
+            "A11-RC": 1.48,
+            "A12-EDI": 3.13
+          },
+          "per_paper_p90_usd": 5.46,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 40.2,
+          "total_with_margin_usd": 49.68,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "3000": {
+          "words": 3000,
+          "a10_occurrences": 177,
+          "a10_calls_first_pass": {
+            "LOCAL": 15,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.15,
+            "A10-RV": 10.0,
+            "A08-OL": 0.21,
+            "A09-WRI": 6.0,
+            "A11-RC": 1.43,
+            "A12-EDI": 3.04
+          },
+          "per_paper_p90_usd": 5.46,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 35.47,
+          "total_with_margin_usd": 43.52,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "2000": {
+          "words": 2000,
+          "a10_occurrences": 137,
+          "a10_calls_first_pass": {
+            "LOCAL": 12,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.15,
+            "A10-RV": 7.91,
+            "A08-OL": 0.21,
+            "A09-WRI": 5.82,
+            "A11-RC": 1.41,
+            "A12-EDI": 2.99
+          },
+          "per_paper_p90_usd": 5.46,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 33.13,
+          "total_with_margin_usd": 40.47,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        },
+        "1500": {
+          "words": 1500,
+          "a10_occurrences": 117,
+          "a10_calls_first_pass": {
+            "LOCAL": 10,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 6.15,
+            "A10-RV": 6.84,
+            "A08-OL": 0.21,
+            "A09-WRI": 5.73,
+            "A11-RC": 1.4,
+            "A12-EDI": 2.97
+          },
+          "per_paper_p90_usd": 5.46,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 31.93,
+          "total_with_margin_usd": 38.92,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        }
+      }
+    },
+    "1 full text + 2 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0112",
+        "R0155"
+      ],
+      "findings": 100,
+      "by_words": {
+        "5000": {
+          "words": 5000,
+          "a10_occurrences": 257,
+          "a10_calls_first_pass": {
+            "LOCAL": 22,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.8,
+            "A10-RV": 13.81,
+            "A08-OL": 0.21,
+            "A09-WRI": 6.18,
+            "A11-RC": 1.47,
+            "A12-EDI": 3.12
+          },
+          "per_paper_p90_usd": 4.53,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 38.31,
+          "total_with_margin_usd": 47.49,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "3000": {
+          "words": 3000,
+          "a10_occurrences": 177,
+          "a10_calls_first_pass": {
+            "LOCAL": 15,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.8,
+            "A10-RV": 9.71,
+            "A08-OL": 0.21,
+            "A09-WRI": 5.82,
+            "A11-RC": 1.43,
+            "A12-EDI": 3.03
+          },
+          "per_paper_p90_usd": 4.53,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 33.69,
+          "total_with_margin_usd": 41.49,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        },
+        "2000": {
+          "words": 2000,
+          "a10_occurrences": 137,
+          "a10_calls_first_pass": {
+            "LOCAL": 12,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.8,
+            "A10-RV": 7.68,
+            "A08-OL": 0.21,
+            "A09-WRI": 5.63,
+            "A11-RC": 1.4,
+            "A12-EDI": 2.98
+          },
+          "per_paper_p90_usd": 4.53,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 31.42,
+          "total_with_margin_usd": 38.53,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        },
+        "1500": {
+          "words": 1500,
+          "a10_occurrences": 117,
+          "a10_calls_first_pass": {
+            "LOCAL": 10,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.8,
+            "A10-RV": 6.64,
+            "A08-OL": 0.21,
+            "A09-WRI": 5.54,
+            "A11-RC": 1.39,
+            "A12-EDI": 2.95
+          },
+          "per_paper_p90_usd": 4.53,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 30.25,
+          "total_with_margin_usd": 37.01,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        }
+      }
+    },
+    "1 full text + 1 abstract (trial)": {
+      "stand_in_records": [
+        "R0042",
+        "R0112"
+      ],
+      "findings": 81,
+      "by_words": {
+        "5000": {
+          "words": 5000,
+          "a10_occurrences": 257,
+          "a10_calls_first_pass": {
+            "LOCAL": 22,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.45,
+            "A10-RV": 13.23,
+            "A08-OL": 0.2,
+            "A09-WRI": 6.02,
+            "A11-RC": 1.47,
+            "A12-EDI": 3.11
+          },
+          "per_paper_p90_usd": 3.92,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 36.58,
+          "total_with_margin_usd": 45.42,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": false
+        },
+        "3000": {
+          "words": 3000,
+          "a10_occurrences": 177,
+          "a10_calls_first_pass": {
+            "LOCAL": 15,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.45,
+            "A10-RV": 9.25,
+            "A08-OL": 0.2,
+            "A09-WRI": 5.65,
+            "A11-RC": 1.42,
+            "A12-EDI": 3.01
+          },
+          "per_paper_p90_usd": 3.92,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 32.09,
+          "total_with_margin_usd": 39.58,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        },
+        "2000": {
+          "words": 2000,
+          "a10_occurrences": 137,
+          "a10_calls_first_pass": {
+            "LOCAL": 12,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.45,
+            "A10-RV": 7.37,
+            "A08-OL": 0.2,
+            "A09-WRI": 5.47,
+            "A11-RC": 1.4,
+            "A12-EDI": 2.97
+          },
+          "per_paper_p90_usd": 3.92,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 29.95,
+          "total_with_margin_usd": 36.81,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        },
+        "1500": {
+          "words": 1500,
+          "a10_occurrences": 117,
+          "a10_calls_first_pass": {
+            "LOCAL": 10,
+            "GLOBAL": 3
+          },
+          "baseline_by_agent": {
+            "A07-SYN": 5.45,
+            "A10-RV": 6.32,
+            "A08-OL": 0.2,
+            "A09-WRI": 5.38,
+            "A11-RC": 1.39,
+            "A12-EDI": 2.94
+          },
+          "per_paper_p90_usd": 3.92,
+          "pre_cp2_worst_usd": 3.18,
+          "total_baseline_usd": 28.77,
+          "total_with_margin_usd": 35.28,
+          "within_cap_with_margin": false,
+          "within_cap_baseline": true
+        }
+      }
+    }
+  }
+}
