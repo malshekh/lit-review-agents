@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A12-EDI output for one unit (front matter or one section) when the manuscript is edited unit by unit",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "enum": [
+        "REVISION",
+        "LINE",
+        "PROOF",
+        "INTEGRATION"
+      ]
+    },
+    "output_manuscript_version": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "abstract": {
+      "type": "string"
+    },
+    "sections": {
+      "type": "array"
+    },
+    "change_log": {
+      "type": "array"
+    },
+    "queries": {
+      "type": "array"
+    },
+    "escalations": {
+      "type": "array"
+    },
+    "unit": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "unit",
+    "output_manuscript_version",
+    "change_log",
+    "queries",
+    "escalations"
+  ],
+  "additionalProperties": true
+}

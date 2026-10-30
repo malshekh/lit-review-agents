@@ -181,6 +181,8 @@ def test_a11_reverifies_stale_report_before_critique(tmp_path,monkeypatch):
     run.save('manuscript_plan.json',{})
     run.save('synthesis_approved.json',{})
     run.save('rv_latest.json',{'stale':True})
+    from bridge_fixtures import bridge_stubs
+    bridge_stubs(run,monkeypatch)   # A10/A11 sequencing only; the bridge's own checks are tested in test_bridge.py
     monkeypatch.setattr(run,'_current',lambda:{'title':'New version'})
     monkeypatch.setattr(run,'_verification_current',lambda *a:False)
     monkeypatch.setattr(run,'_prose_vendors',lambda *a:frozenset({'anthropic'}))
@@ -282,6 +284,8 @@ def test_line_verification_is_preserved_before_proof_or_scientific_hold(tmp_path
     from litreview import orchestrator as orch
     run=_run(tmp_path,monkeypatch)
     run.save('manuscript_plan.json',{})
+    from bridge_fixtures import bridge_stubs
+    bridge_stubs(run,monkeypatch)   # A10/A12 sequencing only; the bridge's own checks are tested in test_bridge.py
     monkeypatch.setattr(run,'_current',lambda:{'sections':[]})
     line_report={'finding_severity':severity,'findings':[{'code':'EVALUATION_CORRECTION'}],
                  'verification_fingerprint':'line-version'}

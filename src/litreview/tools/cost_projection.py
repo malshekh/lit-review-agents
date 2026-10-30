@@ -3,8 +3,8 @@
 Per-paper and per-theme stages (A05 extraction, A06 per-paper and per-theme validation) use rates measured
 on a reference run (`records/cost_rates.json`, written by `litreview cost-rates RUN`): the 90th percentile
 of the measured cost per paper, by content level (an abstract-only paper costs a fraction of a full text).
-A07 uses an explicitly estimated bounded-call envelope, including retrieval. A08 to A12 retain their
-existing maximum-output projections. A07 reserves each actual serialized request before dispatch;
+A07 uses an explicitly estimated bounded-call envelope, including retrieval. A08, A09, A11 and A12 are projected
+from the bridge's bounded request builders (downstream_projection.py); A10 keeps its bounded-call envelope. A07 reserves each actual serialized request before dispatch;
 the planning envelope is not a strict bound on arbitrarily large scientific source strings.
 
 The pipeline refuses to pass CP2 when the projection exceeds the spend cap, and refuses any agent call after
@@ -112,7 +112,7 @@ def _worst(budget, route, agent: str, calls: int, input_tokens: int, cache_write
                       f"+ {m.max_tokens:,} output at max_tokens) on {m.model}"}
 
 
-def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> list[dict]:
+def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inputs: dict | None = None) -> list[dict]:
     """A07 to A12 at worst case, for a corpus of n_findings validated findings. Every A07 turn is one
     attempt: a truncated turn stops the job and supersedes the projection (orchestrator), so a retry is
     re-projected from actual spend rather than assumed. a07_done: turns already committed."""
@@ -143,13 +143,10 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0) -> 
            'usd':round(factor*((budget.cost(vm.model,60000,limits['LOCAL']) or 0)*local_calls
                               +(budget.cost(vm.model,60000,limits['GLOBAL']) or 0)*versions*global_pages),4),
            'detail':f'{candidates} estimated candidate occurrences (24-320, corpus-based before manuscript exists); half-full local packets; 1.5 index entries/finding; 20% edited locals; all global pages rechecked; 60k input/call, full output caps and retrieval; no cache savings; actual reservation required'}
-    return [a07,
-        _worst(budget, route, "A08-OL", 1, FIXED_INPUT["A08-OL"] + n_findings * 300),
-        _worst(budget, route, "A09-WRI", 1 + int(loops["max_redrafts"]), FIXED_INPUT["A09-WRI"]),
-        a10,
-        _worst(budget, route, "A11-RC", cycles, FIXED_INPUT["A11-RC"] + n_findings * 300),
-        _worst(budget, route, "A12-EDI", cycles + 2, FIXED_INPUT["A12-EDI"]),
-    ]
+    # A08, A09, A11 and A12 from the bridge's bounded request builders (downstream_projection.py)
+    from .downstream_projection import lines as bridge_lines
+    a08, a09, a11, a12 = bridge_lines(budget, route, cfg, n_findings, inputs)
+    return [a07, a08, a09, a10, a11, a12]
 
 
 def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, route, cfg: dict) -> dict:
@@ -258,9 +255,20 @@ def remaining_for_run(run, rates: dict | None = None, in_flight: frozenset = fro
         jobs = sorted(run.dir.glob("data/synthesis_job_*/ledger.jsonl"), key=lambda p: p.stat().st_mtime)
         done = len(Ledger(jobs[-1]).state()["committed"]) if jobs else 0
     # every downstream agent whose last stage is still ahead (A10 verifies through finalize)
-    lines += [x for x in downstream(run.budget, run.route, run.cfg, n_findings, a07_done=done)
+    lines += [x for x in downstream(run.budget, run.route, run.cfg, n_findings, a07_done=done,
+                                    inputs=_bridge_inputs(run) if at > STAGES.index("cp3") else None)
               if STAGES.index(AGENT_LAST_STAGE[x["stage"]]) >= at]
     return _total(lines, run.budget, {"stage": stage, "findings": n_findings})
+
+
+def _bridge_inputs(run) -> dict | None:
+    """What the bridge builders need, as the run holds it (read only; nothing is rebuilt here)."""
+    pkg = run.load("synthesis_approved.json")
+    if not pkg:
+        return None
+    return {"pkg": pkg, "corpus": run.load("selected_corpus.json") or [],
+            "findings": run.load("validated_findings.json") or [], "plan": run.load("manuscript_plan.json"),
+            "ledger": run.load("allocation_ledger.json")}
 
 
 def batch_gate(run, agent_id: str, steps: list[str], reserve_usd: float, limit_usd: float,

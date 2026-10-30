@@ -210,6 +210,43 @@ def write_synthesis_alignment(run_dir: Path, digest: str, alignment: dict) -> No
                                         "keep_approved_framework": False, "proposal_review_notes": "", "notes": ""}, indent=2), encoding="utf-8")
 
 
+# ---------------------------------------------------------------- CP_LEDGER: allocation before writing
+def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: dict, elements: dict) -> None:
+    """The allocation ledger for approval before A09 writes: what is discussed individually, grouped, shown only
+    in the table, or not individually discussed (with A08's reason). Evidence selection is the authors' decision
+    under the journal's AI policy; nothing is written until it is approved for these exact plan and ledger."""
+    d = cp_dir(run_dir)
+    (d / "CP_LEDGER_ledger.json").write_text(json.dumps({"fingerprint": digest, "ledger": ledger, "report": report},
+                                                        indent=2, ensure_ascii=False), encoding="utf-8")
+    counts = report.get("counts", {})
+    lines = ["# Allocation ledger: what the review discusses", "",
+             "A08 has allocated every approved element (proposition, gap, adopted interpretation). Approve only if "
+             "this is the evidence selection you want: everything below NOT_INDIVIDUALLY_DISCUSSED will not be "
+             "written individually.", "",
+             *[f"- {k}: {v}" for k, v in counts.items()], "",
+             f"Mandatory elements (conflicts, contrary CORE evidence, researcher-verified inconsistencies, system gaps, "
+             f"NARRATIVE coverage): {len(report.get('mandatory', {}))}, all written (the bridge rejects any other plan).",
+             "", "## Theme to sections", *[f"- {t}: {', '.join(s)}" for t, s in report.get("theme_to_sections", {}).items()],
+             "", "## Not individually discussed", ""]
+    for e in ledger:
+        if e.get("outcome") == "NOT_INDIVIDUALLY_DISCUSSED":
+            text = (elements.get(e["item_id"]) or {}).get("text") or ""
+            lines.append(f"- **{e['item_id']}** {text} — reason: {e.get('reason')}")
+    lines += ["", "## Table only", ""]
+    lines += [f"- **{e['item_id']}** {(elements.get(e['item_id']) or {}).get('text') or ''}"
+              for e in ledger if e.get("outcome") == "TABLE_ONLY"]
+    lines += ["", "## Grouped passages", ""]
+    lines += [f"- {g}: {', '.join(m)}" for g, m in report.get("groups", {}).items()]
+    lines += ["", "Set approve_ledger to true in `CP_LEDGER_decision.json`, then run "
+                  "`litreview approve <run_id> CP_LEDGER`. To change the allocation, record what to change in notes "
+                  "and rerun the outline stage instead."]
+    (d / "CP_LEDGER_review.md").write_text("\n".join(lines), encoding="utf-8")
+    decision = d / "CP_LEDGER_decision.json"
+    if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
+        decision.write_text(json.dumps({"fingerprint": digest, "approve_ledger": False, "notes": ""}, indent=2),
+                            encoding="utf-8")
+
+
 def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
     d = cp_dir(run_dir)
     decision = json.loads((d / f"{cp}_decision.json").read_text(encoding="utf-8"))
@@ -230,6 +267,12 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
             raise DecisionIncomplete("CP_SYN: approve alignment and explicitly retain the approved framework")
         if alignment["planning"]["theme_change_proposals"] and not decision.get("proposal_review_notes", "").strip():
             raise DecisionIncomplete("CP_SYN: record the decision on proposed changes")
+    elif cp == "CP_LEDGER":
+        ledger = json.loads((d / "CP_LEDGER_ledger.json").read_text(encoding="utf-8"))
+        if decision.get("fingerprint") != ledger["fingerprint"]:
+            raise DecisionIncomplete("CP_LEDGER: stale ledger fingerprint (the plan or ledger changed)")
+        if decision.get("approve_ledger") is not True:
+            raise DecisionIncomplete("CP_LEDGER: set approve_ledger to true")
     elif cp == "CP3":
         from .synthesis_registry import fingerprint
         from .scientific_validation import require_package

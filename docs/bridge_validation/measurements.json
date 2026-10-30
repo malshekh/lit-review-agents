@@ -1,0 +1,525 @@
+{
+  "method": "evaluation-only fixtures; production request builders; scripted agents; no generation endpoint",
+  "compact_fixture": {
+    "papers": 120,
+    "findings": 1996,
+    "propositions": 372,
+    "gaps": 679,
+    "reconciliation_issues": 12,
+    "mandatory_elements": 836,
+    "conflicting_links": 50
+  },
+  "plan_problems": [],
+  "ledger_counts": {
+    "DISCUSSED": 33,
+    "GROUPED_WITH": 1006,
+    "TABLE_ONLY": 0,
+    "NOT_INDIVIDUALLY_DISCUSSED": 13
+  },
+  "mandatory_elements": 836,
+  "table": {
+    "rows": 25,
+    "contrary_finding_ids": 54,
+    "contrary_findings_not_shown": 29,
+    "eligible_findings_not_shown": 892,
+    "propositions_fully_shown": 4
+  },
+  "section_packet_bytes": {
+    "S1": 389,
+    "S2": 485426,
+    "S3": 540921,
+    "S4": 466963,
+    "S5": 573572,
+    "S6": 497528,
+    "S7": 476484,
+    "S8": 455909,
+    "S9": 545656,
+    "S10": 454007
+  },
+  "argument_map_bytes": 183280,
+  "admissions_by_agent": {
+    "A08-OL": {
+      "requests": 1,
+      "max_input_bound": 635065,
+      "sum_input_bound": 635065,
+      "all_fit": true,
+      "crossing_threshold": 1,
+      "window": 1050000,
+      "model": "gpt-6.1-sol"
+    },
+    "A09-WRI": {
+      "requests": 11,
+      "max_input_bound": 663057,
+      "sum_input_bound": 5445118,
+      "all_fit": true,
+      "crossing_threshold": 0,
+      "window": 1000000,
+      "model": "claude-opus-5"
+    },
+    "A12-EDI": {
+      "requests": 3,
+      "max_input_bound": 690977,
+      "sum_input_bound": 2072728,
+      "all_fit": true,
+      "crossing_threshold": 0,
+      "window": 1000000,
+      "model": "claude-sonnet-5-5"
+    },
+    "A11-RC": {
+      "requests": 1,
+      "max_input_bound": 690775,
+      "sum_input_bound": 690775,
+      "all_fit": true,
+      "crossing_threshold": 1,
+      "window": 1050000,
+      "model": "gpt-6.1-sol"
+    }
+  },
+  "admissions": [
+    {
+      "agent": "A08-OL",
+      "model": "gpt-6.1-sol",
+      "provider": "openai",
+      "input_bound": 635065,
+      "output_reserve": 32000,
+      "window": 1050000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": 272000,
+      "crosses_threshold": true,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.0203,
+      "step": "A08-OL_v1"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 555894,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.1795,
+      "step": "A09-WRI_draft1_S2_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 615761,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.4788,
+      "step": "A09-WRI_draft1_S3_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 544379,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.1219,
+      "step": "A09-WRI_draft1_S4_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 663057,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.7153,
+      "step": "A09-WRI_draft1_S5_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 582439,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.3122,
+      "step": "A09-WRI_draft1_S6_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 560170,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.2008,
+      "step": "A09-WRI_draft1_S7_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 545046,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.1252,
+      "step": "A09-WRI_draft1_S8_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 645638,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.6282,
+      "step": "A09-WRI_draft1_S9_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 57900,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 0.6895,
+      "step": "A09-WRI_draft1_S1_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 561601,
+      "output_reserve": 16000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.208,
+      "step": "A09-WRI_draft1_S10_r0"
+    },
+    {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 113233,
+      "output_reserve": 8000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 0.7662,
+      "step": "A09-WRI_draft1_front"
+    },
+    {
+      "agent": "A12-EDI",
+      "model": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "input_bound": 690879,
+      "output_reserve": 64000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 2.0218,
+      "step": "A12-EDI_integration_draft1"
+    },
+    {
+      "agent": "A11-RC",
+      "model": "gpt-6.1-sol",
+      "provider": "openai",
+      "input_bound": 690775,
+      "output_reserve": 32000,
+      "window": 1050000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": 272000,
+      "crosses_threshold": true,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 3.2431,
+      "step": "A11-RC_cycle1"
+    },
+    {
+      "agent": "A12-EDI",
+      "model": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "input_bound": 690872,
+      "output_reserve": 64000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 2.0217,
+      "step": "A12-EDI_line"
+    },
+    {
+      "agent": "A12-EDI",
+      "model": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "input_bound": 690977,
+      "output_reserve": 64000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": true,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)",
+      "reserve_usd": 2.022,
+      "step": "A12-EDI_proof"
+    }
+  ],
+  "oversized_fixture": {
+    "papers": 120,
+    "findings": 1996,
+    "propositions": 3720,
+    "gaps": 6790,
+    "reconciliation_issues": 0,
+    "mandatory_elements": 8360,
+    "conflicting_links": 500
+  },
+  "oversized_admission": {
+    "A08-OL": {
+      "agent": "A08-OL",
+      "model": "gpt-6.1-sol",
+      "provider": "openai",
+      "input_bound": 6140653,
+      "output_reserve": 32000,
+      "window": 1050000,
+      "safety_margin": 0,
+      "fits": false,
+      "long_context_threshold": 272000,
+      "crosses_threshold": true,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)"
+    },
+    "A09-WRI": {
+      "agent": "A09-WRI",
+      "model": "claude-opus-5",
+      "provider": "anthropic",
+      "input_bound": 24639290,
+      "output_reserve": 64000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": false,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)"
+    },
+    "A11-RC (GPT-6.1 alternate)": {
+      "agent": "A11-RC",
+      "model": "gpt-6.1-sol",
+      "provider": "openai",
+      "input_bound": 6729889,
+      "output_reserve": 32000,
+      "window": 1050000,
+      "safety_margin": 0,
+      "fits": false,
+      "long_context_threshold": 272000,
+      "crosses_threshold": true,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)"
+    },
+    "A12-EDI (one unit)": {
+      "agent": "A12-EDI",
+      "model": "claude-sonnet-5-5",
+      "provider": "anthropic",
+      "input_bound": 6729234,
+      "output_reserve": 64000,
+      "window": 1000000,
+      "safety_margin": 0,
+      "fits": false,
+      "long_context_threshold": null,
+      "crosses_threshold": false,
+      "basis": "UTF-8 byte bound of the exact serialized request (never below the token count)"
+    }
+  },
+  "projections": {
+    "request_bound_with_plan": [
+      {
+        "stage": "A08-OL",
+        "basis": "REQUEST_BOUND",
+        "calls": 1,
+        "usd": 1.7864,
+        "long_context_calls": 1,
+        "over_window_calls": 0,
+        "max_input_bound": 587872
+      },
+      {
+        "stage": "A09-WRI",
+        "basis": "REQUEST_BOUND",
+        "calls": 62,
+        "usd": 124.518,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 794475
+      },
+      {
+        "stage": "A11-RC",
+        "basis": "REQUEST_BOUND",
+        "calls": 2,
+        "usd": 2.8355,
+        "long_context_calls": 0,
+        "over_window_calls": 2,
+        "max_input_bound": 699970
+      },
+      {
+        "stage": "A12-EDI",
+        "basis": "REQUEST_BOUND",
+        "calls": 6,
+        "usd": 8.5185,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 701780
+      }
+    ],
+    "estimate_before_package": [
+      {
+        "stage": "A08-OL",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 1,
+        "usd": 1.8568,
+        "long_context_calls": 1,
+        "over_window_calls": 0,
+        "max_input_bound": 619561
+      },
+      {
+        "stage": "A09-WRI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 50,
+        "usd": 118.9985,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 841340
+      },
+      {
+        "stage": "A11-RC",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 2,
+        "usd": 2.8714,
+        "long_context_calls": 0,
+        "over_window_calls": 2,
+        "max_input_bound": 716110
+      },
+      {
+        "stage": "A12-EDI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 6,
+        "usd": 8.6646,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 723683
+      }
+    ],
+    "estimate_two_papers": [
+      {
+        "stage": "A08-OL",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 1,
+        "usd": 0.3704,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 45361
+      },
+      {
+        "stage": "A09-WRI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 50,
+        "usd": 42.4385,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 267140
+      },
+      {
+        "stage": "A11-RC",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 2,
+        "usd": 2.2446,
+        "long_context_calls": 0,
+        "over_window_calls": 2,
+        "max_input_bound": 434080
+      },
+      {
+        "stage": "A12-EDI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 6,
+        "usd": 6.7844,
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 441653
+      }
+    ]
+  },
+  "provider_counts": [
+    {
+      "agent": "A09-WRI",
+      "step": "A09-WRI_draft1_S5_r0",
+      "model": "claude-opus-5",
+      "provider_input_tokens": 278525,
+      "input_byte_bound": 663057,
+      "bytes_per_token": 2.381
+    },
+    {
+      "agent": "A09-WRI",
+      "step": "A09-WRI_draft1_front",
+      "model": "claude-opus-5",
+      "provider_input_tokens": 52733,
+      "input_byte_bound": 113233,
+      "bytes_per_token": 2.147
+    },
+    {
+      "agent": "A12-EDI",
+      "step": "A12-EDI_integration_draft1",
+      "model": "claude-sonnet-5-5",
+      "provider_input_tokens": 358879,
+      "input_byte_bound": 690879,
+      "bytes_per_token": 1.925
+    }
+  ]
+}

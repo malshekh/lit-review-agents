@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A08-OL output (top-level contract; see the prompt's output schema for full detail)",
+  "title": "A08-OL output: the manuscript plan and its allocation ledger (prompt v0.5)",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -34,30 +34,325 @@
       "type": "string"
     },
     "title": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "word_count": {
+          "type": "integer"
+        },
+        "proposition_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "text",
+        "proposition_ids"
+      ],
+      "additionalProperties": false
     },
     "abstract_plan": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "target_words": {
+          "type": "integer"
+        },
+        "ordered_proposition_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contribution_statement": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target_words",
+        "ordered_proposition_ids",
+        "contribution_statement"
+      ],
+      "additionalProperties": false
     },
     "keywords": {
       "type": "array",
+      "items": {
+        "type": "string"
+      },
       "maxItems": 6
     },
+    "writing_order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
     "sections": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section_id": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3
+          },
+          "heading": {
+            "type": "string"
+          },
+          "heading_kind": {
+            "enum": [
+              "DESCRIPTIVE",
+              "CLAIM_BEARING",
+              "REPORTING_ONLY",
+              "RELATIONSHIP_UNRESOLVED"
+            ]
+          },
+          "heading_proposition_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "word_budget": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "theme_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ordered_items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_id": {
+                  "type": "string"
+                },
+                "item_type": {
+                  "enum": [
+                    "PROPOSITION",
+                    "GAP",
+                    "AUTHOR_INTERPRETATION"
+                  ]
+                },
+                "group": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note_to_writer": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "item_id",
+                "item_type",
+                "group",
+                "note_to_writer"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "display_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "transition_in": {
+            "type": "string"
+          },
+          "transition_out": {
+            "type": "string"
+          },
+          "wording_restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "section_id",
+          "level",
+          "heading",
+          "heading_kind",
+          "heading_proposition_ids",
+          "purpose",
+          "word_budget",
+          "theme_ids",
+          "ordered_items",
+          "display_item_ids",
+          "transition_in",
+          "transition_out",
+          "wording_restrictions"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "allocation_ledger": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "DISCUSSED",
+              "GROUPED_WITH",
+              "TABLE_ONLY",
+              "NOT_INDIVIDUALLY_DISCUSSED"
+            ]
+          },
+          "section_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "grouped_with": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "item_id",
+          "outcome",
+          "section_id",
+          "grouped_with",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "display_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "display_id": {
+            "const": "T1"
+          },
+          "type": {
+            "const": "TABLE_COMPARISON"
+          },
+          "placement_section_id": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_id",
+          "type",
+          "placement_section_id",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 1
     },
     "budget_summary": {
       "type": "object"
     },
-    "display_items": {
-      "type": "array",
-      "maxItems": 8
-    },
     "readability": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "background_concepts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "abbreviations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "abbr": {
+                "type": "string"
+              },
+              "expansion": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "abbr",
+              "expansion"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nomenclature": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "entity": {
+                "type": "string"
+              },
+              "form_to_use": {
+                "type": "string"
+              },
+              "alternative_at_first_mention": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "entity",
+              "form_to_use",
+              "alternative_at_first_mention"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "background_concepts",
+        "abbreviations",
+        "nomenclature"
+      ],
+      "additionalProperties": false
     },
-    "coverage_check": {
-      "type": "array"
+    "reserved_human_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     }
   },
   "required": [
@@ -70,11 +365,12 @@
     "title",
     "abstract_plan",
     "keywords",
+    "writing_order",
     "sections",
-    "budget_summary",
+    "allocation_ledger",
     "display_items",
-    "readability",
-    "coverage_check"
+    "budget_summary",
+    "readability"
   ],
   "additionalProperties": true
 }
