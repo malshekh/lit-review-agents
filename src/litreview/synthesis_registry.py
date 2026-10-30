@@ -19,7 +19,12 @@ def canonical(value) -> str:
 
 
 def fingerprint(value) -> str:
-    return hashlib.sha256(canonical(value).encode()).hexdigest()
+    # Identical canonical bytes, without a whole-document Unicode + bytes copy.
+    digest = hashlib.sha256()
+    encoder = json.JSONEncoder(ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    for chunk in encoder.iterencode(value):
+        digest.update(chunk.encode("utf-8"))
+    return digest.hexdigest()
 
 
 def offline_tokens(value) -> int:

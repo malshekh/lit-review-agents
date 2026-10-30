@@ -13,6 +13,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import tempfile
 import re
 import shutil
 import time
@@ -109,11 +110,26 @@ class Run:
         return p
 
     def save(self, name: str, obj) -> None:
-        self.data(name).write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Stream encoder chunks: dumps + write_text holds the full Unicode document,
+        # newline translation and UTF-8 buffers together on Windows. Keep the previous
+        # accepted artifact intact if encoding/writing is interrupted.
+        target = self.data(name)
+        fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(obj, stream, ensure_ascii=False, indent=2)
+            os.replace(temporary, target)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
 
     def load(self, name: str, default=None):
         p = self.data(name)
-        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
+        if not p.exists():
+            return default
+        # JSON accepts CRLF whitespace directly; universal-newline translation
+        # otherwise duplicates a large decoded document on Windows.
+        with p.open(encoding="utf-8", newline="") as stream:
+            return json.load(stream)
 
     def family(self) -> str:
         p = self.dir / "input" / "topic_family.txt"
