@@ -1417,17 +1417,67 @@ class Run:
         return "outline"
 
     def stage_outline(self, st: dict) -> str:
-        plan = self.agent("A08-OL", {"synthesis_package": self._publishable("synthesis_approved.json"),
-                                     "selected_corpus": self.load("selected_corpus.json"),
-                                     "journal_profile": config.load("journal_scirev"),
-                                     "display_preference": (self.cfg.get("outline") or {}).get("display_preference")},
-                          step=f"A08-OL_v{self.counter(st, 'outline')}")
-        self.save("manuscript_plan.json", plan)
-        if plan.get("status") == "NEEDS_HUMAN_INPUT":
-            raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
-                        "adjust the selection or plan, then run again")
-        self._build_display_items(plan)
+        """A08 plans from the bridge's compact inputs (argument map, element index, table coverage), never the full
+        package. The single comparative table is built by code first, so A08 knows what it already shows. The plan
+        and its allocation ledger are checked by code (bridge.validate_plan; no repair loop), then held for the
+        researcher's approval of the ledger (CP_LEDGER) when bridge.ledger_approval is on."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
+        self._reproject("outline")
+        pkg, findings, corpus = self._bridge_inputs()
+        bcfg, journal = self._bridge_cfg(), config.load("journal_scirev")
+        try:
+            table = bridge.comparative_table(pkg, findings, corpus, int(bcfg.get("table_max_rows", 25)))
+        except bridge.BridgeError as exc:
+            raise Pause(f"comparative table: {exc}") from exc
+        table["inconsistency_notes"] = display_items.inconsistency_notes(table, self.load("inconsistencies.json", []), corpus)
+        basis = {"package": fingerprint(pkg), "evidence": bridge.evidence_version(pkg, findings), "table": fingerprint(table)}
+        check = self.load("bridge/plan_check.json") or {}
+        plan, ledger = self.load("manuscript_plan.json"), self.load("allocation_ledger.json")
+        reuse = (plan is not None and ledger is not None and check.get("basis") == basis and not check.get("problems")
+                 and check.get("plan_version") == bridge.plan_version(plan, ledger))
+        if not reuse:
+            payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg)
+            try:
+                out = self._admitted("A08-OL", payload, step=f"A08-OL_v{self.counter(st, 'outline')}")
+            except AdmissionRefused as exc:
+                raise Pause(f"A08 request not admitted: {exc}. The outline is one request (it is not subdivided); "
+                            "nothing is dropped to make it fit") from exc
+            ledger = out.pop("allocation_ledger", None) or []
+            plan = out
+            self.save("manuscript_plan.json", plan)
+            self.save("allocation_ledger.json", ledger)
+            if plan.get("status") == "NEEDS_HUMAN_INPUT":
+                raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
+                            "adjust the selection or plan, then run again")
+            problems, report = bridge.validate_plan(plan, ledger, pkg, corpus, table, journal, bcfg)
+            check = {"basis": basis, "plan_version": bridge.plan_version(plan, ledger), "problems": problems,
+                     "report": report}
+            self.save("bridge/plan_check.json", check)
+            self.prov.tool_run("plan_check", "outline", {"problems": len(problems), "counts": report["counts"],
+                                                         "theme_to_sections": report["theme_to_sections"]})
+            if problems:
+                raise Pause(f"A08 plan rejected by the bridge ({len(problems)} problems; first: {problems[0]}). "
+                            "See data/bridge/plan_check.json; rerun the outline stage")
+        self._save_comparative_table(table)
+        self.save("bridge/argument_map.json", bridge.argument_map(pkg, corpus))
+        if bcfg.get("ledger_approval", True):
+            self._ledger_approved(plan, ledger, check["report"], pkg, corpus, table)
         return "draft"
+
+    def _save_comparative_table(self, table: dict) -> None:
+        out_dir = self.dir / "data" / "display_items"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)   # one display item: the comparative table replaces anything built before
+        out_dir.mkdir(parents=True)
+        display_items._write_csv(out_dir / "T1.csv", table["columns"], table["rows"])
+        (out_dir / "T1.json").write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.save("display_items.json", [table])
+        self.prov.tool_run("display_items", "outline", {"T1": table["status"], "rows": len(table["rows"]),
+                                                        "contrary_findings": len(table["contrary_finding_ids"]),
+                                                        "contrary_findings_not_shown": table["contrary_findings_not_shown"],
+                                                        "eligible_findings_not_shown": table["eligible_findings_not_shown"]})
 
     def _build_display_items(self, plan: dict) -> list[dict]:
         """Tables and the evidence map from validated findings (code only; A08-OL supplies no values)."""
@@ -1609,68 +1659,446 @@ class Run:
     def _current(self) -> dict:
         return self.load(f"manuscripts/{self.state()['current_manuscript']}.json")
 
+    # --- the bridge: admission, gates and fingerprints for A08, A09, A11 and A12 -----------------------------
+    def _bridge_cfg(self) -> dict:
+        return self.cfg.get("bridge") or {}
+
+    def _bridge_inputs(self) -> tuple[dict, list[dict], list[dict]]:
+        pkg = self._publishable("synthesis_approved.json")
+        if not pkg:
+            raise Pause("approved synthesis missing: the bridge has nothing to hand to the writing agents")
+        return pkg, self._findings() or [], self.load("selected_corpus.json", [])
+
+    def _reproject(self, stage: str) -> None:
+        """Re-project the rest of the run from what has been spent, before the stage makes its first call. A
+        projection over the cap stops the next call (_require_projection)."""
+        proj = cost_projection.remaining_for_run(self)
+        self.save("cost_projection.json", proj)
+        self.prov.tool_run("reprojection", stage, {"projected_remaining_usd": proj["projected_remaining_usd"],
+                                                   "projected_total_usd": proj["projected_total_usd"],
+                                                   "verdict": proj["verdict"]})
+
+    def _admitted(self, agent_id: str, payload: dict, step: str, schema_file: str | None = None,
+                  exclude: frozenset = frozenset(), limit: str | None = None) -> dict:
+        """One downstream request: bounded and checked against the model's window (admission.py), the pricing
+        threshold, the projection line, the runtime gate and the cap (an existing reservation, held for the call).
+        Raises AdmissionRefused when the request does not fit; the caller subdivides by its fixed rule or stops."""
+        from . import admission
+        from .synthesis_registry import fingerprint
+        m = self.route(agent_id, exclude)
+        overrides = {}
+        if limit:   # an output cap sized to the unit requested (pipeline.yaml -> bridge.output_limits)
+            overrides = {"max_tokens": int(self._bridge_cfg()["output_limits"][limit])}
+            m = dataclasses.replace(m, **overrides)
+        a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
+        usd = self.budget.cost(m.model, a["input_bound"], a["output_reserve"])
+        if usd is None:
+            raise UnpricedModel(m.model)
+        self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})
+        if not a["fits"]:
+            raise admission.AdmissionRefused(
+                f"{agent_id} {step}: input bound {a['input_bound']:,} + output reserve {a['output_reserve']:,} "
+                f"exceeds the {a['window']:,}-token window of {m.model}")
+        self._require_projection()
+        if a["crosses_threshold"]:
+            self._check_long_context(agent_id, a)
+        self._check_request_line(agent_id)
+        self._downstream_gate(agent_id, usd)
+        key = f"{agent_id.lower()}-" + fingerprint([step, m.model, payload])[:24]
+        if key in self.budget.reservations():
+            raise Pause(f"unsettled {agent_id} reservation {key}: reconcile provider usage before retrying")
+        ok, available = self.budget.reserve(key, usd, agent_id, "downstream pre-call reservation")
+        if not ok:
+            raise BudgetExceeded(f"{agent_id} request reserves ${usd:.2f}; only ${available:.2f} remains under the cap")
+        try:
+            out = self.agent(agent_id, payload, step=step, overrides=overrides or None, schema_file=schema_file,
+                             exclude_providers=exclude, reservation_key=key)
+        except AgentError:
+            if any(e["step"] == step for e in self.budget.entries()):
+                self.budget.release(key)   # the call was logged; an unlogged failure stays held until reconciled
+            raise
+        except (Pause, BudgetExceeded, UnpricedModel):
+            self.budget.release(key)
+            raise
+        self.budget.release(key)
+        return out
+
+    def _check_long_context(self, agent_id: str, a: dict) -> None:
+        """A request over the model's long-context threshold is repriced in full: it needs a projection that
+        priced that many such calls for the agent, or the projection is superseded and the run re-projected."""
+        proj = self.load("cost_projection.json") or {}
+        line = next((x for x in proj.get("lines", []) if x.get("stage") == agent_id), {})
+        planned = int(line.get("long_context_calls") or 0)
+        made = sum(1 for e in self.prov.events() if e["type"] == "tool_run" and e["tool"] == "admission"
+                   and e["summary"].get("agent") == agent_id and e["summary"].get("crosses_threshold")
+                   and e["time"] >= proj.get("created", ""))
+        if made > planned:
+            reason = (f"{agent_id}: input bound {a['input_bound']:,} crosses the {a['long_context_threshold']:,}-token "
+                      f"pricing threshold of {a['model']} (call {made}; the projection priced {planned})")
+            self._supersede_projection(reason)
+            raise Pause(f"{reason}. The whole request is repriced above the threshold: re-project with "
+                        f"`litreview project {self.id}` before the call")
+
+    def _check_request_line(self, agent_id: str) -> None:
+        """The projection line for this agent is the authorized spend: past its calls or its dollars, the projection
+        is superseded before the next call."""
+        proj = self.load("cost_projection.json") or {}
+        if proj.get("verdict") != "WITHIN_CAP":
+            return
+        line = next((x for x in proj.get("lines", []) if x.get("stage") == agent_id
+                     and x.get("basis") in ("REQUEST_BOUND", "ESTIMATED_ENVELOPE")), None)
+        if line is None:
+            return
+        since = [e for e in self.budget.entries() if e["agent"] == agent_id and e["time"] >= proj["created"]]
+        usd = sum(e["cost_usd"] or 0 for e in since)
+        reason = (f"{agent_id} has spent ${usd:.2f} since the projection, over its line (${line['usd']:.2f})"
+                  if usd > line["usd"] else f"{agent_id} has made {len(since)} calls since the projection, all its "
+                  f"line ({line['calls']}) allows" if len(since) >= int(line["calls"]) else None)
+        if reason:
+            self._supersede_projection(f"projection line overrun: {reason}")
+            raise Pause(f"projection line overrun: {reason}. Re-project with `litreview project {self.id}`.")
+
+    def _downstream_gate(self, agent_id: str, usd: float) -> None:
+        """The runtime gate (batch.gate_usd, $150) before every downstream call, as before every batch: spent +
+        committed (reservations held) + the rest of the run as projected + this request's reserve. Recorded
+        whatever the verdict. The run's spend cap stays absolute on its own (the reservation enforces it)."""
+        limit = (self.cfg.get("batch") or {}).get("gate_usd")
+        if limit is None:
+            raise BudgetExceeded(f"{agent_id}: batch.gate_usd is not set; no downstream call without the runtime gate")
+        p = cost_projection.remaining_for_run(self)
+        spent, committed = self.budget.spent(), self.budget.reserved()
+        total = spent + committed + p["projected_remaining_usd"] + usd
+        verdict = "PASS" if total <= float(limit) else "STOP"
+        self.prov.tool_run("downstream_gate", agent_id, {"spent_usd": round(spent, 4), "committed_usd": round(committed, 4),
+                                                         "projected_usd": p["projected_remaining_usd"],
+                                                         "reserve_usd": round(usd, 4), "total_usd": round(total, 2),
+                                                         "limit_usd": float(limit), "verdict": verdict})
+        if verdict != "PASS":
+            raise BudgetExceeded(f"{agent_id}: spent ${spent:.2f} + committed ${committed:.2f} + projected "
+                                 f"${p['projected_remaining_usd']:.2f} + this request ${usd:.2f} = ${total:.2f}, over the "
+                                 f"${float(limit):.2f} gate. Revise the scope and re-project; any increase is a separate "
+                                 "priced decision")
+
+    def _ledger_approved(self, plan, ledger, report, pkg, corpus, table) -> None:
+        from . import bridge
+        digest = bridge.plan_version(plan, ledger)
+        decision = checkpoints.approved(self.dir, "CP_LEDGER")
+        if decision and decision.get("fingerprint") == digest and decision.get("approve_ledger") is True:
+            return
+        index = {e["id"]: e for e in bridge.element_index(pkg, corpus, set(table.get("propositions_fully_shown") or []))}
+        checkpoints.write_ledger_review(self.dir, digest, ledger, report, index)
+        self.pause_for_checkpoint("CP_LEDGER")
+
+    def _plan_state(self):
+        """Everything the writing stages work from, checked: approved ledger, packets, map and versions."""
+        from . import bridge
+        pkg, findings, corpus = self._bridge_inputs()
+        plan, ledger = self.load("manuscript_plan.json"), self.load("allocation_ledger.json")
+        if plan is None or ledger is None:
+            raise Pause("no manuscript plan and allocation ledger: run the outline stage")
+        pv = bridge.plan_version(plan, ledger)
+        if (self.load("bridge/plan_check.json") or {}).get("plan_version") != pv:
+            raise Pause("the plan or ledger changed after the bridge checked it: rerun the outline stage")
+        if self._bridge_cfg().get("ledger_approval", True):
+            d = checkpoints.approved(self.dir, "CP_LEDGER")
+            if not d or d.get("fingerprint") != pv or d.get("approve_ledger") is not True:
+                raise Pause("the allocation ledger is not approved for this plan (CP_LEDGER)")
+        try:
+            packets = bridge.section_packets(plan, ledger, pkg, findings, corpus)
+        except bridge.BridgeError as exc:
+            raise Pause(f"section packets: {exc}") from exc
+        ev = bridge.evidence_version(pkg, findings)
+        for sid, packet in packets.items():   # evidence A09 retrieved for a section stays in its packet
+            saved = self.load(f"sections/{pv[:16]}/{sid}.json")
+            if saved and saved.get("evidence_version") == ev:
+                packet["retrieved"] = saved.get("retrieved") or {}
+        return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
+                "amap": bridge.argument_map(pkg, corpus), "pv": pv, "ev": ev, "journal": config.load("journal_scirev"),
+                "table": (self.load("display_items.json") or [None])[0]}
+
+    def _bridge_fingerprint(self, m: dict, ps: dict | None = None) -> str:
+        from . import bridge
+        if ps is None:
+            pkg, findings, _ = self._bridge_inputs()
+            plan, ledger = self.load("manuscript_plan.json", {}), self.load("allocation_ledger.json", [])
+            return bridge.content_fingerprint(m, bridge.plan_version(plan, ledger), bridge.evidence_version(pkg, findings))
+        return bridge.content_fingerprint(m, ps["pv"], ps["ev"])
+
+    def _stamp(self, rv: dict, m: dict, ps: dict) -> dict:
+        """Record what an A10 report approved: the manuscript's content fingerprint (text, plan version and
+        evidence-registry version) under the report's verification fingerprint."""
+        stamps = self.load("bridge/verification_stamps.json", {})
+        stamps[rv.get("verification_fingerprint")] = self._bridge_fingerprint(m, ps)
+        self.save("bridge/verification_stamps.json", stamps)
+        self.save("bridge/fingerprints.json", {**self.load("bridge/fingerprints.json", {}),
+                                               self.state().get("current_manuscript") or "?": stamps[rv.get("verification_fingerprint")]})
+        return rv
+
+    def _require_current(self, rv: dict, m: dict, ps: dict, who: str) -> None:
+        """A11 and A12 refuse stale verification: A10's report must be current for this exact manuscript, and its
+        stamp must match the manuscript's fingerprint now (a plan or evidence-registry change invalidates it)."""
+        if not rv or not self._verification_current(rv, m):
+            raise Pause(f"{who}: A10 verification is not current for this manuscript; verify before continuing")
+        stamp = self.load("bridge/verification_stamps.json", {}).get(rv.get("verification_fingerprint"))
+        if stamp != self._bridge_fingerprint(m, ps):
+            raise Pause(f"{who}: A10 approval is stale: the text, plan or evidence registry changed since it was given")
+
+    def _binding_gate(self, m: dict, ps: dict, where: str) -> None:
+        """After any writer or editor output: every section's tags stay inside its packet, every number in the
+        records it is tagged with, every citation bound; the front matter against all packets."""
+        from . import bridge
+        problems = []
+        for s in m.get("sections") or []:
+            packet = ps["packets"].get(s.get("section_id"))
+            if packet is None:
+                problems.append(f"SECTION_UNKNOWN: {s.get('section_id')}")
+                continue
+            if s.get("heading") != packet.get("heading"):
+                problems.append(f"HEADING: {s.get('section_id')} heading differs from the approved plan")
+            problems += bridge.check_text(s.get("text_markdown") or "", packet, s.get("section_id"))
+        problems += self._front_problems(m, ps)
+        if [s.get("section_id") for s in m.get("sections") or []] != [s["section_id"] for s in ps["plan"]["sections"]]:
+            problems.append("SECTIONS: the manuscript's sections differ from the approved plan")
+        self.save(f"bridge/gate_{where}.json", {"problems": problems})
+        self.prov.tool_run("binding_gate", where, {"problems": len(problems)})
+        if problems:
+            raise Pause(f"{where}: evidence binding gate failed ({len(problems)}; first: {problems[0]}); see "
+                        f"data/bridge/gate_{where}.json")
+
+    def _front_problems(self, m: dict, ps: dict) -> list[str]:
+        from . import bridge
+        gp = bridge.global_packet(ps["packets"])
+        gp["retrieved"] = {k: v for p in ps["packets"].values() for k, v in (p.get("retrieved") or {}).items()}
+        title_ids = (ps["plan"].get("title") or {}).get("proposition_ids") or []
+        problems = bridge.check_text(f"{m.get('title') or ''} ⟦{','.join(title_ids) or 'ORG'}⟧", gp, "title")
+        problems += bridge.check_text(m.get("abstract") or "", gp, "abstract")
+        for c in m.get("table_captions") or []:
+            problems += bridge.check_text(c.get("caption") or "", gp, f"caption {c.get('display_id')}")
+        return problems
+
+    def _write_sections(self, ps: dict, label: str, redo: dict | None = None) -> list[dict]:
+        """A09, one section at a time in the plan's writing order. Each call gets the approved outline, its own
+        packet and the full prose of the sections written before it (narrative context only, never evidence). A
+        structured evidence request is fulfilled from the registry, at most bridge.max_retrieval_rounds times.
+        The deterministic section gate runs before the next section starts. Sections already written for the same
+        plan, evidence and earlier prose are kept on resume. redo: {section_id: revision request}."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
+        bcfg = self._bridge_cfg()
+        rounds, limit = int(bcfg.get("max_retrieval_rounds", 2)), int(bcfg.get("retrieval_limit", 12))
+        store, done = f"sections/{ps['pv'][:16]}", []
+        for sid in ps["plan"]["writing_order"]:
+            previous = list(done)
+            saved = self.load(f"{store}/{sid}.json")
+            keep = saved and saved.get("evidence_version") == ps["ev"] and (
+                sid not in redo if redo is not None else saved.get("previous_fingerprint") == fingerprint(previous))
+            if keep:
+                done.append(saved["section"])
+                continue
+            packet = ps["packets"][sid]
+            packet["retrieved"] = dict(packet.get("retrieved") or {})
+            request = (redo or {}).get(sid)
+            for n in range(rounds + 1):
+                payload = bridge.writer_payload(ps["plan"], packet, previous, ps["amap"], ps["journal"], request)
+                step = f"A09-WRI_{label}_{sid}_r{n}"
+                try:
+                    out = self._admitted("A09-WRI", payload, step, schema_file="A09-WRI.section.schema.json",
+                                         limit="A09_SECTION")
+                except AdmissionRefused as exc:
+                    raise Pause(f"{sid}: writer request not admitted ({exc}). A section is the subdivision unit: split "
+                                "it in the plan (rerun A08); no evidence is dropped to make it fit") from exc
+                if out.get("status") != "NEEDS_EVIDENCE":
+                    break
+                if n == rounds:
+                    raise Pause(f"{sid}: A09 still needs evidence after {rounds} retrieval rounds; nothing is inferred "
+                                "in its place (see outputs/" + step + ".json)")
+                try:
+                    found, log = bridge.fulfil_retrieval(out.get("retrieval_requests") or [], ps["pkg"], ps["findings"], limit)
+                except bridge.BridgeError as exc:
+                    raise Pause(f"{sid}: evidence request refused: {exc}") from exc
+                packet["retrieved"].update(found)
+                self.prov.tool_run("writer_retrieval", step, {"section_id": sid, "round": n + 1, "items": log})
+            if out.get("status") in ("NEEDS_HUMAN_INPUT", "ABSTAINED", "FAILED") or not out.get("section"):
+                raise Pause(f"{sid}: A09 returned {out.get('status')} (see outputs/{step}.json)")
+            section = out["section"]
+            problems = bridge.check_section(section, packet, ps["plan"], previous)
+            self.save(f"{store}/{sid}.gate.json", {"problems": problems, "step": step})
+            self.prov.tool_run("section_gate", step, {"section_id": sid, "problems": len(problems)})
+            if problems:
+                raise Pause(f"{sid}: section gate failed ({len(problems)}; first: {problems[0]}); the next section is "
+                            f"not started (data/{store}/{sid}.gate.json)")
+            self.save(f"{store}/{sid}.json", {
+                "section": section, "retrieved": packet["retrieved"], "evidence_version": ps["ev"],
+                "previous_fingerprint": fingerprint(previous), "plan_gaps": out.get("plan_gaps") or [],
+                "ceiling_unclear": out.get("ceiling_unclear") or [], "step": step,
+                "fingerprint": bridge.content_fingerprint(section, ps["pv"], ps["ev"])})
+            done.append(section)
+        return done
+
+    def _assemble(self, ps: dict, sections: list[dict], label: str) -> dict:
+        """Front matter (A09, from the written sections and the plan), then the draft in the plan's section order."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        payload = bridge.front_matter_payload(ps["plan"], sections, ps["amap"], ps["journal"], ps["table"])
+        try:
+            front = self._admitted("A09-WRI", payload, f"A09-WRI_{label}_front", schema_file="A09-WRI.front.schema.json",
+                                   limit="A09_FRONT_MATTER")
+        except AdmissionRefused as exc:
+            raise Pause(f"front matter request not admitted ({exc})") from exc
+        by_id = {s["section_id"]: s for s in sections}
+        ordered = [by_id[s["section_id"]] for s in ps["plan"]["sections"]]
+        m = {"draft_version": label, "plan_version": ps["pv"], "title": front.get("title"), "abstract": front.get("abstract"),
+             "keywords": front.get("keywords") or [], "sections": ordered, "figure_legends": [],
+             "table_captions": front.get("table_captions") or [],
+             "main_text_word_count": sum(len(tags.strip_tags(s.get("text_markdown") or "").split()) for s in ordered),
+             "plan_gaps": [g for s in ps["plan"]["writing_order"]
+                           for g in (self.load(f"sections/{ps['pv'][:16]}/{s}.json") or {}).get("plan_gaps", [])]}
+        problems = self._front_problems(m, ps)
+        if problems:
+            self.save(f"bridge/gate_{label}_front.json", {"problems": problems})
+            raise Pause(f"front matter gate failed ({len(problems)}; first: {problems[0]})")
+        return m
+
+    def _edit(self, mode: str, m: dict, ps: dict, step: str, **extra) -> dict:
+        """A12 on the whole manuscript if the request is admitted; otherwise one unit at a time (front matter, then
+        each section), each unit's output replacing only that unit. Each unit request carries the same map, ledger,
+        outline and findings; a unit that alone does not fit stops the stage."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        try:
+            out = self._admitted("A12-EDI", bridge.editor_payload(mode, m, ps["amap"], ps["ledger"], ps["plan"], **extra), step)
+            edited = {**m, **{k: out[k] for k in ("title", "abstract", "sections") if k in out}}
+            for k in ("keywords", "table_captions", "figure_legends"):
+                if k in out:
+                    edited[k] = out[k]
+            edited.update(change_log=out.get("change_log") or [], queries=out.get("queries") or [],
+                          escalations=out.get("escalations") or [], edit_mode=mode)
+            return edited
+        except AdmissionRefused:
+            pass
+        outputs, log, queries, escalations = {}, [], [], []
+        for uid, part in bridge.manuscript_units(m):
+            try:
+                o = self._admitted("A12-EDI", bridge.editor_payload(mode, part, ps["amap"], ps["ledger"], ps["plan"],
+                                                                  unit=uid, **extra),
+                                   f"{step}_{uid}", schema_file="A12-EDI.unit.schema.json", limit="A12_UNIT")
+            except AdmissionRefused as exc:
+                raise Pause(f"{step}: unit {uid} not admitted ({exc}); nothing is dropped to make it fit") from exc
+            outputs[uid] = o
+            log += o.get("change_log") or []
+            queries += o.get("queries") or []
+            escalations += o.get("escalations") or []
+        edited = bridge.merge_units(m, outputs)
+        edited.update(change_log=log, queries=queries, escalations=escalations, edit_mode=mode, edited_by_unit=True)
+        return edited
+
+    def _integrate(self, draft: dict, ps: dict, label: str) -> dict:
+        """One A12 pass over the assembled draft for transitions, repetition, terminology and argument progression.
+        Every change to an element-tagged sentence is recorded as substantive; A10 verifies the integrated draft in
+        any case. The binding gate runs on the result."""
+        from . import bridge
+        integrated = self._edit("INTEGRATION", draft, ps, f"A12-EDI_integration_{label}")
+        report = bridge.classify_integration(draft, integrated)
+        self.save(f"bridge/integration_{label}.json", report)
+        self.prov.tool_run("integration_pass", label, {"substantive": report["substantive"],
+                                                       "changed_sections": sorted(report["changed_sections"])})
+        self._binding_gate(integrated, ps, f"integration_{label}")
+        return {k: v for k, v in integrated.items() if k not in ("change_log", "queries", "escalations", "edit_mode",
+                                                                 "edited_by_unit")}
+
     def stage_draft(self, st: dict) -> str:
-        plan = self.load("manuscript_plan.json")
-        draft = self.agent("A09-WRI", {"manuscript_plan": plan, "journal_profile": config.load("journal_scirev")},
-                           step="A09-WRI_draft1")
+        """Sequential section writing, front matter, one integration pass, then A10 on the integrated draft.
+        A09 redrafts only the sections A10's blocking findings point at."""
+        self._reproject("draft")
+        ps = self._plan_state()
+        sections = self._write_sections(ps, "draft1")
+        draft = self._integrate(self._assemble(ps, sections, "draft1"), ps, "draft1")
         self._save_manuscript(draft, "m01_draft")
-        rv = self._verify(draft, "DRAFT", "A10-RV_draft1")
+        rv = self._stamp(self._verify(draft, "DRAFT", "A10-RV_draft1"), draft, ps)
         for i in range(int(self.cfg["loops"]["max_redrafts"])):
             blocking = [f for f in rv.get("findings", []) if f.get("severity") == "BLOCKING"
-                        and f.get("responsible_stage") == "A09-WRI"]
+                        and str(f.get("responsible_stage") or "").startswith("A09")]
             if not blocking and not rv.get("systemic_failure"):
                 break
-            draft = self.agent("A09-WRI", {"manuscript_plan": plan, "journal_profile": config.load("journal_scirev"),
-                                           "revision_request": rv.get("findings"), "previous_draft": draft},
-                               step=f"A09-WRI_draft{i + 2}")
+            redo = self._sections_named(rv, draft, blocking or rv.get("findings", []))
+            sections = self._write_sections(ps, f"draft{i + 2}", redo=redo)
+            draft = self._integrate(self._assemble(ps, sections, f"draft{i + 2}"), ps, f"draft{i + 2}")
             self._save_manuscript(draft, f"m01_draft{i + 2}")
-            rv = self._maybe_verify(draft, "DRAFT", f"A10-RV_draft{i + 2}", rv)
+            rv = self._stamp(self._maybe_verify(draft, "DRAFT", f"A10-RV_draft{i + 2}", rv), draft, ps)
         self.save("rv_latest.json", rv)
         return "review_loop"
 
+    @staticmethod
+    def _sections_named(rv: dict, m: dict, findings: list[dict]) -> dict:
+        """{section_id: [findings]} for the sections A10's findings point at (front matter is rewritten anyway)."""
+        where = {o["occurrence_id"]: o["path"] for o in rv.get("occurrence_inventory", [])}
+        out: dict[str, list] = {}
+        for f in findings:
+            for oid in f.get("occurrence_ids") or []:
+                path = where.get(oid) or []
+                if path[:2] == ["manuscript", "sections"] and len(path) > 2:
+                    out.setdefault(m["sections"][path[2]]["section_id"], []).append(f)
+        return out or {s["section_id"]: findings for s in m.get("sections") or []}
+
     def stage_review_loop(self, st: dict) -> str:
-        plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
+        """A11 critiques the manuscript with the compact map, the ledger and A10's findings (never the full plan or
+        package); A12 revises. Both refuse stale verification."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        self._reproject("review_loop")
+        ps = self._plan_state()
         for cycle in range(1, int(self.cfg["loops"]["max_critique_cycles"]) + 1):
             m, rv = self._current(), self.load("rv_latest.json")
-            if not self._verification_current(rv or {},m):
-                rv = self._verify(m,'REVISION',f'A10-RV_precritique{cycle}')
-                self.save('rv_latest.json',rv)
-            rc = self.agent("A11-RC", {"manuscript": m, "manuscript_plan": plan, "synthesis_package": pkg,
-                                       "a10_findings": {k:v for k,v in rv.items() if k not in
-                                           ('occurrence_inventory','verdicts','global_index_ids_reviewed','request_metrics','correction_trace')},
-                                       "journal_profile": config.load("journal_scirev"),
-                                       "previous_critique": self.load("rc_latest.json")},
-                            step=f"A11-RC_cycle{cycle}", exclude_providers=self._prose_vendors("A11-RC"))
+            if not self._verification_current(rv or {}, m):
+                rv = self._stamp(self._verify(m, 'REVISION', f'A10-RV_precritique{cycle}'), m, ps)
+                self.save('rv_latest.json', rv)
+            self._require_current(rv, m, ps, "A11-RC")
+            summary = {k: v for k, v in rv.items() if k not in ('occurrence_inventory', 'verdicts',
+                       'global_index_ids_reviewed', 'request_metrics', 'correction_trace')}
+            payload = bridge.critique_payload(m, ps["amap"], ps["ledger"], summary, ps["journal"], self.load("rc_latest.json"))
+            try:
+                rc = self._admitted("A11-RC", payload, f"A11-RC_cycle{cycle}", exclude=self._prose_vendors("A11-RC"))
+            except AdmissionRefused as exc:
+                raise Pause(f"A11 request not admitted ({exc}); the critique reads the whole manuscript and is not "
+                            "subdivided") from exc
+            rc["bridge_fingerprint"] = self._bridge_fingerprint(m, ps)
             self.save("rc_latest.json", rc)
             if rc["decision"] == "ACCEPT":
-                if any(f.get('severity')=='BLOCKING' for f in rv.get('findings',[])):
+                if any(f.get('severity') == 'BLOCKING' for f in rv.get('findings', [])):
                     raise Pause('A11 ACCEPT cannot override unresolved A10 BLOCKING defects')
                 return "finish_edit"
             if rc["decision"] == "HOLD_FOR_UPSTREAM_REVIEW":
                 raise Pause("A11-RC requests upstream review (see data/rc_latest.json)")
-            ed = self.agent("A12-EDI", {"mode": "REVISION", "manuscript": m, "manuscript_plan": plan,
-                                        "critique": rc, "verification_findings": rv.get("findings")},
-                            step=f"A12-EDI_revision{cycle}")
+            self._require_current(rv, m, ps, "A12-EDI REVISION")
+            if rc["bridge_fingerprint"] != self._bridge_fingerprint(m, ps):
+                raise Pause("A12-EDI REVISION: the critique is stale (text, plan or evidence changed after it)")
+            ed = self._edit("REVISION", m, ps, f"A12-EDI_revision{cycle}", critique=rc,
+                            verification_findings=rv.get("findings"))
+            self._binding_gate(ed, ps, f"revision{cycle}")
             self._save_manuscript(ed, f"m02_revision{cycle}")
-            rv = self._maybe_verify(ed, "REVISION", f"A10-RV_revision{cycle}", rv, ed.get("change_log"))
+            rv = self._stamp(self._maybe_verify(ed, "REVISION", f"A10-RV_revision{cycle}", rv, ed.get("change_log")), ed, ps)
             self.save("rv_latest.json", rv)
         raise Pause("critique cycles exhausted without ACCEPT — review data/rc_latest.json "
                     "(the draft is never accepted just because cycles ran out)")
 
     def stage_finish_edit(self, st: dict) -> str:
-        plan = self.load("manuscript_plan.json")
-        line = self.agent("A12-EDI", {"mode": "LINE", "manuscript": self._current(), "manuscript_plan": plan},
-                          step="A12-EDI_line")
+        self._reproject("finish_edit")
+        ps = self._plan_state()
+        m = self._current()
+        self._require_current(self.load("rv_latest.json") or {}, m, ps, "A12-EDI LINE")
+        line = self._edit("LINE", m, ps, "A12-EDI_line")
+        self._binding_gate(line, ps, "line")
         self._save_manuscript(line, "m03_line")
-        rv = self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log"))
+        rv = self._stamp(self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log")), line, ps)
         self.save("rv_latest.json", rv)
         if rv.get("finding_severity") in ("MAJOR", "BLOCKING"):
             raise Pause("scientific findings after line edit require correction (see data/rv_latest.json)")
-        proof = self.agent("A12-EDI", {"mode": "PROOF", "manuscript": line, "manuscript_plan": plan,
-                                      "verification_findings":rv.get('findings',[])},
-                           step="A12-EDI_proof")
+        self._require_current(rv, line, ps, "A12-EDI PROOF")
+        proof = self._edit("PROOF", line, ps, "A12-EDI_proof", verification_findings=rv.get('findings', []))
+        self._binding_gate(proof, ps, "proof")
         self._save_manuscript(proof, "m04_proof")
-        final = self._verify(proof, "FINAL", "A10-RV_final")
+        final = self._stamp(self._verify(proof, "FINAL", "A10-RV_final"), proof, ps)
         self.save("rv_final.json", final)
         if final.get("release_disposition") not in ("APPROVED", "APPROVED_WITH_MINOR_FINDINGS"):
             raise Pause(f"final verification: {final.get('release_disposition')} (see data/rv_final.json)")

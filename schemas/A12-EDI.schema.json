@@ -34,7 +34,8 @@
       "enum": [
         "REVISION",
         "LINE",
-        "PROOF"
+        "PROOF",
+        "INTEGRATION"
       ]
     },
     "output_manuscript_version": {

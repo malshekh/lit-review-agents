@@ -62,6 +62,9 @@ def test_the_gate_stops_a_batch_before_anything_is_uploaded(run, monkeypatch):
 
 @pytest.mark.projection_guard
 def test_the_gate_counts_the_batch_once_and_unsettled_batches_as_committed(run):
+    # a gate above this run's projection, so the arithmetic is checked on a PASS (the A07 envelope and the
+    # section-by-section A09 line put two papers over $150 at worst case)
+    run.cfg = {**run.cfg, "batch": {**run.cfg["batch"], "gate_usd": 1000.00}}
     run.budget.reserve("other", 2.0, "A05-KE")                         # held by an unsettled batch
     _log(run, "A02-SP", 1.5)
     g = run._batch_gate("A05-KE", ["A05-KE_R0001"], 3.0)
@@ -73,7 +76,7 @@ def test_the_gate_counts_the_batch_once_and_unsettled_batches_as_committed(run):
     assert {"A07-SYN", "A10-RV", "A12-EDI"} <= set(lines)
     assert (g["spent_usd"], g["committed_usd"], g["reserve_usd"]) == (1.5, 2.0, 3.0)
     assert g["total_usd"] == pytest.approx(1.5 + 2.0 + g["projected_usd"] + 3.0, abs=0.01)
-    assert g["verdict"] == ("PASS" if g["total_usd"] <= 150 else "STOP") and g["limit_usd"] == 150.0
+    assert g["verdict"] == ("PASS" if g["total_usd"] <= 1000 else "STOP") and g["limit_usd"] == 1000.0
 
 
 @pytest.mark.projection_guard

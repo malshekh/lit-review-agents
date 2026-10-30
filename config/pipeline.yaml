@@ -94,8 +94,39 @@ themes:
 # Passed to A08-OL as the researcher's preference for the review's display item(s).
 outline:
   display_preference: >-
-    One display item: an evidence map across study systems (FIGURE_EVIDENCE_MAP), showing where
-    evidence exists and where it stops, which states the preclinical-to-clinical translation gap visually.
+    One display item: a single comparative table (T1, TABLE_COMPARISON) of biochemical, preclinical and
+    clinical evidence, built by code from eligible findings (system, intervention, key observation, role,
+    limitation, citation). Contrary evidence is always included; it fits one page. No other display items.
+
+# Evidence-to-manuscript bridge (bridge.py): the A08 allocation ledger, section packets, sequential A09
+# writing with a deterministic gate after every section, and the comparative table.
+bridge:
+  ledger_approval: true         # stop after A08 until the researcher approves the allocation ledger (CP_LEDGER):
+                                #   what gets individual discussion is evidence selection, the authors' decision
+  max_group_size: 16            # most elements one GROUPED_WITH passage may carry
+  table_max_rows: 25            # one typeset page (journal table_max_pages: 1)
+  max_retrieval_rounds: 2       # A09 evidence requests per section
+  retrieval_limit: 12           # items per request round
+  output_limits:                # max_tokens per downstream request kind, thinking included (sized to the unit
+                                #   written, not the whole manuscript; agents' max_tokens apply otherwise)
+    A09_SECTION: 16000          # one section of about 300-1,000 words plus thinking
+    A09_FRONT_MATTER: 8000      # title, abstract (200 words), keywords, one caption
+    A12_UNIT: 16000             # one section or the front matter, edited, with its change log
+
+# Admission for A08, A09, A11 and A12 (admission.py): every request is bounded (UTF-8 bytes of the exact
+# serialized request, never below its token count) and must fit the model's window with its output reserve.
+# A model with no window here is refused (fail closed): add a documented value before using it.
+admission:
+  context_windows:
+    claude-opus-5: 1000000      # A09; A12 alternate (repository and audit: 1M)
+    claude-sonnet-5-5: 1000000  # A12; A09 alternate (1M input, run 20261025-100039)
+    gpt-6.1-sol: 1050000        # A08; A11 alternate (researcher, 2026-10-29)
+    # kimi-k3.1-pro (A11 primary, A08 alternate): no documented window recorded, so A11 on Kimi is refused
+  reasoning_reserve_tokens:     # added to max_tokens where reasoning is not established to count within it
+    anthropic: 0                # thinking counts within max_tokens
+    openai: 0                   # reasoning counts within max_completion_tokens
+    kimi: 32000                 # not established: reserved again in full
+  safety_margin_tokens: 0
 
 # A06 instability test: after per-paper validation, every paper with a blocked finding is validated once
 # more with the identical input (whole paper against whole paper, same prompt, text, identities and model

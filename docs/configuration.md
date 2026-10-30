@@ -250,6 +250,45 @@ superseded and nothing more is called until the run is re-projected. Each A07 tu
 produces nothing and stops the job, so it supersedes the projection, and resuming requires a new one priced
 from actual spend (turns already committed are not priced again).
 
+**Downstream admission** (`admission`, `src/litreview/admission.py`). Before every A08, A09, A11 and A12
+request, the exact serialized request is bounded in UTF-8 bytes (never below its token count) and must fit
+the routed model's window (`admission.context_windows`) with its output reserve (`max_tokens`, plus
+`reasoning_reserve_tokens` for providers where reasoning is not established to count within it). A request
+that cannot be bounded, or whose model has no recorded window, is refused. Kimi K3.1 Pro has no recorded
+window, so A11 on Kimi is refused until a documented value is added. A request that does not fit is
+subdivided by a fixed rule or the stage stops. A09 writes one section per request, and a section too large
+for one request stops the stage: the plan must split it. A12 edits the whole manuscript, or one unit at a
+time (front matter, then each section) when the whole does not fit. A08 and A11 are single requests and stop.
+Nothing is truncated or dropped to fit.
+
+A request whose bound is above the model's long-context threshold (GPT-6.1: 272k) is repriced in full, so it
+is dispatched only if the current projection priced that many long-context calls for the agent
+(`long_context_calls`); otherwise the projection is superseded and the run re-projected. Each request then
+passes the runtime gate (`batch.gate_usd`, the same $150 stop as batches: spent + committed + projected +
+this request) and holds a reservation for its bound under `run.spend_cap_usd` until it settles. The A08 to
+A12 projection lines (`src/litreview/tools/downstream_projection.py`) come from the same request builders
+(`REQUEST_BOUND` once the approved package exists, `ESTIMATED_ENVELOPE` before it), price input at the byte
+bound divided by 1.8 (below every free provider count measured), and are re-made at the start of each of
+those stages. Spend or calls past a line supersede the projection before the next call.
+
+**The bridge** (`bridge`, `src/litreview/bridge.py`). Code, not a model, hands the approved synthesis to the
+writing agents. A08 receives a compact argument map and one line per element, and returns a plan and an
+allocation ledger: every proposition, gap and adopted interpretation is `DISCUSSED`, `GROUPED_WITH`,
+`TABLE_ONLY` or `NOT_INDIVIDUALLY_DISCUSSED` (with a reason). Mandatory elements are always written: conflicts,
+contrary CORE evidence, researcher-verified inconsistencies, system gaps and NARRATIVE coverage. Groups have
+at most `max_group_size` members. The plan is checked by code, and with `ledger_approval` the run stops at
+`CP_LEDGER` (`litreview approve RUN CP_LEDGER`) before anything is written.
+
+A09 then writes section by section from packets. Each packet holds A07's records verbatim, the findings
+behind them, the union of a group's qualifications, and the contrary context from other sections. Each
+request also carries the outline and all earlier prose. A gate runs after every section: tags, numbers,
+citations, display references, heading and terminology. A09 may request evidence from the registry at most
+`max_retrieval_rounds` times per section. After assembly, one A12 `INTEGRATION` pass runs, then A10.
+
+The single display item is the comparative table `T1`, built by code with `table_max_rows` rows.
+`output_limits` size A09 and A12 requests to the unit written. Fingerprints of the text, plan and
+evidence-registry version stamp every A10 approval; A11 and A12 refuse a stale one.
+
 **Evaluation-only runs** (`src/litreview/publication.py`). `litreview mark-evaluation-only RUN --reason ...`
 stamps the run's synthesis in its own data; CP3, the outline, display tables, verification, critique and
 every later stage refuse a stamped synthesis, in that run or any run it is copied into.

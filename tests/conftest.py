@@ -36,13 +36,32 @@ def fake_get(monkeypatch):
 @pytest.fixture(autouse=True)
 def _projection_guard(request, monkeypatch):
     """Tests drive runs past CP2 with fake models: the spend guards (Run._require_projection, the worst-case line
-    check and the batch gate) are off unless a test is marked `projection_guard`, which tests the guards."""
+    check, the batch gate, and the downstream re-projection, gate, line and long-context checks) are off unless a
+    test is marked `projection_guard`, which tests the guards."""
     if request.node.get_closest_marker("projection_guard"):
         return
     from litreview import orchestrator
     monkeypatch.setattr(orchestrator.Run, "_require_projection", lambda self: None)
     monkeypatch.setattr(orchestrator.Run, "_check_worst_case_line", lambda self, agent_id: None)
     monkeypatch.setattr(orchestrator.Run, "_batch_gate", lambda self, *a, **k: None)
+    monkeypatch.setattr(orchestrator.Run, "_reproject", lambda self, stage: None)
+    monkeypatch.setattr(orchestrator.Run, "_downstream_gate", lambda self, *a, **k: None)
+    monkeypatch.setattr(orchestrator.Run, "_check_request_line", lambda self, agent_id: None)
+    monkeypatch.setattr(orchestrator.Run, "_check_long_context", lambda self, agent_id, a: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_network(monkeypatch):
+    """No test reaches the network: any socket connection or name lookup fails the test. Paid and free provider
+    endpoints alike are only ever called from the audit scripts, never from tests."""
+    import socket
+
+    def refuse(*a, **k):
+        raise AssertionError(f"a test tried to reach the network: {a[:2]}")
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
 
 
 def pytest_configure(config):
