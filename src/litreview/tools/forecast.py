@@ -37,6 +37,15 @@ A10_LOCAL_BYTES = 7_914_333 / 42
 A10_PAGE_BYTES = 5_050_855 / 23
 A10_INDEX_PER_FINDING = 2892 / 1996
 A10_RETRIEVAL_SHARE = 0.15                               # assumption: a retrieval round adds 15% to its request
+# The largest cohort actually run end to end (reference run 20261025-100039: 28 papers, 471 findings). A projection
+# beyond it is UNVALIDATED until a larger cohort has run and recalibrated it (researcher's decision, 2026-10-30).
+LARGEST_RUN = {"papers": 28, "findings": 471}
+
+
+def validation(papers: int | None = None, findings: int | None = None) -> str:
+    beyond = (papers or 0) > LARGEST_RUN["papers"] or (findings or 0) > LARGEST_RUN["findings"]
+    return ("UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger "
+            "cohort has run" if beyond else "within the largest cohort run; per-call rates still provisional")
 
 
 def a07(F: int, cfg: dict, budget, route, s: dict | None) -> tuple[float, int]:
@@ -106,7 +115,8 @@ def calibrated_line(stage: str, F: int, cfg: dict, budget, route, done_share: fl
     baseline = figures.get("baseline", adverse) * left
     source = ("provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency)"
               if stage == "A07-SYN" else "production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10)")
-    return {"stage": stage, "basis": "CALIBRATED_FORECAST", "calls": max(0, round(calls * left)),
+    return {"stage": stage, "basis": "CALIBRATED_FORECAST", "validation": validation(findings=F),
+            "calls": max(0, round(calls * left)),
             "usd": round(baseline * (1 + margin), 4), "baseline_usd": round(baseline, 4), "uncertainty_margin": margin,
             "adverse_usd": round(adverse * left, 4), "scenarios": {k: round(v * left, 4) for k, v in figures.items()},
             "detail": f"{F:,} findings; calibrated from {source}; usd = baseline x {1 + margin:.2f}; "
@@ -150,6 +160,7 @@ def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, ra
         out[name] = {k: round(v, 2) for k, v in stages.items()} | {"total": round(sum(stages.values()), 2)}
     base = out["baseline"]["total"]
     margin = float(fc["uncertainty_margin"])
-    return {"papers": n_papers, "full_text": n_ft, "abstract": n_ab, "findings": F, "scenarios": out,
+    return {"papers": n_papers, "validation": validation(n_papers, F), "full_text": n_ft, "abstract": n_ab,
+            "findings": F, "scenarios": out,
             "baseline_with_margin": round(base * (1 + margin), 2), "uncertainty_margin": margin,
             "bridge_basis": req["basis"]}

@@ -36,12 +36,14 @@ def main():
     by_n = {}
     for n in (20, 28, 40, 50, 60, 70, 80, 100, 120):
         r = forecast.full_run(n, FULL_TEXT_SHARE, cfg, b, route, rates)
-        by_n[n] = {"findings": r["findings"], **{s: r["scenarios"][s]["total"] for s in r["scenarios"]},
+        by_n[n] = {"findings": r["findings"], "validation": r["validation"],
+                   **{s: r["scenarios"][s]["total"] for s in r["scenarios"]},
                    "baseline_with_margin": r["baseline_with_margin"]}
     fits = {f"{label} <= ${cap}": max([n for n, v in by_n.items() if v[key] <= cap], default=None)
             for cap in (150, 200) for label, key in (("baseline + margin", "baseline_with_margin"), ("baseline", "baseline"),
                                                      ("adverse", "adverse"))}
-    result = {"method": "calibrated planning forecast (src/litreview/tools/forecast.py); measured inputs and stated "
+    result = {"label": "UNVALIDATED: every projection here beyond 28 papers is unvalidated until a larger cohort has run",
+              "method": "calibrated planning forecast (src/litreview/tools/forecast.py); measured inputs and stated "
                         "assumptions as documented there and in pipeline.yaml -> forecast; not a bill",
               "spent_usd": 0.0, "outstanding_reservations_usd": 0.0,
               "at_120_papers": at120, "by_paper_count": by_n, "largest_paper_count_fitting": fits,

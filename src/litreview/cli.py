@@ -216,6 +216,12 @@ def cmd_cost_rates(args) -> int:
     return 0
 
 
+def cmd_calibration_report(args) -> int:
+    from .tools import calibration_report
+    print(json.dumps(calibration_report.report(RUNS_DIR / args.run_id), indent=1))
+    return 0
+
+
 def cmd_project(args) -> int:
     from .tools import cost_projection
     run = Run(args.run_id)
@@ -301,6 +307,9 @@ def main(argv: list[str] | None = None) -> int:
     cr = sub.add_parser("cost-rates", help="measure per-paper and per-theme costs from a run (records/cost_rates.json)")
     cr.add_argument("run_id")
     cr.set_defaults(fn=cmd_cost_rates)
+    cb = sub.add_parser("calibration-report", help="report what a run measured for calibration (read only)")
+    cb.add_argument("run_id")
+    cb.set_defaults(fn=cmd_calibration_report)
     pj = sub.add_parser("project", help="project what a run still has to spend; required before spend after CP2")
     pj.add_argument("run_id")
     pj.set_defaults(fn=cmd_project)
