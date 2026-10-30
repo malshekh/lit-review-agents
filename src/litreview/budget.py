@@ -210,7 +210,9 @@ class BudgetTracker:
         for e in self.entries():
             if e.get("batch_id"):
                 logged[e["batch_id"]] += e["cost_usd"] or 0.0
-        return sum(max(0.0, r["usd"] - (logged[r["batch_id"]] if r.get("batch_id") else 0.0)) for r in res.values())
+        for e in self.entries():
+            if e.get("reservation_key"):logged[e["reservation_key"]] += e["cost_usd"] or 0.0
+        return sum(max(0.0, r["usd"] - (logged[r["batch_id"]] if r.get("batch_id") else logged[k])) for k,r in res.items())
 
     def reserve(self, key: str, usd: float, agent_id: str, note: str = "") -> tuple[bool, float]:
         """Hold `usd` under `key` if it fits under the cap after spend and every other reservation.
@@ -242,7 +244,7 @@ class BudgetTracker:
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
                cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0,
                started_at: float | None = None, cache_requested: bool = False, batch_id: str | None = None,
-               prompt_chars: int | None = None) -> dict:
+               prompt_chars: int | None = None, reservation_key: str | None = None) -> dict:
         """cache_requested: the request carried cache_control marks. A requested cache that neither read
         nor wrote (a prefix changed by a byte, or below the provider's minimum) is logged as a miss.
         batch_id: the call ran inside that batch and is billed at batch rates. prompt_chars: characters sent
@@ -265,6 +267,7 @@ class BudgetTracker:
             "cost_usd": None if parts is None else sum(parts.values()),
             "cost_parts_usd": None if parts is None else {k: round(v, 6) for k, v in parts.items()},
         }
+        if reservation_key:entry["reservation_key"]=reservation_key
         if batch_id:
             entry["batch_id"] = batch_id
         if prompt_chars:

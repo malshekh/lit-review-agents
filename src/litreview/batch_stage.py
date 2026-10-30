@@ -179,6 +179,12 @@ class BatchStage:
                 "output_tokens_per_item": out, "basis": "configured max_tokens per item (worst case)"}
 
     def _submit(self, m, steps: list[str]) -> dict:
+        from . import pilot_authorization as pilot
+        if pilot.enabled(self.run):
+            try:pilot.require(self.run,self.agent_id)
+            except pilot.AuthorizationRequired as exc:
+                from .orchestrator import Pause
+                raise Pause(str(exc)) from exc
         crossed = [s for s in steps if m.provider in self.exclude(s)]
         if crossed:   # routing already prevents this; checked again here because nothing after it can be undone
             raise VendorSeparationError(
@@ -199,8 +205,9 @@ class BatchStage:
         self.run._batch_gate(self.agent_id, steps, est["projected_usd"])   # raises BatchGateRefused: stop
         self.run._spend_review(self.agent_id, f"batch {sub_id}", est["projected_usd"])   # review point: stop and ask
         b = self.run.budget
-        ok, available = b.reserve(sub_id, est["projected_usd"], self.agent_id,
-                                  note=f"{len(steps)} items on {m.model}")
+        reserve=getattr(self.run,"_reserve",None)
+        ok, available = (reserve(sub_id,est["projected_usd"],self.agent_id,f"{len(steps)} items on {m.model}",steps=steps) if reserve else
+                         b.reserve(sub_id,est["projected_usd"],self.agent_id,note=f"{len(steps)} items on {m.model}"))
         est["available_usd"] = round(available, 4)
         if not ok:
             raise ReservationRefused(

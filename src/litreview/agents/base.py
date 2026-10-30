@@ -90,7 +90,7 @@ def user_parts(payload: dict, cache_keys: tuple[str, ...] = ()) -> list[dict]:
 def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
               budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None,
               schema_file: str | None = None, reservation_key: str | None = None,
-              repair_limit: int | None = None) -> dict:
+              repair_limit: int | None = None, dispatch_guard=None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
     `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
     overrides its output schema (A07 job turns)."""
@@ -119,6 +119,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         message = user if attempt == 0 else user + [{
             "text": "Your previous reply was not valid against the required output schema:\n"
                     + last_error + "\nReturn only the corrected JSON object.", "cache": False}]
+        held = dispatch_guard(attempt,system,message,m) if dispatch_guard else reservation_key
         try:
             resp = complete(m.provider, system=system, user=message, model=m.model,
                             max_tokens=m.max_tokens, temperature=m.temperature, effort=m.effort,
@@ -132,7 +133,9 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                       cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens,
                       cache_write_1h_tokens=resp.cache_write_1h_tokens, started_at=started,
                       cache_requested=m.provider == "anthropic" and (m.cache_system or any(p["cache"] for p in user)),
-                      prompt_chars=len(system) + sum(len(p["text"]) for p in message))
+                      prompt_chars=len(system) + sum(len(p["text"]) for p in message),
+                      **({"reservation_key":held} if dispatch_guard else {}))
+        if dispatch_guard and held!=reservation_key:budget.release(held)
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
         if resp.stop_reason == "refusal":
             # a policy decline, not a formatting error: never retried (same model, same request, same answer)

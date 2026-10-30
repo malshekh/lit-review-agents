@@ -225,10 +225,34 @@ def cmd_calibration_report(args) -> int:
 def cmd_project(args) -> int:
     from .tools import cost_projection
     run = Run(args.run_id)
+    from . import pilot_authorization as pilot
+    if pilot.enabled(run):
+        scope=pilot.STAGE_2 if getattr(args,'stage',None)=='2' else pilot.STAGE_1
+        try: review=pilot.request(run,scope)
+        except pilot.AuthorizationRequired as exc:print(str(exc));return 2
+        print(json.dumps(review,indent=2))
+        return 0 if review['projection']['verdict']=='WITHIN_CAP' else 2
     proj = cost_projection.remaining_for_run(run)
     run.save("cost_projection.json", proj)
     print(cost_projection.text(proj))
     return 0 if proj["verdict"] == "WITHIN_CAP" else 2
+
+
+def cmd_pilot_reference(args) -> int:
+    from . import pilot_authorization as pilot
+    try:pilot.record_key(Run(args.run_id),json.loads(_read(args.metadata)))
+    except (ValueError,OSError) as exc:print(str(exc));return 2
+    print('Human reference-key metadata recorded; key contents never enter research payloads.')
+    return 0
+
+
+def cmd_authorize_stage(args) -> int:
+    from . import pilot_authorization as pilot
+    scope=pilot.STAGE_1 if args.stage=='1' else pilot.STAGE_2
+    try:pilot.approve(Run(args.run_id),scope,args.fingerprint,args.reviewer)
+    except ValueError as exc:print(str(exc));return 2
+    print(scope+' recorded; all scientific checkpoints still apply.')
+    return 0
 
 
 def cmd_mark_evaluation_only(args) -> int:
@@ -313,7 +337,13 @@ def main(argv: list[str] | None = None) -> int:
     cb.set_defaults(fn=cmd_calibration_report)
     pj = sub.add_parser("project", help="project what a run still has to spend; required before spend after CP2")
     pj.add_argument("run_id")
+    pj.add_argument('--stage',choices=['1','2'],default='1',help='staged pilot financial scope; no authorization is granted by projection')
     pj.set_defaults(fn=cmd_project)
+    pr=sub.add_parser('pilot-reference',help='record a human-approved external reference-key version/hash, not its contents')
+    pr.add_argument('run_id');pr.add_argument('--metadata',required=True);pr.set_defaults(fn=cmd_pilot_reference)
+    au=sub.add_parser('authorize-stage',help='explicit human financial approval of the exact pending stage projection')
+    au.add_argument('run_id');au.add_argument('stage',choices=['1','2'])
+    au.add_argument('--fingerprint',required=True);au.add_argument('--reviewer',required=True);au.set_defaults(fn=cmd_authorize_stage)
     me = sub.add_parser("mark-evaluation-only", help="stamp a run's synthesis so no publication stage accepts it")
     me.add_argument("run_id")
     me.add_argument("--reason", required=True)

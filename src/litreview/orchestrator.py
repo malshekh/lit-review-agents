@@ -25,7 +25,7 @@ from .agents.base import prompt_version
 from .budget import BatchGateRefused, BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR, SCHEMAS_DIR
 from .provenance import ProvenanceLog
-from . import synthesis_input, theme_framework
+from . import synthesis_input, theme_framework, pilot_authorization as pilot
 from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
 from .synthesis_job import JobStopped
@@ -65,7 +65,7 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "seeds.txt").write_text("\n".join(seeds or []), encoding="utf-8")
     (d / "topic_family.txt").write_text(family, encoding="utf-8")
     (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
-    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}})
+    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}, "execution_mode": "STAGED_PILOT"})
     return run_id
 
 
@@ -167,6 +167,7 @@ class Run:
         refused = model_record.refused(self.family())
         done = STAGES[:STAGES.index(self.state()["stage"])]
         for agent_id in self.cfg["agents"]:
+            if pilot.enabled(self) and STAGES.index(self.state()["stage"])<=STAGES.index("cp3") and agent_id in pilot.SECOND:continue
             if AGENT_LAST_STAGE.get(agent_id) in done:   # this run no longer needs the agent
                 continue
             tried = [m.model for m in config.agent_candidates(agent_id)]
@@ -213,6 +214,8 @@ class Run:
     def _require_projection(self) -> None:
         """No agent call after CP2 without a cost projection within the cap (cost_projection.py). Spend is
         decided at CP2, where changing the selection is cheap; `litreview project RUN` re-projects."""
+        if pilot.enabled(self):
+            return  # stage-specific guard runs before dispatch/reservation, including before CP2
         stage = self.state().get("stage")
         if stage not in STAGES or STAGES.index(stage) <= STAGES.index("cp2"):
             return
@@ -254,6 +257,13 @@ class Run:
     def _batch_gate(self, agent_id: str, steps: list[str], reserve_usd: float) -> dict:
         """The runtime gate before any batch (pipeline.yaml -> batch.gate_usd), recorded in provenance whatever
         the verdict. Steps held by unsettled batches are committed spend, not projected spend."""
+        if pilot.enabled(self):
+            try:
+                pilot.require(self,agent_id)
+                p=pilot.project(self,pilot.stage_for(self,agent_id),in_flight=frozenset(steps),candidate=(agent_id,reserve_usd))
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            if p['verdict']!='WITHIN_CAP':raise Pause('Pilot batch exceeds remaining authorized budget')
+            return p
         limit = (self.cfg.get("batch") or {}).get("gate_usd")
         if limit is None:
             raise BatchGateRefused(f"{agent_id}: batch.gate_usd is not set; no batch is submitted without the gate")
@@ -274,9 +284,30 @@ class Run:
                 f"the scope and re-project (`litreview project {self.id}`); scientific checks are not cut to fit.")
         return g
 
+    def _reserve(self,key,usd,agent_id,note="",steps=()):
+        if pilot.enabled(self):
+            try:
+                pilot.require(self,agent_id)
+                in_flight={s for p in (self.dir/'data'/'batches').glob('*.json')
+                           for r in json.loads(p.read_text(encoding='utf-8'))
+                           if r['status'] in ('INTENT','SUBMITTED','UNRESOLVED') for s in r['steps']}
+                p=pilot.project(self,pilot.stage_for(self,agent_id),in_flight=frozenset(in_flight|set(steps)),candidate=(agent_id,usd))
+                if p['verdict']!='WITHIN_CAP':raise pilot.AuthorizationRequired('New commitment would exceed $35 future-work admission')
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+        ok,available=self.budget.reserve(key,usd,agent_id,note)
+        if ok and pilot.enabled(self):
+            meta=self.load('pilot_reservations.json',{})
+            scope=pilot.stage_for(self,agent_id)
+            meta[key]={'scope':scope,'steps':list(steps),'authorization':self.load('pilot_'+scope+'.json')['fingerprint']}
+            pilot.atomic(self.data('pilot_reservations.json'),meta)
+        return ok,available
+
     def _supersede_projection(self, reason: str) -> None:
         """Spend the projection did not plan for (a paid turn that produced nothing) makes it stale: the next
         agent call requires a new one, priced from what has actually been spent."""
+        if pilot.enabled(self):
+            from .synthesis_registry import fingerprint
+            self.save('pilot_financial_plan.json',{'superseded_reason':reason,'previous':fingerprint(self.load('pilot_financial_plan.json'))})
         proj = self.load("cost_projection.json")
         if proj is not None:
             proj.update(verdict="SUPERSEDED", superseded_reason=reason[:300],
@@ -286,6 +317,30 @@ class Run:
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
               reservation_key: str | None = None) -> dict:
+        if pilot.enabled(self):
+            # Reuse an accepted, version-identical output before considering another paid submission.
+            # A logged response settles only its own hold; uncertain provider usage remains held.
+            try:pilot.require(self,agent_id,financial=False)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            from .synthesis_registry import fingerprint
+            actual_model=self.route(agent_id,exclude_providers)
+            if overrides:actual_model=dataclasses.replace(actual_model,**overrides)
+            approved_route=self.load('pilot_'+pilot.stage_for(self,agent_id)+'.json')['context']['routes'][agent_id]
+            if actual_model.model!=approved_route['model'] or actual_model.provider!=approved_route['provider']:
+                raise Pause('Actual route differs from the financially approved route; re-project before dispatch')
+            replay=fingerprint([agent_id,payload,dataclasses.asdict(actual_model),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
+            saved=self.load('pilot_requests.json',{}).get(step)
+            accepted_path=self.dir/'outputs'/f'{step}.json'
+            if saved and saved['request']==replay and accepted_path.exists():
+                from .agents.base import validate
+                accepted=json.loads(accepted_path.read_text(encoding='utf-8'));validate(agent_id,accepted,schema_file)
+                if saved.get('output_hash') and saved['output_hash']!=fingerprint(accepted):raise Pause('Accepted output changed')
+                logged={e.get('reservation_key') for e in self.budget.entries() if e['step']==step}
+                for key,meta in self.load('pilot_reservations.json',{}).items():
+                    if step in meta.get('steps',[]) and key in logged:self.budget.release(key)
+                return accepted
+            try: pilot.require(self,agent_id,financial=not bool(reservation_key))
+            except pilot.AuthorizationRequired as exc: raise Pause(str(exc)) from exc
         self._require_projection()
         self._check_worst_case_line(agent_id)
         m = self.route(agent_id, exclude_providers)
@@ -299,11 +354,56 @@ class Run:
                 m.model, watched["input_counted"] or watched["input_byte_bound"], watched["output_reserve"]) or 0.0)
         try:
             extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+            if pilot.enabled(self):
+                from .synthesis_registry import fingerprint
+                request_id=fingerprint([agent_id,payload,dataclasses.asdict(m),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
+                cached=self.load('pilot_requests.json',{}).get(step)
+                if cached:
+                    if cached['request']!=request_id:raise Pause('Changed paid request identity; review and use a new step after approval')
+                    output=self.dir/'outputs'/f'{step}.json'
+                    if output.exists():
+                        from .agents.base import validate
+                        accepted=json.loads(output.read_text(encoding='utf-8'));validate(agent_id,accepted,schema_file)
+                        if cached.get('output_hash') and cached['output_hash']!=fingerprint(accepted):raise Pause('Accepted output changed')
+                        return accepted
+                    if any(e['step']==step for e in self.budget.entries()) or any(k.startswith('pilot-'+request_id[:24]) for k in self.budget.reservations()):
+                        raise Pause('Interrupted paid request: reconcile provider billing/accepted output before retry')
+                requests=self.load('pilot_requests.json',{})
+                requests[step]={'request':request_id}
+                pilot.atomic(self.data('pilot_requests.json'),requests)
+                def guard(attempt,system,message,model):
+                    try: pilot.require(self,agent_id,financial=False)
+                    except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+                    if reservation_key:
+                        meta=self.load('pilot_reservations.json',{}).get(reservation_key,{})
+                        if meta.get('scope')!=pilot.stage_for(self,agent_id) or meta.get('authorization')!=(self.load('pilot_'+meta.get('scope','')+'.json') or {}).get('fingerprint'):
+                            raise Pause('Reservation lacks current stage authorization')
+                        return reservation_key
+                    from .synthesis_registry import offline_tokens
+                    tokens=offline_tokens(system)+offline_tokens(message)
+                    amount=self.budget.cost(model.model,0,model.max_tokens,0,0,tokens)
+                    key='pilot-'+request_id[:24]+'-'+str(attempt)
+                    if key in self.budget.reservations():raise Pause('Unsettled pilot request; reconcile before retry')
+                    self._spend_review(agent_id,step,amount)
+                    if not self._reserve(key,amount,agent_id,'pilot per-attempt reservation',steps=[step])[0]:
+                        raise BudgetExceeded('Pilot request exceeds remaining $35 authorization')
+                    return key
+                extra['dispatch_guard']=guard
             out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
                             schema_file=schema_file, **extra)
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
+        if pilot.enabled(self):
+            requests=self.load('pilot_requests.json',{})
+            requests[step]['output_hash']=fingerprint(out)
+            if agent_id in pilot.SECOND:
+                from .admission import input_bound, output_reserve
+                s=self.cfg['forecast']['scenarios']['baseline']
+                forecast_usd=self.budget.cost(m.model,int(input_bound(build_system_prompt(agent_id),payload)/float(s['bytes_per_token'])),
+                                              int(output_reserve(m,self.cfg['admission'])*float(s['output'])))
+                requests[step].update(agent=agent_id,projection_basis=pilot.work_basis(self),forecast_usd=forecast_usd)
+            pilot.atomic(self.data('pilot_requests.json'),requests)
         self._context_actual(watched)
         model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
         self.last_model = m.model
@@ -396,10 +496,32 @@ class Run:
             while st["stage"] != "done":
                 if until and st["stage"] == until:
                     raise Pause(f"stopped before {until} (--until)")
+                if pilot.enabled(self):
+                    try:
+                        agent='A08-OL' if STAGES.index(st['stage'])>STAGES.index('cp3') else 'A02-SP'
+                        pilot.require(self,agent)
+                    except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
                 handler = getattr(self, f"stage_{st['stage']}")
                 nxt = handler(st)
+                if pilot.enabled(self) and nxt=='outline':
+                    try:pilot.require(self,'A08-OL')
+                    except pilot.AuthorizationRequired as exc:
+                        pilot.partial(self,str(exc))
+                        raise Pause(str(exc)) from exc
                 st = self.state() | {"stage": nxt}
                 self.save_state(st)
+                if pilot.enabled(self):
+                    # Recalculate from accepted work at every completed stage. Reprojection is not approval.
+                    financial_stage=pilot.STAGE_2 if STAGES.index(nxt)>STAGES.index('cp3') else pilot.STAGE_1
+                    try:
+                        projection=pilot.project(self,financial_stage)
+                        self.save('pilot_live_projection.json',projection)
+                    except pilot.AuthorizationRequired as exc:
+                        if financial_stage==pilot.STAGE_2:pilot.partial(self,str(exc))
+                        raise Pause(str(exc)) from exc
+                    if nxt=='outline':
+                        try:pilot.require(self,'A08-OL')
+                        except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
             st["status"] = "COMPLETE"
         except Pause as p:
             st = self.state()
@@ -449,7 +571,7 @@ class Run:
             "topic_statement": (inp / "topic.md").read_text(encoding="utf-8"),
             "researcher_notes": (inp / "notes.md").read_text(encoding="utf-8"),
             "seed_papers": [s for s in (inp / "seeds.txt").read_text(encoding="utf-8").splitlines() if s.strip()],
-            "journal_profile": config.load("journal_scirev"),
+            "journal_profile": pilot.journal(self),
             "theme_guidance": self.cfg.get("themes", {"primary_min": 5, "primary_max": 8}),
             "revision_feedback": feedback,
         }, step=f"A02-SP_scope_v{self.counter(st, 'scope')}")
@@ -678,8 +800,12 @@ class Run:
                            "tier": decision["tier_overrides"].get(rid) or q.get("proposed_tier"),
                            "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence")})
         # the projection decides here, where changing the selection is still cheap
-        proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
-                                             self.cfg)
+        if pilot.enabled(self):
+            try:proj=pilot.project(self,pilot.STAGE_1,records=corpus)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+        else:
+            proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
+                                                 self.cfg)
         self.save("cost_projection.json", proj)
         self.prov.tool_run("cost_projection", "cp2", {k: proj[k] for k in ("projected_total_usd", "cap_usd", "verdict", "papers")})
         if proj["verdict"] != "WITHIN_CAP":
@@ -1397,7 +1523,7 @@ class Run:
             key = f"a07-{tag}-{name}"
             if key in self.budget.reservations():
                 raise Pause("unsettled A07 call reservation: reconcile provider usage before retrying " + key)
-            ok, available = self.budget.reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation")
+            ok, available = self._reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation", steps=[f"A07-SYN_job{tag}_{name}"])
             if not ok:
                 raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
             try:
@@ -1590,7 +1716,7 @@ class Run:
         from .synthesis_registry import fingerprint
         self._reproject("outline")
         pkg, findings, corpus = self._bridge_inputs()
-        bcfg, journal = self._bridge_cfg(), config.load("journal_scirev")
+        bcfg, journal = self._bridge_cfg(), pilot.journal(self)
         try:
             table = bridge.comparative_table(pkg, findings, corpus, int(bcfg.get("table_max_rows", 25)))
         except bridge.BridgeError as exc:
@@ -1697,7 +1823,7 @@ class Run:
             if usd is None:raise UnpricedModel(model.model)
             key = 'a10-'+fingerprint([execution,mode,payload])[:32]
             if key in self.budget.reservations():raise Pause('unsettled A10 reservation: reconcile provider billing before retry '+key)
-            if not self.budget.reserve(key,usd,'A10-RV','bounded verification pre-call reservation')[0]:
+            if not self._reserve(key,usd,'A10-RV','bounded verification pre-call reservation',steps=[step+'_'+key+'_'+name])[0]:
                 raise BudgetExceeded('A10 request exceeds remaining budget')
             dispatch = step+'_'+key+'_'+name
             try:
@@ -1861,7 +1987,8 @@ class Run:
     def _reproject(self, stage: str) -> None:
         """Re-project the rest of the run from what has been spent, before the stage makes its first call. A
         projection over the cap stops the next call (_require_projection)."""
-        proj = cost_projection.remaining_for_run(self)
+        proj = (pilot.project(self,pilot.STAGE_2 if STAGES.index(self.state()['stage'])>STAGES.index('cp3') else pilot.STAGE_1) if pilot.enabled(self) else cost_projection.remaining_for_run(self))
+        if pilot.enabled(self):proj={**proj,'created':time.strftime('%Y-%m-%dT%H:%M:%S')}
         self.save("cost_projection.json", proj)
         self.prov.tool_run("reprojection", stage, {"projected_remaining_usd": proj["projected_remaining_usd"],
                                                    "projected_total_usd": proj["projected_total_usd"],
@@ -1896,7 +2023,7 @@ class Run:
         key = f"{agent_id.lower()}-" + fingerprint([step, m.model, payload])[:24]
         if key in self.budget.reservations():
             raise Pause(f"unsettled {agent_id} reservation {key}: reconcile provider usage before retrying")
-        ok, available = self.budget.reserve(key, usd, agent_id, "downstream pre-call reservation")
+        ok, available = self._reserve(key, usd, agent_id, "downstream pre-call reservation", steps=[step])
         if not ok:
             raise BudgetExceeded(f"{agent_id} request reserves ${usd:.2f}; only ${available:.2f} remains under the cap")
         try:
@@ -1954,6 +2081,10 @@ class Run:
         limit = (self.cfg.get("batch") or {}).get("gate_usd")
         if limit is None:
             raise BudgetExceeded(f"{agent_id}: batch.gate_usd is not set; no downstream call without the runtime gate")
+        if pilot.enabled(self):
+            try:pilot.require(self,agent_id)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            return
         p = cost_projection.remaining_for_run(self)
         spent, committed = self.budget.spent(), self.budget.reserved()
         total = spent + committed + p["projected_remaining_usd"] + usd
@@ -2003,7 +2134,7 @@ class Run:
             if saved and saved.get("evidence_version") == ev:
                 packet["retrieved"] = saved.get("retrieved") or {}
         return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
-                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": config.load("journal_scirev"),
+                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": pilot.journal(self),
                 "table": (self.load("display_items.json") or [None])[0]}
 
     def _contrary_register(self, pkg: dict, findings: list, plan: dict | None, ledger: list | None) -> list | None:
