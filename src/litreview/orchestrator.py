@@ -1615,7 +1615,7 @@ class Run:
             if plan.get("status") == "NEEDS_HUMAN_INPUT":
                 raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
                             "adjust the selection or plan, then run again")
-            problems, report = bridge.validate_plan(plan, ledger, pkg, corpus, table, journal, bcfg)
+            problems, report = bridge.validate_plan(plan, ledger, pkg, corpus, table, journal, bcfg, findings)
             check = {"basis": basis, "plan_version": bridge.plan_version(plan, ledger), "problems": problems,
                      "report": report}
             self.save("bridge/plan_check.json", check)
@@ -1624,14 +1624,21 @@ class Run:
             if problems:
                 raise Pause(f"A08 plan rejected by the bridge ({len(problems)} problems; first: {problems[0]}). "
                             "See data/bridge/plan_check.json; rerun the outline stage")
-        self._save_comparative_table(table)
+        self._save_comparative_table(table, plan, ledger, pkg, findings)
         self.save("bridge/argument_map.json", bridge.argument_map(pkg, corpus, findings))
         if bcfg.get("ledger_approval", True):
             self._ledger_approved(plan, ledger, check["report"], pkg, corpus, table)
         return "draft"
 
-    def _save_comparative_table(self, table: dict) -> None:
+    def _save_comparative_table(self, table: dict, plan: dict | None = None, ledger: list | None = None,
+                                pkg: dict | None = None, findings: list | None = None) -> None:
         from . import bridge
+        discussed_in = None
+        if plan is not None and ledger is not None and pkg is not None and findings is not None:
+            register = bridge.contrary_register(pkg, findings, table, plan, ledger)
+            self.save("bridge/contrary_register.json", register)
+            used = {s for e in register if not e["in_table"] for s in e.get("sections") or []}
+            discussed_in = [s.get("heading") for s in plan.get("sections") or [] if s.get("section_id") in used]
         out_dir = self.dir / "data" / "display_items"
         if out_dir.exists():
             shutil.rmtree(out_dir)   # one display item: the comparative table replaces anything built before
@@ -1639,7 +1646,7 @@ class Run:
         display_items._write_csv(out_dir / "T1.csv", table["columns"], table["rows"])
         (out_dir / "T1.json").write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
         # A10 and the export see the reader-facing table only (bridge.reader_table); the selection record stays above
-        self.save("display_items.json", [bridge.reader_table(table, self.load("selected_corpus.json", []))])
+        self.save("display_items.json", [bridge.reader_table(table, self.load("selected_corpus.json", []), discussed_in)])
         self.prov.tool_run("display_items", "outline", {"T1": table["status"], "rows": len(table["rows"]),
                                                         "contrary_findings": len(table["contrary_finding_ids"]),
                                                         "contrary_findings_not_shown": table["contrary_findings_not_shown"],
@@ -1704,10 +1711,12 @@ class Run:
             self.budget.release(key)
             return out
         tables = self.load('display_items.json', [])
+        register = self._contrary_register(pkg, self._findings() or [], plan or None, self.load('allocation_ledger.json'))
         from .verification_job import version
         digest = fingerprint([version(manuscript,plan,pkg,registry,tables),execution,cfg])[:24]
         job = VerificationJob(self.data('verification_jobs')/digest,manuscript,plan,pkg,registry,tables,
-            cfg,call,count,execution,cache_directory=self.data('verification_cache'),prior_report=self.load('rv_latest.json',{}))
+            cfg,call,count,execution,cache_directory=self.data('verification_cache'),prior_report=self.load('rv_latest.json',{}),
+            contrary_register=register)
         try:rv = job.run(pass_)
         except (JobStopped,AgentError) as exc:
             self.save('verification_jobs/'+digest+'/report.json',{
@@ -1984,7 +1993,8 @@ class Run:
             if not d or d.get("fingerprint") != pv or d.get("approve_ledger") is not True:
                 raise Pause("the allocation ledger is not approved for this plan (CP_LEDGER)")
         try:
-            packets = bridge.section_packets(plan, ledger, pkg, findings, corpus)
+            packets = bridge.section_packets(plan, ledger, pkg, findings, corpus,
+                                             self._contrary_register(pkg, findings, plan, ledger))
         except bridge.BridgeError as exc:
             raise Pause(f"section packets: {exc}") from exc
         ev = bridge.evidence_version(pkg, findings)
@@ -1995,6 +2005,40 @@ class Run:
         return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
                 "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": config.load("journal_scirev"),
                 "table": (self.load("display_items.json") or [None])[0]}
+
+    def _contrary_register(self, pkg: dict, findings: list, plan: dict | None, ledger: list | None) -> list | None:
+        """The contrary-evidence register for the current evidence, table record and plan (None before a table)."""
+        from . import bridge
+        full = self.load("display_items/T1.json")
+        if not full or full.get("type") != "TABLE_COMPARISON" or full.get("status") != "BUILT":
+            return None
+        return bridge.contrary_register(pkg, findings, full, plan, ledger)
+
+    def _contrary_release(self, m: dict, rv: dict) -> None:
+        """Release gate: every material contrary finding is in the final table, addressed in A10-verified cited
+        prose, or excluded by the researcher with a recorded justification (CP_CONTRARY, bound to this register and
+        this verified manuscript). Anything else pauses the run; no table row may conceal its contrary evidence."""
+        from . import bridge
+        from .synthesis_registry import fingerprint
+        full = self.load("display_items/T1.json") or {}
+        if full.get("type") != "TABLE_COMPARISON" or full.get("status") != "BUILT":
+            return    # no comparative table was built by the bridge (legacy runs): nothing to account for
+        pkg, findings, _ = self._bridge_inputs()
+        register = self._contrary_register(pkg, findings, self.load("manuscript_plan.json"),
+                                           self.load("allocation_ledger.json"))
+        if register is None:
+            return
+        digest = fingerprint({"register": register, "verification": rv.get("verification_fingerprint")})
+        approved = checkpoints.review_approved(self.dir, "CP_CONTRARY", digest) or {}
+        exclusions = {x["finding_id"]: x["justification"] for x in approved.get("exclusions") or []}
+        acc = bridge.contrary_accounting(register, rv, self.load("display_items/T1.json"), exclusions)
+        self.save("bridge/contrary_release.json", {"fingerprint": digest, **acc})
+        self.prov.tool_run("contrary_release", rv.get("pass") or "release",
+                           {"counts": acc["counts"], "unaddressed": acc["unaddressed"],
+                            "table_conceals": acc["table_conceals"], "exclusions": exclusions})
+        if acc["release_blocked"]:
+            checkpoints.write_contrary_review(self.dir, digest, acc, register)
+            self.pause_for_checkpoint("CP_CONTRARY")
 
     def _bridge_fingerprint(self, m: dict, ps: dict | None = None) -> str:
         from . import bridge
@@ -2304,6 +2348,7 @@ class Run:
         defects = any(f.get('severity') in ('MAJOR','BLOCKING') for f in report.get('findings',[]))
         if defects or not self._verification_current(report,m) or report.get('release_disposition') not in ('APPROVED','APPROVED_WITH_MINOR_FINDINGS'):
             raise Pause('final release requires current complete A10 approval with no unresolved major/blocking findings')
+        self._contrary_release(m, report)
         plan = self.load("manuscript_plan.json")
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json")}
         tables = self._built_tables()

@@ -360,10 +360,11 @@ def fixture_plan(pkg: dict, corpus: list[dict], table: dict, group_size: int = 1
     return plan, ledger
 
 
-def tagged_text(packet: dict, words_per_unit: int = 0) -> str:
+def tagged_text(packet: dict, words_per_unit: int = 0, max_citations: int | None = None) -> str:
     """Prose that passes the section gate, made only from the packet: one sentence per unit (a grouped passage is
-    one sentence tagged with every member), citing the members' own papers, stating only numbers in their records
-    (here: none). Evaluation text."""
+    one sentence tagged with every member), citing the members' own papers (all of them, or the first
+    max_citations: a writer that drops citations, which the contrary-evidence release gate must catch), stating
+    only numbers in their records (here: none). Evaluation text."""
     limit = bridge.max_findings_per_sentence()
     records = bridge.packet_records(packet)
     out = ["This section is organized by evidence system. ⟦ORG⟧"]
@@ -374,7 +375,8 @@ def tagged_text(packet: dict, words_per_unit: int = 0) -> str:
                 part.append(i)
                 continue
             if part:
-                cited = list(dict.fromkeys(c for x in part for c in packet["citations_by_tag"].get(x, [])))[:3]
+                cited = list(dict.fromkeys(c for x in part for c in packet["citations_by_tag"].get(x, [])))
+                cited = cited[:max_citations] if max_citations is not None else cited
                 cites = "; ".join(f"@{c}" for c in cited)
                 out.append(f"Evaluation sentence for {'a group of elements' if len(part) > 1 else 'an element'}"
                            f"{' [' + cites + ']' if cites else ''}. ⟦{','.join(part)}⟧")

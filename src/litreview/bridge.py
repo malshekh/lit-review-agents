@@ -43,7 +43,8 @@ PROMINENCE_RANK = {"HEADLINE": 0, "NARRATIVE_PRIMARY": 1, "NARRATIVE_SUPPORTING"
 # (`finding_record`), as do the span-correction history, eligibility status and its reason.
 FINDING_AUDIT_FIELDS = ("span",)
 GATE1_KEEP = ("passed", "source_fingerprint", "finding_fingerprint")
-TABLE_COLUMNS = ["Evidence level", "System", "Intervention", "Key observation", "Role", "Limitation", "Citation"]
+TABLE_COLUMNS = ["Evidence level", "System", "Intervention", "Key observation", "Role and contrary evidence",
+                 "Limitation", "Citation"]
 CLASS_ORDER = ("CLINICAL", "PRECLINICAL", "BIOCHEMICAL")
 CLASS_LABEL = {"CLINICAL": "Clinical", "PRECLINICAL": "Preclinical", "BIOCHEMICAL": "Biochemical", None: "Not reported"}
 
@@ -245,32 +246,41 @@ def evidence_class(f: dict) -> str | None:
 
 
 TABLE_RULE = (
-    "Rows are eligible findings (A06 status SUPPORTING) that an approved proposition uses as SUPPORTING or "
-    "CONFLICTING evidence; appraisal-only and ineligible findings never appear, and findings whose evidence system "
-    "is not reported appear only as contrary evidence. Contrary evidence is a finding used as CONFLICTING evidence "
-    "or named, with others, by a global reconciliation issue. (1) Contrary findings come first, clinical before "
-    "preclinical before biochemical. (2) Other rows rotate over clinical, preclinical and biochemical evidence; within "
-    "a class, findings behind higher-prominence propositions come first, then findings used by more propositions, then "
-    "findings from papers flagged as contrary evidence, then finding ID; at most one such row per paper. (3) No claim "
-    "is shown without its contrary evidence: a supporting row enters only together with every contrary finding of the "
+    "The table is a selective synthesis of the most important evidence, not an inventory of every finding. Rows are "
+    "eligible findings (A06 status SUPPORTING) that an approved proposition uses as SUPPORTING or CONFLICTING "
+    "evidence; appraisal-only and ineligible findings never appear, and findings whose evidence system is not "
+    "reported appear only as contrary evidence. Contrary evidence is a finding used as CONFLICTING evidence or named, "
+    "with others, by a global reconciliation issue; every contrary finding is treated as material unless the "
+    "researcher approves a justified exclusion. (1) Contrary findings come first, clinical before preclinical before "
+    "biochemical. (2) Other rows rotate over clinical, preclinical and biochemical evidence; within a class, findings "
+    "behind higher-prominence propositions come first, then findings used by more propositions, then findings from "
+    "papers flagged as contrary evidence, then finding ID; at most one such row per paper. (3) No claim is shown "
+    "without its contrary evidence: a supporting row enters only together with every contrary finding of the "
     "propositions it supports and every finding sharing a reconciliation issue with it; if they do not all fit, the "
-    "row is left out. The table stops at max_rows (one page). Contrary findings that do not fit are listed, and the "
-    "prose discusses them (they are mandatory elements).")
+    "row is left out. The role column links rows for and against the same claim by a set letter, and says when "
+    "further contrary evidence is discussed in the text. The table stops at max_rows (one page). Contrary "
+    "findings that do not fit stay in the contrary-evidence register: each must be carried by a written element, "
+    "rendered in cited, A10-verified prose, or excluded by the researcher with a recorded justification "
+    "(CP_CONTRARY) before release.")
+# Context fields compared for a contradiction pair, so that disagreement across different systems, lines, doses or
+# arms is never presented as like-for-like. Values stay in the findings themselves; the record names the fields.
+COMPARABILITY_KEYS = ("evidence_system", "species", "cell_line_or_type", "primary_or_immortalized", "strain",
+                      "model_type", "population", "idh_status", "mgmt_status", "agent", "dose_or_concentration",
+                      "route", "duration", "frequency", "comparator", "setting", "endpoint", "assay", "readout",
+                      "timepoint")
 
 
-def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_rows: int = 25) -> dict:
-    """The review's single display item, built by code. Each cell is copied from the finding (context fields,
-    entity mentions, quantities, constraints, attribution); each row is tagged with the propositions that use
-    the finding, so A10 verifies cells and citations like prose."""
-    by_id = {f["finding_id"]: f for f in findings}
-    recs = {r["record_id"]: r for r in corpus}
-    uses = defaultdict(list)                       # fid -> [(proposition, role)]
+def _relations(pkg: dict, by_id: dict) -> tuple[dict, dict, set]:
+    """(uses, partners, issue_findings). uses: eligible finding -> [(proposition, role)] for SUPPORTING and
+    CONFLICTING links; partners: finding -> the contrary findings that must be shown with it (the CONFLICTING
+    findings of the propositions it supports, and every finding sharing a reconciliation issue with it)."""
+    uses = defaultdict(list)
     for p in pkg.get("propositions") or []:
         for x in _links(p):
             f = by_id.get(x["finding_id"])
             if x.get("role") in ("SUPPORTING", "CONFLICTING") and f is not None and status_of(f) == "SUPPORTING":
                 uses[x["finding_id"]].append((p, x["role"]))
-    partners = defaultdict(set)                    # fid -> findings that must be shown with it
+    partners = defaultdict(set)
     for p in pkg.get("propositions") or []:
         sup = [x["finding_id"] for x in _links(p) if x.get("role") == "SUPPORTING" and x["finding_id"] in uses]
         con = [x["finding_id"] for x in _links(p) if x.get("role") == "CONFLICTING" and x["finding_id"] in uses]
@@ -282,6 +292,25 @@ def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_r
         issue_findings |= ids
         for f in ids:
             partners[f] |= ids - {f}
+    return uses, partners, issue_findings
+
+
+def _label(n: int) -> str:
+    out = ""
+    n += 1
+    while n:
+        n, r = divmod(n - 1, 26)
+        out = chr(65 + r) + out
+    return out
+
+
+def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_rows: int = 25) -> dict:
+    """The review's single display item, built by code. Each cell is copied from the finding (context fields,
+    entity mentions, quantities, constraints, attribution); each row is tagged with the propositions that use
+    the finding, so A10 verifies cells and citations like prose."""
+    by_id = {f["finding_id"]: f for f in findings}
+    recs = {r["record_id"]: r for r in corpus}
+    uses, partners, issue_findings = _relations(pkg, by_id)
 
     def contrary(fid):
         return any(role == "CONFLICTING" for _, role in uses[fid]) or fid in issue_findings
@@ -318,6 +347,33 @@ def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_r
                 fid = pools[c].pop(0)
                 if take([fid] + sorted(partners[fid] - {fid}, key=_natural), f"{CLASS_LABEL[c].lower()} evidence"):
                     papers.add(by_id[fid]["record_id"])
+    shown = [fid for fid, _ in chosen]
+    covered = sorted(p["proposition_id"] for p in pkg.get("propositions") or []
+                     if [x for x in _links(p) if x.get("role") in ("SUPPORTING", "CONFLICTING")]
+                     and all(x["finding_id"] in picked for x in _links(p) if x.get("role") in ("SUPPORTING", "CONFLICTING"))
+                     and not p.get("appraised_finding_ids"))
+    # rows for and against the same claim share a set letter (connected through `partners`, both directions)
+    parent = {f: f for f in shown}
+
+    def root(f):
+        while parent[f] != f:
+            parent[f] = parent[parent[f]]
+            f = parent[f]
+        return f
+    for s in shown:
+        for c in partners[s] & picked:
+            parent[root(c)] = root(s)
+    members = defaultdict(list)
+    for f in shown:
+        members[root(f)].append(f)
+    letters = {}
+    for f in shown:
+        r = root(f)
+        if len(members[r]) > 1 and r not in letters:
+            letters[r] = _label(len(letters))
+    against = _contrary_of(pkg)
+    props = {p["proposition_id"]: p for p in pkg.get("propositions") or []}
+    unshown_contrary = set(contrary_ids) - picked
     rows, selection = [], []
     for fid, why in chosen:
         f = by_id[fid]
@@ -338,17 +394,24 @@ def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_r
             limits.append(f"Modality: {f['modality']}")
         if f.get("assertion_type") == "AUTHORS_INTERPRETATION":
             limits.append("Authors' interpretation, not an observed result")
+        letter = letters.get(root(fid))
+        # further contrary evidence for this row's claims outside the table: a contrary finding of a proposition the
+        # row's propositions are contradicted by, or one of their own, that is not shown
+        further = any(x["finding_id"] in unshown_contrary for p in pids for q in {p} | against.get(p, set())
+                      for x in _links(props.get(q) or {}) if x.get("role") in ("SUPPORTING", "CONFLICTING"))
+        if contrary(fid):
+            link = f"contrary evidence, set {letter}" if letter else "contrary evidence; the claim it challenges is discussed in the text"
+        else:
+            link = f"contrary evidence shown in set {letter}" if letter else "no contrary evidence identified in this review"
+        if further:
+            link += "; further contrary evidence is discussed in the text"
         rows.append([CLASS_LABEL[evidence_class(f)], system, intervention,
-                     f"{observation} ⟦{','.join(pids)}⟧", " / ".join(roles), "; ".join(limits) or "None recorded",
-                     f"[@{f['record_id']}]"])
-        selection.append({"finding_id": fid, "reason": why, "proposition_ids": pids})
-    covered = sorted(p["proposition_id"] for p in pkg.get("propositions") or []
-                     if [x for x in _links(p) if x.get("role") in ("SUPPORTING", "CONFLICTING")]
-                     and all(x["finding_id"] in {fid for fid, _ in chosen} for x in _links(p)
-                             if x.get("role") in ("SUPPORTING", "CONFLICTING"))
-                     and not p.get("appraised_finding_ids"))
+                     f"{observation} ⟦{','.join(pids)}⟧", f"{' / '.join(roles)}; {link}",
+                     "; ".join(limits) or "None recorded", f"[@{f['record_id']}]"])
+        selection.append({"finding_id": fid, "reason": why, "proposition_ids": pids,
+                          "contrary_set": letter, "further_contrary_in_text": further})
     return {"display_id": "T1", "kind": "TABLE", "type": "TABLE_COMPARISON", "status": "BUILT" if rows else "EMPTY",
-            "columns": list(TABLE_COLUMNS), "rows": rows, "row_finding_ids": [fid for fid, _ in chosen],
+            "columns": list(TABLE_COLUMNS), "rows": rows, "row_finding_ids": shown,
             "row_selection": selection, "selection_rule": TABLE_RULE, "max_rows": max_rows,
             "contrary_finding_ids": contrary_ids,
             "contrary_findings_not_shown": [f for f in contrary_ids if f not in picked],
@@ -358,23 +421,150 @@ def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_r
             "warnings": [] if rows else ["no eligible finding is used by an approved proposition"]}
 
 
-def reader_table(table: dict, corpus: list[dict]) -> dict:
+def reader_table(table: dict, corpus: list[dict], discussed_in: list[str] | None = None) -> dict:
     """The table as the reader, A10 and the export see it: columns, tagged rows and notes. The notes state that the
-    rows are a rule-based selection, how many eligible findings and papers they were drawn from, and what happened
-    to contrary evidence that did not fit. Selection bookkeeping (row reasons, counts, IDs) stays in the full table
-    record (data/display_items/T1.json), so it never becomes reader-facing text to verify."""
+    rows are a rule-based selection, how many eligible findings and papers they were drawn from, how rows for and
+    against a claim are linked, and where contrary evidence that did not fit is discussed (discussed_in: headings of
+    the sections whose written elements carry it, from the approved plan). Selection bookkeeping (row reasons,
+    counts, IDs) stays in the full table record (data/display_items/T1.json), so it never becomes reader-facing text
+    to verify."""
     eligible = len(table.get("row_finding_ids") or []) + int(table.get("eligible_findings_not_shown") or 0)
     papers = int(table.get("eligible_papers") or 0)
     hidden = len(table.get("contrary_findings_not_shown") or [])
     notes = [f"The rows are a selection by a fixed rule from {eligible} eligible findings in {papers} papers, not a "
              "summary of every study reviewed. A supporting row appears only together with the contrary evidence for "
-             "the claims it supports."]
+             "the claims it supports; rows sharing a set letter in the role column report evidence for and against "
+             "the same claim and may differ in system, dose or treatment arm."]
     if hidden:
-        notes.append(f"{hidden} further contrary findings are discussed in the text rather than shown here.")
+        where = f", in: {'; '.join(discussed_in)}" if discussed_in else ""
+        notes.append(f"{hidden} further contrary findings are discussed in the text rather than shown here{where}.")
     out = {k: copy.deepcopy(table.get(k)) for k in ("display_id", "kind", "type", "columns", "rows", "row_finding_ids",
                                                      "inconsistency_notes") if table.get(k) is not None}
     out["notes"] = notes
     return out
+
+
+# ------------------------------------------------------------------ the contrary-evidence register
+def carriers(pkg: dict) -> dict[str, set[str]]:
+    """finding -> the elements that carry it into prose: every element whose evidence or established_by names it,
+    and every proposition of a reconciliation issue that names it."""
+    out = defaultdict(set)
+    for eid, el in elements(pkg).items():
+        for fid in _finding_ids(el["record"]) + list(el["record"].get("conflicting_finding_ids") or []):
+            out[fid].add(eid)
+    for i in pkg.get("reconciliation") or []:
+        for fid in i.get("finding_ids") or []:
+            out[fid] |= set(i.get("proposition_ids") or [])
+    return out
+
+
+def comparability(a: dict, b: dict) -> dict:
+    """Which context fields of two findings differ, or are not reported for one of them (COMPARABILITY_KEYS).
+    Names only: the values are the findings' own, verbatim, in the packet. Nothing is judged comparable here; the
+    record says where an apparent disagreement may come from different systems, lines, doses or arms."""
+    ca, cb = a.get("context") or {}, b.get("context") or {}
+    missing = lambda v: v in (None, "", [], {}) or str(v).strip().upper() in ("NOT_REPORTED", "NOT_APPLICABLE")
+    differs, unreported = [], []
+    for k in COMPARABILITY_KEYS:
+        va, vb = ca.get(k), cb.get(k)
+        if missing(va) and missing(vb):
+            continue
+        if missing(va) or missing(vb):
+            unreported.append(k)
+        elif canonical(va) != canonical(vb):
+            differs.append(k)
+    return {"differs": differs, "not_reported_for_one": unreported,
+            "evidence_class": [evidence_class(a), evidence_class(b)]}
+
+
+def contrary_register(pkg: dict, findings: list[dict], table: dict, plan: dict | None = None,
+                      ledger: list[dict] | None = None) -> list[dict]:
+    """Every contrary finding (the table's contrary_finding_ids), in the table's order: whether the table shows it,
+    why it is contrary, the elements that carry it, the supporting findings it challenges with a comparability
+    record for each pair, and (with an approved plan) the written elements and sections that carry it. Every entry
+    is material unless the researcher approves a justified exclusion at release (CP_CONTRARY)."""
+    by_id = {f["finding_id"]: f for f in findings}
+    uses, partners, issue_findings = _relations(pkg, by_id)
+    carry = carriers(pkg)
+    shown = set(table.get("row_finding_ids") or [])
+    written, where = set(), {}
+    if plan is not None and ledger is not None:
+        written = {e["item_id"] for e in ledger if e.get("outcome") in WRITTEN}
+        where = {it["item_id"]: s["section_id"] for s in plan.get("sections") or [] for it in s.get("ordered_items") or []}
+    out = []
+    for fid in table.get("contrary_finding_ids") or []:
+        reasons = sorted({f"CONFLICTING_EVIDENCE_IN:{p['proposition_id']}" for p, role in uses[fid] if role == "CONFLICTING"}
+                         | {f"RECONCILIATION_ISSUE:{i.get('issue_id')}" for i in pkg.get("reconciliation") or []
+                            if fid in (i.get("finding_ids") or [])}, key=_natural)
+        challenged = sorted((s for s, cs in partners.items() if fid in cs and s != fid), key=_natural)
+        entry = {"finding_id": fid, "record_id": by_id[fid]["record_id"], "in_table": fid in shown,
+                 "reasons": reasons, "carried_by": sorted(carry.get(fid, ()), key=_natural),
+                 "challenges": [{"finding_id": s, "in_table": s in shown,
+                                 "proposition_ids": sorted({p["proposition_id"] for p, role in uses[s] if role == "SUPPORTING"},
+                                                           key=_natural),
+                                 **comparability(by_id[fid], by_id[s])} for s in challenged]}
+        if plan is not None and ledger is not None:
+            entry["written_by"] = sorted(set(entry["carried_by"]) & written, key=_natural)
+            entry["sections"] = sorted({where[e] for e in entry["written_by"] if e in where}, key=_natural)
+        out.append(entry)
+    return out
+
+
+def contrary_problems(register: list[dict], table: dict) -> list[str]:
+    """Structural rule for the plan: a contrary finding the table does not show must be carried by at least one
+    element the plan writes; a supporting row may never be shown while a finding contrary to it is not."""
+    problems = []
+    shown = set(table.get("row_finding_ids") or [])
+    for e in register:
+        if not e["in_table"] and not e.get("written_by"):
+            problems.append(f"CONTRARY_NOT_CARRIED: {e['finding_id']} is not in the table and no written element "
+                            f"carries it (carriers: {e['carried_by'] or 'none'})")
+        if not e["in_table"]:
+            for c in e["challenges"]:
+                if c["finding_id"] in shown:
+                    problems.append(f"TABLE_CONCEALS_CONTRARY: row {c['finding_id']} is shown without its contrary "
+                                    f"finding {e['finding_id']}")
+    return problems
+
+
+def contrary_accounting(register: list[dict], report: dict, table: dict | None,
+                        exclusions: dict[str, str] | None = None) -> dict:
+    """The release gate's account of every contrary finding against the final A10 report:
+      SHOWN_IN_TABLE      a row of the final table;
+      ADDRESSED_IN_PROSE  at least one body sentence A10 VERIFIED that is tagged with an element carrying the
+                          finding and cites its paper (whether A10 named the finding itself is recorded);
+      EXCLUSION_APPROVED  excluded by the researcher with a recorded justification (CP_CONTRARY);
+      UNADDRESSED         none of these: blocks release.
+    Also re-checks the table: no supporting row without its contrary findings."""
+    verdicts = {v["occurrence_id"]: v for v in report.get("verdicts") or []}
+    body = [o for o in report.get("occurrence_inventory") or [] if o.get("path", [])[:2] == ["manuscript", "sections"]
+            and (verdicts.get(o["occurrence_id"]) or {}).get("verdict") == "VERIFIED"]
+    rows = set((table or {}).get("row_finding_ids") or [])
+    exclusions = exclusions or {}
+    entries, blocking = [], []
+    for e in register:
+        fid, carry = e["finding_id"], set(e.get("carried_by") or [])
+        hits = [o for o in body if e["record_id"] in (o.get("citation_record_ids") or []) and carry & set(o.get("item_ids") or [])]
+        if fid in rows:
+            status = "SHOWN_IN_TABLE"
+        elif hits:
+            status = "ADDRESSED_IN_PROSE"
+        elif str(exclusions.get(fid) or "").strip():
+            status = "EXCLUSION_APPROVED"
+        else:
+            status = "UNADDRESSED"
+            blocking.append(fid)
+        entries.append({"finding_id": fid, "record_id": e["record_id"], "status": status,
+                        "occurrence_ids": [o["occurrence_id"] for o in hits],
+                        "named_by_a10": any(fid in (verdicts[o["occurrence_id"]].get("evidence_finding_ids") or [])
+                                            for o in hits),
+                        **({"justification": exclusions[fid]} if status == "EXCLUSION_APPROVED" else {})})
+    concealed = [f"{c['finding_id']} shown without {e['finding_id']}" for e in register if e["finding_id"] not in rows
+                 for c in e["challenges"] if c["finding_id"] in rows]
+    return {"entries": entries, "unaddressed": blocking, "table_conceals": concealed,
+            "counts": {s: sum(1 for x in entries if x["status"] == s)
+                       for s in ("SHOWN_IN_TABLE", "ADDRESSED_IN_PROSE", "EXCLUSION_APPROVED", "UNADDRESSED")},
+            "release_blocked": bool(blocking or concealed)}
 
 
 def _first(ctx: dict, *keys: str) -> str | None:
@@ -387,10 +577,12 @@ def _natural(s: str):
 
 # ------------------------------------------------------------------ plan and ledger validation
 def validate_plan(plan: dict, ledger: list[dict], pkg: dict, corpus: list[dict], table: dict | None,
-                  journal: dict, cfg: dict) -> tuple[list[str], dict]:
+                  journal: dict, cfg: dict, findings: list[dict] | None = None) -> tuple[list[str], dict]:
     """Every structural rule of the plan and the allocation ledger, checked by code. Returns (problems, report);
     any problem rejects the plan (there is no automatic repair). The report records the theme-to-section
-    mapping, outcome counts and every mandatory element's placement."""
+    mapping, outcome counts and every mandatory element's placement. With findings and a built table, the
+    contrary-evidence register is checked too: every contrary finding the table does not show must be carried by
+    a written element (`contrary_problems`)."""
     problems: list[str] = []
     els = elements(pkg)
     mandatory = mandatory_reasons(pkg, corpus)
@@ -500,6 +692,10 @@ def validate_plan(plan: dict, ledger: list[dict], pkg: dict, corpus: list[dict],
         if th:
             theme_sections[th].add(sid)
             section_themes[sid].add(th)
+    register = None
+    if findings is not None and table and table.get("status") == "BUILT":
+        register = contrary_register(pkg, findings, table, plan, ledger)
+        problems += contrary_problems(register, table)
     report = {"outcomes": {o: sorted((e for e, x in by_id.items() if x.get("outcome") == o and e in els), key=_natural)
                            for o in OUTCOMES},
               "counts": {o: sum(1 for x in by_id.values() if x.get("outcome") == o) for o in OUTCOMES},
@@ -510,6 +706,11 @@ def validate_plan(plan: dict, ledger: list[dict], pkg: dict, corpus: list[dict],
               "theme_to_sections": {t: sorted(s) for t, s in sorted(theme_sections.items())},
               "section_to_themes": {s: sorted(t) for s, t in sorted(section_themes.items())},
               "papers_not_cited": unplaced}
+    if register is not None:
+        report["contrary_evidence"] = {
+            "in_table": [e["finding_id"] for e in register if e["in_table"]],
+            "not_in_table": {e["finding_id"]: {"written_by": e["written_by"], "sections": e["sections"]}
+                             for e in register if not e["in_table"]}}
     return problems, report
 
 
@@ -641,11 +842,14 @@ def qualifications_union(records: list[dict], table: dict) -> dict:
     return out
 
 
-def section_packets(plan: dict, ledger: list[dict], pkg: dict, findings: list[dict], corpus: list[dict]) -> dict:
+def section_packets(plan: dict, ledger: list[dict], pkg: dict, findings: list[dict], corpus: list[dict],
+                    register: list[dict] | None = None) -> dict:
     """{section_id: packet}. A packet is everything A09 may write a section from: its units (records, and for a
     group the union of qualifications), the contrary context of every unit, one findings table, index lines
     (verbatim) for the section's other theme elements, the reconciliation issues touching it, and the tags and
-    citations a sentence in it may use."""
+    citations a sentence in it may use. With the contrary-evidence register, `contrary_evidence` lists every
+    contrary finding in the packet's findings table: whether the table shows it, what it challenges, and which
+    context fields differ between the two (comparability: names only, values are in the findings table)."""
     els = elements(pkg)
     fby = {f["finding_id"]: f for f in findings}
     out_of = {e["item_id"]: e for e in ledger}
@@ -709,6 +913,10 @@ def section_packets(plan: dict, ledger: list[dict], pkg: dict, findings: list[di
             "allowed_tags": sorted(allowed, key=_natural),
             "citations_by_tag": citations,
         }
+        if register is not None:
+            packets[s["section_id"]]["contrary_evidence"] = [
+                {k: copy.deepcopy(e[k]) for k in ("finding_id", "in_table", "reasons", "challenges")}
+                for e in register if e["finding_id"] in table]
     return packets
 
 

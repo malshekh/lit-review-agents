@@ -26,6 +26,9 @@ SURFACES = ('title', 'abstract', 'sections', 'introduction', 'conclusion', 'keyw
 # references; a one-sentence title). A scientific occurrence there needs no citation, but a VERIFIED verdict must
 # still name the evidence findings it rests on (bound through the plan's title and abstract propositions).
 NO_CITATION_SURFACES = {('manuscript', 'title'), ('manuscript', 'abstract'), ('manuscript', 'keywords')}
+# Contrary-evidence issues A10 GLOBAL raises (prompt A10, GLOBAL): kept at least at these severities.
+CONTRARY_FLOOR = {'CONTRARY_EVIDENCE_UNADDRESSED': 'BLOCKING', 'TABLE_CONCEALS_CONTRARY_EVIDENCE': 'BLOCKING',
+                  'TABLE_PROSE_INCONSISTENT': 'MAJOR', 'FORCED_EQUIVALENCE': 'MAJOR'}
 META = {'section_id', 'display_id', 'item_id', 'kind', 'type', 'origin', 'level', 'path',
         'source_proposition_ids', 'proposition_ids', 'citation_record_ids', 'warnings'}
 
@@ -116,11 +119,16 @@ def current(report, digest, policy=None):
 
 class VerificationJob:
     def __init__(self, directory, manuscript, plan, package, registry, tables, cfg, call, count,
-                 execution_identity, cache_directory=None, prior_report=None):
+                 execution_identity, cache_directory=None, prior_report=None, contrary_register=None):
         self.dir = Path(directory)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.manuscript, self.plan, self.package, self.registry = manuscript, plan, package, registry
         self.tables, self.cfg, self.call, self.count = list(tables), cfg, call, count
+        # bridge.contrary_register: each material contrary finding's entry rides on its own GLOBAL index entry
+        self.contrary = {e['finding_id']:{k:e[k] for k in ('in_table','reasons','carried_by','written_by','sections')
+                                          if k in e} | {'challenges':[{k:c[k] for k in ('finding_id','in_table','differs',
+                                          'not_reported_for_one') if k in c} for c in e.get('challenges',[])]}
+                         for e in contrary_register or []}
         self.occurrences = inventory(manuscript, tables)
         if not self.occurrences:raise JobStopped('empty verification inventory')
         self.digest = version(manuscript, plan, package, registry, tables)
@@ -350,6 +358,9 @@ class VerificationJob:
     def validate_issues(self, issues, allowed, visible):
         for i in issues:
             if i['code'] in evidence.SEVERITY_FLOOR:i['severity']=evidence.SEVERITY_FLOOR[i['code']]
+            floor=CONTRARY_FLOOR.get(i['code'])
+            if floor and {'MINOR':1,'MAJOR':2,'BLOCKING':3}[i['severity']]<{'MINOR':1,'MAJOR':2,'BLOCKING':3}[floor]:
+                i['severity']=floor
             if not i['occurrence_ids'] or set(i['occurrence_ids'])-allowed:
                 raise JobStopped('A10 issue references unseen occurrence')
             if set(i['finding_ids'])-visible:raise JobStopped('A10 issue references unseen evidence')
@@ -370,7 +381,9 @@ class VerificationJob:
             'retrieval':{'available':True,'operations':['finding_ids','query','source_item_ids','proposition_ids']}}
 
     def global_pages(self, verdicts):
-        entries = [{'id':fid,'kind':'FINDING','value':self.registry.index_line(fid)} for fid in self.registry.findings]
+        entries = [{'id':fid,'kind':'FINDING','value':self.registry.index_line(fid),
+                    **({'contrary_evidence':self.contrary[fid]} if fid in self.contrary else {})}
+                   for fid in self.registry.findings]
         entries += [{'id':p['proposition_id'],'kind':'PROPOSITION','value':compact_proposition(p)} for p in self.package.get('propositions', [])]
         entries += [{'id':'RECONCILIATION:'+str(n),'kind':'RECONCILIATION','value':p} for n,p in enumerate(self.package.get('reconciliation', []))]
         entries += [{'id':g['gap_id'],'kind':'GAP','value':{k:g[k] for k in ('gap_id','statement','source_item_ids','established_by') if k in g}} for g in self.package.get('knowledge_gaps', [])]

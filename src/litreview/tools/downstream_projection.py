@@ -148,7 +148,10 @@ def requests(route, cfg: dict, n_findings: int, inputs: dict | None = None) -> d
             table = {"propositions_fully_shown": [], "row_finding_ids": [], "rows": []}
         amap = bridge.argument_map(pkg, corpus, findings)
         a08 = _system("A08-OL") + offline_tokens(bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings))
-        packets = _packets(plan, ledger, pkg, findings, corpus)
+        # packets carry the contrary-evidence register entries, as the writing stage builds them
+        register = (bridge.contrary_register(pkg, findings, table, plan, ledger if plan else None)
+                    if table.get("status") == "BUILT" else None)
+        packets = _packets(plan, ledger, pkg, findings, corpus, register)
         outline = bridge.outline_view(plan) if plan else None
         outline_b = bridge.size(outline) if outline else 4_000 + 600 * len(packets)
         thesis_b = bridge.size(amap.get("thesis"))
@@ -219,13 +222,13 @@ def lines(budget, route, cfg: dict, n_findings: int, inputs: dict | None = None)
             for a in ("A08-OL", "A09-WRI", "A11-RC", "A12-EDI")]
 
 
-def _packets(plan, ledger, pkg, findings, corpus) -> dict:
+def _packets(plan, ledger, pkg, findings, corpus, register=None) -> dict:
     """The approved plan's packets; before a plan, one estimated packet per primary theme (its propositions, an even
     share of gaps and interpretations, their contrary context and index), plus an introduction and a conclusion
     the size of the largest. Stale evidence is priced as it stands (the stage itself refuses it)."""
     if plan and ledger is not None:
         try:
-            return bridge.section_packets(plan, ledger, pkg, findings, corpus)
+            return bridge.section_packets(plan, ledger, pkg, findings, corpus, register)
         except bridge.BridgeError:
             pass
     els = bridge.elements(pkg)
@@ -243,7 +246,7 @@ def _packets(plan, ledger, pkg, findings, corpus) -> dict:
         section = {"section_id": sid, "heading": th, "ordered_items": [{"item_id": x} for x in items]}
         led = [{"item_id": x, "outcome": "DISCUSSED", "section_id": sid} for x in items]
         try:
-            out[sid] = bridge.section_packets({"sections": [section]}, led, pkg, findings, corpus)[sid]
+            out[sid] = bridge.section_packets({"sections": [section]}, led, pkg, findings, corpus, register)[sid]
         except bridge.BridgeError:
             out[sid] = {"units": [{"records": {x: {"record": els[x]["record"],
                                                    "findings": {f: fby.get(f) for f in bridge._finding_ids(els[x]["record"])}}

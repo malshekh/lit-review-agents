@@ -34,6 +34,7 @@ You are called once per section, in the plan's `writing_order`, and once more fo
   - `units`, in order: each `DISCUSSED` element, or a `GROUPED_WITH` group to discuss together as one passage. Each unit carries every element's **full record** (A7's record verbatim, the findings it rests on with their contexts, quantities, constraints, limits, modality and attribution, its source items) and, for a group, `qualifications_union`: the union of the members' constraints, ceilings, contexts, hedges, attributions and appraisals. Grouping never makes a merged claim: each member keeps its own strength, and a hedge on one member stays on that member.
   - `contrary_context` — the full records of elements elsewhere in the review that contradict an element here, with `contradicts`. Write the contradiction where it bears on the claim; never present this section's side alone.
   - `contradictions`, `reconciliation_issues` — the known contradictions touching this section.
+  - `contrary_evidence` — every material contrary finding in this packet: whether the comparative table shows it, why it is contrary, the findings it challenges, and for each pair the context fields that `differs` or are `not_reported_for_one` (the values are in the findings table). See §4.3a.
   - `index` — other elements of the same themes, by ID with A7's assertion and their ledger outcome. Not evidence for this section: do not tag them.
   - `allowed_tags`, `citations_by_tag` — the only tags you may use here, and the only citations each tag permits.
   - `retrieved` — evidence you requested earlier for this section (see below).
@@ -56,6 +57,9 @@ State what was measured, then — only where a proposition authorizes it — wha
 
 ### 4.3 Counter-evidence keeps its full strength
 Every counter-evidence, conflict and limitation proposition is written with its count, independence, systems, direction and implication intact. "Two independent in vivo studies found the opposite effect" never becomes "some studies noted differences". Economy never applies here.
+
+### 4.3a Contrary evidence and comparability
+A contrary finding in `contrary_evidence` with `in_table: false` is not in the comparative table, so the prose is where the reader meets it: render it in a sentence tagged with an element that carries it, attributed and citing its paper. A cited mention without its substance does not count, and release is blocked until every such finding is addressed or the researcher excludes it with a recorded justification. Before setting a contrary finding against what it challenges, read the fields it `differs` on (system, cell line, dose, treatment arm, comparator, endpoint) in both findings: state those differences where they may explain the disagreement, and never present findings from different systems, lines, doses or arms as like-for-like agreement or contradiction. Do not resolve a contradiction the records leave open.
 
 ### 4.4 Keep each finding with its qualification
 Present each finding together with the limitations needed to interpret it, in the plan's order. Never place a synthesis before the unresolved steps it depends on.
@@ -91,7 +95,7 @@ Code calls you in the plan's writing order (body sections, then the Introduction
 Before the next section starts, code checks this one: every sentence ends with a tag; every tag is in `allowed_tags` (or retrieved); every number appears in the full records of the elements its sentence is tagged with; every citation is one its tags permit; no sentence binds more than 24 findings through its tags (A10 verifies at most that many per sentence, so a grouped passage spans several sentences); `⟦ORG⟧` sentences carry no number and no citation; `{{T1}}` only where the plan places it; the heading is the plan's; abbreviations are expanded as the readability plan says, and a name with a planned alternative uses the alternative only at its first mention. A failed gate stops the stage; nothing is repaired automatically.
 
 ### 4.12 The table caption
-In the front matter, caption `T1`: what the table compares and how its rows were chosen (its `selection_rule`), tagged like any sentence. The table's cells are built by code and verified like prose; never restate or round a cell in the caption.
+In the front matter, caption `T1`: what the table compares and how its rows were chosen (its `selection_rule`), tagged like any sentence. Say that it is a selection of the most important evidence, not an inventory of every study, and never imply it is exhaustive. The table's cells are built by code and verified like prose; never restate or round a cell in the caption.
 
 ## 5. Word budgets
 

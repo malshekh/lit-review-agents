@@ -9,7 +9,7 @@ import jsonschema
 import pytest
 
 from bridge_fixtures import compact_package, fixture_plan, oversized_package, tagged_text
-from litreview import bridge, checkpoints, config
+from litreview import bridge, checkpoints, config, verification_job
 from litreview import orchestrator as orch
 from litreview.admission import AdmissionRefused
 from litreview.agents.base import validate
@@ -91,9 +91,14 @@ def make_run(tmp_path, monkeypatch, fx, stage="outline"):
     monkeypatch.setattr(run, "_publishable", lambda name: run.load(name))
     # current findings come from the fixture (Task 1 rebuilds them from extractions the fixture does not have)
     monkeypatch.setattr(run, "_findings", lambda: run.load("validated_findings.json"))
-    # A10 is not under test here: a report is "current" for exactly the manuscript it was made for
-    report = lambda m, *a, **k: {"verification_fingerprint": fingerprint(m), "verification_execution": "COMPLETE",
-                                 "findings": [], "occurrence_inventory": [], "release_disposition": "APPROVED"}
+    # A10 is not under test here: a report is "current" for exactly the manuscript it was made for, and scripts every
+    # occurrence as VERIFIED (so the contrary-evidence release gate reads what the scripted writer actually rendered)
+    def report(m, *a, **k):
+        occ = verification_job.inventory(m, run.load("display_items.json", []))
+        return {"verification_fingerprint": fingerprint(m), "verification_execution": "COMPLETE", "findings": [],
+                "occurrence_inventory": occ, "release_disposition": "APPROVED",
+                "verdicts": [{"occurrence_id": o["occurrence_id"], "verdict": "VERIFIED", "evidence_finding_ids": []}
+                             for o in occ]}
     monkeypatch.setattr(run, "_verify", report)
     monkeypatch.setattr(run, "_maybe_verify", report)
     monkeypatch.setattr(run, "_verification_current", lambda rv, m: rv.get("verification_fingerprint") == fingerprint(m))

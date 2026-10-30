@@ -42,6 +42,15 @@ global review, not an independent scientific vote. Every registry finding appear
 of manuscript citation; request its full source before an evidence-based judgment. Inspect contradictions
 between distant sections, certainty/terminology drift, missing qualifications, unsupported generalizations,
 dependent-study double counting, omitted negative/contrary evidence and divergence from A07 synthesis.
+Contrary evidence: an index entry carrying contrary_evidence is a material contrary finding (whether the
+table shows it, the elements and sections that carry it, the findings it challenges, and the context fields
+that differ between them). Check that each is accounted for: shown in the table, or substantively discussed
+in the prose with attribution and citation, not merely cited. Check that no table row or prose conclusion
+presents a claim while concealing evidence that materially challenges it, and that the table's conclusions
+agree with the complete manuscript. Findings from different systems, cell lines, doses or treatment arms
+must not be presented as like-for-like agreement or contradiction without stating the difference. Codes:
+CONTRARY_EVIDENCE_UNADDRESSED and TABLE_CONCEALS_CONTRARY_EVIDENCE (BLOCKING); TABLE_PROSE_INCONSISTENT
+and FORCED_EQUIVALENCE (MAJOR).
 Return verdicts [], the exact inventory_fingerprint, and reviewed_index_ids in supplied page order.
 Issues must identify affected occurrence IDs from claim_verification_index. Retrieve source evidence
 for scientific issues with finding_ids. A purely internal manuscript contradiction can have finding_ids [].
