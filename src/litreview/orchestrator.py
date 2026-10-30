@@ -291,6 +291,12 @@ class Run:
         m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
+        watched = self._context_check(agent_id, payload, step, m)
+        if reservation_key:   # the call's cost is already held under the cap
+            self._spend_review(agent_id, step, 0.0)
+        else:                 # worst case for this call: its input (count, else bound) and every output token
+            self._spend_review(agent_id, step, self.budget.cost(
+                m.model, watched["input_counted"] or watched["input_byte_bound"], watched["output_reserve"]) or 0.0)
         try:
             extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
             out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
@@ -298,11 +304,71 @@ class Run:
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
+        self._context_actual(watched)
         model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
         self.last_model = m.model
         if self.budget.should_warn():
             notify.send("budget_warning", f"Run {self.id}: 80% of budget used", self.budget.summary_text())
         return out
+
+    def _context_check(self, agent_id: str, payload: dict, step: str, m) -> dict:
+        """(input + reserved output) / window for this exact request (context_watch.py), logged with both the byte
+        bound and the provider's count where available. WARN: logged and notified. REVIEW: stops for the
+        researcher's approval of this request (CP_CONTEXT), unless it is already recorded. Operational defaults,
+        not reliability guarantees; the hard admission ceilings are unchanged."""
+        from . import context_watch
+        from .agents.base import build_system_prompt, user_parts
+        from .synthesis_registry import fingerprint
+        system, user = build_system_prompt(agent_id), user_parts(payload, m.cache_payload)
+        counting = ((self.cfg.get("context_utilisation") or {}).get("provider_count") or {}).get(m.provider)
+        rec = context_watch.measure(agent_id, step, system, user, payload, m, self.cfg,
+                                    context_watch.anthropic_counter if counting else None)
+        if rec["level"] == "REVIEW":
+            rec["review_fingerprint"] = fingerprint({"agent": agent_id, "step": step, "model": m.model,
+                                                     "max_tokens": m.max_tokens, "payload": payload})
+            rec["approved"] = checkpoints.review_approved(self.dir, "CP_CONTEXT", rec["review_fingerprint"]) is not None
+        self.prov.tool_run("context_utilisation", step, rec)
+        if rec["level"] == "WARN":
+            notify.send("context_warning", f"Run {self.id}: {step} uses {rec['utilisation']:.0%} of {m.model}'s window",
+                        f"Basis {rec['basis']}; warn at {rec['thresholds']['warn']:.0%}, review at "
+                        f"{rec['thresholds']['review']:.0%} (operational defaults, not reliability guarantees).")
+        if rec["level"] == "REVIEW" and not rec["approved"]:
+            checkpoints.write_context_review(self.dir, rec["review_fingerprint"], {
+                k: rec[k] for k in ("agent", "model", "step", "utilisation", "window", "basis", "input_byte_bound",
+                                    "input_counted", "output_reserve", "utilisation_byte_bound", "utilisation_counted")}
+                | {"warn_threshold": rec["thresholds"]["warn"], "review_threshold": rec["thresholds"]["review"]})
+            self.pause_for_checkpoint("CP_CONTEXT")
+        return rec
+
+    def _spend_review(self, agent_id: str, step: str, request_usd: float) -> None:
+        """The run's spend review point (run.spend_review_usd): before the call that would take committed spend
+        (spent + reserved + this call's worst case not yet reserved) past it, the run stops and asks (CP_SPEND,
+        recorded in provenance); after approval it continues to the hard cap, which never moves."""
+        from .synthesis_registry import fingerprint
+        point = (self.cfg.get("run") or {}).get("spend_review_usd")
+        if point is None:
+            return
+        spent, reserved = self.budget.spent(), self.budget.reserved()
+        after = spent + reserved + float(request_usd)
+        if after <= float(point):
+            return
+        digest = fingerprint({"run": self.id, "spend_review_usd": float(point)})
+        if checkpoints.review_approved(self.dir, "CP_SPEND", digest):
+            return
+        detail = {"agent": agent_id, "step": step, "spent_usd": round(spent, 4), "reserved_usd": round(reserved, 4),
+                  "request_usd": round(float(request_usd), 4), "committed_after_usd": round(after, 4),
+                  "review_point_usd": float(point), "cap_usd": self.budget.cap}
+        self.prov.tool_run("spend_review_point", step, detail)
+        checkpoints.write_spend_review(self.dir, digest, detail)
+        self.pause_for_checkpoint("CP_SPEND")
+
+    def _context_actual(self, rec: dict) -> None:
+        """After the call: utilisation from the provider-reported input tokens (calibrates the bound and count)."""
+        from . import context_watch
+        entry = next((e for e in reversed(self.budget.entries()) if e.get("step") == rec["step"]), None)
+        act = context_watch.actual(rec, entry)
+        if act:
+            self.prov.tool_run("context_utilisation_actual", rec["step"], act)
 
     def counter(self, st: dict, key: str) -> int:
         st["counters"][key] = st["counters"].get(key, 0) + 1

@@ -237,6 +237,14 @@ def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: 
               for e in ledger if e.get("outcome") == "TABLE_ONLY"]
     lines += ["", "## Grouped passages", ""]
     lines += [f"- {g}: {', '.join(m)}" for g, m in report.get("groups", {}).items()]
+    contrary = report.get("contrary_evidence")
+    if contrary:
+        lines += ["", "## Contrary evidence", "",
+                  f"{len(contrary['in_table'])} contrary findings are shown in the comparative table. The "
+                  f"{len(contrary['not_in_table'])} below are not; each stays mandatory and must be addressed in "
+                  "cited, verified prose before release (or excluded by you with a justification at CP_CONTRARY):", ""]
+        lines += [f"- {fid}: written by {', '.join(v['written_by'])} in {', '.join(v['sections']) or 'no section'}"
+                  for fid, v in contrary["not_in_table"].items()]
     lines += ["", "Set approve_ledger to true in `CP_LEDGER_decision.json`, then run "
                   "`litreview approve <run_id> CP_LEDGER`. To change the allocation, record what to change in notes "
                   "and rerun the outline stage instead."]
@@ -245,6 +253,76 @@ def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: 
     if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
         decision.write_text(json.dumps({"fingerprint": digest, "approve_ledger": False, "notes": ""}, indent=2),
                             encoding="utf-8")
+
+
+# ---------------------------------------------------------------- review pauses bound to one fingerprint
+# CP_CONTRARY (release: contrary evidence neither in the table nor addressed in prose), CP_CONTEXT (a request near
+# its model's window), CP_SPEND (the run's spend review point). Each approval is bound to the fingerprint it was
+# written for, logged to provenance by `approve`, and kept in <cp>_approvals.json, so a later pause never erases it.
+REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND")
+
+
+def _write_review(run_dir: Path, cp: str, digest: str, lines: list[str], template: dict, state: dict) -> None:
+    d = cp_dir(run_dir)
+    (d / f"{cp}_state.json").write_text(json.dumps({"fingerprint": digest, **state}, indent=2, ensure_ascii=False),
+                                        encoding="utf-8")
+    (d / f"{cp}_review.md").write_text("\n".join(lines), encoding="utf-8")
+    decision = d / f"{cp}_decision.json"
+    if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
+        decision.write_text(json.dumps({"fingerprint": digest, **template, "notes": ""}, indent=2), encoding="utf-8")
+
+
+def write_contrary_review(run_dir: Path, digest: str, accounting: dict, register: list[dict]) -> None:
+    """Release is blocked: material contrary findings are neither in the table nor addressed in verified prose."""
+    by_id = {e["finding_id"]: e for e in register}
+    lines = ["# Contrary evidence not accounted for: release blocked", "",
+             "Each finding below is contrary evidence (used as CONFLICTING evidence, or named by a reconciliation "
+             "issue). It is not in the comparative table, and no A10-verified sentence tagged with an element that "
+             "carries it cites its paper. Either revise the manuscript so the prose addresses it (then run again), or "
+             "exclude it with a scientific justification in `CP_CONTRARY_decision.json` (`exclusions`: a list of "
+             "objects with `finding_id` and `justification`), then run `litreview approve <run_id> CP_CONTRARY`.", ""]
+    for fid in accounting["unaddressed"]:
+        e = by_id.get(fid, {})
+        lines.append(f"- **{fid}** ({', '.join(e.get('reasons') or [])}); carried by "
+                     f"{', '.join(e.get('carried_by') or []) or 'no element'}; written in "
+                     f"{', '.join(e.get('sections') or []) or 'no section'}")
+    for c in accounting.get("table_conceals") or []:
+        lines.append(f"- table: {c} (not excludable: the table builder must be corrected)")
+    _write_review(run_dir, "CP_CONTRARY", digest, lines, {"exclusions": []},
+                  {"unaddressed": accounting["unaddressed"], "table_conceals": accounting.get("table_conceals") or []})
+
+
+def write_context_review(run_dir: Path, digest: str, detail: dict) -> None:
+    """A request's (input + reserved output) / window is at or above its review threshold (still under the hard
+    admission ceiling). Operational defaults, not reliability guarantees."""
+    lines = ["# Context window review", "",
+             f"{detail['agent']} ({detail['model']}), step {detail['step']}: input plus reserved output would use "
+             f"{detail['utilisation']:.1%} of the {detail['window']:,}-token window (basis {detail['basis']}).", "",
+             *[f"- {k}: {v}" for k, v in detail.items()], "",
+             "Thresholds are operational defaults, not reliability guarantees: a request this close to the window "
+             "may degrade. Approve this exact request (`approve_request: true`), or split the work and run again. "
+             "Then run `litreview approve <run_id> CP_CONTEXT`."]
+    _write_review(run_dir, "CP_CONTEXT", digest, lines, {"approve_request": False}, {"detail": detail})
+
+
+def write_spend_review(run_dir: Path, digest: str, detail: dict) -> None:
+    """The run reached its spend review point: it pauses and asks before going further."""
+    lines = ["# Spend review point", "",
+             f"Spent ${detail['spent_usd']:.2f}, reserved ${detail['reserved_usd']:.2f}; the next call "
+             f"(${detail['request_usd']:.2f}, {detail['agent']}) would take committed spend to "
+             f"${detail['committed_after_usd']:.2f}, past the ${detail['review_point_usd']:.2f} review point. "
+             f"The hard cap stays ${detail['cap_usd']:.2f}.", "",
+             "Set `approve_continue` to true to continue to the cap, then run `litreview approve <run_id> CP_SPEND`."]
+    _write_review(run_dir, "CP_SPEND", digest, lines, {"approve_continue": False}, {"detail": detail})
+
+
+def review_approved(run_dir: Path, cp: str, digest: str) -> dict | None:
+    """The approval recorded for exactly this fingerprint, if any."""
+    p = cp_dir(run_dir) / f"{cp}_approvals.json"
+    for a in json.loads(p.read_text(encoding="utf-8")) if p.exists() else []:
+        if a.get("fingerprint") == digest:
+            return a
+    return None
 
 
 def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
@@ -273,6 +351,23 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
             raise DecisionIncomplete("CP_LEDGER: stale ledger fingerprint (the plan or ledger changed)")
         if decision.get("approve_ledger") is not True:
             raise DecisionIncomplete("CP_LEDGER: set approve_ledger to true")
+    elif cp in REVIEW_CPS:
+        state = json.loads((d / f"{cp}_state.json").read_text(encoding="utf-8"))
+        if decision.get("fingerprint") != state["fingerprint"]:
+            raise DecisionIncomplete(f"{cp}: stale fingerprint (what is under review changed)")
+        if cp == "CP_CONTEXT" and decision.get("approve_request") is not True:
+            raise DecisionIncomplete("CP_CONTEXT: set approve_request to true, or split the work and run again")
+        if cp == "CP_SPEND" and decision.get("approve_continue") is not True:
+            raise DecisionIncomplete("CP_SPEND: set approve_continue to true to continue to the cap")
+        if cp == "CP_CONTRARY":
+            ex = decision.get("exclusions") or []
+            if not ex:
+                raise DecisionIncomplete("CP_CONTRARY: list exclusions, or revise the manuscript and run again")
+            for x in ex:
+                if x.get("finding_id") not in state["unaddressed"]:
+                    raise DecisionIncomplete(f"CP_CONTRARY: {x.get('finding_id')} is not an unaddressed contrary finding")
+                if len(str(x.get("justification") or "").strip()) < 20:
+                    raise DecisionIncomplete(f"CP_CONTRARY: {x.get('finding_id')} needs a scientific justification")
     elif cp == "CP3":
         from .synthesis_registry import fingerprint
         from .scientific_validation import require_package
@@ -289,6 +384,10 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
             raise DecisionIncomplete("CP3: set selected_thesis.")
     provenance.human_decision(cp, decision, decision.get("notes", ""))
     (d / f"{cp}_approved.json").write_text(json.dumps(decision, indent=2), encoding="utf-8")
+    if cp in REVIEW_CPS:
+        p = d / f"{cp}_approvals.json"
+        log = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+        p.write_text(json.dumps(log + [decision], indent=2), encoding="utf-8")
     return decision
 
 

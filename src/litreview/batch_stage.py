@@ -190,11 +190,14 @@ class BatchStage:
         bad = [c for c in ids if not CUSTOM_ID.match(c)]
         if bad:
             raise ValueError(f"{self.agent_id}: invalid batch custom_id(s): {bad[:3]}")
+        for step in steps:   # every item is a call: (input + reserved output) / window, logged; REVIEW stops
+            self.run._context_check(self.agent_id, self.payloads[step], step, m)
         reqs, shape = self._requests(m, ids)
         data = batch.manifest(reqs)
         digest = batch.sha256(data)
         est = self.project(m, steps, shape)
         self.run._batch_gate(self.agent_id, steps, est["projected_usd"])   # raises BatchGateRefused: stop
+        self.run._spend_review(self.agent_id, f"batch {sub_id}", est["projected_usd"])   # review point: stop and ask
         b = self.run.budget
         ok, available = b.reserve(sub_id, est["projected_usd"], self.agent_id,
                                   note=f"{len(steps)} items on {m.model}")

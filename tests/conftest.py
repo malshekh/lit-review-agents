@@ -62,6 +62,9 @@ def _no_network(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
     monkeypatch.setattr(socket, "create_connection", refuse)
     monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    # the free provider token count (context_watch) is a network call too: never from a test
+    from litreview import context_watch
+    monkeypatch.setattr(context_watch, "anthropic_counter", lambda *a, **k: None)
 
 
 def pytest_configure(config):

@@ -10,6 +10,8 @@
 
 run:
   spend_cap_usd: 35.00          # hard stop for one run; the orchestrator halts before exceeding it
+  spend_review_usd: 25.00       # pilot review point: before the call that would take spent + reserved + that call's
+                                #   worst case past it, the run stops and asks (CP_SPEND); the cap does not move
   warn_at_fraction: 0.8         # warning email/log when 80% of the cap is spent
   allow_unpriced_models: false  # refuse to run a model with no price in prices.yaml
 
@@ -129,6 +131,18 @@ admission:
     kimi: 32000                 # reasoning is always on (Moonshot: type only); not established to count
                                 #   within max_tokens, so reserved again in full
   safety_margin_tokens: 0
+
+# Context utilisation, every call (interactive and batch): (input + reserved output) / the model's window above.
+# Logged with both the byte bound of the exact request and the provider's own count where available (Anthropic's
+# free messages.count_tokens: provider_count), plus the actual figure from usage after the call. The count decides
+# the level when present, else the byte bound (conservative). warn: logged and notified; review: the run stops
+# for the researcher's approval of that exact request (CP_CONTEXT, recorded in provenance). OPERATIONAL DEFAULTS,
+# NOT RELIABILITY GUARANTEES. The hard admission ceilings (admission above; A07/A10 job ceilings) are unchanged.
+# A model with no window above is logged WINDOW_UNKNOWN (no ratio).
+context_utilisation:
+  default: { warn: 0.80, review: 0.90 }
+  models: {}                    # per-model overrides, e.g. kimi-k3.1-pro: { warn: 0.80, review: 0.85 }
+  provider_count: { anthropic: true }
 
 # A06 instability test: after per-paper validation, every paper with a blocked finding is validated once
 # more with the identical input (whole paper against whole paper, same prompt, text, identities and model
