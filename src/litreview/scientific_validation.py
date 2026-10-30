@@ -92,5 +92,13 @@ def require_package(pkg, findings):
     for obj in props + pkg.get('knowledge_gaps', []):
         if set(obj.get('source_item_ids', [])) - set(pkg.get('source_items', {})):
             raise ValueError('unknown synthesis source item')
-        for key in ('established_by', 'premise_proposition_ids'):
-            if set(obj.get(key, [])) - set(ids):raise ValueError('unknown synthesis proposition reference')
+        if set(obj.get('premise_proposition_ids', [])) - set(ids):
+            raise ValueError('unknown synthesis proposition reference')
+        # bounded A07 (A07-SYN prompt and RegistrySynthesisJob.group): a gap is established by eligible FINDING IDs;
+        # legacy packages named propositions. Anything else, or an ineligible finding, is refused.
+        for ref in obj.get('established_by', []):
+            if ref in fs:
+                if evidence.status_of(fs[ref]) != 'SUPPORTING':
+                    raise ValueError(f'gap established by ineligible finding {ref}')
+            elif ref not in ids:
+                raise ValueError('unknown synthesis proposition or finding reference')

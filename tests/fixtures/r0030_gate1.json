@@ -1,0 +1,975 @@
+{
+ "evaluation_only": true,
+ "reference_run": "20261025-100039",
+ "record_id": "R0030",
+ "extraction": {
+  "agent_id": "A5-KE",
+  "prompt_version": "0.1",
+  "status": "COMPLETE_WITH_WARNINGS",
+  "warnings": [
+   "No copper supplementation or copper measurement is reported anywhere in this paper. DSF was tested without added copper, and the copper content of DMEM/10% FBS is NOT_REPORTED. The paper is therefore not evidence about the disulfiram-copper complex.",
+   "IDH status of the cell lines (1306MG, U87MG and derivatives) is NOT_REPORTED. Cell-line authentication and mycoplasma testing are NOT_REPORTED.",
+   "Supplementary figures S1-S5 were not provided. Findings that cite a supplementary figure (F8) rest on the main-text sentence only.",
+   "The wound-healing metric is defined in Methods 4.8 as remaining wound area (%), but Results describe lower values as inhibited motility. The order of 'X vs. Y' values also differs between sentences, e.g. treated-vs-control in the 2D results and control-vs-treated in the 3D results. Which value belongs to which arm is therefore not recoverable from the spans alone. Raw strings are preserved and not resolved.",
+   "The paper's 'Conflicts of Interest' section reads 'Consent for publication was obtained from the participants.' This is not a conflict-of-interest statement. Conflicts are recorded as NOT_REPORTED.",
+   "Animal numbers per group, randomisation, blinding and DMSO vehicle concentration in vivo are NOT_REPORTED. Methods give dosing 'from post-transplantation day 10 to day 55', whereas the Figure 8 legend states tumour growth 'was observed for 45 days'. Both are recorded without reconciliation.",
+   "Approval status of disulfiram, galunisertib and temozolomide was not looked up in this task. The paper calls galunisertib 'an approval drug'. Types are therefore DRUG_STATUS_UNVERIFIED.",
+   "Entity normalization (normalized_id, Cellosaurus RRIDs, approved gene symbols) is left to code."
+  ],
+  "limitations": [
+   "Content level is FULL_TEXT, but the supplementary figures and data were not available.",
+   "The in vivo experiments use only radiation-resistant or radiation-TMZ-resistant derivative cells. No parental-cell xenograft, no TMZ or radiotherapy arm, and no pharmacokinetic, brain-exposure or target-engagement measurement for DSF is reported, so none can be extracted.",
+   "Survival (Kaplan-Meier) is reported for 2GR4 (Fig 8D) and 3.5GR6 (Fig 8H). No survival panel is described for R6T3 (Fig 8I-K). This is a reporting gap, not a negative finding.",
+   "In vitro combination indices (Table 1) come from a single dose pair per cell line, with no replicate statistics reported for the CI values.",
+   "Two-way ANOVA statistics in the in vivo results report the interaction term as non-significant. They also test 'DSF, G, D + G vs. Veh' as a single main effect, so they do not isolate the combination from monotherapies. The paper reports no post-hoc pairwise statistics in the text."
+  ],
+  "record_id": "R0030",
+  "content_level": "FULL_TEXT",
+  "sections_inspected": [
+   "Abstract",
+   "1. Introduction",
+   "2. Results (2.1-2.5)",
+   "3. Discussion",
+   "4. Materials and Methods",
+   "5. Conclusions",
+   "Figure legends 1-10",
+   "Table 1",
+   "Funding",
+   "Conflicts of Interest",
+   "Institutional Review Board Statement",
+   "References (list only, for attribution)"
+  ],
+  "study_profile": {
+   "study_type": "PRIMARY_RESEARCH",
+   "evidence_systems": [
+    "IN_VITRO_CELLULAR",
+    "IN_VITRO_3D",
+    "IN_VIVO_ANIMAL"
+   ],
+   "in_silico_subtype": [],
+   "human_design": null,
+   "trial_phase": null,
+   "registration_id": null,
+   "funding_and_conflicts": "Funding: MOST 107-2320-B-006-055- and MOST 109-2320-B-006-052- (Ministry of Sciences and Technology of Taiwan) and NCKUH-11004006 (National Cheng Kung University Hospital). Conflicts: NOT_REPORTED (the section contains only 'Consent for publication was obtained from the participants.')."
+  },
+  "entities": [
+   {
+    "entity_id": "E1",
+    "mention": "Disulfiram (DSF)",
+    "type": "DRUG_STATUS_UNVERIFIED",
+    "subtype": null,
+    "roles": [
+     "INTERVENTION"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "RESOLVED",
+    "normalization_source": "ChEMBL",
+    "normalized_id": "CHEMBL964",
+    "approved_name": "DISULFIRAM",
+    "max_clinical_phase": 4.0,
+    "drug_status_verified": "APPROVED",
+    "pubchem": "PubChem CID:3117",
+    "expansion": {
+     "abbreviation": "DSF",
+     "long_form": "Disulfiram",
+     "source_span": "Disulfiram (DSF)"
+    },
+    "resolved_from": "MENTION_HEAD"
+   },
+   {
+    "entity_id": "E2",
+    "mention": "Galunisertib",
+    "type": "DRUG_STATUS_UNVERIFIED",
+    "subtype": "TGF-β receptor inhibitor (as described by authors)",
+    "roles": [
+     "INTERVENTION"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "RESOLVED",
+    "normalization_source": "ChEMBL",
+    "normalized_id": "CHEMBL2364611",
+    "approved_name": "GALUNISERTIB",
+    "max_clinical_phase": 2.0,
+    "drug_status_verified": "INVESTIGATIONAL",
+    "pubchem": "PubChem CID:10090485"
+   },
+   {
+    "entity_id": "E3",
+    "mention": "DSF + Galunisertib (D + G)",
+    "type": "DRUG_STATUS_UNVERIFIED",
+    "subtype": "combination of E1 and E2",
+    "roles": [
+     "INTERVENTION"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "PubChem",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E4",
+    "mention": "NCT-501",
+    "type": "TOOL_COMPOUND",
+    "subtype": "described as specific inhibitor of ALDH1A1",
+    "roles": [
+     "TOOL",
+     "COMPARATOR"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "RESOLVED",
+    "normalization_source": "PubChem",
+    "normalized_id": "PubChem CID:92044412"
+   },
+   {
+    "entity_id": "E5",
+    "mention": "LY364947",
+    "type": "TOOL_COMPOUND",
+    "subtype": "TGF-β receptor inhibitor (as described by authors)",
+    "roles": [
+     "TOOL"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "RESOLVED",
+    "normalization_source": "PubChem",
+    "normalized_id": "PubChem CID:447966"
+   },
+   {
+    "entity_id": "E6",
+    "mention": "temozolomide (TMZ)",
+    "type": "DRUG_STATUS_UNVERIFIED",
+    "subtype": null,
+    "roles": [
+     "EXPOSURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "RESOLVED",
+    "normalization_source": "ChEMBL",
+    "normalized_id": "CHEMBL810",
+    "approved_name": "TEMOZOLOMIDE",
+    "max_clinical_phase": 4.0,
+    "drug_status_verified": "APPROVED",
+    "pubchem": "PubChem CID:5394",
+    "expansion": {
+     "abbreviation": "TMZ",
+     "long_form": "temozolomide",
+     "source_span": "temozolomide (TMZ)"
+    },
+    "resolved_from": "MENTION_HEAD"
+   },
+   {
+    "entity_id": "E7",
+    "mention": "ALDHs (aldehyde dehydrogenases; ALDH activity)",
+    "type": "ENZYME",
+    "subtype": null,
+    "roles": [
+     "TARGET",
+     "OUTCOME_MEASURE",
+     "BIOMARKER"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ACTIVITY",
+    "identity_relation": null,
+    "construct": {
+     "form": "endogenous",
+     "source": "endogenous",
+     "tag": "none",
+     "variant": "wild-type",
+     "species_of_construct": "NOT_REPORTED"
+    },
+    "taxon": "NCBITaxon:9606",
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "MyGene.info (human)",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E8",
+    "mention": "ALDH1 / ALDH1A1",
+    "type": "PROTEIN",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ABUNDANCE",
+    "identity_relation": null,
+    "construct": {
+     "form": "NOT_REPORTED",
+     "source": "endogenous",
+     "tag": "none",
+     "variant": "wild-type",
+     "species_of_construct": "NOT_REPORTED"
+    },
+    "normalization_state": "LOOKUP_FAILED",
+    "normalization_source": "error",
+    "normalized_id": null,
+    "note": "400 Client Error: search_phase_execution_exception for url: https://mygene.info/v3/query?q=symbol%3AALDH1+%2F+ALDH1A1&species=human&fields=symbol%2Cname%2Centrezgene%2CMGI%2CRGD%2CHGNC&size=5"
+   },
+   {
+    "entity_id": "E9",
+    "mention": "TGF-β (secreted, ELISA of conditioned medium)",
+    "type": "PROTEIN",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ABUNDANCE",
+    "identity_relation": null,
+    "construct": null,
+    "taxon": "NCBITaxon:9606",
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "MyGene.info (human)",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E10",
+    "mention": "phosphorylation on TRI (TGF-β receptor I)",
+    "type": "POST_TRANSLATIONAL_MODIFICATION",
+    "subtype": "phosphorylation (Ser165 antibody listed in Methods)",
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "MODIFICATION",
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "NOT_APPLICABLE",
+    "normalization_source": "none",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E11",
+    "mention": "Slug",
+    "type": "PROTEIN",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ABUNDANCE",
+    "identity_relation": null,
+    "construct": null,
+    "taxon": "NCBITaxon:9606",
+    "normalization_state": "RESOLVED",
+    "normalization_source": "HGNC (prev_symbol)",
+    "normalized_id": "HGNC:11094",
+    "approved_symbol": "SNAI2",
+    "approved_name": "snail family transcriptional repressor 2",
+    "uniprot": "O43623",
+    "ec_numbers": []
+   },
+   {
+    "entity_id": "E12",
+    "mention": "N-cadherin",
+    "type": "PROTEIN",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE",
+     "BIOMARKER"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ABUNDANCE",
+    "identity_relation": null,
+    "construct": null,
+    "taxon": "NCBITaxon:9606",
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "MyGene.info (human)",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E13",
+    "mention": "Fibronectin",
+    "type": "PROTEIN",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE",
+     "BIOMARKER"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": "PROTEIN_ABUNDANCE",
+    "identity_relation": null,
+    "construct": null,
+    "taxon": "NCBITaxon:9606",
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "MyGene.info (human)",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E14",
+    "mention": "tumor sphere formation / growth (sphere diameter)",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E15",
+    "mention": "cell migration / cell motility / mobility",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E16",
+    "mention": "in vivo tumor growth (bioluminescence)",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E17",
+    "mention": "survival of mice (Kaplan-Meier)",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E18",
+    "mention": "RR and RTR GBM cells (1306MG 3.5GR6, R6T3; U87MG 2GR4, R4T3)",
+    "type": "CELL_LINE",
+    "subtype": "derived in-house by repeated irradiation (RR) and then TMZ (RTR)",
+    "roles": [
+     "MODEL_SYSTEM"
+    ],
+    "molecule_species": "human",
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "Cellosaurus",
+    "normalized_id": null,
+    "note": "no line named exactly 'RR and RTR GBM cells (1306MG 3.5GR6, R6T3; U87MG 2GR4, R4T3)'"
+   },
+   {
+    "entity_id": "E19",
+    "mention": "parental 1306MG and U87MG",
+    "type": "CELL_LINE",
+    "subtype": null,
+    "roles": [
+     "MODEL_SYSTEM",
+     "COMPARATOR"
+    ],
+    "molecule_species": "human",
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "Cellosaurus",
+    "normalized_id": null,
+    "note": "no line named exactly 'parental 1306MG and U87MG'"
+   },
+   {
+    "entity_id": "E20",
+    "mention": "NOD/SCID mice (NOD.CB17-Prkdcscid/NcrCrl)",
+    "type": "ORGANISM",
+    "subtype": null,
+    "roles": [
+     "MODEL_SYSTEM"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/NCBITAXON",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E21",
+    "mention": "cell viability / growth (trypan blue)",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E22",
+    "mention": "prognosis of recurrent GBM patients",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E23",
+    "mention": "progression-free and overall survival (single GBM patient)",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E24",
+    "mention": "mouse body weight",
+    "type": "PHENOTYPE",
+    "subtype": null,
+    "roles": [
+     "OUTCOME_MEASURE"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "UNRESOLVED",
+    "normalization_source": "OLS4/HP",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E25",
+    "mention": "TGF-β1 (exogenous, 10 ng/mL)",
+    "type": "RECOMBINANT_PROTEIN",
+    "subtype": null,
+    "roles": [
+     "INTERVENTION"
+    ],
+    "molecule_species": null,
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": {
+     "form": "NOT_REPORTED",
+     "source": "NOT_REPORTED",
+     "tag": "NOT_REPORTED",
+     "variant": "NOT_REPORTED",
+     "species_of_construct": "NOT_REPORTED"
+    },
+    "normalization_state": "NOT_APPLICABLE",
+    "normalization_source": "none",
+    "normalized_id": null
+   },
+   {
+    "entity_id": "E26",
+    "mention": "TGF-β receptors (TRI/TRII) inhibition by LY364947 or Galunisertib",
+    "type": "RECEPTOR",
+    "subtype": null,
+    "roles": [
+     "TARGET"
+    ],
+    "molecule_species": "human (cells stated as human GBM lines)",
+    "measured_at": null,
+    "identity_relation": null,
+    "construct": null,
+    "normalization_state": "LOOKUP_FAILED",
+    "normalization_source": "error",
+    "normalized_id": null,
+    "note": "400 Client Error: search_phase_execution_exception for url: https://mygene.info/v3/query?q=symbol%3ATGF-%CE%B2+receptors+%28TRI%2FTRII%29+inhibition+by+LY364947+or+Galunisertib&species=human&fields=sy"
+   }
+  ],
+  "contexts": [
+   {
+    "context_id": "C1",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "1306MG, U87MG parental and RR/RTR derivatives",
+     "primary_or_immortalized": "NOT_REPORTED",
+     "relationship_to_disease": "NON_DISEASE_SYSTEM",
+     "authentication_reported": "not reported",
+     "agent": "DSF",
+     "dose_or_concentration": "GI20: 8 μM for 1306MG, 3.5GR6, R6T3; 150 nM for U87MG, 2GR4, R4T3",
+     "duration": "18 h (1306MG), 24 h (U87MG) wound-healing endpoint",
+     "vehicle": "0.1% DMSO",
+     "comparator": "VEHICLE",
+     "assay": "2D wound healing (ibidi inserts), serum-free medium",
+     "readout": "percentage of wound area (see warning on direction)",
+     "n": "N = 3 (Fig 4A,B)",
+     "replicate_type": "NOT_SPECIFIED",
+     "statistical_test": "unpaired two-tailed Student's t-test",
+     "blinding": "NOT_REPORTED",
+     "randomization": "NOT_REPORTED"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "A 20% dose of Disulfiram (DSF) growth inhibitor was selected. 0.1% DMSO was used as solvent control (labelled as 0 μM).",
+     "Therefore, we evaluated the cell response to different doses of DSF ( Figure S3A ). A 20% dose of growth inhibition (GI 20 ) was selected for further investigation (8 μM for 1306MG, 3.5GR6, and R6T3; 150 nM for U87MG, 2GR4, and R4T3).",
+     "18 h were required for 1306MG, and 24 h were required for U87MG."
+    ]
+   },
+   {
+    "context_id": "C2",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "U87MG parental, 2GR4, R4T3",
+     "relationship_to_disease": "NON_DISEASE_SYSTEM",
+     "agent": "DSF (alone or with Galunisertib)",
+     "dose_or_concentration": "150 nM DSF; 100 μM Galunisertib (combination, Fig 5)",
+     "duration": "9 h",
+     "vehicle": "DMSO (concentration for Transwell not separately stated)",
+     "comparator": "VEHICLE / single agents",
+     "assay": "3D Transwell migration",
+     "n": "N = 5 (Fig 4C); N = 6 (Fig 5)",
+     "replicate_type": "NOT_SPECIFIED",
+     "statistical_test": "unpaired two-tailed Student's t-test",
+     "blinding": "NOT_REPORTED",
+     "randomization": "NOT_REPORTED"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "150 nM DSF, 100 nM NCT-501, 10 ng/mL TGF-β, 4 μM LY364947 , and 100 μM Galunisertib were selected to treat the cells for 9 h."
+    ]
+   },
+   {
+    "context_id": "C3",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "1306MG, U87MG parental, RR, RTR",
+     "relationship_to_disease": "NON_DISEASE_SYSTEM",
+     "agent": "DSF + Galunisertib",
+     "dose_or_concentration": "DSF 8 μM (1306MG lines) or 150 nM (U87MG lines); Galunisertib 100 μM",
+     "duration": "24 h",
+     "comparator": "single agents; 0 control",
+     "assay": "trypan blue exclusion; combination index by CompuSyn",
+     "readout": "viability; CI",
+     "n": "N = 3-5 depending on line (Fig 6); CI replicate number NOT_REPORTED",
+     "replicate_type": "NOT_SPECIFIED",
+     "statistical_test": "unpaired two-tailed Student's t-test",
+     "blinding": "NOT_REPORTED",
+     "randomization": "NOT_REPORTED"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "150 nM DSF and 100 nM NCT-501 for U87MG, 8 μM DSF and 300 nM NCT-501 for 1306MG, 10 ng/mL TGF-β, 4 μM LY364947 , and 100 μM Galunisertib were used to treat cells for 24 h.",
+     "Table 1 ... Disufiram (DSF) (μM) Galunisertib (G) (μM) Cytotoxicity of DSF + G CI Description 1306MG 8 100 0.328 1.203 Moderate antagonism"
+    ]
+   },
+   {
+    "context_id": "C4",
+    "fields": {
+     "evidence_system": "IN_VITRO_3D",
+     "species": "human (stated)",
+     "cell_line_or_type": "RR 1306MG 3.5GR6 and RTR 1306MG R6T3",
+     "assay": "tumor sphere formation (1200 cells, DMEM/F12 + EGF, bFGF, B27)",
+     "dose_or_concentration": "NOT_REPORTED for the sphere experiment",
+     "duration": "21 days",
+     "comparator": "control / single agents",
+     "readout": "sphere diameter (μm; described as 'lengths')",
+     "n": "NOT_REPORTED",
+     "statistical_test": "unpaired two-tailed Student's t-test (general Methods statement)",
+     "blinding": "NOT_REPORTED",
+     "randomization": "NOT_REPORTED"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "Treatments were repeated ten times with DMEM/F12 containing 10 ng/mL EGF, 10 ng/mL bFGF, and B27 was supplemented twice weekly. The cells were subjected to different treatments for 21 days. The diameters of the spheres were measured using ImageJ software."
+    ]
+   },
+   {
+    "context_id": "C5",
+    "fields": {
+     "evidence_system": "IN_VIVO_ANIMAL",
+     "species": "mouse",
+     "strain": "NOD.CB17-Prkdcscid/NcrCrl (NOD/SCID)",
+     "sex": "male",
+     "age_or_stage": "8 to 10-week-old",
+     "n_organisms": "NOT_REPORTED",
+     "model_type": "XENOGRAFT",
+     "cell_line_or_type": "luciferase-expressing RR U87MG 2GR4, 5 × 10^5 cells in 2 μL PBS, orthotopic (striatum)",
+     "relationship_to_disease": "INDUCED_DISEASE_MODEL",
+     "agent": "DSF, Galunisertib, or both",
+     "dose_or_concentration": "DSF 50 mg/kg; Galunisertib 75 mg/kg",
+     "route": "intraperitoneal",
+     "frequency": "twice weekly",
+     "duration": "from day 10 to day 55 (Methods); observed 45 days (Fig 8 legend)",
+     "vehicle": "DMSO (concentration NOT_REPORTED)",
+     "comparator": "VEHICLE",
+     "assay": "IVIS bioluminescence twice weekly; Kaplan-Meier",
+     "statistical_test": "two-way ANOVA",
+     "blinding": "NOT_REPORTED",
+     "randomization": "NOT_REPORTED"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "At day 10 post-transplantation, DSF (50 mg/kg), Galunisertib (75 mg/kg), DSF (50 mg/kg) + Galunisertib (75 mg/kg), or DMSO as a vehicle was injected intraperitoneally twice weekly into the mice.",
+     "5 × 10 5 GBM cells in 2 μL PBS were inoculated orthotopically into 8 to 10-week-old male NOD/SCID mice."
+    ]
+   },
+   {
+    "context_id": "C6",
+    "fields": {
+     "evidence_system": "IN_VIVO_ANIMAL",
+     "species": "mouse",
+     "strain": "NOD/SCID",
+     "sex": "male",
+     "model_type": "XENOGRAFT",
+     "cell_line_or_type": "luciferase-expressing RR 1306MG 3.5GR6, orthotopic",
+     "dose_or_concentration": "as C5 (stated in Fig 8 legend for all three cell lines)",
+     "route": "intraperitoneal",
+     "frequency": "twice weekly",
+     "comparator": "VEHICLE",
+     "n_organisms": "NOT_REPORTED",
+     "statistical_test": "two-way ANOVA"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "The same procedures of IVIS observation and the treatments of Veh, DSF, G, and D + G were applied to the RR 1306MG 3.5GR6 and RTR 1306MG R6T3 cells in vivo growth."
+    ]
+   },
+   {
+    "context_id": "C7",
+    "fields": {
+     "evidence_system": "IN_VIVO_ANIMAL",
+     "species": "mouse",
+     "strain": "NOD/SCID",
+     "sex": "male",
+     "model_type": "XENOGRAFT",
+     "cell_line_or_type": "luciferase-expressing RTR 1306MG R6T3, orthotopic",
+     "dose_or_concentration": "as C5",
+     "route": "intraperitoneal",
+     "frequency": "twice weekly",
+     "comparator": "VEHICLE",
+     "n_organisms": "NOT_REPORTED",
+     "statistical_test": "two-way ANOVA"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "The same procedures of IVIS observation and the treatments of Veh, DSF, G, and D + G were applied to the RR 1306MG 3.5GR6 and RTR 1306MG R6T3 cells in vivo growth."
+    ]
+   },
+   {
+    "context_id": "C8",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "1306MG and U87MG parental, RR, RTR",
+     "assay": "ALDEFLUOR with flow cytometry (DEAB control); western blot for ALDH1A1 (U87MG lines)",
+     "comparator": "parental cells",
+     "n": "N = 3-5 depending on panel (Fig 3)",
+     "statistical_test": "NOT_REPORTED for this panel beyond asterisks (general: t-test)"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "The activity of aldehyde dehygrogenases (ALDHs) was measured using the ALDEFLUOR assay with flow cytometry. N, N-diethylaminobenzaldehyde (DEAB) was used to inhibit ALDH."
+    ]
+   },
+   {
+    "context_id": "C9",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "RR and RTR 1306MG and U87MG",
+     "agent": "DSF",
+     "dose_or_concentration": "8 μM (1306MG lines), 150 nM (U87MG lines)",
+     "duration": "24 h",
+     "comparator": "VEHICLE (DMSO)",
+     "assay": "ELISA (Fig 9D,E); western blot (Fig 9F-H; U87MG 2GR4/R4T3 for signalling proteins, 1306MG lines for N-cadherin/Fibronectin only)",
+     "n": "N = 3-4 (Fig 9)"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "8 μM and 150 nM DSF were used to inhibit ALDHs in 1306MG and U87MG, respectively.",
+     "( F ) the cells were subjected to DSF for 24 h."
+    ]
+   },
+   {
+    "context_id": "C10",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "1306MG and U87MG parental, RR, RTR",
+     "agent": "TGF-β1, LY364947, Galunisertib",
+     "dose_or_concentration": "10 ng/mL TGF-β1; 4 μM LY364947; 100 μM Galunisertib",
+     "comparator": "untreated/vehicle",
+     "assay": "ALDEFLUOR",
+     "n": "N = 3-5 (Fig 9A-C)"
+    },
+    "context_source": "ELSEWHERE_IN_PAPER",
+    "context_spans": [
+     "10 ng/mL TGF-β1, 4 μM LY364947 , and 100 μM Galunisertib were used to manipulate the TGF-β signaling activity."
+    ]
+   },
+   {
+    "context_id": "C11",
+    "fields": {
+     "evidence_system": "NOT_APPLICABLE",
+     "note": "Statements in the Discussion attributed to other works; no experiment of this paper"
+    },
+    "context_source": "NOT_REPORTED",
+    "context_spans": []
+   },
+   {
+    "context_id": "C12",
+    "fields": {
+     "evidence_system": "IN_VITRO_CELLULAR",
+     "species": "human (stated)",
+     "cell_line_or_type": "cell lines of the study (not specified in span)",
+     "agent": "DSF at GI20 and NCT-501",
+     "assay": "ALDEFLUOR",
+     "n": "NOT_REPORTED (Figure S5 not inspected)"
+    },
+    "context_source": "IN_SPAN",
+    "context_spans": [
+     "The DSF dose of GI 20 and the selected dose of NCT-501 inhibited about 20% of the ALDH activity ( Figure S5 )."
+    ]
+   }
+  ],
+  "author_stated_limitations": [
+   {
+    "text": "However, our study focused on the correlation between ADLH and TGF-β signaling in comprehensive population after experimental radiation alone or radiation followed with TMZ.",
+    "location": "3. Discussion, paragraph 2"
+   },
+   {
+    "text": "In order to clarify the intact interaction between ADLH and TGF-β signaling, the selection of ALDH-positive subgroups and the major ALDH isoform(s) consisting of ALDEFLUOR activity need to be figured out.",
+    "location": "3. Discussion, paragraph 2"
+   },
+   {
+    "text": "Also, for mechanistic investigation, gene modification, such as specific ALDH isoform knockdown/overexpression and functional mutation, is necessary.",
+    "location": "3. Discussion, paragraph 2"
+   },
+   {
+    "text": "In spite of the in vitro and in vivo results showing the anti-tumor potential combining DSF and Galunisertib by targeting both cancer stem cells and mesenchymal-like cells, however, we only examined the inhibitory effects of combining DSF and Galunisertib by using tumor sphere formation assay.",
+    "location": "3. Discussion, paragraph 4"
+   }
+  ],
+  "in_paper_conflicts": [
+   {
+    "finding_ids": [
+     "F21"
+    ],
+    "description": "The text states DSF, G or D + G 'did not affect the body weight of the mice' (2GR4), while the same paragraph reports a significant two-way ANOVA main effect for treatment on body weight (F (3, 157) = 4.851, p = 0.0030). Not resolved."
+   },
+   {
+    "finding_ids": [
+     "F13",
+     "F15"
+    ],
+    "description": "DSF monotherapy is reported as having no effect on in vivo tumour growth (2GR4), but its median survival is stated as 'not defined' (like the vehicle comparator's defined median of 54 days). No survival statistics are given. Not resolved."
+   },
+   {
+    "finding_ids": [
+     "F4",
+     "F5",
+     "F6"
+    ],
+    "description": "DSF reduced 2D migration of 3.5GR6, R6T3 and 2GR4 but not of R4T3 (F5), whereas it reduced 3D migration of R4T3 (F6). Different assay formats and time points. Not resolved."
+   },
+   {
+    "finding_ids": [
+     "F11",
+     "F12"
+    ],
+    "description": "Combination indices indicate synergism or slight synergism in RR/RTR 1306MG and RR U87MG, near-additivity in RTR U87MG and antagonism in both parental lines. The direction depends on cell line. Not resolved."
+   },
+   {
+    "finding_ids": [
+     "F14",
+     "F17",
+     "F18"
+    ],
+    "description": "D + G is reported to suppress or delay tumour growth (bioluminescence) in 2GR4 and 3.5GR6, while survival curves in 3.5GR6 show no difference. Not resolved."
+   }
+  ],
+  "out_of_scope_observations": [
+   {
+    "span": "A combination of DSF and copper enhances radiosensitivity via inducing cell death or interfering with DNA repair [ 45 , 46 ].",
+    "note": "Secondary attribution about DSF + copper, not an experiment of this paper. Refs 45 and 46 are as printed in the reference list (the latter being Koh H.K., et al. 2019, DSF in human GBM cells in vitro). Not extracted as a finding."
+   },
+   {
+    "span": "Galunisertib in combination with standard TMZ-based radiochemotherapy or alone with lomustine did not significantly improve the survival of newly diagnosed or recurrent GBM patients [ 50 , 51 ].",
+    "note": "Galunisertib clinical trials attributed to others. Outside the disulfiram scope, recorded as context only."
+   },
+   {
+    "span": "However, specifically inhibiting ALDH1A1 with NCT-501 only reduced the diameter of the RTR 1306MG R6T3 tumor spheres (vs. 88.2 ± 0.1 μm, p < 0.001) ( Figure 7 B).",
+    "note": "NCT-501 (ALDH1A1-specific tool compound) results are not extracted as separate findings. They are relevant if the review compares pan-ALDH inhibition by DSF with ALDH1A1-specific inhibition."
+   },
+   {
+    "span": "Disulfiram attenuates drug-primed reinstatement of cocaine seeking via inhibition of dopamine beta-hydroxylase.",
+    "note": "Title of ref 37 in this paper's reference list, the source cited for the claim of ALDH-independent DSF effects (F34). Recorded as printed, with no judgement made on its fit."
+   }
+  ],
+  "findings": [
+   {
+    "finding_id": "F18",
+    "subject_entity_id": "E3",
+    "predicate": "NO_EFFECT_ON",
+    "object_entity_id": "E17",
+    "polarity": "NULL",
+    "modality": "ASSERTED",
+    "direction": "NO_CHANGE",
+    "assertion_type": "REPORTED_RESULT",
+    "origin": "EXPLICIT",
+    "context_id": "C6",
+    "span": "However, the survival curve of DSF, G, D + G, and Veh did not show the differences ( Figure 8 H ).",
+    "span_location": {
+     "section": "2. Results, 2.4",
+     "figure_or_table": "Figure 8H",
+     "paragraph": "2"
+    },
+    "premise_spans": [],
+    "bridge": null,
+    "warrant_note": "'did not show the differences' in survival across Veh, DSF, G and D + G for 3.5GR6. It is a null survival result for the combination and for DSF.",
+    "quantities": [],
+    "contradicts_prior_report": false,
+    "attributed_to": null,
+    "themes": [
+     "In vivo efficacy signals and negative monotherapy result",
+     "Combination therapy — sensitization to targeted agents"
+    ],
+    "knowledge_assist": null
+   },
+   {
+    "finding_id": "F20",
+    "subject_entity_id": "E3",
+    "predicate": "DECREASES",
+    "object_entity_id": "E16",
+    "polarity": "POSITIVE",
+    "modality": "ASSERTED",
+    "direction": "DECREASE",
+    "assertion_type": "REPORTED_RESULT",
+    "origin": "EXPLICIT",
+    "context_id": "C7",
+    "span": "only D + G was able to inhibit the in vivo growth of RTR 1306MG R6T3 cells ... A two-way ANOVA revealed a main effect of DSF, G, D + G vs. Veh (F (3, 418) = 5.795, p < 0.0001), interaction (F (39, 418) = 0.7455, p = 0.8694)",
+    "span_location": {
+     "section": "2. Results, 2.4",
+     "figure_or_table": "Figure 8I,J",
+     "paragraph": "2"
+    },
+    "premise_spans": [],
+    "bridge": null,
+    "warrant_note": "'only D + G was able to inhibit the in vivo growth'. The span contains an ellipsis joining two adjacent sentence fragments from the same paragraph. The interaction term is non-significant (p = 0.8694). No survival data are described for R6T3.",
+    "quantities": [
+     {
+      "measured_property": "bioluminescence, treatment main effect",
+      "raw_value": "F (3, 418) = 5.795",
+      "raw_unit": "NOT_APPLICABLE",
+      "value_type": "OTHER_SPECIFIED",
+      "variance_or_ci": null,
+      "p_value": "< 0.0001",
+      "n": "NOT_REPORTED",
+      "converted": null
+     }
+    ],
+    "contradicts_prior_report": false,
+    "attributed_to": null,
+    "themes": [
+     "Combination therapy — sensitization to targeted agents"
+    ],
+    "knowledge_assist": null
+   },
+   {
+    "finding_id": "F21",
+    "subject_entity_id": "E1",
+    "predicate": "NO_EFFECT_ON",
+    "object_entity_id": "E24",
+    "polarity": "NULL",
+    "modality": "ASSERTED",
+    "direction": "NO_CHANGE",
+    "assertion_type": "REPORTED_RESULT",
+    "origin": "EXPLICIT",
+    "context_id": "C5",
+    "span": "Also, comparing Veh-treated groups, DSF, G, or D + G did not affect the body weight of the mice.",
+    "span_location": {
+     "section": "2. Results, 2.4",
+     "figure_or_table": "Figure 8C",
+     "paragraph": "1"
+    },
+    "premise_spans": [],
+    "bridge": null,
+    "warrant_note": "'did not affect the body weight of the mice' (2GR4 cohort). The same paragraph reports a significant ANOVA main effect for body weight (p = 0.0030); see in_paper_conflicts.",
+    "quantities": [
+     {
+      "measured_property": "body weight, treatment main effect",
+      "raw_value": "F (3, 157) = 4.851",
+      "raw_unit": "NOT_APPLICABLE",
+      "value_type": "OTHER_SPECIFIED",
+      "variance_or_ci": null,
+      "p_value": "0.0030",
+      "n": "NOT_REPORTED",
+      "converted": null
+     }
+    ],
+    "contradicts_prior_report": false,
+    "attributed_to": null,
+    "themes": [
+     "In vivo efficacy signals and negative monotherapy result"
+    ],
+    "knowledge_assist": null
+   }
+  ]
+ },
+ "fulltext_sections": {
+  "2. Results": "2. Results 2.1. Developing Therapeutic Resistance in Glioblastoma Promotes TGF-β-Induced Mesenchymal-Like Phenotype In our previous finding, the development of radiation resistance in glioblastoma (GBM) enhances TGF-β secretion and reduces temozolomide (TMZ) sensitivity [ 24 ]. Therefore, we sequentially challenged radiation-resistant (RR) GBM cells with TMZ to develop a radiation-TMZ-resistant (RTR) GBM cell model. RR GBM cells responding to TMZ dosages of 50, 100, 150, 200, and 250 μM were evaluated. A single treatment of 250 μM TMZ only inhibited the viability the RR GBM cells by about 30% (72.9 ± 2.46% for 1306MG R6T1; 62.4 ± 3.52% for U87MG R4T1). However, three consecutive treatments of 250 μM TMZ were unable to suppress RR GBM cell growth (85.5 ± 1.28% for 1306MG R6T3; 88.3 ± 2.15% for U87MG R4T3). Therefore, the cells with three TMZ treatments were defined as RTR GBM cells (1306MG R6T3 and U87MG R4T3) ( Figure S1 ). TGF-β is a key regulator of the epithelial–mesenchymal transition (EMT) or mesenchymal differentiation. Both TGF-β and mesenchymal properties are malignant indicators in cancer progression. We hypothesized that TGF-β-induced mesenchymal transition would be enhanced in both RR and RTR GBM. We first examined the TGF-β secretions. In comparison with parental GBM cells, the secretion of TGF-β (25.7 ± 2.69 pg/mL vs. 1607.7 ± 19.16 pg/mL vs.1207.0 ± 27.33 pg/mL for 1306MG, 3.5GR6, and R6T3; 995.4 ± 10.98 pg/mL vs. 1234.1 ± 23.10 pg/mL vs. 1058.1 ± 8.56 pg/mL for U87MG, 2GR4, and R4T3) increased in both RR and RTR ( Figure 1 A). In addition, the downstream effectors of TGF-β, including TGF-β receptor I (TRI), TRII, Slug, and Snail were upregulated, and the phosphorylation on TRI, TRII, and Smad2 was enhanced in both RR and RTR ( Figure 1 B). RR and RTR increased the expression of the mesenchymal markers, N-cadherin and Fibronectin ( Figure 1 C). Furthermore, blockade of TGF-β signaling with 200, 400, and 600 nM of the TRs inhibitor LY364947 inhibited RR-induced phosphorylation on Smad2 and reduced the expression of N-cadherin and Fibronectin. In addition, we modulated the activity of TGF-β signaling through exogenous TGF-β1 or inhibiting TRs with LY364947 and Galunisertib. The results of MTT assay showed that LY364947 did not affect the cell viability of both parental and TR 1306MG and U87MG cells ( Figure S2A ). On the other hand, up to 500 μM Galunisertib was able to inhibit approximately 40% of cell viability ( Figure S2B ). Accordingly, we selected 4 μM LY364947 and 100 μM Galunisertib, which inhibited 20% of cell viability, for further investigation. As shown in Figure 2 , activated TGF-β signaling by exogenous TGF-β1 only enhanced the cell motility of the parental GBM cells (51.8 ± 3.29% vs. 39.7 ± 3.26%, p = 0.0438 for 1306MG; 54.4 ± 5.18% vs. 41.0 ± 2.63%, p = 0.0424 for U87MG) while exogenous TGF-β1 did not affect the cell motility of therapeutic-resistant GBM cells (RR and RTR) (29.9 ± 2.17% vs. 28.8 ± 2.48%, p = 0.7663 for 3.5GR6, 50.5 ± 6.09% vs. 45.5 ± 3.68%, p = 0.3549 for R6T3; 40.7 ± 3.39% vs. 32.0 ± 4.27%, p = 0.0732 for 2GR4, 32.3 ± 2.91% vs. 35.4 ± 6.58%, p = 0.6075 for R4T3). On the other hand, blockade of TRs by LY364947 or Galunisertib suppressed cell migration in both the parental and therapeutic-resistant GBM cells. Thus, the development of therapeutic resistance facilitated TGF-β-induced mesenchymal properties. Figure 1 Developing therapeutic resistance promoted TGF-β-induced mesenchymal-like phenotype. ( A ) The concentration of TGF-β in the condition medium was measured using an enzyme-linked immunosorbent assay (ELISA). The histograms showing the secretion of TGF-β in 1306MG and U87MG; N = 4; ( B ) western blotting (WB) showing the expression of the downstream effectors of TGF-β, including phosphorylated and total TGF-β receptor I (TRI), phosphorylated and total TGF-β receptor II (TRII), phosphorylated and total Smad2, and Slug; ( C ) WB showing the expression of Fibronectin and N-cadherin; ( D ) TGF-β receptors of 1306MG were inhibited by LY364947 for 24 h. WB and histograms showing the ratio of pSmad2 and Smad2 and the protein expression of Fibronectin and N-cadherin; ( E ) TGF-β receptors of U87MG were inhibited by LY364947 for 24 h. WB and histograms showing the ratio of pSmad2 and Smad2 and the protein expression of Fibronectin and N-cadherin; the data were represented as mean ± standard error of the mean (SEM); * refers to a comparison with the control; *, p < 0.05; **, p < 0.01; ***, p < 0.001. Figure 2 Suppressing TGF-β signaling reversed therapeutic resistance-facilitated cell motility. TGF-β signaling was blocked by both 4 μM LY364947 and 100 μM Galunisertib. Wound healing was used to evaluate cell migration. 0.1% DMSO was used as vehicle control (Veh). ( A ) Graphs and histograms showing the cell migration of 1306MG, radiation-resistant 3.5GR6, and radiation-temozolomide (TMZ)-resistant R6T3; N = 3 for 1306MG and 3.5GR6; N = 4 for R6T3; ( B ) graphs and the histograms showing the cell migration of U87MG, radiation-resistant 2GR4, and radiation-TMZ-resistant R4T3; N = 3 for U87MG; N = 4 for 2GR4 and R4T3; scale bar = 100 μm; mean ± SEM; * refers to a comparison with the control; *, p < 0.05; **, p < 0.01; ***, p < 0.001. 2.2. The Role of ALDH in Therapeutic Resistance Cancer stem cell properties play a role in cancer progression. The activity and expression of ALDHs are the indicators of cancer stemness. ALDH activity was measured using an ALDEFLUOR assay. We found that developing RR and RTR activated ALDHs ( Figure 3 A,B). Also, the expression of ALDH1 was upregulated in the RR and RTR GBM cells (1 ± 0 vs. 1.05 ± 0.04 and 1.10 ± 0.34, p = 0.0153 and 0.0017 for U87MG vs. 2GR4 and R4T3) ( Figure 3 C). Disulfiram (DSF), the pan-ALDHs inhibitor, is an old drug used for alcoholism. DSF as a single or co-adjuvant treatment for cancers increases anti-tumor efficacy [ 25 , 26 ]. Additionally, DSF is able to enhance radiation responses and chemotherapy sensitivity in cancers, but its targets and the underlying mechanism are not known [ 27 , 28 ]. Therefore, we evaluated the cell response to different doses of DSF ( Figure S3A ). A 20% dose of growth inhibition (GI 20 ) was selected for further investigation (8 μM for 1306MG, 3.5GR6, and R6T3; 150 nM for U87MG, 2GR4, and R4T3). NCT-501, a specific inhibitor of ALDH1A1, was selected to elucidate the role of ALDH1 in therapeutic resistance. We first evaluated the effects of NCT-501 on cell growth. As shown in Figure S3B , NCT-501 did not affect the cell viability. Figure 3 Developing therapeutic resistance-activated aldehyde dehygrogenases. The activity of aldehyde dehygrogenases (ALDHs) was measured using the ALDEFLUOR assay with flow cytometry. N, N-diethylaminobenzaldehyde (DEAB) was used to inhibit ALDH. ( A ) Representative flow cytometry plots and histograms showing the activity of ALDHs in 1306MG, radiation-resistant 3.5GR6, and radiation-TMZ-resistant R6T3; N = 3 for 3.5GR6; N = 4 for 1306MG; N = 5 for R6T3; ( B ) representative flow cytometry plots and histograms showing the activity of ALDHs in U87MG, radiation-resistant 2GR4, and radiation-TMZ-resistant R4T3; N = 3; ( C ) WB and histogram showing the protein expression of ALDH1A1 of U87MG, radiation-resistant 2GR4, and radiation-TMZ-resistant R4T3; N = 3; mean ± SEM; * indicates comparison with parental 1306MG or U87MG; **, p < 0.01; ***, p < 0.001. ALDHs may enhance migration and invasion abilities and in turn contribute to EMT [ 19 , 20 , 21 ]. Therefore, cell mobility was evaluated using a two-dimensional (2D) wound healing assay and a three-dimensional (3D) Transwell assay. Interestingly, the DSF dose of GI 20 did not affect the 2D cell migration of parental 1306MG and U87MG (47.3 ± 2.1% vs. 48.7 ± 1.7%, p = 0.5908 for 1306MG; 51.5 ± 3.8% vs. 49.7 ± 5.5%, p = 0.7927 for U87MG), while it significantly inhibited therapeutic resistance-induced cell motility (41.4 ± 1.6% vs. 48.9 ± 1.2%, p = 0.0019 for 3.5GR6, 49.2 ± 3.0% vs. 56.9 ± 1.3%, p = 0.0361 for R6T3; 43.5 ± 2.1% vs. 52.9 ± 1.3%, p = 0.0016 for 2GR4). However, DSF did not affect the 2D mobility of RTR U87MG R4T3 (33.9 ± 2.2% vs. 38.4 ± 2.0%, p = 0.1496) ( Figure 4 A,B). In the 3D migration results, the DSF dose of GI 20 did not affect the 3D motility of the parental U87MG (68.9 ± 2.8 vs. 67.85 ± 3.2, p = 0.950), but it reduced the 3D migration ability of both RR and RTR U87MG (90.4 ± 7.8 vs. 71.85 ± 6.1, p = 0.0117 for 2GR4, 77.2 ± 3.4 vs. 63.85 ± 2.8, p = 0.0001 for R4T3) ( Figure 4 C). Figure 4 Disulfiram inhibited therapeutic resistance-induced cell mobility. A 20% dose of Disulfiram (DSF) growth inhibitor was selected. 0.1% DMSO was used as solvent control (labelled as 0 μM). The cell mobility was evaluated using a two-dimensional (2D) wound healing assay and a three-dimensional (3D) Transwell assay. ( A ) Graphs of the wound and histogram showing the inhibitory effects of DSF on 2D cell mobility of 1306MG, radiation-resistant 3.5GR6, and radiation-TMZ-resistant R6T3; N = 3; scale bar = 100 μm; ( B ) graphs and histogram showing the inhibitory effect of DSF on 2D cell mobility of U87MG, radiation-resistant 2GR4, and radiation-TMZ-resistant R4T3; N = 3; scale bar = 100 μm; ( C ) graphs showing the migratory cells and histogram indicating the cell mobility of the inhibitory effect of DSF on 3D cell mobility of U87MG, radiation-resistant 2GR4, and radiation-TMZ-resistant R4T3; N = 5; scale bar = 20 μm; mean ± SEM; a refers to a comparison with parental 1306MG or U87MG; b refers to a comparison with the control; a and b, p < 0.05; aa and bb, p < 0.01. On the other hand, we also examined whether specifically inhibiting NCT-501 attenuated cell motility. NCT-501 did not affect the cell migration of parental 1306MG. In contrast, 300 nM NCT-501 was able to inhibit the cell motility of RR 1306MG 3.5GR6 (32 ± 3.9% vs. 44 ± 3.9%, p = 0.0108) and RTR 1306MG R6T3 (46 ± 2.6% vs. 59 ± 3.1%, p = 0.0216) ( Figure S4A ). 100 nM NCT-501 was able to reduce the 2D migration ability of parental U87MG (43 ± 2.36% vs. 52 ± 1.60%, p = 0.0037), RR 2GR4 (34 ± 1.40% vs. 47 ± 2.80%, p = 0.0005), and RTR R4T3 (47 ± 0.63% vs. 53 ± 2.13%, p = 0.0597) ( Figure S4B ). Therefore, 300 nM NCT-501 for 1306MG and 100 nM NCT-501 U87MG were selected for further investigation. Otherwise, the inhibitory efficacy of DSF and NCT-501 on ALDHs was measured using the ALDEFLUOR assay with flow cytometry. The DSF dose of GI 20 and the selected dose of NCT-501 inhibited about 20% of the ALDH activity ( Figure S5 ). 2.3. Combining TGF-β Signaling Inhibition and ALDH Inactivation Inhibits Cell Migration and the Growth of Tumor Spheres Due to high correlations among ALDH activity, TGF-β-induced MD, and therapeutic resistance, we hypothesized that combining the inhibition of ALDH and TGF-β signaling could lead to better therapeutic effects than single treatments with any of them alone. First, we examined the inhibitory effect of combined treatment on cell mobility using a Transwell migration assay. Exogenous TGF-β only increased the migratory cells in parental U87MG cells (105.0 ± 2.1 vs. 129.2 ± 5.7, p = 0.0017) ( Figure 5 A); however, it did not affect the cell mobility of RR U87MG 2GR4 (127.4 ± 4.2 vs. 133.6 ± 4.2, p = 0.3045) ( Figure 5 B) and RTR U87MG R4T3 (73.3 ± 4.4 vs. 79.1 ± 2.9, p = 0.2865) ( Figure 5 C). Meanwhile, the blockade of TRs by LY364947 or Galunisertib inhibited resistance-induced mobility in RR U87MG 2GR4 (127.4 ± 4.2 vs. 111.1 ± 3.4, p = 0.0070 for LY364947 ; vs. 102.2 ± 2.7, p < 0.001 for Galunisertib) ( Figure 5 B) and RTR U87MG R4T3 (73.3 ± 4.4 vs. 61.5 ± 2.3, p = 0.0334 for LY364047 ; vs. 53.8 ± 3.2, p = 0.0022 for Galunisertib) ( Figure 5 C). Combining DSF and Galunisertib led to better inhibitory effects on cell mobility than the use of either ALDH or TGF-β signaling inhibition alone in RR U87MG 2GR4 (89.3 ± 4.4 vs. 108.2 ± 2.7, p = 0.0019 for DSF, p = 0.0224 for Galunisertib) ( Figure 5 B) and RTR U87MG R4T3 (57.2 ± 0.9 vs. 45.5 ± 1.2, p < 0.001 for DSF, p = 0.0311) ( Figure 5 C). Exogenous TGF-β was able to rescue the inhibitory effect of NCT-501 on the cell motility of RR U87MG 2GR4 (110.3 ± 3.4 vs. 122.5 ± 4.1, p = 0.0329) ( Figure 5 B) and RTR U87MG R4T3 (62.4 ± 1.6 vs. 67.9 ± 1.8, p = 0.0322) ( Figure 5 C); however, it did not alter the effects of DSF on the cell migration of RR U87MG 2GR4 (108.2 ± 2.7 vs. 114.6 ± 3.4, p = 0.1534) ( Figure 5 B) and RTR U87MG R4T3 (57.2 ± 0.9 vs. 60.7 ± 1.7, p = 0.1006) ( Figure 5 C). Figure 5 Combining ALDH and TGF-β inhibition suppresses the cell mobility. The cell mobility was evaluated using a 3D Transwell assay. 150 nM DSF, 100 nM NCT-501, 10 ng/mL TGF-β, 4 μM LY364947 , and 100 μM Galunisertib were selected to treat the cells for 9 h. The “+” means with the treatment while the “-” means without the treatment. ( A ) Graphs showing the migratory cells and histogram indicating the cell mobility of U87MG under the various treatments; N = 6; ( B ) graphs showing the migratory cells and histogram indicating the cell mobility of radiation-resistant U87MG 2GR4 under the various treatments; N = 6; ( C ) graphs showing the migratory cells and histogram indicating the cell mobility of radiation-TMZ-resistant U87MG R4T3 under the various treatments; N = 6; scale bar = 20 μm; mean ± SEM; a refers to a comparison with the control; b refers to a comparison with sole DSF or NCT-501; c refers to a comparison with sole TGF-β1 or LY364947 or Galunisertib; a, b, c, p < 0.05; aa, bb, cc, p < 0.01; aaa, bbb, ccc, p < 0.001. Next, we evaluated the cytotoxic effect of sole DSF, NCT-501, LY364947 , Galunisertib and combined treatment on parental, RR, and RTR GBM cells. In parental GBM cells, exogenous TGF-β1 only promoted U87MG growth (100.0 ± 2.5% vs. 110.7 ± 4.5%, p = 0.0354) ( Figure 6 A). TGF-β1 did not affect cell growth of RR and RTR 1306MG and U87MG ( Figure 6 B,C). Inhibiting TGF-β signaling by LY364947 or Galunisertib was able to inhibit 10% of cell growth. Combining DSF and Galunisertib showed higher cytotoxicity to GBM than sole treatment, while exogenous TGF-β was not able to reverse the growth inhibition of DSF. DSF desensitized GBM cells to TGF-β1 in parental 1306MG (108.5 ± 4.5% vs. 84.3 ± 5.0%, p = 0.0016) and U87MG (110.7 ± 4.5% vs. 94.4 ± 5.7%, p = 0.0209) ( Figure 6 A), RR 1306MG 3.5GR6 (107.0 ± 1.9% vs. 86.5 ± 4.0%, p = 0.0046) and U87MG 2GR4 (110.1 ± 4.0% vs. 92.0 ± 3.8%, p = 0.0314) ( Figure 6 B), and RTR U87MG R4T3 (107.7 ± 2.8% vs. 92.3 ± 3.2%, p = 0.0231) ( Figure 6 C). Also, combining NCT-501 with either LY364947 or Galunisertib led to cytotoxicity. In addition, according to the combination index, combining DSF and Galunisertib showed slightly synergistic effects on RR 1306MG 3.5GR6 (CI = 0.895) and RTR 1306MG R6T3 (CI = 0.897), and it appeared to have synergistic effects on RR U87MG cells (CI = 0.672). However, combining DSF and Galunisertib had nearly additive effects on RTR U87MG R4T3 cells (CI = 0.970). Conversely, combining DSF and Galunisertib showed moderate antagonistic effects on parental 1306MG (CI = 1.203) and U87MG cells (CI = 1.333) ( Table 1 ). Figure 6 Combining ALDH and TGF-β inhibition represses cell growth. A Trypan blue exclusion assay was used to evaluate the cell proliferation. 150 nM DSF and 100 nM NCT-501 for U87MG, 8 μM DSF and 300 nM NCT-501 for 1306MG, 10 ng/mL TGF-β, 4 μM LY364947 , and 100 μM Galunisertib were used to treat cells for 24 h. The “+” means with the treatment while the “-” means without the treatment. ( A ) Histograms showing the cell viability of parental 1306MG and U87MG; N = 4; ( B ) histograms showing the cell viability of radiation-resistant 1306MG 3.5GR6 and U87MG 2GR4; N = 5 for 3.5GR6; N = 3 for 2GR4; ( C ) histograms showing the cell viability of radiation-TMZ-resistant 1306MG R6T3 and U87MG R4T3; N = 3; mean ± SEM; a refers to a comparison with the 0 control; b refers to a comparison with sole DSF or NCT-501; c refers to a comparison with sole TGF-β or LY364947 or Galunisertib; a, b, c, p < 0.05; aa, bb, cc, p < 0.01; aaa, bbb, p < 0.001. Table 1 The combination index (CI) of combining Disufiram and Galunisertib. Disufiram (DSF) (μM) Galunisertib (G) (μM) Cytotoxicity of DSF + G CI Description 1306MG 8 100 0.328 1.203 Moderate antagonism 3.5GR6 8 100 0.359 0.895 Slight synergism R6T3 8 100 0.377 0.897 Slight synergism U87MG 150 100 0.274 1.333 Moderate antagonism 2GR4 150 100 0.279 0.672 Synergism R4T3 150 100 0.393 0.970 Nearly additive The CI value was calculated by analyzing the cell viability of Disufiram, Galunisertib, and combining Disulfiram and Galunisertib with CampuSyn software. CI = 0.30–0.70, Synergism; CI = 0.70–0.85, Moderate synergism; CI = 0.85–0.90, slight synergism; CI = 0.90–1.10, Nearly additive; CI = 1.20–1.45, Moderate antagonism. Also, we evaluated whether concurrent inhibition of ALDH and TGF-β receptors was able to inhibit the growth of tumor spheres. RR 1306MG 3.5GR6 and RTR 1306MG R6T3 were able to the growth of tumor spheres under 3D conditions. Furthermore, RTR 1306MG R6T3 cells not only formed spheres but grew processes under 3D conditions. Exogenous TGF-β1 promoted the processes formation, and Galunisertib reduced the growth of tumor spheres in RR 1306MG 3.5GR6 (119.0 ± 5.1 μm vs. 96.6 ± 2.5 μm, p < 0.001) ( Figure 7 A) and RTR 1306MG R6T3 (107.8 ± 0.6 μm vs. 93.3 ± 2.3 μm, p < 0.001) ( Figure 7 B). Inhibiting ALDHs with DSF led to suppression of the formation and growth of RR 1306MG 3.5GR6 tumor spheres (vs. 65.3 ± 5.6 μm, p < 0.001) ( Figure 7 A) and RTR 1306MG R6T3 (vs. 62.2 ± 1.9 μm p < 0.001) ( Figure 7 B). However, specifically inhibiting ALDH1A1 with NCT-501 only reduced the diameter of the RTR 1306MG R6T3 tumor spheres (vs. 88.2 ± 0.1 μm, p < 0.001) ( Figure 7 B). Combining DSF with Galunisertib led to better inhibitory effects in terms of tumor sphere than DSF and Galunisertib in RR 1306MG 3.5GR6 alone (vs. 54.8 ± 0.9 μm, p = 0.0425 for DSF, and p < 0.001 for Galunisertib) ( Figure 7 A) and RTR 1306MG R6T3 (vs. 57.1 ± 0.3 μm, p = 0.0354 for DSF, and p < 0.001 for Galunisertib) ( Figure 7 B). However, combining NCT-501 and Galunisertib led to better inhibitory effects on tumor sphere growth than NCT-501 alone in RR 1306MG 3.5GR6 (vs. 100.7 ± 3.7 μm, p = 0.0122) ( Figure 7 A). Accordingly, combining DSF and Galunisertib led to better inhibitory effects than the use of DSF or Galunisertib alone. Figure 7 Combining ALDH inhibition and Galunisertib restrains the growth of tumor spheres. The 3D tumor sphere formation assay was used to evaluate the inhibitory effects of combining ALDH inhibition and Galunisertib on the growth of tumor spheres. The lengths of the tumor spheres were calculated. The “+” means with the treatment while the “-” means without the treatment. ( A ) Graphs and histogram showing the ability of radiation-resistant 1306MG 3.5GR6 to form tumor spheres; ( B ) graphs and histogram showing indicating the ability of radiation-TMZ-resistant 1306MG R6T3 to form tumor spheres; the red arrows indicate the tumor spheres; the blue arrows indicate the cells with the growth of processes; scale bar = 100 μm; mean ± SEM; * refers to a comparison with the control; # refers to a comparison with sole Galunisertib or DSF or NCT-501; * and #, p < 0.05; *** and ###, p < 0.001. 2.4. Disulfiram Sensitizes Resistant GBM to Galunisertib In order to examine the anti-tumor effects and toxicity of DSF and Galunisertib (G) alone, and that when combining DSF and Galunisertib (D + G), we developed orthotopic xenograft GBM model by injecting luciferase-expressing therapeutic-resistant GBM cells into the striatum of NOD/SCID mice. At day 10 post-transplantation, the mice were treated twice weekly with DSF, G, D + G, or DMSO as a vehicle (Veh). As shown in Figure 8 A, in comparison with Veh, DSF and G did not affect the in vivo growth of RR U87MG 2GR4 cells, while D + G significantly suppressed the in vivo growth of RR U87MG 2GR4 cells ( Figure 8 A). A two-way ANOVA revealed a main effect of DSF, G, D + G vs. Veh (F (3, 150) = 3.571, p = 0.0156), interaction (F (39, 150) = 1.260, p = 0.1647), and days after treatment (F (13, 150) = 11.79, p < 0.0001) ( Figure 8 B). Also, comparing Veh-treated groups, DSF, G, or D + G did not affect the body weight of the mice. A two-way ANOVA revealed a main effect of DSF, G, D + G vs. Veh (F (3, 157) = 4.851, p = 0.0030), interaction (F (42, 157) = 0.4747, p = 0.9971), and days after treatment (F (14, 157) = 2.766, p = 0.0011) ( Figure 8 C). In addition, a Kaplan–Meier analysis of the survival of the Veh-, DSF-, G-, and D + G-treated mice is presented in Figure 8 D. The median survival of Veh-treated mice was 54 days while the median survival of DSF-, G-, and D + G-treated mice were not defined. In order to exclude the cell line-specific and resistance-specific effects, the luciferase-expressing RR 1306MG 3.5GR6 and RTR 1306MG R6T3 cells were injected intracranially into the NOD/SCID mice. The same procedures of IVIS observation and the treatments of Veh, DSF, G, and D + G were applied to the RR 1306MG 3.5GR6 and RTR 1306MG R6T3 cells in vivo growth. As shown in Figure 8 E, compared with the Veh-treated groups, DSF and G did not affect tumor growth while D + G significantly delayed the in vivo tumor growth of RR 1306MG 3.5GR6. Furthermore, D + G showed better anti-tumor effects on RR 1306MG 3.5GR6 in vivo than DSF or Galunisertib alone ( Figure 8 E). A two-way ANOVA revealed a main effect of DSF, G, D + G vs. Veh (F (3, 443) = 2.843, p = 0.0375), interaction (F (39, 443) = 0.8691, p = 0.6968), and days after treatment (F (13, 443) = 11.89, p < 0.0001) ( Figure 8 F). In comparison with the Veh-treated groups, DSF, G, or D + G did not affect the body weight of the mice ( Figure 8 G). However, the survival curve of DSF, G, D + G, and Veh did not show the differences ( Figure 8 H). The similar phenomena were found in Figure 8 I, only D + G was able to inhibit the in vivo growth of RTR 1306MG R6T3 cells while Veh, DSF, G did not affect the tumor growth. A two-way ANOVA revealed a main effect of DSF, G, D + G vs. Veh (F (3, 418) = 5.795, p < 0.0001), interaction (F (39, 418) = 0.7455, p = 0.8694), and days after treatment (F (13, 418) = 4.255, p < 0.0001) ( Figure 8 J). Also, DSF, G, or D + G did not affect the body weight of the mice ( Figure 8 K). Figure 8 Combining DSF and Galunisertib shows better anti-tumor efficacy than sole treatments. The Luciferase (Luc)-expressing radiation-resistant U87MG 2GR4, or radiation-resistant 1306MG 3.5GR6, or radiation-TMZ-resistant 1306MG R6T3 cells (5 × 105 cells in 2 μL PBS) were injected into the striatum of the brain of NOD-SCID mice. At day 10 post-transplantation, DSF (50 mg/kg), Galunisertib (75 mg/kg), DSF (50 mg/kg) + Galunisertib (75 mg/kg), or DMSO as a vehicle was injected intraperitoneally twice weekly into the mice. Bioluminescence was used to monitor tumor growth with the IVIS-200 imaging system twice weekly and tumor growth was observed for 45 days. ( A ) Graphs showing the in vivo tumor growth of radiation-resistant U87MG 2GR4 cells; ( B ) histogram indicating the bioluminescent photons of tumor cells; ( C ) histogram showing the changes in body weight; ( D ) Kaplan–Meier survival curve of the vehicle-, DSF-, G-, and D + G-treated mice; ( E ) graphs showing the in vivo tumor growth of radiation-resistant 1306MG 3.5GR6 cells; ( F ) histogram indicating the bioluminescent photons of tumor cells; ( G ) histogram showing the changes in body weight; ( H ) Kaplan–Meier survival curve of the vehicle-, DSF-, G-, and D + G-treated mice; ( I ) graphs showing the in vivo tumor growth of radiation-TMZ-resistant 1306MG R6T3 cells; ( J ) histogram indicating the bioluminescent photons of tumor cells; ( K ) histogram showing the changes in body weight; mean ± SEM; * refers to a comparison with the D + G treatment; *, p < 0.05; **, p < 0.01; ***, p < 0.001. 2.5. The Interplay between TGF-β Signaling and ALDH In order to clarify the crosstalk between TGF-β signaling and ALDHs, we first examined whether TGF-β signaling regulated ALDHs. Activating TGF-β signaling by exogenous TGF-β1 only enhanced the activity of ALDHs in parental U87MG cells (100 ± 0.32% vs. 112 ± 0.65%, p > 0.001), but it did not affect the ALDHs in parental 1306MG cells (100 ± 0.65% vs. 96 ± 4.55%, p = 0.386) ( Figure 9 A). In RR and RTR GBM, exogenous TGF-β1 did not alter the activity of ALDHs (100 ± 0.46% vs. 94 ± 10.90%, p = 0.6120 for 3.5GR6; 100 ± 0.62% vs. 103 ± 2.78%, p = 0.3532 for 2GR4; 100 ± 0.32% vs. 90 ± 12.53%, p = 0.4720 for R6T3; 100 ± 0.43% vs. 95 ± 8.06%, p = 0.5094 for R4T3) ( Figure 9 B,C). Therefore, TGF-β may not be the upstream regulator of ALDHs. On the other hand, inhibition of TGF-β receptors by either LY364947 or Galunisertib significantly reduced the activity of ALDHs in parental, RR, and RTR GBM cells ( Figure 9 A–C). Figure 9 Blockade of ALDH by DSF suppresses TGF-β-regulated mesenchymal-like phenotype. An ALDEFLUOR assay was performed to evaluate the effects of modulating TGF-β signaling on ALDH activity. 10 ng/mL TGF-β1, 4 μM LY364947 , and 100 μM Galunisertib were used to manipulate the TGF-β signaling activity. The “+” means with the treatment while the “-” means without the treatment. ( A ) Histograms showing the activity of ALDHs in parental 1306MG and U87MG; N = 4 for 1306MG; N = 3 for U87MG; ( B ) Histograms showing the activity of ALDHs in radiation-resistant 1306MG 3.5GR6 and U87MG 2GR4; N = 4 for 3.5GR6 and 2GR4; ( C ) Histograms showing the activity of ALDHs in radiation-TMZ-resistant 1306MG R6T3 and U87MG R4T3; N = 4 for R6T3; N = 5 for R4T3; ( D ) ELISA was used to measure the TGF-β secretions. 8 μM and 150 nM DSF were used to inhibit ALDHs in 1306MG and U87MG, respectively. The histograms showing TGF-β secretions in radiation-resistant 1306MG 3.5GR6 and U87MG 2GR4; N = 3 for 3.5GR6; N = 4 for 2GR4; ( E ) histograms showing the TGF-β secretions in radiation-TMZ-resistant 1306MG R6T3 and U87MG R4T3; N = 3 for R6T3; N = 4 for R4T3; ( F ) the cells were subjected to DSF for 24 h. The protein expression of the downstream effectors of TGF-β and mesenchymal markers was measured using WB. The WB and histograms showing the protein expression of phosphorylated and total TRI, TRII, Smad2, the transcription factor Slug, N-cadherin, and Fibronectin in radiation-resistant U87MG 2GR4; N = 3; ( G ) the WB and histograms showing the expression of phosphorylated and total TRI, TRII, Smad2, the transcription factor Slug, N-cadherin, and Fibronectin in radiation-TMZ-resistant U87MG R4T3; N = 3; ( H ) the WB showing the expression of N-cadherin and Fibronectin under treatment for 24 h in radiation-resistant 1306MG 3.5GR6 and radiation-TMZ-resistant 1306MG R6T3; mean ± SEM; * refers to a comparison with the control; *, p < 0.05; **, p < 0.01; ***, p < 0.001. Conversely, we evaluated whether ALDH inhibition by DSF was able to inhibit therapeutic resistance-induced TGF-β signaling. As shown in Figure 9 D,E, DSF suppressed the secretion of TGF-β in the RR and RTR GBM cells. DSF primarily reduced the phosphorylation of TRI. Also, it downregulated the expression of TRI in the RR and RTR GBM cells. In the RTR U87MG cells, DSF also inhibited the phosphorylation of TRII. In terms of intracellular signal transduction, DSF not only inhibited the phosphorylation of Smad2 in the RTR U87MG cells, but directly reduced the expression of Smad2 in the RR and RTR U87MG cells. In addition, the dose of DSF GI 20 downregulated the transcription factor Slug and reversed therapeutic resistance-induced MD by decreasing N-cadherin and Fibronectin ( Figure 9 F,G). Furthermore, DSF and NCT-501 were able to de-sensitize RR and RTR GBM cells to exogenous TGF-β. Combining the inhibitory effects of the ALDHs and TGF-β receptors efficiently decreased the expression of mesenchymal N-cadherin and Fibronectin ( Figure 9 H)."
+ },
+ "expected": {
+  "F18": true,
+  "F20": true,
+  "F21": false
+ }
+}

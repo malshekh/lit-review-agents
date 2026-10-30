@@ -38,8 +38,11 @@ from .tools.display_items import NOT_REPORTED, _ctx, _quantities, _relation
 OUTCOMES = ("DISCUSSED", "GROUPED_WITH", "TABLE_ONLY", "NOT_INDIVIDUALLY_DISCUSSED")
 WRITTEN = ("DISCUSSED", "GROUPED_WITH")
 PROMINENCE_RANK = {"HEADLINE": 0, "NARRATIVE_PRIMARY": 1, "NARRATIVE_SUPPORTING": 2, "DISPLAY": 3, "SUPPLEMENTARY": 4}
-# Finding fields that are audit records, not interpretation: left out of packets (rejoinable by finding ID).
-FINDING_AUDIT_FIELDS = ("span", "provenance_gate1", "span_corrections")
+# Finding fields left out of packets (rejoinable by finding ID): the source quotation (supplied on request through
+# retrieval) and Gate 1's per-check detail. Gate 1's verdict and the source/finding fingerprints stay
+# (`finding_record`), as do the span-correction history, eligibility status and its reason.
+FINDING_AUDIT_FIELDS = ("span",)
+GATE1_KEEP = ("passed", "source_fingerprint", "finding_fingerprint")
 TABLE_COLUMNS = ["Evidence level", "System", "Intervention", "Key observation", "Role", "Limitation", "Citation"]
 CLASS_ORDER = ("CLINICAL", "PRECLINICAL", "BIOCHEMICAL")
 CLASS_LABEL = {"CLINICAL": "Clinical", "PRECLINICAL": "Preclinical", "BIOCHEMICAL": "Biochemical", None: "Not reported"}
@@ -154,10 +157,11 @@ def _contrary_of(pkg: dict) -> dict[str, set[str]]:
 
 
 # ------------------------------------------------------------------ the global argument map
-def argument_map(pkg: dict, corpus: list[dict]) -> dict:
+def argument_map(pkg: dict, corpus: list[dict], findings: list[dict] | None = None) -> dict:
     """One global map of the argument. Every text value is copied from A07's output; counts come from the
     registry (`global_independence`). The list of identity-unknown finding IDs is replaced by its length
-    (the IDs stay in the package)."""
+    (the IDs stay in the package). With findings, each approved theme lists the subthemes A05 assigned to the
+    findings its propositions rest on (verbatim, sorted)."""
     decision = pkg.get("researcher_decision") or {}
     chosen = decision.get("selected_thesis")
     option = next((copy.deepcopy(t) for t in pkg.get("thesis_options") or [] if t.get("option_id") == chosen), None)
@@ -166,7 +170,14 @@ def argument_map(pkg: dict, corpus: list[dict]) -> dict:
     for p in props:
         by_theme[p.get("primary_theme_id")].append(p["proposition_id"])
     fw = pkg.get("theme_framework") or {}
-    themes = [{"theme": copy.deepcopy(t), "proposition_ids": by_theme.get(t.get("theme_id"), [])}
+    fby = {f["finding_id"]: f for f in findings or []}
+    subthemes = defaultdict(set)
+    for p in props:
+        for fid in _finding_ids(p):
+            subthemes[p.get("primary_theme_id")] |= {s for s in (fby.get(fid) or {}).get("subthemes") or []
+                                                     if isinstance(s, str)}
+    themes = [{"theme": copy.deepcopy(t), "proposition_ids": by_theme.get(t.get("theme_id"), []),
+               "subthemes": sorted(subthemes.get(t.get("theme_id"), ()))}
               for t in fw.get("primary_themes") or []]
     if by_theme.get("UNMAPPED"):
         themes.append({"theme": {"theme_id": "UNMAPPED", "name": "Unmapped (administrative bucket, not a theme)"},
@@ -341,9 +352,29 @@ def comparative_table(pkg: dict, findings: list[dict], corpus: list[dict], max_r
             "row_selection": selection, "selection_rule": TABLE_RULE, "max_rows": max_rows,
             "contrary_finding_ids": contrary_ids,
             "contrary_findings_not_shown": [f for f in contrary_ids if f not in picked],
+            "eligible_papers": len({by_id[f]["record_id"] for f in uses}),
             "eligible_findings_not_shown": len(uses) - len(chosen),
             "propositions_fully_shown": covered,
             "warnings": [] if rows else ["no eligible finding is used by an approved proposition"]}
+
+
+def reader_table(table: dict, corpus: list[dict]) -> dict:
+    """The table as the reader, A10 and the export see it: columns, tagged rows and notes. The notes state that the
+    rows are a rule-based selection, how many eligible findings and papers they were drawn from, and what happened
+    to contrary evidence that did not fit. Selection bookkeeping (row reasons, counts, IDs) stays in the full table
+    record (data/display_items/T1.json), so it never becomes reader-facing text to verify."""
+    eligible = len(table.get("row_finding_ids") or []) + int(table.get("eligible_findings_not_shown") or 0)
+    papers = int(table.get("eligible_papers") or 0)
+    hidden = len(table.get("contrary_findings_not_shown") or [])
+    notes = [f"The rows are a selection by a fixed rule from {eligible} eligible findings in {papers} papers, not a "
+             "summary of every study reviewed. A supporting row appears only together with the contrary evidence for "
+             "the claims it supports."]
+    if hidden:
+        notes.append(f"{hidden} further contrary findings are discussed in the text rather than shown here.")
+    out = {k: copy.deepcopy(table.get(k)) for k in ("display_id", "kind", "type", "columns", "rows", "row_finding_ids",
+                                                     "inconsistency_notes") if table.get(k) is not None}
+    out["notes"] = notes
+    return out
 
 
 def _first(ctx: dict, *keys: str) -> str | None:
@@ -510,6 +541,9 @@ def finding_record(f: dict) -> dict:
     quantities, constraints, limit, modality, attribution, disposition), without its audit trail (span, Gate 1
     record) or theme bookkeeping, which stay in the run and are joined by finding ID."""
     out = {k: copy.deepcopy(v) for k, v in f.items() if k not in FINDING_AUDIT_FIELDS + FINDING_ADMIN_FIELDS}
+    if isinstance(f.get("provenance_gate1"), dict):
+        out["provenance_gate1"] = {k: copy.deepcopy(f["provenance_gate1"][k]) for k in GATE1_KEEP
+                                   if k in f["provenance_gate1"]}
     out["eligibility_status"] = status_of(f)
     return out
 
@@ -730,8 +764,10 @@ def fulfil_retrieval(requests: list[dict], pkg: dict, findings: list[dict], limi
                 st = status_of(fby[i])
                 if st not in ("SUPPORTING", "NOT_ESTABLISHED"):
                     raise BridgeError(f"retrieval: finding {i} is {st}; ineligible evidence is never supplied")
+                # an explicitly requested finding comes with its original source quotation
                 records[i] = {"id": i, "kind": "FINDING", "record": {"citation_record_ids": [fby[i]["record_id"]]},
-                              "finding_ids": [i], "findings": {i: finding_record(fby[i])},
+                              "finding_ids": [i], "findings": {i: {**finding_record(fby[i]),
+                                                                   "span": copy.deepcopy(fby[i].get("span"))}},
                               "allowed_role": "SUPPORTING or CONFLICTING" if st == "SUPPORTING" else "SUBJECT_OF_APPRAISAL only"}
             else:
                 raise BridgeError(f"retrieval: {i} is not in the approved package or the evidence registry")
@@ -787,11 +823,31 @@ def _sentences(text: str) -> list[tuple[str, list[str]]]:
     return [(s, ids) for s, ids in tags.bindings("\n".join(lines)) if s.strip()]
 
 
+def max_findings_per_sentence() -> int:
+    """A10 records at most this many evidence findings per occurrence verdict (A10-RV.bounded.schema.json), so a
+    sentence may not bind more: A10 could not verify it. Read from A10's schema, its single source."""
+    import json
+    from .paths import SCHEMAS_DIR
+    schema = json.loads((SCHEMAS_DIR / "A10-RV.bounded.schema.json").read_text(encoding="utf-8"))
+    return int(schema["properties"]["verdicts"]["items"]["properties"]["evidence_finding_ids"]["maxItems"])
+
+
+def sentence_findings(ids: list[str], records: dict) -> set[str]:
+    """Findings a sentence tagged with ids binds, as A10 follows them (premises of an interpretation included)."""
+    out = set()
+    for i in ids:
+        r = records.get(i) or {}
+        out |= set(r.get("finding_ids") or [])
+        for p in (r.get("premises") or {}).values():
+            out |= set(p.get("finding_ids") or [])
+    return out
+
+
 def check_text(text: str, packet: dict, where: str) -> list[str]:
     """The deterministic gate for one piece of prose: every sentence tagged; tags only from the packet; every
     number found in the full records of the elements its sentence is tagged with; citations only those of the
-    tagged elements; display references only those planned here. Organizational sentences carry no numbers
-    and no citations."""
+    tagged elements; no more findings bound than A10 can verify in one occurrence; display references only those
+    planned here. Organizational sentences carry no numbers and no citations."""
     problems = []
     records = packet_records(packet)
     allowed = set(packet.get("allowed_tags") or []) | set(packet.get("retrieved") or {})
@@ -815,6 +871,10 @@ def check_text(text: str, packet: dict, where: str) -> list[str]:
             if cited:
                 problems.append(f"CITATION_IN_ORG: {label}: an organizational sentence carries a citation")
             continue
+        bound = sentence_findings(sci, records)
+        if len(bound) > max_findings_per_sentence():
+            problems.append(f"TOO_MANY_FINDINGS: {label} binds {len(bound)} findings; A10 verifies at most "
+                            f"{max_findings_per_sentence()} per sentence: split it")
         known = set()
         for i in sci:
             if i in records:
@@ -932,9 +992,10 @@ def ledger_summary(ledger: list[dict]) -> list[dict]:
              if e.get(k) is not None} for e in ledger]
 
 
-def outline_payload(pkg: dict, corpus: list[dict], journal: dict, table: dict, cfg: dict) -> dict:
+def outline_payload(pkg: dict, corpus: list[dict], journal: dict, table: dict, cfg: dict,
+                    findings: list[dict] | None = None) -> dict:
     """A08's input: the global map, one line per element and the table's coverage. Never the full package."""
-    return {"argument_map": argument_map(pkg, corpus),
+    return {"argument_map": argument_map(pkg, corpus, findings),
             "element_index": element_index(pkg, corpus, set(table.get("propositions_fully_shown") or [])),
             "comparative_table": {k: copy.deepcopy(table.get(k)) for k in ("display_id", "type", "columns",
                                   "row_finding_ids", "propositions_fully_shown", "selection_rule", "status")},
@@ -958,7 +1019,7 @@ def writer_payload(plan: dict, packet: dict, previous: list[dict], amap: dict, j
 def front_matter_payload(plan: dict, sections: list[dict], amap: dict, journal: dict, table: dict | None) -> dict:
     return {"mode": "FRONT_MATTER", "outline": outline_view(plan), "thesis": copy.deepcopy(amap.get("thesis")),
             "sections": [{k: s.get(k) for k in ("section_id", "heading", "text_markdown")} for s in sections],
-            "comparative_table": copy.deepcopy({k: table.get(k) for k in ("display_id", "columns", "rows", "selection_rule")})
+            "comparative_table": copy.deepcopy({k: table.get(k) for k in ("display_id", "columns", "rows", "notes")})
             if table else None, "journal_profile": copy.deepcopy(journal)}
 
 

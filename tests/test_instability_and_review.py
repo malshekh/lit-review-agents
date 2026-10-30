@@ -203,10 +203,12 @@ def test_committed_a07_turns_are_not_priced_again():
     from pathlib import Path
     b, cfg = BudgetTracker(Path(tempfile.mkdtemp())), config.load("pipeline")
     route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]
+    from litreview.tools import forecast
     full = cp.downstream(b, route, cfg, 120)[0]
     rest = cp.downstream(b, route, cfg, 120, a07_done=3)[0]
-    assert full["calls"] - rest["calls"] == 3
-    assert rest["usd"] == pytest.approx(full["usd"] * rest["calls"] / full["calls"], abs=0.001)
+    expected = 2 + forecast.A07_GROUP_CALLS(120) + -(-forecast.A07_PROPOSITIONS_PER_FINDING * 120 // 32)
+    assert rest["usd"] == pytest.approx(full["usd"] * (1 - 3 / expected), abs=0.001)
+    assert rest["calls"] < full["calls"]
 
 
 @pytest.mark.projection_guard

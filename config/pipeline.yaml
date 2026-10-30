@@ -118,14 +118,16 @@ bridge:
 # A model with no window here is refused (fail closed): add a documented value before using it.
 admission:
   context_windows:
-    claude-opus-5: 1000000      # A09; A12 alternate (repository and audit: 1M)
-    claude-sonnet-5-5: 1000000  # A12; A09 alternate (1M input, run 20261025-100039)
-    gpt-6.1-sol: 1050000        # A08; A11 alternate (researcher, 2026-10-29)
-    # kimi-k3.1-pro (A11 primary, A08 alternate): no documented window recorded, so A11 on Kimi is refused
+    # Provider metadata endpoints, 2026-10-30 (tests/model_window_probe.py, docs/integration_validation/model_windows.json)
+    claude-opus-5: 1000000      # A09; A12 alternate. Anthropic max_input_tokens 1,000,000
+    claude-sonnet-5-5: 1000000  # A12; A09 alternate. Anthropic max_input_tokens 1,000,000
+    kimi-k3.1-pro: 1048576      # A11; A08 alternate. Moonshot context_length 1,048,576 (input + output)
+    gpt-6.1-sol: 1050000        # A08; A11 alternate. Researcher-supplied 2026-10-29: OpenAI's endpoint reports none
   reasoning_reserve_tokens:     # added to max_tokens where reasoning is not established to count within it
     anthropic: 0                # thinking counts within max_tokens
     openai: 0                   # reasoning counts within max_completion_tokens
-    kimi: 32000                 # not established: reserved again in full
+    kimi: 32000                 # reasoning is always on (Moonshot: type only); not established to count
+                                #   within max_tokens, so reserved again in full
   safety_margin_tokens: 0
 
 # A06 instability test: after per-paper validation, every paper with a blocked finding is validated once
@@ -159,6 +161,34 @@ synthesis:
   output_limits: { PLAN: 4000, GROUP: 12000, RECONCILE: 6000, FINAL: 6000 }
   context_ceiling_tokens: 900000 # stop cleanly if projected input + max output would exceed this (window 1M)
   cache_ttl: 1h                  # cache the small shared system prompt, not the raw corpus
+
+# Calibrated planning forecast (src/litreview/tools/forecast.py). Projections after CP2 and the runtime gate use
+# the BASELINE scenario plus uncertainty_margin; every call is still admitted and reserved at its own strict bound,
+# and run.spend_cap_usd stays absolute. Measured: A05/A06 per-paper and per-theme costs, batch factor and repeat
+# share (records/cost_rates.json), A07 provider-counted input (docs/a07_efficiency), A10 request bounds
+# (docs/integrated_validation/a10), A08-A12 request bounds and byte/token counts (docs/bridge_validation).
+# Everything below is an ASSUMPTION, stated so it can be changed: no live output, retrieval or retry rates exist.
+forecast:
+  uncertainty_margin: 0.30
+  scenarios:
+    # output: share of each output cap used (thinking included); bytes_per_token: A08-A12 and A10 request bytes per
+    # token (measured 1.925-2.381 on Claude; GPT/Kimi not counted); retrieval: share of A09 sections / A07 and A10
+    # turns using one retrieval round (adverse: every turn, every round); redraft: share of sections redrafted;
+    # cycles/revisions: A11 critique cycles and A12 revisions; paper: per-paper cost statistic; repeat: share of
+    # papers repeated by the A06 instability test (measured 0.643); batch: A05/A06 at batch rates after one
+    # interactive probe; retries: paid calls that fail and are redone, as a share of model-stage cost; pre_cp2: A02-A04.
+    baseline: {output: 0.50, bytes_per_token: 2.1, retrieval: 0.25, a07_retrieval: 0.10, a10_retrieval: 0.10,
+               redraft: 0.20, cycles: 2, revisions: 1, paper: mean_usd, repeat: measured, theme: mean_usd,
+               batch: true, retries: 0.05, pre_cp2: 4.00, a10_local_rerun: [1.0, 0.3, 0.6, 0.1]}
+    low:      {output: 0.25, bytes_per_token: 2.4, retrieval: 0.0, a07_retrieval: 0.0, a10_retrieval: 0.0,
+               redraft: 0.0, cycles: 1, revisions: 0, paper: mean_usd, repeat: measured, theme: mean_usd,
+               batch: true, retries: 0.0, pre_cp2: 2.07, a10_local_rerun: [1.0, 0.6, 0.1]}
+    high:     {output: 0.75, bytes_per_token: 2.0, retrieval: 0.50, a07_retrieval: 0.25, a10_retrieval: 0.25,
+               redraft: 0.50, cycles: 2, revisions: 1, paper: p90_usd, repeat: measured, theme: p90_usd,
+               batch: true, retries: 0.10, pre_cp2: 6.00, a10_local_rerun: [1.0, 0.5, 0.5, 1.0, 0.2]}
+    adverse:  {output: 1.00, bytes_per_token: 1.8, retrieval: 1.0, a07_retrieval: 1.0, a10_retrieval: 1.0,
+               redraft: 1.0, cycles: 2, revisions: 2, paper: p90_usd, repeat: 1.0, theme: p90_usd,
+               batch: false, retries: 0.15, pre_cp2: 8.00, a10_local_rerun: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]}
 
 # Vendor batch APIs (50% off) for stages of independent calls: A05 and A06 per paper (A06 only while
 # loops.max_reextractions is 0). Before a batch: one real item runs interactively (a refusal stops the stage

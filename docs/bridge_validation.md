@@ -1,5 +1,13 @@
 # Evidence-to-manuscript bridge: validation (Task 2)
 
+> **Updated by the Task 3 integration (docs/task3_integration_report.md).** Kimi K3.1 Pro's window is now
+> recorded from Moonshot's model endpoint (1,048,576), so A11 runs on its configured model; the first condition
+> below no longer applies. `docs/bridge_validation/measurements.json` was regenerated on the integrated code: the
+> fixture plan now splits the knowledge gaps over bounded subsections and the scripted writer renders a grouped
+> passage as sentences within A10's 24-finding limit, so request counts and sizes differ from the tables below.
+> Projection lines now carry a calibrated baseline plus a 30% margin; the $124.52 A09 figure is that line's
+> strict adverse bound.
+
 **Verdict.** The compact 120-paper fixture passes through outline, sequential writing, integration, critique
 and editing. Every request is admitted within its model's window. The oversized fixture stops before
 dispatch at every agent. Two conditions apply:

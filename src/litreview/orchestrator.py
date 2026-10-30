@@ -236,7 +236,8 @@ class Run:
         proj = self.load("cost_projection.json")
         if not proj or proj.get("verdict") != "WITHIN_CAP":
             return   # _require_projection has already stopped the call
-        line = next((x for x in proj.get("lines", []) if x.get("basis") == "WORST_CASE" and x["stage"] == agent_id), None)
+        line = next((x for x in proj.get("lines", []) if x.get("basis") in ("WORST_CASE", "CALIBRATED_FORECAST")
+                     and x["stage"] == agent_id), None)
         if line is None:
             return
         since = [e for e in self.budget.entries() if e["agent"] == agent_id and e["time"] >= proj["created"]]
@@ -1535,7 +1536,7 @@ class Run:
         reuse = (plan is not None and ledger is not None and check.get("basis") == basis and not check.get("problems")
                  and check.get("plan_version") == bridge.plan_version(plan, ledger))
         if not reuse:
-            payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg)
+            payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
             try:
                 out = self._admitted("A08-OL", payload, step=f"A08-OL_v{self.counter(st, 'outline')}")
             except AdmissionRefused as exc:
@@ -1558,19 +1559,21 @@ class Run:
                 raise Pause(f"A08 plan rejected by the bridge ({len(problems)} problems; first: {problems[0]}). "
                             "See data/bridge/plan_check.json; rerun the outline stage")
         self._save_comparative_table(table)
-        self.save("bridge/argument_map.json", bridge.argument_map(pkg, corpus))
+        self.save("bridge/argument_map.json", bridge.argument_map(pkg, corpus, findings))
         if bcfg.get("ledger_approval", True):
             self._ledger_approved(plan, ledger, check["report"], pkg, corpus, table)
         return "draft"
 
     def _save_comparative_table(self, table: dict) -> None:
+        from . import bridge
         out_dir = self.dir / "data" / "display_items"
         if out_dir.exists():
             shutil.rmtree(out_dir)   # one display item: the comparative table replaces anything built before
         out_dir.mkdir(parents=True)
         display_items._write_csv(out_dir / "T1.csv", table["columns"], table["rows"])
         (out_dir / "T1.json").write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
-        self.save("display_items.json", [table])
+        # A10 and the export see the reader-facing table only (bridge.reader_table); the selection record stays above
+        self.save("display_items.json", [bridge.reader_table(table, self.load("selected_corpus.json", []))])
         self.prov.tool_run("display_items", "outline", {"T1": table["status"], "rows": len(table["rows"]),
                                                         "contrary_findings": len(table["contrary_finding_ids"]),
                                                         "contrary_findings_not_shown": table["contrary_findings_not_shown"],
@@ -1772,7 +1775,13 @@ class Run:
         pkg = self._publishable("synthesis_approved.json")
         if not pkg:
             raise Pause("approved synthesis missing: the bridge has nothing to hand to the writing agents")
-        return pkg, self._findings() or [], self.load("selected_corpus.json", [])
+        findings = self._findings() or []
+        from .scientific_validation import require_package
+        try:   # Task 1's contract, against current evidence: the bridge never hands on what CP3 could not approve
+            require_package(pkg, findings)
+        except ValueError as exc:
+            raise Pause(f"approved synthesis no longer satisfies its evidence contract: {exc}") from exc
+        return pkg, findings, self.load("selected_corpus.json", [])
 
     def _reproject(self, stage: str) -> None:
         """Re-project the rest of the run from what has been spent, before the stage makes its first call. A
@@ -1918,7 +1927,7 @@ class Run:
             if saved and saved.get("evidence_version") == ev:
                 packet["retrieved"] = saved.get("retrieved") or {}
         return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
-                "amap": bridge.argument_map(pkg, corpus), "pv": pv, "ev": ev, "journal": config.load("journal_scirev"),
+                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": config.load("journal_scirev"),
                 "table": (self.load("display_items.json") or [None])[0]}
 
     def _bridge_fingerprint(self, m: dict, ps: dict | None = None) -> str:
@@ -2045,12 +2054,19 @@ class Run:
         """Front matter (A09, from the written sections and the plan), then the draft in the plan's section order."""
         from . import bridge
         from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
         payload = bridge.front_matter_payload(ps["plan"], sections, ps["amap"], ps["journal"], ps["table"])
-        try:
-            front = self._admitted("A09-WRI", payload, f"A09-WRI_{label}_front", schema_file="A09-WRI.front.schema.json",
-                                   limit="A09_FRONT_MATTER")
-        except AdmissionRefused as exc:
-            raise Pause(f"front matter request not admitted ({exc})") from exc
+        key = fingerprint([ps["pv"], ps["ev"], payload])
+        cached = self.load(f"bridge/front_{label}.json") or {}
+        if cached.get("key") == key:   # resuming: the front matter for exactly these sections is not requested again
+            front = cached["front"]
+        else:
+            try:
+                front = self._admitted("A09-WRI", payload, f"A09-WRI_{label}_front", schema_file="A09-WRI.front.schema.json",
+                                       limit="A09_FRONT_MATTER")
+            except AdmissionRefused as exc:
+                raise Pause(f"front matter request not admitted ({exc})") from exc
+            self.save(f"bridge/front_{label}.json", {"key": key, "front": front})
         by_id = {s["section_id"]: s for s in sections}
         ordered = [by_id[s["section_id"]] for s in ps["plan"]["sections"]]
         m = {"draft_version": label, "plan_version": ps["pv"], "title": front.get("title"), "abstract": front.get("abstract"),
@@ -2103,7 +2119,14 @@ class Run:
         Every change to an element-tagged sentence is recorded as substantive; A10 verifies the integrated draft in
         any case. The binding gate runs on the result."""
         from . import bridge
-        integrated = self._edit("INTEGRATION", draft, ps, f"A12-EDI_integration_{label}")
+        from .synthesis_registry import fingerprint
+        key = fingerprint([ps["pv"], ps["ev"], draft])
+        cached = self.load(f"bridge/integrated_{label}.json") or {}
+        if cached.get("key") == key:   # resuming: the same draft is not integrated (paid) again
+            integrated = cached["integrated"]
+        else:
+            integrated = self._edit("INTEGRATION", draft, ps, f"A12-EDI_integration_{label}")
+            self.save(f"bridge/integrated_{label}.json", {"key": key, "integrated": integrated})
         report = bridge.classify_integration(draft, integrated)
         self.save(f"bridge/integration_{label}.json", report)
         self.prov.tool_run("integration_pass", label, {"substantive": report["substantive"],
@@ -2264,6 +2287,7 @@ class Run:
                            "notes": ["NR, not reported. Values are taken from validated findings; "
                                      "check against the source papers before submission."]
                                     + [tags.CITE_RE.sub(cite, n["text"]) for n in t.get("inconsistency_notes", [])]
+                                    + [tags.strip_tags(n) for n in t.get("notes", [])]
                                     + ([f"Left blank for the authors: {', '.join(t['unmapped_columns'])}."]
                                        if t.get("unmapped_columns") else [])}
                           for t in tables]}

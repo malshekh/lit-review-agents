@@ -1,6 +1,6 @@
 {
  "reference_run": "20261025-100039",
- "measured_at": "2026-10-29",
+ "measured_at": "2026-10-30",
  "per_paper": {
   "ABSTRACT": {
    "papers": 17,
@@ -26,5 +26,10 @@
   "mean_usd": 0.0529,
   "p90_usd": 0.0926
  },
- "themes_per_paper": 2.321
+ "themes_per_paper": 2.321,
+ "batch_factor": {
+  "A05-KE": 0.5,
+  "A06-SV": 0.5
+ },
+ "repeat_share": 0.643
 }

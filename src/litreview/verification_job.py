@@ -22,6 +22,10 @@ CHECKS = ['SOURCE', 'NUMBERS_UNITS', 'MECHANISM_CAUSALITY', 'CERTAINTY', 'CHEMIC
           'MODEL_GBM', 'CLINICAL_REACH', 'COUNTER_EVIDENCE', 'ATTRIBUTION_INDEPENDENCE', 'CITATION']
 SURFACES = ('title', 'abstract', 'sections', 'introduction', 'conclusion', 'keywords',
             'figure_legends', 'table_captions', 'captions', 'legends', 'tables', 'display_items')
+# Surfaces where the journal forbids references (config/journal_scirev.yaml: an unstructured abstract with no
+# references; a one-sentence title). A scientific occurrence there needs no citation, but a VERIFIED verdict must
+# still name the evidence findings it rests on (bound through the plan's title and abstract propositions).
+NO_CITATION_SURFACES = {('manuscript', 'title'), ('manuscript', 'abstract'), ('manuscript', 'keywords')}
 META = {'section_id', 'display_id', 'item_id', 'kind', 'type', 'origin', 'level', 'path',
         'source_proposition_ids', 'proposition_ids', 'citation_record_ids', 'warnings'}
 
@@ -315,7 +319,8 @@ class VerificationJob:
             if v['verdict'] != 'NON_SCIENTIFIC' and set(v['checks']) != set(CHECKS):
                 raise JobStopped('A10 incomplete scientific checks')
             occurrence = self.by_occurrence[v['occurrence_id']]
-            if v['verdict'] != 'NON_SCIENTIFIC' and not occurrence['citation_record_ids']:
+            exempt = tuple(occurrence['path'][:2]) in NO_CITATION_SURFACES and v['evidence_finding_ids']
+            if v['verdict'] != 'NON_SCIENTIFIC' and not occurrence['citation_record_ids'] and not exempt:
                 self.flag(v['occurrence_id'], 'UNCITED_SCIENTIFIC_ASSERTION', 'MAJOR', 'Supply a supporting citation or qualify/remove assertion')
             needed = [a for b in payload['occurrences'] if b['occurrence_id']==v['occurrence_id'] for a in b['appraisal_bindings']]
             checked = {a['binding_id']:a for a in v['appraisal_checks']}

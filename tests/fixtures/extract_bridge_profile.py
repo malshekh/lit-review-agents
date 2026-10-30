@@ -8,12 +8,15 @@ is hashed before and after, and a difference is an error.
 Sources (all from the reference run):
   propositions      the 63 complete propositions recoverable from the run's A07 output (A07-SYN_v2.raw0.txt),
                     whose tail was truncated at max_tokens; objects are parsed one by one, never repaired
-  findings          validated_findings.json without spans (the table and qualifiers need contexts, entities,
-                    quantities, constraints and limits, not quotations)
+  findings          validated_findings.json, with their source quotations (spans): A10 refuses to verify a claim
+                    from a finding without its original passage, so the integrated simulation needs them
   corpus            selected_corpus.json citation metadata, tier and contrary-evidence flags
   conflicts         every CONFLICT in theme_records.json
   systems_missing   every distinct `systems_missing` string in theme_records.json (A07's SYSTEM_GAP items)
   inconsistencies   inconsistencies.json items, with their required visibility
+  theme_records     theme_records.json (A06 per-theme results), to build an A07 registry for the integrated
+                    simulation (tests/integrated_pipeline.py)
+  spec_approved     spec_approved.json (the review specification approved at CP1)
 """
 import gzip
 import hashlib
@@ -54,7 +57,7 @@ def main(run: Path) -> None:
     data = run / "data"
     load = lambda n: json.loads((data / n).read_text(encoding="utf-8"))
     props = recover_propositions((run / "outputs" / "A07-SYN_v2.raw0.txt").read_text(encoding="utf-8"))
-    findings = [{k: v for k, v in f.items() if k != "span"} for f in load("validated_findings.json")]
+    findings = load("validated_findings.json")
     corpus = [{k: r.get(k) for k in ("record_id", "title", "authors", "year", "venue", "tier", "themes",
                                      "is_preprint", "is_contrary_evidence", "doi", "pmid")}
               for r in load("selected_corpus.json")]
@@ -67,7 +70,8 @@ def main(run: Path) -> None:
                          "synthesis, never a manuscript input.",
                "reference_run": run.name, "propositions": props, "findings": findings, "corpus": corpus,
                "conflicts": conflicts, "systems_missing": missing,
-               "inconsistencies": load("inconsistencies.json")}
+               "inconsistencies": load("inconsistencies.json"), "theme_records": themes,
+               "spec_approved": load("spec_approved.json")}
     if tree_hash(run) != before:
         raise SystemExit("the reference run changed while it was read")
     with gzip.open(OUT, "wt", encoding="utf-8") as fh:

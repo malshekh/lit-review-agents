@@ -123,11 +123,16 @@ def test_the_projection_covers_every_stage_still_ahead(run):
 def test_a07_projection_covers_bounded_calls_and_retrieval_without_cache_assumptions(tmp_path):
     from litreview import config
     from litreview.budget import BudgetTracker
-    from litreview.synthesis_registry import projected_a07
+    from litreview.tools import forecast
     b, cfg = BudgetTracker(tmp_path), config.load("pipeline")
     route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]
-    line = cp.downstream(b, route, cfg, 100)[0]
-    env = projected_a07(cfg["synthesis"], 100)
-    assert line["calls"] == env["calls"]
-    assert line["basis"] == "ESTIMATED_ENVELOPE"
-    assert line["usd"] == pytest.approx(b.cost(route("A07-SYN").model, env["input_tokens"], env["output_tokens"]), abs=.001)
+    line = cp.downstream(b, route, cfg, 1996)[0]
+    adverse, calls = forecast.a07(1996, cfg, b, route, None)
+    base = forecast.a07(1996, cfg, b, route, cfg["forecast"]["scenarios"]["baseline"])[0]
+    assert line["basis"] == "CALIBRATED_FORECAST" and line["calls"] == calls          # every retrieval round counted
+    assert line["usd"] == pytest.approx(base * (1 + cfg["forecast"]["uncertainty_margin"]), abs=.001)
+    assert line["adverse_usd"] == pytest.approx(adverse, abs=.001) and adverse > line["usd"]
+    # the calibration reproduces the measured production requests it was fitted on (docs/a07_efficiency), from above
+    measured = 416_714 + 2_905_938 + 889_123 + 92_275
+    fitted = sum(f(1996) for f in forecast.A07_INPUT.values())
+    assert measured <= fitted <= measured * 1.10

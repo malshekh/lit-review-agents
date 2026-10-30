@@ -61,32 +61,64 @@ def _model(agent: str, route, bcfg: dict, limit: str | None):
     return dataclasses.replace(m, max_tokens=int(bcfg["output_limits"][limit])) if limit else m
 
 
-def _line(agent: str, requests: list[tuple[int, str | None]], budget, route, adm: dict, bcfg: dict,
-          basis: str, detail: str) -> dict:
-    """requests: (input bound, output-limit kind) per request."""
-    usd, long, over, out_total, max_in = 0.0, 0, 0, 0, 0
-    for bound, limit in requests:
-        m = _model(agent, route, bcfg, limit)
-        try:
-            out = output_reserve(m, adm)
-        except AdmissionRefused:
-            out = 2 * int(m.max_tokens)          # reasoning reserve unknown: priced at twice the cap
-        threshold = (budget.prices.get(m.model) or {}).get("long_context_threshold")
-        rates = budget._rates(m.model, bound)              # the tier the byte bound falls in, as at dispatch
-        if rates is not None:
-            usd += (bound / BYTES_PER_TOKEN * rates["input"] + out * rates["output"]) / 1e6
-        long += bool(threshold and bound > threshold)
-        try:
-            over += bound + out > context_window(m.model, adm)
-        except AdmissionRefused:
-            over += 1                            # no recorded window: refused at dispatch
-        out_total += out
-        max_in = max(max_in, bound)
+def _price(agent: str, bound: int, limit: str | None, budget, route, adm: dict, bcfg: dict, s: dict | None) -> tuple:
+    """(usd, output tokens, crosses threshold, over window) for one request. s None: strict pricing (input at the
+    byte bound / BYTES_PER_TOKEN, tier by the byte bound as at dispatch, the full output reserve); s a scenario:
+    input at bytes / its bytes_per_token, tier by those tokens, its share of the output reserve."""
+    m = _model(agent, route, bcfg, limit)
+    try:
+        out = output_reserve(m, adm)
+    except AdmissionRefused:
+        out = 2 * int(m.max_tokens)          # reasoning reserve unknown: priced at twice the cap
+    threshold = (budget.prices.get(m.model) or {}).get("long_context_threshold")
+    tokens = bound / (float(s["bytes_per_token"]) if s else BYTES_PER_TOKEN)
+    rates = budget._rates(m.model, bound if s is None else int(tokens))
+    used = out * (float(s["output"]) if s else 1.0)
+    usd = 0.0 if rates is None else (tokens * rates["input"] + used * rates["output"]) / 1e6
+    try:
+        over = bound + out > context_window(m.model, adm)
+    except AdmissionRefused:
+        over = True                          # no recorded window: refused at dispatch
+    return usd, used, bool(threshold and bound > threshold), over
+
+
+def _weight(tag: str, s: dict) -> float:
+    """How many times a tagged request is expected under scenario s (adverse: every loop at its maximum)."""
+    kind, _, n = tag.partition(":")
+    r, d = float(s["retrieval"]), float(s["redraft"])
+    if kind == "retrieval":                  # round n of a section's evidence requests
+        return r if (int(n) == 1 or r >= 1.0) else 0.0
+    if kind in ("redraft", "front_redraft", "integration_redraft"):
+        return d
+    if kind == "redraft_retrieval":
+        return d * (r if (int(n) == 1 or r >= 1.0) else 0.0)
+    if kind == "critique":
+        return 1.0 if int(n) <= int(s["cycles"]) else 0.0
+    if kind == "revision":
+        return 1.0 if int(n) <= int(s["revisions"]) else 0.0
+    return 1.0                               # outline, section, front, integration, line, proof
+
+
+def _line(agent: str, requests: list[tuple[int, str | None, str]], budget, route, cfg: dict, basis: str,
+          detail: str) -> dict:
+    """The projection line for one agent. `usd`: the calibrated baseline plus the forecast's uncertainty margin
+    (pipeline.yaml -> forecast). `adverse_usd`: every request the loops allow, full output, strict pricing.
+    `calls` and `long_context_calls` count every request the configured loops allow, so neither a retrieval
+    round nor a redraft forces re-projection, while spend beyond `usd` does. `scenarios`: each scenario's figure."""
+    adm, bcfg, fc = cfg.get("admission") or {}, cfg.get("bridge") or {}, cfg.get("forecast") or {}
+    scen = {name: round(sum(_weight(t, s) * _price(agent, b, k, budget, route, adm, bcfg, s)[0] for b, k, t in requests), 4)
+            for name, s in (fc.get("scenarios") or {}).items()}
+    strict = [_price(agent, b, k, budget, route, adm, bcfg, None) for b, k, _ in requests]
+    margin = float(fc.get("uncertainty_margin", 0.30))
+    adverse = sum(x[0] for x in strict)
+    baseline = scen.get("baseline", adverse)
     m = route(agent)
-    return {"stage": agent, "basis": basis, "calls": len(requests), "usd": round(usd, 4), "long_context_calls": long,
-            "over_window_calls": over, "max_input_bound": max_in, "output_reserved": out_total,
-            "detail": f"{len(requests)} requests on {m.model}: input at its byte bound / {BYTES_PER_TOKEN} uncached "
-                      f"(tier by the byte bound), plus its full output reserve; {detail}"}
+    return {"stage": agent, "basis": basis, "calls": len(requests), "usd": round(baseline * (1 + margin), 4),
+            "baseline_usd": round(baseline, 4), "uncertainty_margin": margin, "adverse_usd": round(adverse, 4),
+            "scenarios": scen, "long_context_calls": sum(x[2] for x in strict),
+            "over_window_calls": sum(x[3] for x in strict), "max_input_bound": max((b for b, _, _ in requests), default=0),
+            "detail": f"up to {len(requests)} requests on {m.model}; usd = calibrated baseline x {1 + margin:.2f}; "
+                      f"adverse = every request, full output, bytes / {BYTES_PER_TOKEN}; {detail}"}
 
 
 def _prose_bytes(journal: dict) -> int:
@@ -96,9 +128,8 @@ def _prose_bytes(journal: dict) -> int:
     return words * BYTES_PER_WORD
 
 
-def lines(budget, route, cfg: dict, n_findings: int, inputs: dict | None = None) -> list[dict]:
-    """A08, A09, A11 and A12 lines. inputs: {"pkg", "corpus", "findings", "plan", "ledger", "journal"} (any may be
-    missing; without a package the lines are estimates)."""
+def requests(route, cfg: dict, n_findings: int, inputs: dict | None = None) -> dict:
+    """Every A08, A09, A11 and A12 request the configured loops allow, as (byte bound, output-limit kind, tag)."""
     from .. import config
     inputs = inputs or {}
     journal = inputs.get("journal") or config.load("journal_scirev")
@@ -115,8 +146,8 @@ def lines(budget, route, cfg: dict, n_findings: int, inputs: dict | None = None)
             table = bridge.comparative_table(pkg, findings, corpus, int(bcfg.get("table_max_rows", 25)))
         except bridge.BridgeError:
             table = {"propositions_fully_shown": [], "row_finding_ids": [], "rows": []}
-        amap = bridge.argument_map(pkg, corpus)
-        a08 = _system("A08-OL") + offline_tokens(bridge.outline_payload(pkg, corpus, journal, table, bcfg))
+        amap = bridge.argument_map(pkg, corpus, findings)
+        a08 = _system("A08-OL") + offline_tokens(bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings))
         packets = _packets(plan, ledger, pkg, findings, corpus)
         outline = bridge.outline_view(plan) if plan else None
         outline_b = bridge.size(outline) if outline else 4_000 + 600 * len(packets)
@@ -141,40 +172,51 @@ def lines(budget, route, cfg: dict, n_findings: int, inputs: dict | None = None)
         record_sizes = [RETRIEVED_RECORD_BYTES] * n_elements
         ledger_rows, table_b = n_elements, 25 * 900
         detail_plan = f"{ESTIMATE_SECTIONS} sections assumed; sizes per finding from the compact fixture"
-    # retrieval adds at most retrieval_limit records per round, never more than the registry holds
     per_round = [sum(record_sizes[i * rlimit:(i + 1) * rlimit]) for i in range(rounds)]
     a09, written = [], 0
     for k, sid in enumerate(order):
         earlier = written if budgets else prose * k // max(1, len(order))
         base = _system("A09-WRI") + FRAMING + outline_b + thesis_b + packet_b[sid] + earlier
-        a09 += [(base + sum(per_round[:n]), "A09_SECTION") for n in range(rounds + 1)]
+        a09.append((base, "A09_SECTION", "section"))
+        a09 += [(base + sum(per_round[:n]), "A09_SECTION", f"retrieval:{n}") for n in range(1, rounds + 1)]
         written += budgets.get(sid, 0) * BYTES_PER_WORD
-    a09 = a09 * (1 + redrafts)
-    a09 += [(_system("A09-WRI") + FRAMING + outline_b + thesis_b + table_b + prose, "A09_FRONT_MATTER")] * (1 + redrafts)
+    first = list(a09)
+    for _ in range(redrafts):
+        a09 += [(b, k, "redraft" if t == "section" else "redraft_retrieval:" + t.partition(":")[2]) for b, k, t in first]
+    front = _system("A09-WRI") + FRAMING + outline_b + thesis_b + table_b + prose
+    a09 += [(front, "A09_FRONT_MATTER", "front")] + [(front, "A09_FRONT_MATTER", "front_redraft")] * redrafts
     ledger_b = ledger_rows * 90
     a11_in = _system("A11-RC") + FRAMING + prose + amap_b + ledger_b + A10_SUMMARY_BYTES + 4 * int(route("A11-RC").max_tokens)
-    a11 = [(a11_in, None)] * cycles
+    a11 = [(a11_in, None, f"critique:{c}") for c in range(1, cycles + 1)]
     whole = _system("A12-EDI") + FRAMING + prose + amap_b + ledger_b + outline_b + A10_SUMMARY_BYTES \
         + 4 * int(route("A11-RC").max_tokens)
-    passes = (1 + redrafts) + cycles + 2              # integration per draft, revisions, LINE, PROOF
+    passes = ["integration"] + ["integration_redraft"] * redrafts + [f"revision:{c}" for c in range(1, cycles + 1)] \
+        + ["line", "proof"]
     m12 = route("A12-EDI")
     try:
         fits = whole + output_reserve(m12, adm) <= context_window(m12.model, adm)
     except AdmissionRefused:
         fits = False
     if fits:
-        a12, how = [(whole, None)] * passes, "whole-manuscript requests"
+        a12, how = [(whole, None, tag) for tag in passes], "whole-manuscript requests"
     else:
         units = len(packets) + 1
-        a12 = [(whole - prose + -(-prose // max(1, units - 1)), "A12_UNIT")] * (passes * units)
+        a12 = [(whole - prose + -(-prose // max(1, units - 1)), "A12_UNIT", tag) for tag in passes for _ in range(units)]
         how = f"{units} units per pass (the whole manuscript does not fit the window)"
-    return [
-        _line("A08-OL", [(a08, None)], budget, route, adm, bcfg, basis, "the outline request (map, element index, table coverage)"),
-        _line("A09-WRI", a09, budget, route, adm, bcfg, basis,
-              f"{detail_plan}, each with {rounds} retrieval rounds, {1 + redrafts} draft(s), plus front matter per draft"),
-        _line("A11-RC", a11, budget, route, adm, bcfg, basis, f"{cycles} critique cycles: manuscript, map, ledger, A10 summary"),
-        _line("A12-EDI", a12, budget, route, adm, bcfg, basis, f"{passes} passes ({how})"),
-    ]
+    return {"basis": basis,
+            "A08-OL": ([(a08, None, "outline")], "the outline request (map, element index, table coverage)"),
+            "A09-WRI": (a09, f"{detail_plan}, each with up to {rounds} retrieval rounds and {redrafts} redraft(s), "
+                             "plus front matter per draft"),
+            "A11-RC": (a11, f"up to {cycles} critique cycles: manuscript, map, ledger, A10 summary"),
+            "A12-EDI": (a12, f"integration per draft, up to {cycles} revisions, LINE and PROOF ({how})")}
+
+
+def lines(budget, route, cfg: dict, n_findings: int, inputs: dict | None = None) -> list[dict]:
+    """A08, A09, A11 and A12 lines. inputs: {"pkg", "corpus", "findings", "plan", "ledger", "journal"} (any may be
+    missing; without a package the lines are estimates)."""
+    req = requests(route, cfg, n_findings, inputs)
+    return [_line(a, req[a][0], budget, route, cfg, req["basis"], req[a][1])
+            for a in ("A08-OL", "A09-WRI", "A11-RC", "A12-EDI")]
 
 
 def _packets(plan, ledger, pkg, findings, corpus) -> dict:

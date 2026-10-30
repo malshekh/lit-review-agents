@@ -1,0 +1,148 @@
+{
+  "papers": 120,
+  "findings": 1996,
+  "a07": {
+    "status": "COMPLETE",
+    "propositions": 324,
+    "gaps": 501,
+    "reconciliation_issues": 1,
+    "findings_unaccounted": 0,
+    "coverage_incomplete": 0
+  },
+  "held_finding": {
+    "id": "R0003:F15",
+    "status": "HELD_FOR_CORRECTION",
+    "in_any_packet": false,
+    "in_table": false,
+    "used_by_any_proposition": false
+  },
+  "ineligible_findings_in_packets": [],
+  "manuscript_tags_with_ineligible_roles": [],
+  "ledger": {
+    "DISCUSSED": 48,
+    "GROUPED_WITH": 777,
+    "TABLE_ONLY": 0,
+    "NOT_INDIVIDUALLY_DISCUSSED": 0,
+    "elements": 825
+  },
+  "written_elements_rendered": 825,
+  "written_elements": 825,
+  "mandatory_not_written": [],
+  "cross_theme_issue": {
+    "propositions": [
+      "GROUP_G0001.P1",
+      "GROUP_G0011.P1"
+    ],
+    "sections": [
+      "S2",
+      "S3"
+    ],
+    "in_each_sections_packet": true
+  },
+  "a10_final": {
+    "execution": "COMPLETE",
+    "release": "APPROVED",
+    "coverage": {
+      "occurrences_total": 388,
+      "occurrences_reviewed": 388,
+      "global_index_entries_reviewed": 2822,
+      "inventory_fingerprint": "93d42c111c2cdcb39621b5f04f59c4635ecd1527639848aee4ebfe8bb9ce24f5"
+    },
+    "current_for_final_manuscript": true,
+    "stamp_matches": true,
+    "table_occurrences": 184
+  },
+  "table": {
+    "rows": 25,
+    "notes": [
+      "The rows are a selection by a fixed rule from 1286 eligible findings in 112 papers, not a summary of every study reviewed. A supporting row appears only together with the contrary evidence for the claims it supports."
+    ],
+    "columns": [
+      "Evidence level",
+      "System",
+      "Intervention",
+      "Key observation",
+      "Role",
+      "Limitation",
+      "Citation"
+    ]
+  },
+  "calls": {
+    "A08-OL": 1,
+    "A09-WRI": 17,
+    "A10-RV": 90,
+    "A11-RC": 2,
+    "A12-EDI": 4
+  },
+  "successful_section_calls": {
+    "S1": 1,
+    "S10": 1,
+    "S11": 1,
+    "S12": 1,
+    "S13": 1,
+    "S14": 1,
+    "S15": 1,
+    "S16": 1,
+    "S2": 1,
+    "S3": 1,
+    "S4": 1,
+    "S5": 1,
+    "S6": 1,
+    "S7": 1,
+    "S8": 1,
+    "S9": 1
+  },
+  "front_matter_calls": 1,
+  "integration_calls": 1,
+  "admissions_by_agent": {
+    "A08-OL": {
+      "requests": 1,
+      "max_input_bound": 419600,
+      "all_fit": true,
+      "window": 1050000
+    },
+    "A09-WRI": {
+      "requests": 18,
+      "max_input_bound": 837930,
+      "all_fit": true,
+      "window": 1000000
+    },
+    "A12-EDI": {
+      "requests": 4,
+      "max_input_bound": 492849,
+      "all_fit": true,
+      "window": 1000000
+    },
+    "A11-RC": {
+      "requests": 2,
+      "max_input_bound": 491733,
+      "all_fit": true,
+      "window": 1048576
+    }
+  },
+  "interruptions": {
+    "outline": 0,
+    "draft": 2,
+    "review_loop": 0,
+    "finish_edit": 0,
+    "finalize": 0
+  },
+  "final_state": "finalize",
+  "exported_tables": 1,
+  "projection": {
+    "A10-RV": {
+      "basis": "CALIBRATED_FORECAST",
+      "calls": 1170,
+      "usd": 61.1635,
+      "baseline_usd": 47.0488,
+      "adverse_usd": 423.2273
+    },
+    "A12-EDI": {
+      "basis": "REQUEST_BOUND",
+      "calls": 6,
+      "usd": 5.0199,
+      "baseline_usd": 3.8615,
+      "adverse_usd": 8.0358
+    }
+  }
+}

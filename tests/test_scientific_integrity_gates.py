@@ -105,9 +105,10 @@ def test_repairs_are_unique_literal_and_revalidated(tmp_path,monkeypatch):
 
 
 def test_r0030_formatting_and_ellipsis_but_not_ambiguous_statistics():
-    data=Path(__file__).resolve().parents[1]/'runs/20261025-100039/data'
-    original=json.loads((data/'extractions/R0030.json').read_text(encoding='utf-8'))
-    sections=json.loads((data/'fulltext/R0030.json').read_text(encoding='utf-8'))
+    # R0030's three findings and the one source section their quotes come from, extracted read-only from the
+    # reference run by tests/fixtures/extract_r0030.py (which checks the outcomes match the complete source)
+    fixture=json.loads((Path(__file__).parent/'fixtures/r0030_gate1.json').read_text(encoding='utf-8'))
+    original,sections=fixture['extraction'],fixture['fulltext_sections']
     ext=span_check.repair_findings(original,sections)
     gates={g['finding_id']:g for g in span_check.check_findings(ext,sections)}
     assert span_check.passed(gates['F18'])

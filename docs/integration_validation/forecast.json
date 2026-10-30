@@ -1,0 +1,158 @@
+{
+  "method": "calibrated planning forecast (src/litreview/tools/forecast.py); measured inputs and stated assumptions as documented there and in pipeline.yaml -> forecast; not a bill",
+  "spent_usd": 0.0,
+  "outstanding_reservations_usd": 0.0,
+  "at_120_papers": {
+    "papers": 120,
+    "full_text": 47,
+    "abstract": 73,
+    "findings": 2017,
+    "scenarios": {
+      "baseline": {
+        "A02-A04 (pre-CP2)": 4.0,
+        "A05+A06 per paper": 43.38,
+        "A06 instability repeats": 16.2,
+        "A06 per theme": 14.76,
+        "A07 synthesis": 45.49,
+        "A08 outline": 1.36,
+        "A09 writing": 27.79,
+        "A10 verification": 47.05,
+        "A11 critique": 1.97,
+        "A12 editing": 4.16,
+        "failed and redone calls (A07-A12)": 6.39,
+        "total": 212.56
+      },
+      "low": {
+        "A02-A04 (pre-CP2)": 2.07,
+        "A05+A06 per paper": 43.38,
+        "A06 instability repeats": 16.2,
+        "A06 per theme": 14.76,
+        "A07 synthesis": 31.81,
+        "A08 outline": 0.57,
+        "A09 writing": 14.16,
+        "A10 verification": 27.0,
+        "A11 critique": 0.74,
+        "A12 editing": 2.24,
+        "failed and redone calls (A07-A12)": 0.0,
+        "total": 152.94
+      },
+      "high": {
+        "A02-A04 (pre-CP2)": 6.0,
+        "A05+A06 per paper": 71.07,
+        "A06 instability repeats": 16.2,
+        "A06 per theme": 25.84,
+        "A07 synthesis": 63.77,
+        "A08 outline": 1.54,
+        "A09 writing": 48.67,
+        "A10 verification": 86.98,
+        "A11 critique": 2.36,
+        "A12 editing": 5.33,
+        "failed and redone calls (A07-A12)": 20.87,
+        "total": 348.62
+      },
+      "adverse": {
+        "A02-A04 (pre-CP2)": 8.0,
+        "A05+A06 per paper": 139.51,
+        "A06 instability repeats": 50.63,
+        "A06 per theme": 25.84,
+        "A07 synthesis": 198.58,
+        "A08 outline": 1.79,
+        "A09 writing": 167.68,
+        "A10 verification": 423.23,
+        "A11 critique": 2.84,
+        "A12 editing": 8.53,
+        "failed and redone calls (A07-A12)": 120.4,
+        "total": 1147.03
+      }
+    },
+    "baseline_with_margin": 276.33,
+    "uncertainty_margin": 0.3,
+    "bridge_basis": "REQUEST_BOUND"
+  },
+  "by_paper_count": {
+    "20": {
+      "findings": 339,
+      "baseline": 68.86,
+      "low": 43.37,
+      "high": 124.25,
+      "adverse": 513.03,
+      "baseline_with_margin": 89.52
+    },
+    "28": {
+      "findings": 471,
+      "baseline": 79.96,
+      "low": 51.89,
+      "high": 141.48,
+      "adverse": 561.35,
+      "baseline_with_margin": 103.95
+    },
+    "40": {
+      "findings": 677,
+      "baseline": 96.02,
+      "low": 64.51,
+      "high": 166.3,
+      "adverse": 628.97,
+      "baseline_with_margin": 124.83
+    },
+    "50": {
+      "findings": 847,
+      "baseline": 110.04,
+      "low": 75.49,
+      "high": 187.83,
+      "adverse": 687.49,
+      "baseline_with_margin": 143.05
+    },
+    "60": {
+      "findings": 1016,
+      "baseline": 123.7,
+      "low": 86.12,
+      "high": 208.97,
+      "adverse": 746.08,
+      "baseline_with_margin": 160.81
+    },
+    "70": {
+      "findings": 1185,
+      "baseline": 137.81,
+      "low": 97.17,
+      "high": 230.58,
+      "adverse": 804.92,
+      "baseline_with_margin": 179.15
+    },
+    "80": {
+      "findings": 1339,
+      "baseline": 150.94,
+      "low": 107.4,
+      "high": 250.7,
+      "adverse": 860.09,
+      "baseline_with_margin": 196.22
+    },
+    "100": {
+      "findings": 1678,
+      "baseline": 177.98,
+      "low": 128.85,
+      "high": 292.05,
+      "adverse": 972.28,
+      "baseline_with_margin": 231.37
+    },
+    "120": {
+      "findings": 2017,
+      "baseline": 207.3,
+      "low": 151.25,
+      "high": 336.62,
+      "adverse": 1092.35,
+      "baseline_with_margin": 269.49
+    }
+  },
+  "largest_paper_count_fitting": {
+    "baseline + margin <= $150": 50,
+    "baseline <= $150": 70,
+    "adverse <= $150": null,
+    "baseline + margin <= $200": 80,
+    "baseline <= $200": 100,
+    "adverse <= $200": null
+  },
+  "exposures_not_added": {
+    "A05 Opus 5 fallback after a refusal": "about 2.5x A05's share; requires `litreview approve-alternate`",
+    "unbounded failures": "a failed paid call supersedes the projection; resuming needs a new one"
+  }
+}

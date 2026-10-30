@@ -44,7 +44,7 @@ def run_stages(fx, root):
     for name, value in (("_publishable", lambda n: run.load(n)), ("_findings", lambda: run.load("validated_findings.json")),
                         ("_verify", report), ("_maybe_verify", report),
                         ("_verification_current", lambda rv, m: rv.get("verification_fingerprint") == fingerprint(m)),
-                        ("_prose_vendors", lambda reader: frozenset({"anthropic", "kimi"})),   # A11 on GPT-6.1
+                        ("_prose_vendors", lambda reader: frozenset({"anthropic"})),   # A11 on Kimi K3.1 Pro
                         ("_reproject", lambda stage: None), ("_downstream_gate", lambda *a: None),
                         ("_check_request_line", lambda a: None), ("_check_long_context", lambda *a: None),
                         ("_require_projection", lambda: None)):
@@ -72,12 +72,12 @@ def oversized(big):
                                                              "text_markdown": "x ⟦ORG⟧"} for s in plan["sections"]]}
     requests = {"A08-OL": bridge.outline_payload(big["pkg"], big["corpus"], journal, table, cfg["bridge"]),
                 "A09-WRI": bridge.writer_payload(plan, packets[largest], [], amap, journal),
-                "A11-RC (GPT-6.1 alternate)": bridge.critique_payload(m, amap, ledger, {}, journal, None),
+                "A11-RC": bridge.critique_payload(m, amap, ledger, {}, journal, None),
                 "A12-EDI (one unit)": bridge.editor_payload("LINE", {"sections": m["sections"][:1]}, amap, ledger, plan)}
     out = {}
     for label, payload in requests.items():
         agent = label.split()[0]
-        model = config.agent_candidates(agent)[1] if "alternate" in label else route(agent)
+        model = route(agent)
         out[label] = admission.assess(agent, payload, model, adm, prices)
     return describe(big), out
 

@@ -56,8 +56,9 @@ def test_cp2_refuses_a_selection_projected_over_the_cap(tmp_path, monkeypatch):
     assert run.load("selected_corpus.json") is None                  # nothing proceeds
     proj = run.load("cost_projection.json")
     assert proj["verdict"] == "OVER_CAP" and proj["by_level"] == {"ABSTRACT": 0, "FULL_TEXT": 12}
-    # A08, A09, A11 and A12 come from the bridge's request builders: an estimate before any package exists
-    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "ESTIMATED_ENVELOPE"}
+    # A07 and A10 are calibrated forecasts; A08, A09, A11 and A12 come from the bridge's request builders (an
+    # estimate before any package exists)
+    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "CALIBRATED_FORECAST", "ESTIMATED_ENVELOPE"}
 
 
 def test_cp2_passes_a_selection_within_the_cap_and_records_the_projection(tmp_path, monkeypatch):

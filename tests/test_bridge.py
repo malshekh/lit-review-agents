@@ -101,8 +101,10 @@ def make_run(tmp_path, monkeypatch, fx, stage="outline"):
     return run
 
 
-def kimi_window(run, tokens=262_144):
-    """A11's primary (Kimi) has no recorded window in pipeline.yaml, so A11 is refused; tests that run A11 give it one."""
+def kimi_window(run, tokens=None):
+    """Kimi K3.1 Pro's window is recorded in pipeline.yaml from Moonshot's model endpoint; a test may override it."""
+    if tokens is None:
+        return
     adm = run.cfg["admission"]
     run.cfg = {**run.cfg, "admission": {**adm, "context_windows": {**adm["context_windows"], "kimi-k3.1-pro": tokens}}}
 
@@ -125,10 +127,7 @@ def outline_and_approve(run, agents):
 
 # ------------------------------------------------------------------ the compact 120-paper plan processes fully
 def test_compact_120_paper_plan_processes_fully_within_every_window(tmp_path, monkeypatch, fx):
-    run = make_run(tmp_path, monkeypatch, fx)
-    # A11 on its configured alternate, GPT-6.1 (1.05M window): Kimi has no recorded window, and at 120 papers the
-    # critique request (manuscript, map, ledger, A10 summary) is about 0.7M bytes
-    monkeypatch.setattr(run, "_prose_vendors", lambda reader: frozenset({"anthropic", "kimi"}))
+    run = make_run(tmp_path, monkeypatch, fx)        # A11 on its configured model, Kimi K3.1 Pro (1,048,576)
     agents = Agents(run, fx)
     monkeypatch.setattr(run, "agent", agents)
     outline_and_approve(run, agents)
@@ -616,9 +615,15 @@ def test_the_projection_prices_long_context_requests_at_the_long_rates(fx):
     a08 = lines["A08-OL"]
     assert a08["basis"] == "REQUEST_BOUND" and a08["max_input_bound"] > 272_000 and a08["long_context_calls"] == 1
     long = b._rates("gpt-6.1-sol", 300_000)
-    assert a08["usd"] == pytest.approx((a08["max_input_bound"] / dp.BYTES_PER_TOKEN * long["input"]
-                                        + 32_000 * long["output"]) / 1e6, abs=1e-4)
-    assert lines["A11-RC"]["over_window_calls"] == lines["A11-RC"]["calls"]   # Kimi has no recorded window
+    assert a08["adverse_usd"] == pytest.approx((a08["max_input_bound"] / dp.BYTES_PER_TOKEN * long["input"]
+                                                + 32_000 * long["output"]) / 1e6, abs=1e-4)
+    base = cfg["forecast"]["scenarios"]["baseline"]
+    tokens = a08["max_input_bound"] / base["bytes_per_token"]
+    tier = b._rates("gpt-6.1-sol", int(tokens))                    # 302k tokens: still the long-context tier
+    assert a08["baseline_usd"] == pytest.approx((tokens * tier["input"] + 32_000 * base["output"] * tier["output"]) / 1e6,
+                                                abs=1e-4)
+    assert a08["usd"] == pytest.approx(a08["baseline_usd"] * 1.3, abs=1e-3)
+    assert lines["A11-RC"]["over_window_calls"] == 0                          # within Kimi's 1,048,576
 
 
 # ------------------------------------------------------------------ fingerprints and stale approval
@@ -654,7 +659,8 @@ def test_requarantining_one_finding_invalidates_the_approval_and_stops_editing(t
     next(f for f in findings if f["finding_id"] == fid)["eligibility"] = {"status": "QUARANTINED"}
     run.save("validated_findings.json", findings)
     calls = len(agents.calls)
-    with pytest.raises(orch.Pause, match="no longer eligible|stale"):
+    # Task 1's package contract stops it first; the bridge's own eligibility check is the second line
+    with pytest.raises(orch.Pause, match="evidence contract|no longer eligible|stale"):
         run.stage_review_loop(run.state())
     assert len(agents.calls) == calls                                  # neither A11 nor A12 ran on stale approval
 
@@ -782,6 +788,9 @@ def test_requests_that_cannot_be_bounded_or_placed_fail_closed(tmp_path, monkeyp
     monkeypatch.setattr(run, "agent", lambda *a, **k: pytest.fail("dispatched without admission"))
     with pytest.raises(AdmissionRefused, match="cannot be serialized"):
         run._admitted("A08-OL", {"not json": object()}, "A08-OL_v1")
+    adm = run.cfg["admission"]
+    run.cfg = {**run.cfg, "admission": {**adm, "context_windows": {k: v for k, v in adm["context_windows"].items()
+                                                                   if k != "kimi-k3.1-pro"}}}
     with pytest.raises(AdmissionRefused, match="no context window recorded for kimi"):
         run._admitted("A11-RC", {"x": 1}, "A11-RC_cycle1", exclude=frozenset({"anthropic"}))
     assert not run.budget.reservations()

@@ -74,7 +74,32 @@ def measured_rates(run_dir: Path) -> dict:
     out["per_theme"] = {"themes": len(themes), "mean_usd": round(sum(themes) / max(len(themes), 1), 4),
                         "p90_usd": round(_pct(themes, .9), 4)}
     out["themes_per_paper"] = round(len(themes) / max(len(levels), 1), 3)
+    out.update(_batch_and_repeat(run_dir, entries, levels))
     return out
+
+
+def _batch_and_repeat(run_dir: Path, entries: list[dict], levels: dict) -> dict:
+    """Two measured quantities for planning: what the reference run's own A05 and A06 calls would have cost at
+    the vendors' batch rates, as a fraction of what they cost (token class by token class, from prices.yaml;
+    `-batch` entries, else standard rates), and the share of papers with a BLOCKED finding (the papers the A06
+    instability test repeats)."""
+    from ..budget import BudgetTracker
+    import tempfile
+    b = BudgetTracker(Path(tempfile.mkdtemp()))
+    keys = ("input_tokens", "output_tokens", "cached_input_tokens", "cache_write_tokens", "cache_write_1h_tokens")
+    factor = {}
+    for agent in ("A05-KE", "A06-SV"):
+        rows = [e for e in entries if e.get("agent") == agent and not e.get("batch_id") and e.get("model")]
+        std = sum(b.cost(e["model"], *(e.get(k, 0) for k in keys)) or 0 for e in rows)
+        bat = sum(b.cost(e["model"], *(e.get(k, 0) for k in keys), batch=True) or 0 for e in rows)
+        factor[agent] = round(bat / std, 4) if std else 1.0
+    blocked = 0
+    for rid in levels:
+        v = run_dir / "data" / "validations" / f"{rid}.json"
+        if v.exists() and any(str(x.get("disposition") or "").startswith("BLOCKED")
+                              for x in json.loads(v.read_text(encoding="utf-8")).get("validations", [])):
+            blocked += 1
+    return {"batch_factor": factor, "repeat_share": round(blocked / max(len(levels), 1), 3)}
 
 
 def rates_path() -> Path:
@@ -113,19 +138,28 @@ def _worst(budget, route, agent: str, calls: int, input_tokens: int, cache_write
 
 
 def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inputs: dict | None = None) -> list[dict]:
-    """A07 to A12 at worst case, for a corpus of n_findings validated findings. Every A07 turn is one
-    attempt: a truncated turn stops the job and supersedes the projection (orchestrator), so a retry is
-    re-projected from actual spend rather than assumed. a07_done: turns already committed."""
-    loops, syn = cfg["loops"], cfg["synthesis"]
-    groups = max(1, math.ceil(n_findings / int(syn["max_findings_per_group"])))
+    """A07 to A12 for a corpus of n_findings validated findings: each line's `usd` is the calibrated baseline plus
+    the forecast's uncertainty margin (pipeline.yaml -> forecast), with `adverse_usd` and every scenario alongside;
+    `calls` is the most the configured loops allow. Spend beyond a line supersedes the projection before the next
+    call (orchestrator). a07_done: A07 turns already committed."""
+    # A07 and A10: calibrated forecasts from measured production requests (forecast.py), replacing the earlier
+    # envelopes (A07 $5,492.64 and A10 $158.34 at 1,996 findings), which no workload could be admitted under
+    from .forecast import A07_GROUP_CALLS, A07_PROPOSITIONS_PER_FINDING, calibrated_line
+    syn = cfg["synthesis"]
+    expected = 2 + A07_GROUP_CALLS(n_findings) + math.ceil(A07_PROPOSITIONS_PER_FINDING * n_findings
+                                                            / int(syn.get("reconcile_page_size", 32)))
+    a07 = calibrated_line("A07-SYN", n_findings, cfg, budget, route, done_share=min(1.0, a07_done / expected))
+    a10 = calibrated_line("A10-RV", n_findings, cfg, budget, route)
+    # A08, A09, A11 and A12 from the bridge's bounded request builders (downstream_projection.py)
+    from .downstream_projection import lines as bridge_lines
+    a08, a09, a11, a12 = bridge_lines(budget, route, cfg, n_findings, inputs)
+    return [a07, a08, a09, a10, a11, a12]
+
+
+def _legacy_a10_envelope(budget, route, cfg: dict, n_findings: int) -> dict:
+    """The superseded A10 planning envelope, kept for comparison in reports only."""
+    loops = cfg["loops"]
     cycles = int(loops["max_critique_cycles"])
-    from ..synthesis_registry import projected_a07
-    envelope = projected_a07(syn, n_findings)
-    m = route("A07-SYN")
-    fraction = max(0, envelope["calls"] - a07_done) / max(1, envelope["calls"])
-    a07 = {"stage": "A07-SYN", "basis": "ESTIMATED_ENVELOPE", "calls": max(0, envelope["calls"] - a07_done),
-           "usd": round((budget.cost(m.model, envelope["input_tokens"], envelope["output_tokens"]) or 0) * fraction, 4),
-           "detail": "bounded registry call envelope including retrieval; no cache savings; per-call admission required"}
     # A10 now has many bounded calls, not four unbounded whole-corpus calls. This is an
     # intentionally conservative planning scenario, NOT a hard bound on a future manuscript.
     # Include optional revisions and retrieval; exact requests reserve individually at dispatch.
@@ -143,10 +177,22 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inp
            'usd':round(factor*((budget.cost(vm.model,60000,limits['LOCAL']) or 0)*local_calls
                               +(budget.cost(vm.model,60000,limits['GLOBAL']) or 0)*versions*global_pages),4),
            'detail':f'{candidates} estimated candidate occurrences (24-320, corpus-based before manuscript exists); half-full local packets; 1.5 index entries/finding; 20% edited locals; all global pages rechecked; 60k input/call, full output caps and retrieval; no cache savings; actual reservation required'}
-    # A08, A09, A11 and A12 from the bridge's bounded request builders (downstream_projection.py)
-    from .downstream_projection import lines as bridge_lines
-    a08, a09, a11, a12 = bridge_lines(budget, route, cfg, n_findings, inputs)
-    return [a07, a08, a09, a10, a11, a12]
+    return a10
+
+
+def _batch_factor(rates: dict, cfg: dict) -> float:
+    """Measured batch factor for A05/A06 per-paper work (records/cost_rates.json -> batch_factor), when both agents
+    are batched (A06 only while loops.max_reextractions is 0); else 1. The first paper of a stage runs
+    interactively (the probe), so `_batched` charges it at the full rate."""
+    b = cfg.get("batch") or {}
+    if not b.get("enabled") or not {"A05-KE", "A06-SV"} <= set(b.get("agents") or [])             or int((cfg.get("loops") or {}).get("max_reextractions", 0)):
+        return 1.0
+    return max((rates.get("batch_factor") or {"none": 1.0}).values())
+
+
+def _batched(units: list[float], factor: float) -> float:
+    units = sorted(units, reverse=True)   # the probe charged at the full rate is the dearest paper
+    return (units[0] + sum(units[1:]) * factor) if units else 0.0
 
 
 def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, route, cfg: dict) -> dict:
@@ -154,18 +200,20 @@ def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, rou
     lines, n_findings, by_level = [], 0, {"ABSTRACT": 0, "FULL_TEXT": 0}
     for rec in selection:
         by_level[content_level(rec, run_dir)] += 1
+    factor = _batch_factor(rates, cfg)
     for level, n in by_level.items():
         r = rates["per_paper"][level]
         if n:
             lines.append({"stage": f"A05-KE + A06-SV per paper ({level})", "basis": "MEASURED_P90", "calls": n,
-                          "usd": round(n * r["p90_usd"], 4),
+                          "usd": round(_batched([r["p90_usd"]] * n, factor), 4),
                           "detail": f"{n} papers x ${r['p90_usd']:.4f} (90th percentile of {r['papers']} papers in "
-                                    f"{rates['reference_run']})"})
+                                    f"{rates['reference_run']})" + (f"; batch factor {factor} after one interactive "
+                                    "probe" if factor < 1 else "")})
             n_findings += math.ceil(n * r["findings_p90"])
     if (cfg.get("validation") or {}).get("instability_test"):
         # every paper assumed to have a blocked finding, so every paper repeated
-        usd = sum(n * rates["per_paper"][lv].get("a06_p90_usd", rates["per_paper"][lv]["p90_usd"])
-                  for lv, n in by_level.items())
+        usd = _batched([rates["per_paper"][lv].get("a06_p90_usd", rates["per_paper"][lv]["p90_usd"])
+                        for lv, n in by_level.items() for _ in range(n)], factor)
         lines.append({"stage": "A06-SV whole-paper repeat (instability test)", "basis": "MEASURED_P90",
                       "calls": len(selection), "usd": round(usd, 4),
                       "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th "
@@ -206,10 +254,13 @@ def _per_paper_remaining(run, rates: dict, in_flight: frozenset) -> tuple[list[d
                 and f"A06-SV_{rid}_repeat" not in in_flight:
             usd["A06-SV whole-paper repeat (instability test)"][0] += 1
             usd["A06-SV whole-paper repeat (instability test)"][1] += a06
+    factor = _batch_factor(rates, run.cfg)
     for stage, (n, x) in usd.items():
         if n:
-            lines.append({"stage": stage, "basis": "MEASURED_P90", "calls": n, "usd": round(x, 4),
-                          "detail": f"{n} papers at the 90th percentile by content level ({rates['reference_run']})"})
+            lines.append({"stage": stage, "basis": "MEASURED_P90", "calls": n,
+                          "usd": round(_batched([x / n] * n, factor), 4),
+                          "detail": f"{n} papers at the 90th percentile by content level ({rates['reference_run']})"
+                                    + (f"; batch factor {factor} after one interactive probe" if factor < 1 else "")})
     if not run.data("theme_records.json").exists():
         themes = max(1, math.ceil(len(run.load("selected_corpus.json") or []) * rates["themes_per_paper"]))
         lines.append({"stage": "A06-SV per theme", "basis": "MEASURED_P90", "calls": themes,

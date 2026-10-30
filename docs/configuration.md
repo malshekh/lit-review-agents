@@ -254,8 +254,9 @@ from actual spend (turns already committed are not priced again).
 request, the exact serialized request is bounded in UTF-8 bytes (never below its token count) and must fit
 the routed model's window (`admission.context_windows`) with its output reserve (`max_tokens`, plus
 `reasoning_reserve_tokens` for providers where reasoning is not established to count within it). A request
-that cannot be bounded, or whose model has no recorded window, is refused. Kimi K3.1 Pro has no recorded
-window, so A11 on Kimi is refused until a documented value is added. A request that does not fit is
+that cannot be bounded, or whose model has no recorded window, is refused. The windows were read from the
+providers' model-metadata endpoints on 2026-10-30 (`tests/model_window_probe.py`): Claude 1,000,000 input tokens,
+Kimi K3.1 Pro 1,048,576; OpenAI's endpoint reports none, so GPT-6.1's 1,050,000 is researcher-supplied. A request that does not fit is
 subdivided by a fixed rule or the stage stops. A09 writes one section per request, and a section too large
 for one request stops the stage: the plan must split it. A12 edits the whole manuscript, or one unit at a
 time (front matter, then each section) when the whole does not fit. A08 and A11 are single requests and stop.
@@ -270,6 +271,24 @@ A12 projection lines (`src/litreview/tools/downstream_projection.py`) come from 
 (`REQUEST_BOUND` once the approved package exists, `ESTIMATED_ENVELOPE` before it), price input at the byte
 bound divided by 1.8 (below every free provider count measured), and are re-made at the start of each of
 those stages. Spend or calls past a line supersede the projection before the next call.
+
+**Calibrated forecast** (`forecast`, `src/litreview/tools/forecast.py`). After CP2 every A07 to A12 projection
+line's `usd` is a calibrated baseline plus `forecast.uncertainty_margin` (30%), with the low, high and adverse
+scenarios and the strict adverse figure alongside, and `calls` set to the most the configured loops allow. A07 is
+fitted on provider-counted input of its production requests at 40, 80 and 120 papers; A10 on its production
+request bounds for a 5,000-word manuscript; A08 to A12 on the bridge's request builders; A05/A06 per-paper lines
+use the measured 90th percentile with the measured batch factor (0.5) after one interactive probe. The scenario
+assumptions (output share of caps, bytes per token, retrieval and redraft frequency, critique cycles, failed
+calls) are in `pipeline.yaml -> forecast` because nothing has measured them. The forecast plans; it never
+authorizes a call: each call is still admitted and reserved at its own strict bound, the runtime gate and the
+spend cap still stop it, and spend beyond a line supersedes the projection before the next call.
+`python -B tests/full_run_forecast.py` writes the whole-run forecast.
+
+**Two interface rules between the writer and A10.** The journal forbids references in the title and abstract,
+so A10 does not require a citation there, but a verified occurrence still has to name the evidence findings it
+rests on (`NO_CITATION_SURFACES` in `verification_job.py`). A10 records at most 24 evidence findings per
+occurrence, so the section gate refuses a sentence that binds more (`bridge.max_findings_per_sentence`, read from
+A10's schema): a grouped passage spans several sentences.
 
 **The bridge** (`bridge`, `src/litreview/bridge.py`). Code, not a model, hands the approved synthesis to the
 writing agents. A08 receives a compact argument map and one line per element, and returns a plan and an

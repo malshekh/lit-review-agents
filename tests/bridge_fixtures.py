@@ -315,15 +315,28 @@ def fixture_plan(pkg: dict, corpus: list[dict], table: dict, group_size: int = 1
             ledger.append({"item_id": e, "outcome": "TABLE_ONLY" if e in shown else "NOT_INDIVIDUALLY_DISCUSSED",
                            "section_id": None, "grouped_with": [],
                            "reason": None if e in shown else "Display-level detail beyond the word budget's reach"})
+    # propositions outside the approved themes (A07's administrative UNMAPPED bucket) and the knowledge gaps are
+    # written, grouped, in bounded subsections before the Conclusion: a section is the unit admission subdivides
+    # by, so a plan that put every gap in one section would be stopped before dispatch (as A08's would be)
+    stray = [e for e, el in els.items() if el["kind"] == "PROPOSITION" and el["record"].get("primary_theme_id") not in themes]
     gap_ids = [e for e, el in els.items() if el["kind"] == "GAP"]
-    for part in chunks(gap_ids):
-        place(concl, part, "GAP")
+    units = [("PROPOSITION", part) for part in chunks(stray)] + [("GAP", part) for part in chunks(gap_ids)]
+    parts = [units[i:i + 6] for i in range(0, len(units), 6)]
+    gap_sections = []
+    for k, part in enumerate(parts, 1):
+        s = {"section_id": f"S{len(sections) + k}", "heading": f"Evidence gaps and limitations, part {k}",
+             "theme_ids": [], "ordered_items": []}
+        for kind, ids in part:
+            place(s, ids, kind)
+        gap_sections.append(s)
+    sections[-1:-1] = gap_sections
     for e, el in els.items():
         if el["kind"] == "AUTHOR_INTERPRETATION":
             place(concl, [e], "AUTHOR_INTERPRETATION")
-    budgets = {"S1": 600, concl["section_id"]: 500}
+    budgets = {"S1": 600, concl["section_id"]: 500, **{s["section_id"]: 120 for s in gap_sections}}
     for s in sections:
-        s.update(level=1, heading_kind="DESCRIPTIVE", heading_proposition_ids=[], purpose=f"Fixture purpose of {s['heading']}",
+        s.update(level=2 if s in gap_sections else 1, heading_kind="DESCRIPTIVE", heading_proposition_ids=[],
+                 purpose=f"Fixture purpose of {s['heading']}",
                  word_budget=budgets.get(s["section_id"], (4750 - 1100) // len(themes)), display_item_ids=[],
                  transition_in="", transition_out="", wording_restrictions=[])
     sections[1]["display_item_ids"] = ["T1"] if table.get("status") == "BUILT" else []
@@ -348,13 +361,24 @@ def fixture_plan(pkg: dict, corpus: list[dict], table: dict, group_size: int = 1
 
 
 def tagged_text(packet: dict, words_per_unit: int = 0) -> str:
-    """Prose that passes the section gate, made only from the packet: for each unit one sentence per element,
-    tagged with it, citing its own papers, stating only numbers in its record (here: none). Evaluation text."""
+    """Prose that passes the section gate, made only from the packet: one sentence per unit (a grouped passage is
+    one sentence tagged with every member), citing the members' own papers, stating only numbers in their records
+    (here: none). Evaluation text."""
+    limit = bridge.max_findings_per_sentence()
+    records = bridge.packet_records(packet)
     out = ["This section is organized by evidence system. ⟦ORG⟧"]
     for u in packet["units"]:
-        for i in u["item_ids"]:
-            cites = "; ".join(f"@{c}" for c in packet["citations_by_tag"].get(i, [])[:3])
-            out.append(f"Evaluation sentence for an element{' [' + cites + ']' if cites else ''}. ⟦{i}⟧")
+        part = []                                # a passage: as many sentences as A10's per-sentence limit needs
+        for i in u["item_ids"] + [None]:
+            if i is not None and len(bridge.sentence_findings(part + [i], records)) <= limit:
+                part.append(i)
+                continue
+            if part:
+                cited = list(dict.fromkeys(c for x in part for c in packet["citations_by_tag"].get(x, [])))[:3]
+                cites = "; ".join(f"@{c}" for c in cited)
+                out.append(f"Evaluation sentence for {'a group of elements' if len(part) > 1 else 'an element'}"
+                           f"{' [' + cites + ']' if cites else ''}. ⟦{','.join(part)}⟧")
+            part = [i] if i is not None else []
     return " ".join(out)
 
 
@@ -377,6 +401,4 @@ def bridge_stubs(run, monkeypatch, ps: dict | None = None):
     monkeypatch.setattr(run, "_stamp", lambda rv, m, ps: rv)
     monkeypatch.setattr(run, "_require_current", lambda *a, **k: None)
     monkeypatch.setattr(run, "_bridge_fingerprint", lambda *a, **k: "fp")
-    windows = dict(run.cfg["admission"]["context_windows"], **{"kimi-k3.1-pro": 262_144})
-    run.cfg = {**run.cfg, "admission": {**run.cfg["admission"], "context_windows": windows}}
     return ps
