@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A06-SV output (top-level contract; see the prompt's output schema for full detail)",
+  "title": "A06 mode-specific scientific validation contract",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -35,6 +35,88 @@
         "PER_PAPER",
         "PER_THEME"
       ]
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "validations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_id",
+          "disposition",
+          "gate1",
+          "constraints",
+          "plain_language_limit"
+        ],
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "disposition": {
+            "enum": [
+              "SUPPORTED",
+              "SUPPORTED_WITH_CONSTRAINTS",
+              "SUPPORTED_FOR_OBSERVATION",
+              "PARTIALLY_SUPPORTED",
+              "DOES_NOT_ESTABLISH",
+              "BLOCKED_PROVENANCE",
+              "BLOCKED_ALIGNMENT",
+              "HUMAN_REVIEW_REQUIRED",
+              "UNRESOLVED_SOURCE_ACCESS"
+            ]
+          },
+          "gate1": {
+            "enum": [
+              "PASSED",
+              "FAILED",
+              "UNRESOLVED_SOURCE_ACCESS"
+            ]
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "plain_language_limit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "theme": {
+      "type": "string"
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "finding_ids"
+        ],
+        "properties": {
+          "finding_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "independence": {
+      "type": "array"
+    },
+    "evidence_reach": {
+      "type": "object"
     }
   },
   "required": [
@@ -45,5 +127,39 @@
     "limitations",
     "mode"
   ],
-  "additionalProperties": true
+  "additionalProperties": true,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "PER_PAPER"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "record_id",
+          "validations"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "PER_THEME"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "theme",
+          "conflicts",
+          "independence",
+          "evidence_reach"
+        ]
+      }
+    }
+  ]
 }

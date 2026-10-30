@@ -13,7 +13,7 @@ SYNTH = {"propositions": [
 
 def _finding(fid, system, species, polarity="POSITIVE"):
     return {"finding_id": fid, "record_id": fid.split(":")[0], "subject": "E1", "predicate": "DECREASES",
-            "object": "E2", "polarity": polarity, "span": "X reduced Y.", "disposition": "SUPPORTED",
+            "object": "E2", "polarity": polarity, "span": "X reduced Y by -30% (p = 0.01; n = 8).", "disposition": "SUPPORTED",
             "constraints": ["single dose"], "quantities": [{"measured_property": "Y", "raw_value": "-30",
                                                             "raw_unit": "%", "p_value": "0.01", "n": "8"}],
             "context": {"evidence_system": system, "species": species, "dose_or_concentration": "NOT_REPORTED"},

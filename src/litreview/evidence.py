@@ -10,13 +10,13 @@ correcting an identifier never promotes a finding by itself.
   SUPPORTING             SUPPORTED, SUPPORTED_WITH_CONSTRAINTS,                 SUPPORTING or CONFLICTING evidence
                          SUPPORTED_FOR_OBSERVATION, PARTIALLY_SUPPORTED
   NOT_ESTABLISHED        DOES_NOT_ESTABLISH                                     SUBJECT_OF_APPRAISAL only
-  HELD_FOR_CORRECTION    BLOCKED_ALIGNMENT caused only by a code-attached       nothing
-                         identity (kept recoverable, never rejected)
+  HELD_FOR_CORRECTION    failed deterministic provenance, BLOCKED_PROVENANCE, nothing
+                         or BLOCKED_ALIGNMENT caused by a code-attached identity
   REVALIDATION_REQUIRED  any: an entity identity changed after validation       nothing, until A06 revalidates
   QUARANTINED            a revalidation changed the disposition with no change  nothing, until a human decides
                          to the extraction and no identity correction to
                          explain it (see review_changes)
-  REJECTED               BLOCKED_PROVENANCE; BLOCKED_ALIGNMENT (extraction)     nothing
+  REJECTED               BLOCKED_ALIGNMENT (extraction), or explicit rejection  nothing
   UNRESOLVED             HUMAN_REVIEW_REQUIRED, UNRESOLVED_SOURCE_ACCESS, none  nothing
 
 Evidence roles sit on each finding-proposition link, not on the proposition: one proposition may cite
@@ -52,6 +52,9 @@ def status_of(finding: dict) -> str:
     """The eligibility status of a validated-finding record. The disposition sets the ceiling; a stored
     status can only lower it (held, revalidation required), never raise it."""
     stored = (finding.get("eligibility") or {}).get("status")
+    if (finding.get('provenance_gate1', {}).get('passed') is False
+            and stored not in ('QUARANTINED', 'REJECTED', 'REVALIDATION_REQUIRED')):
+        return 'HELD_FOR_CORRECTION'
     d = finding.get("disposition")
     if stored in ("HELD_FOR_CORRECTION", "REVALIDATION_REQUIRED", "QUARANTINED", "REJECTED", "UNRESOLVED"):
         return stored
@@ -59,6 +62,8 @@ def status_of(finding: dict) -> str:
         return "SUPPORTING"
     if d == "DOES_NOT_ESTABLISH":
         return "NOT_ESTABLISHED"
+    if d == 'BLOCKED_PROVENANCE':
+        return 'HELD_FOR_CORRECTION'
     return "REJECTED" if str(d or "").startswith("BLOCKED_") else "UNRESOLVED"
 
 
@@ -130,7 +135,8 @@ def classify(finding: dict, validation: dict | None, defects: list[dict], implic
         return {"status": "NOT_ESTABLISHED", "disposition": d,
                 "reason": "A06: the paper's evidence does not establish the finding as stated"}
     if d == "BLOCKED_PROVENANCE":
-        return {"status": "REJECTED", "disposition": d, "reason": "Gate 1 (provenance) failed"}
+        return {"status": "HELD_FOR_CORRECTION", "disposition": d,
+                "reason": "Gate 1 failed; preserve source evidence for correction and revalidation"}
     if d == "BLOCKED_ALIGNMENT":
         codes = _codes(v.get("gate2"), *(x.get("defect_type") for x in defects))
         causes = {str(x.get("cause") or "").upper() for x in defects} - {""}
@@ -286,7 +292,7 @@ def review_changes(record_id: str, old_val: dict, old_ext: dict, new_val: dict, 
                       "new_gate2": v.get("gate2"), "direction": direction, "explained_by": explained,
                       "identity_changed": sorted(moved), "action": action,
                       "reason": f"revalidation changed {od} -> {nd} ({direction}) {why}",
-                      "old_validation": old.get(fid), "decision": None})
+                      "old_validation": old.get(fid), "new_validation":v, "decision": None})
     return items
 
 

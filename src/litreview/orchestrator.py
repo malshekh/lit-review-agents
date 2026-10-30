@@ -696,10 +696,19 @@ class Run:
         return {i["local_id"]: i for i in self.load("validation_review.json", []) if i["record_id"] == rid}
 
     def _record_review(self, rid: str, items: list[dict]) -> None:
-        """Replace this paper's undecided review items with `items`; human decisions already made stay."""
-        keep = [i for i in self.load("validation_review.json", []) if i["record_id"] != rid or i.get("decision")]
+        """Replace pending reviews; retain human decisions only for the same evidence/validation version."""
+        from .synthesis_registry import fingerprint
+        ext = self.load(f'extractions/{rid}.json', {})
+        fps = evidence.finding_fingerprints(ext)
+        source = self.load(f'fulltext/{rid}.json', {})
+        items = [{**i, 'validation_version':fingerprint([i.get('old_validation'),i.get('new_validation'),
+                   fps.get(i['local_id']),source])} for i in items]
+        versions = {i['finding_id']:i['validation_version'] for i in items}
+        keep = [i for i in self.load("validation_review.json", []) if i["record_id"] != rid or
+                (i.get('decision') and (i['finding_id'] not in versions or
+                                       i.get('validation_version') == versions[i['finding_id']]))]
         decided = {i["finding_id"] for i in keep}
-        self.save("validation_review.json", keep + [i for i in items if i["finding_id"] not in decided])
+        self._write_validation("validation_review.json", keep + [i for i in items if i["finding_id"] not in decided])
 
     def review_revalidations(self, notes: dict[str, str] | None = None) -> list[dict]:
         """Apply the revalidation review rule to every paper revalidated in this run, against the validations
@@ -772,7 +781,18 @@ class Run:
         audit and the run's registry, and so cannot reach any consumer. The validation then records the
         identities it was made against, so a later identity change sends the finding back for revalidation
         instead of silently keeping (or gaining) its disposition."""
+        # Provider output cannot supply trusted replay/review/identity metadata.
+        if isinstance(val, dict):val = {k:v for k,v in val.items() if not k.startswith('_')}
         ext = self.load(f"extractions/{rid}.json", {})
+        self._require_complete_validation(rid, val, ext)
+        previous = self.load(f'validations/{rid}.json')
+        if previous and previous.get('_review_pending'):
+            self._recover_validation_review(rid, previous)
+        saved = self.load(f'a06_inputs/{rid}.json', {}).get('payload', {})
+        if 'extraction' in saved and 'paper_text' in saved:
+            if (evidence.finding_fingerprints(saved['extraction']) != evidence.finding_fingerprints(ext)
+                    or saved['paper_text'] != self.load(f'fulltext/{rid}.json', {})):
+                raise Pause(f'{rid}: A06 source input changed during validation; result not accepted')
         ents = {e.get("entity_id"): e for e in ext.get("entities", [])}
         audits = []
         for c in val.get("normalization_conflicts") or []:
@@ -787,13 +807,50 @@ class Run:
             self.save(f"extractions/{rid}.json", ext)
         val["_entity_identities"] = evidence.identity_snapshot(ext)
         val["_finding_fingerprints"] = evidence.finding_fingerprints(ext)
+        from .scientific_validation import source_fingerprint
+        val['_source_fingerprint'] = source_fingerprint(self.load(f'fulltext/{rid}.json', {}))
         previous = self.load(f"validations/{rid}.json")
         if previous is not None:
             # a revalidation: a changed disposition with nothing in the input to explain it is not applied
             # (evidence.review_changes); the previous extraction is the archived one if identities moved since
             prev_ext = self.load(f"renormalization/extractions_before/{rid}.json") or ext
-            self._record_review(rid, evidence.review_changes(rid, previous, prev_ext, val, ext))
-        self.save(f"validations/{rid}.json", val)
+            val['_pending_review_items'] = evidence.review_changes(rid, previous, prev_ext, val, ext)
+            val['_review_pending'] = bool(val['_pending_review_items'])
+        self._write_validation(f'validations/{rid}.json', val)
+        self._recover_validation_review(rid, val)
+
+    def _recover_validation_review(self, rid, val):
+        if val.get('_review_pending'):
+            self._record_review(rid, val['_pending_review_items'])
+            val = {**val, '_review_pending':False}
+            self._write_validation(f'validations/{rid}.json', val)
+        return val
+
+    def _write_validation(self, name, val):
+        """Atomically install a validation or its associated source/review artifact."""
+        target = self.data(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix('.pending')
+        temporary.write_text(json.dumps(val, ensure_ascii=False, indent=2), encoding='utf-8')
+        os.replace(temporary, target)
+
+    def _require_complete_validation(self, rid, val, ext):
+        from .scientific_validation import require_complete
+        try:require_complete(val or {}, ext, rid)
+        except ValueError as exc:
+            self.save(f'validation_rejections/{rid}.json', {'error':str(exc), 'response':val})
+            raise Pause(f'{rid}: {exc}; validation not accepted') from exc
+
+    def _prepare_validation(self, rid):
+        ext = self.load(f'extractions/{rid}.json', {})
+        sections = self.load(f'fulltext/{rid}.json', {})
+        repaired = span_check.repair_findings(ext, sections)
+        if repaired != ext:
+            self._write_validation(f'extractions/{rid}.json', repaired)
+            self.prov.tool_run('deterministic_span_repair', rid,
+                {'corrections':[{'finding_id':f['finding_id'], 'history':f['span_corrections']}
+                                for f in repaired.get('findings', []) if f.get('span_corrections')]})
+        return repaired, sections
 
     def _extraction_vendor(self, rid: str, entries: list[dict] | None = None) -> str:
         """The vendor that actually produced this paper's current extraction: the provider of the last call
@@ -818,8 +875,7 @@ class Run:
                 rid = rec["record_id"]
                 if self.data(f"validations/{rid}.json").exists():
                     continue
-                sections = self.load(f"fulltext/{rid}.json")
-                ext = self.load(f"extractions/{rid}.json")
+                ext, sections = self._prepare_validation(rid)
                 # a paper re-extracted before re-extraction was turned off keeps its label (v2)
                 n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
                 rid_of[f"A06-SV_{rid}_v{n}"] = rid
@@ -840,7 +896,7 @@ class Run:
             start = 1 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 0
             label_offset = start - min(start, max_re)   # keeps v2 as v2 if re-extraction was later turned off
             for attempt in range(min(start, max_re), max_re + 1):
-                ext = self.load(f"extractions/{rid}.json")
+                ext, sections = self._prepare_validation(rid)
                 gate1 = span_check.check_findings(ext, sections)
                 payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext, "gate1_results": gate1,
                            "paper_text": sections}
@@ -868,6 +924,10 @@ class Run:
                     break
                 self.save(f"extractions/{rid}.json", self._normalize(rid, ext))
             self._save_validation(rid, val)
+        for rec in corpus:
+            rid = rec['record_id']
+            self._require_complete_validation(rid, self.load(f'validations/{rid}.json'),
+                                               self.load(f'extractions/{rid}.json', {}))
         self._instability_test(corpus)
         findings = self._validated_findings(corpus)
         theme_records = self._theme_pass(corpus, findings)
@@ -936,8 +996,11 @@ class Run:
             steps[f"A06-SV_{rid}_repeat"] = (rid, saved)
         todo = [(s, saved["payload"]) for s, (rid, saved) in steps.items()
                 if not self.data(f"validation_repeats/{rid}.json").exists()]   # each paper repeated once
-        self.run_many("A06-SV", todo,
-                      lambda step, out: self.save(f"validation_repeats/{steps[step][0]}.json", out),
+        def accept_repeat(step, out):
+            rid, saved = steps[step]
+            self._require_complete_validation(rid, out, saved['payload']['extraction'])
+            self._write_validation(f'validation_repeats/{rid}.json', out)
+        self.run_many("A06-SV", todo, accept_repeat,
                       exclude=lambda step: frozenset({self._extraction_vendor(steps[step][0])}))
         entries = self.budget.entries()
 
@@ -958,6 +1021,8 @@ class Run:
                 invalid[rid] = bad
                 continue
             orig = self.load(f"validations/{rid}.json")
+            self._require_complete_validation(rid, orig, saved['payload']['extraction'])
+            self._require_complete_validation(rid, rep, saved['payload']['extraction'])
             r, review = evidence.compare_repeat(rid, orig, rep)
             self._record_review(rid, review)
             rows += r
@@ -998,6 +1063,9 @@ class Run:
                                                                   for r in corpus]},
                                            step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}",
                                            exclude_providers=theme_exclude)
+            from .scientific_validation import require_theme
+            try:require_theme(theme_records[th], th, fs)
+            except ValueError as exc:raise Pause(str(exc)) from exc
         return theme_records
 
     def _validated_findings(self, corpus: list[dict]) -> list[dict]:
@@ -1009,10 +1077,27 @@ class Run:
             rid = rec["record_id"]
             ext = self.load(f"extractions/{rid}.json", {})
             val_doc = self.load(f"validations/{rid}.json", {})
+            self._require_complete_validation(rid, val_doc, ext)
+            val_doc = self._recover_validation_review(rid, val_doc)
+            from .scientific_validation import source_fingerprint
+            sections = self.load(f'fulltext/{rid}.json', {})
+            gates = {g['finding_id']:g for g in span_check.check_findings(ext, sections)}
             review = self._review_items(rid)
             # the disposition, constraints and limit come from the same reading as the eligibility
             val = evidence.effective_validations(val_doc, review)
             elig = evidence.annotate_paper(ext, val_doc, review)
+            stale_source = val_doc.get('_source_fingerprint') != source_fingerprint(sections)
+            old_fingerprints = val_doc.get('_finding_fingerprints')
+            current_fingerprints = evidence.finding_fingerprints(ext)
+            for f in ext.get('findings', []):
+                fid = f['finding_id']
+                if not span_check.passed(gates[fid]) and elig[fid]['status'] not in ('QUARANTINED','REJECTED','REVALIDATION_REQUIRED'):
+                    elig[fid] = {**elig[fid], 'status':'HELD_FOR_CORRECTION',
+                                 'reason':'deterministic Gate 1 failed; source correction and revalidation required'}
+                elif (((old_fingerprints or {}).get(fid) != current_fingerprints[fid] or stale_source)
+                      and elig[fid]['status'] not in ('QUARANTINED','REJECTED','HELD_FOR_CORRECTION')):
+                    elig[fid] = {'status':'REVALIDATION_REQUIRED', 'disposition':val.get(fid, {}).get('disposition'),
+                                 'reason':'source or extracted finding changed after validation'}
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
@@ -1024,6 +1109,10 @@ class Run:
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
                             "disposition": v.get("disposition"), "eligibility": elig.get(f["finding_id"]),
+                            'provenance_gate1':{'passed':span_check.passed(gates[f['finding_id']]),
+                                'checks':gates[f['finding_id']], 'source_fingerprint':source_fingerprint(sections),
+                                'finding_fingerprint':current_fingerprints[f['finding_id']]},
+                            'span_corrections':f.get('span_corrections', []),
                             "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
                             # only this finding's own subject and object, not the paper's whole entity list;
@@ -1097,11 +1186,14 @@ class Run:
                 raise ValueError(f"{rid} is not in the selected corpus")
             if not self.data(f"renormalization/validations_before/{rid}.json").exists():
                 self.save(f"renormalization/validations_before/{rid}.json", self.load(f"validations/{rid}.json"))
-            sections, ext = self.load(f"fulltext/{rid}.json"), self.load(f"extractions/{rid}.json")
+            ext, sections = self._prepare_validation(rid)
             n = 1 + sum(1 for p in (self.dir / "outputs").glob(f"A06-SV_{rid}_reval*.json") if ".raw" not in p.name)
-            val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                                        "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections},
-                             step=f"A06-SV_{rid}_reval{n}", exclude_providers=frozenset({self._extraction_vendor(rid)}))
+            payload = {"mode":"PER_PAPER", "review_spec":spec, "extraction":ext,
+                       "gate1_results":span_check.check_findings(ext, sections), "paper_text":sections}
+            step = f'A06-SV_{rid}_reval{n}'
+            self._save_a06_input(rid, step, payload)
+            val = self.agent('A06-SV', payload, step=step,
+                             exclude_providers=frozenset({self._extraction_vendor(rid)}))
             self._save_validation(rid, val)
         findings = self._validated_findings(list(corpus.values()))
         self.save("validated_findings.json", findings)
@@ -1124,20 +1216,19 @@ class Run:
         return sorted(stale)
 
     def _findings(self) -> list[dict]:
-        """validated_findings.json with eligibility. A file written before eligibility existed is annotated
-        from the extractions and validations (deterministic, no agent call) and saved, so every consumer
-        sees it."""
+        """Rebuild the evidence projection from current sources and complete A06 inputs."""
         findings = self.load("validated_findings.json")
-        if findings and any(k not in f for f in findings for k in handoff.CONTRACT):
-            rebuilt = {f["finding_id"]: f for f in self._validated_findings(self.load("selected_corpus.json", []))}
-            findings = [rebuilt.get(f["finding_id"]) or
-                        (f if "eligibility" in f else
-                         {**f, "eligibility": evidence.classify({}, {"disposition": f.get("disposition")}, [], set())})
-                        for f in findings]
-            self.save("validated_findings.json", findings)
-            self._save_held(findings)
-            self.prov.tool_run("evidence_eligibility", "annotate", evidence.summary(findings))
-        return findings
+        corpus = self.load('selected_corpus.json', [])
+        if not corpus:
+            if findings:raise Pause('cannot authorize cached evidence without selected source extractions')
+            return findings
+        if any(self.load(f"extractions/{r['record_id']}.json") is None for r in corpus):
+            raise Pause('cannot authorize cached evidence without selected source extractions')
+        fresh = self._validated_findings(corpus)
+        if fresh != findings:
+            self.save('validated_findings.json', fresh)
+            self._save_held(fresh)
+        return fresh
 
     def _save_held(self, findings: list[dict]) -> None:
         """Findings held for correction (a code-attached identity contradicts the source), kept recoverable:
@@ -1408,6 +1499,12 @@ class Run:
         pkg = self._publishable("synthesis_package.json")
         if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
             raise Pause("incomplete synthesis cannot proceed to A08")
+        from .scientific_validation import require_package
+        try:require_package(pkg, self._findings() or [])
+        except ValueError as exc:raise Pause(str(exc)) from exc
+        from .synthesis_registry import fingerprint
+        if decision.get('synthesis_fingerprint') != fingerprint(pkg):
+            raise Pause('CP3 approval is stale; review current synthesis package')
         pkg["researcher_decision"] = decision
         adopted = set(decision.get("adopted_interpretations", []))
         pkg["author_interpretations"] = [{**p, "type": "AUTHOR_INTERPRETATION", "id": p["pi_id"].replace("PI", "AI")}
@@ -1513,6 +1610,9 @@ class Run:
             raise Pause('incomplete synthesis cannot proceed to A10 verification')
         findings = self._findings()
         if pkg.get('registry_fingerprint'):
+            from .scientific_validation import require_package
+            try:require_package(pkg, findings or [])
+            except ValueError as exc:raise Pause(str(exc)) from exc
             for path in (self.dir/'data').glob('synthesis_job_*/registry.json'):
                 registry = EvidenceRegistry(json.loads(path.read_text(encoding='utf-8')))
                 if registry.digest == pkg['registry_fingerprint']:
@@ -1549,8 +1649,13 @@ class Run:
     def _verification_current(self, report, manuscript):
         from .verification_job import current, version, policy_hash
         pkg = self._publishable('synthesis_approved.json')
-        digest = version(manuscript,self.load('manuscript_plan.json',{}),pkg,self._verification_registry(pkg),self.load('display_items.json',[]))
-        return current(report,digest,policy_hash(self.cfg['scientific_verification']))
+        registry = self._verification_registry(pkg)
+        digest = version(manuscript,self.load('manuscript_plan.json',{}),pkg,registry,self.load('display_items.json',[]))
+        expected = set(registry.findings) | {p['proposition_id'] for p in pkg.get('propositions', [])}
+        expected |= {g['gap_id'] for g in pkg.get('knowledge_gaps', [])}
+        expected |= {'RECONCILIATION:'+str(n) for n,_ in enumerate(pkg.get('reconciliation', []))}
+        return (current(report,digest,policy_hash(self.cfg['scientific_verification']))
+                and set(report.get('global_index_ids_reviewed', [])) == expected)
 
     def _a10_detail_report(self) -> dict | None:
         return verification_scope.detail_report(self.prov.events(), self.budget.entries())

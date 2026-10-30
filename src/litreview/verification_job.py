@@ -89,9 +89,25 @@ def policy_hash(cfg):
 
 
 def current(report, digest, policy=None):
-    return (report.get('verification_fingerprint') == digest and not report.get('stale')
+    identity_ok = (report.get('verification_fingerprint') == digest and not report.get('stale')
             and report.get('verification_execution') == 'COMPLETE'
             and (policy is None or report.get('verification_policy_fingerprint')==policy))
+    if not identity_ok:return False
+    occurrences = report.get('occurrence_inventory', [])
+    verdicts = report.get('verdicts', [])
+    coverage = report.get('coverage', {})
+    ids = [o.get('occurrence_id') for o in occurrences]
+    reviewed = [v.get('occurrence_id') for v in verdicts]
+    global_ids = report.get('global_index_ids_reviewed', [])
+    return (bool(ids) and None not in ids and len(ids)==len(set(ids))
+            and len(reviewed)==len(ids) and set(reviewed)==set(ids)
+            and coverage.get('occurrences_total')==len(ids)
+            and coverage.get('occurrences_reviewed')==len(ids)
+            and coverage.get('inventory_fingerprint')==fingerprint(occurrences)
+            and len(global_ids)==len(set(global_ids))
+            and coverage.get('global_index_entries_reviewed')==len(global_ids)
+            and all(v.get('verdict')=='NON_SCIENTIFIC' or set(v.get('checks',[]))==set(CHECKS)
+                    for v in verdicts))
 
 
 class VerificationJob:

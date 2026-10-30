@@ -40,8 +40,8 @@ def test_transitive_plan_binding_preserves_complete_proposition_and_source(tmp_p
     assert payload['findings']  # Full original finding, not just its compact index.
 
 
-def test_upstream_gate1_counterexample_remains_visible(tmp_path, monkeypatch):
-    """Documents an upstream defect without changing A06 rules in this task."""
+def test_upstream_gate1_counterexample_is_now_held(tmp_path, monkeypatch):
+    """A permissive A06 disposition cannot override deterministic provenance."""
     monkeypatch.setattr(orch, 'RUNS_DIR', tmp_path)
     run = orch.Run('gate1-counterexample')
     ext = {'findings': [{'finding_id': 'F1', 'span': 'Invented effect at 1000 mM',
@@ -51,16 +51,17 @@ def test_upstream_gate1_counterexample_remains_visible(tmp_path, monkeypatch):
         {'finding_id': 'F1', 'disposition': 'SUPPORTED', 'constraints': []}]})
     assert not span_check.check_findings(ext, {'results': 'No such effect reported'})[0]['span_found']
     findings = run._validated_findings([{'record_id': 'R0001'}])
-    assert findings[0]['eligibility']['status'] == 'SUPPORTING'
+    assert findings[0]['eligibility']['status'] == 'HELD_FOR_CORRECTION'
 
 
-def test_a06_schema_accepts_complete_without_any_finding_dispositions():
+def test_a06_schema_rejects_complete_without_any_finding_dispositions():
     import json
     import jsonschema
     from litreview.paths import SCHEMAS_DIR
     schema = json.loads((SCHEMAS_DIR/'A06-SV.schema.json').read_text())
-    jsonschema.validate({'agent_id':'A06-SV','prompt_version':'audit','status':'COMPLETE',
-        'warnings':[],'limitations':[],'mode':'PER_PAPER'}, schema)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate({'agent_id':'A06-SV','prompt_version':'audit','status':'COMPLETE',
+            'warnings':[],'limitations':[],'mode':'PER_PAPER'}, schema)
 
 
 def test_capacity_fixture_uses_real_proposition_tags_and_5000_words(tmp_path):

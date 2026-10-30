@@ -139,6 +139,7 @@ def read_cp2_selection(run_dir: Path) -> dict:
 
 # ---------------------------------------------------------------- CP3: argument
 def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, framework: dict | None = None) -> None:
+    from .synthesis_registry import fingerprint
     d = cp_dir(run_dir)
     lines = ["# Checkpoint 3 — Approve the argument", ""]
     if len(pkg.get("models") or []) > 1:
@@ -174,7 +175,7 @@ def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, fram
     lines += [*_emerging_lines(emerging, "findings"), *_framework_lines(framework, "Current theme framework"),
               "Fill in `CP3_decision.json`, then run `litreview approve <run_id> CP3`."]
     (d / "CP3_review.md").write_text("\n".join(lines), encoding="utf-8")
-    template = {"selected_thesis": None, "adopted_interpretations": [], "rejected_interpretations": [],
+    template = {"synthesis_fingerprint":fingerprint(pkg), "selected_thesis": None, "adopted_interpretations": [], "rejected_interpretations": [],
                 "edits": None, "theme_framework_update": None, "notes": ""}
     (d / "CP3_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
@@ -230,11 +231,17 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
         if alignment["planning"]["theme_change_proposals"] and not decision.get("proposal_review_notes", "").strip():
             raise DecisionIncomplete("CP_SYN: record the decision on proposed changes")
     elif cp == "CP3":
+        from .synthesis_registry import fingerprint
+        from .scientific_validation import require_package
         pkg_path = Path(run_dir) / "data" / "synthesis_package.json"
-        if pkg_path.exists():
-            pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
-            if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
-                raise DecisionIncomplete("CP3: incomplete synthesis cannot be approved")
+        if not pkg_path.exists():raise DecisionIncomplete('CP3: synthesis package missing')
+        pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+        findings_path = Path(run_dir)/'data/validated_findings.json'
+        findings = json.loads(findings_path.read_text(encoding='utf-8')) if findings_path.exists() else []
+        try:require_package(pkg, findings)
+        except ValueError as exc:raise DecisionIncomplete('CP3: '+str(exc)) from exc
+        if decision.get('synthesis_fingerprint') != fingerprint(pkg):
+            raise DecisionIncomplete('CP3: stale synthesis fingerprint; review current package')
         if not decision.get("selected_thesis"):
             raise DecisionIncomplete("CP3: set selected_thesis.")
     provenance.human_decision(cp, decision, decision.get("notes", ""))

@@ -68,6 +68,8 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     run.save("manuscript_plan.json", PLAN)
     run.save("synthesis_approved.json", PACKAGE)
     run.save("validated_findings.json", FINDINGS)
+    from evidence_fixtures import seed_sources
+    seed_sources(run, FINDINGS)
     monkeypatch.setattr(run, "_deterministic_report", lambda m: {})
     _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
     sent = []
@@ -110,6 +112,8 @@ def _run(tmp_path, monkeypatch):
     run.save_state({"stage": "draft", "status": "READY", "counters": {}})
     (run.dir / "input").mkdir(parents=True, exist_ok=True)
     (run.dir / "input" / "topic_family.txt").write_text("onc", encoding="utf-8")
+    from evidence_fixtures import seed_sources
+    seed_sources(run, FINDINGS)
     return run
 
 

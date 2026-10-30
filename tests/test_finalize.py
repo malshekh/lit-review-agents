@@ -23,6 +23,8 @@ def run(tmp_path, monkeypatch):
     r.save("synthesis_approved.json", SYNTH)
     r.save("validated_findings.json", FINDINGS)
     r.save("selected_corpus.json", [{**c, "title": "T", "venue": "V"} for c in CORPUS])
+    from evidence_fixtures import seed_sources
+    seed_sources(r, FINDINGS)
     r.save("manuscripts/m04_proof.json", {
         "title": "X lowers Y in rodents", "abstract": "Abstract text.", "keywords": ["X"],
         "sections": [{"section_id": "S1", "heading": "Introduction",
@@ -62,7 +64,7 @@ def test_table_only_citations_count_as_cited(run):
     assert "R0003" not in rep["selected_papers_not_cited"]
 
 
-@pytest.mark.parametrize('change',['text','table','synthesis','evidence','missing_report','blocking'])
+@pytest.mark.parametrize('change',['text','table','synthesis','evidence','missing_report','blocking','missing_verdict','missing_global'])
 def test_release_requires_current_verified_version(run,change):
     if change=='text':
         m=run._current();m['abstract']='Changed assertion';run.save('manuscripts/m04_proof.json',m)
@@ -71,8 +73,15 @@ def test_release_requires_current_verified_version(run,change):
     elif change=='synthesis':
         pkg=run.load('synthesis_approved.json');pkg['propositions'][0]['assertion']='Changed conclusion';run.save('synthesis_approved.json',pkg)
     elif change=='evidence':
-        fs=run.load('validated_findings.json');fs[0]['span']='Changed source';run.save('validated_findings.json',fs)
+        ext=run.load('extractions/R0001.json');ext['findings'][0]['span']='Changed source'
+        run.save('extractions/R0001.json',ext)
     elif change=='missing_report':run.save('rv_final.json',{})
+    elif change=='missing_verdict':
+        rv=run.load('rv_final.json');rv['verdicts'].pop();run.save('rv_final.json',rv)
+    elif change=='missing_global':
+        rv=run.load('rv_final.json');rv['global_index_ids_reviewed'].pop()
+        rv['coverage']['global_index_entries_reviewed']=len(rv['global_index_ids_reviewed'])
+        run.save('rv_final.json',rv)
     else:
         rv=run.load('rv_final.json');rv['findings']=[{'severity':'BLOCKING'}];run.save('rv_final.json',rv)
     with pytest.raises(orch.Pause,match='current complete A10'):

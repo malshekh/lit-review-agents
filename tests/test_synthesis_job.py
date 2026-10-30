@@ -228,6 +228,8 @@ def test_stage_synthesize_uses_bounded_packets_and_requires_alignment(tmp_path, 
                         ("selected_corpus.json",data["selected_corpus"]), ("theme_records.json",data["theme_records"]),
                         ("validated_findings.json",findings)]:r.save(name,value)
     model = FixtureModel(EvidenceRegistry(data))
+    from evidence_fixtures import seed_sources
+    seed_sources(r, findings)
     def fake_run_agent(agent_id, payload, run_dir, step, budget, prov, **kwargs):
         assert kwargs["reservation_key"] in budget.reservations()
         assert kwargs["repair_limit"] == 0

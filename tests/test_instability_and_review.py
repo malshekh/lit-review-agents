@@ -23,7 +23,8 @@ def _run(tmp_path, monkeypatch):
     run = orch.Run("t")
     run.save_state({"stage": "validate", "status": "READY", "counters": {}})
     run.save("selected_corpus.json", [{"record_id": "R0001"}])
-    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma."})
+    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma. " +
+        ' '.join(f'DSF suppressed growth ({i}).' for i in (1,2,3))})
     run.save("extractions/R0001.json", {
         "record_id": "R0001",
         "entities": [{"entity_id": "E1", "mention": "DSF", "type": "APPROVED_DRUG", **WRONG},
@@ -42,7 +43,9 @@ def _v(fid, disposition, constraints=(), gate2="ALIGNED"):
 
 
 def _doc(*vals):
-    return {"record_id": "R0001", "validations": list(vals)}
+    present = {v['finding_id'] for v in vals}
+    return {"record_id": "R0001", "validations": list(vals) +
+        [_v(f'F{i}', 'SUPPORTED') for i in (1,2,3) if f'F{i}' not in present]}
 
 
 def _finding(run, fid):
