@@ -1508,6 +1508,9 @@ class Run:
         from .synthesis_registry import EvidenceRegistry
         from .synthesis_input import build_corpus
         if not pkg:raise Pause('approved synthesis missing for A10 verification')
+        if (pkg.get('status', 'COMPLETE') != 'COMPLETE' or pkg.get('coverage_incomplete_item_ids')
+                or pkg.get('findings_unaccounted')):
+            raise Pause('incomplete synthesis cannot proceed to A10 verification')
         findings = self._findings()
         if pkg.get('registry_fingerprint'):
             for path in (self.dir/'data').glob('synthesis_job_*/registry.json'):

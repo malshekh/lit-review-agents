@@ -219,10 +219,21 @@ class VerificationJob:
         fids.update(x['finding_id'] for x in links)
         missing = fids - set(self.registry.findings)
         if missing:raise JobStopped('A10 binding references missing registry findings')
-        props = {i: [{k:v for k,v in p.items() if k in ('proposition_id','type','assertion','statement','evidence',
-                    'source_item_ids','established_by','constraints','scientific_limitations','reconciliation_issue_ids')}
+        # Follow the same reference chain as finding/role binding. Preserve the full
+        # proposition, including qualifications added by synthesis or human review.
+        reachable, queue = set(), list(ids)
+        while queue:
+            i = queue.pop()
+            if i in reachable:continue
+            reachable.add(i)
+            for obj in self.idx.get(i, []):
+                for key,value in obj.items():
+                    if scope._follows(key):
+                        queue.extend(x for x in (value if isinstance(value,list) else [value])
+                                     if isinstance(x,str) and x in self.idx)
+        props = {i: [dict(p)
                     for p in self.idx.get(i, []) if 'proposition_id' in p or 'statement' in p]
-                 for i in sorted(ids) if i in self.idx}
+                 for i in sorted(reachable) if i in self.idx}
         appraisals = [{**x, 'binding_id': occurrence['occurrence_id']+':A'+str(n)+':'+x['finding_id']}
                       for n,x in enumerate(links) if x.get('role') == 'SUBJECT_OF_APPRAISAL']
         bad = [x for x in links if not evidence.role_allowed(self.registry.findings.get(x['finding_id']), x.get('role'))]

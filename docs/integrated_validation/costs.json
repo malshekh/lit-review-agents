@@ -1,0 +1,124 @@
+{
+  "historical_billed_telemetry_not_a_new_run": {
+    "A02-SP": {
+      "calls": 5,
+      "billed_usd": 0.740857
+    },
+    "A03-LM": {
+      "calls": 3,
+      "billed_usd": 0.957916
+    },
+    "A04-CQ": {
+      "calls": 18,
+      "billed_usd": 0.36800675
+    },
+    "A05-KE": {
+      "calls": 48,
+      "billed_usd": 13.328103999999998
+    },
+    "A06-SV": {
+      "calls": 129,
+      "billed_usd": 11.833540800000007
+    },
+    "A07-SYN": {
+      "calls": 2,
+      "billed_usd": 7.063503
+    }
+  },
+  "historical_total_spent": 34.29192755,
+  "historical_reservations_file_present": false,
+  "baseline_other_stages": {
+    "A02-SP": 0.740857,
+    "A03-LM": 0.957916,
+    "A04-CQ": 0.36800675,
+    "pre_CP2_growth_reserve": 1.93322025,
+    "A05-KE_batch": 28.560222857142854,
+    "A06-SV_initial_batch": 14.08827,
+    "A06-SV_repeat_batch_all_papers": 25.34935714285714,
+    "A06-SV_themes": 14.733708000000004,
+    "A08-OL": 2.9552,
+    "A09-WRI": 3.8,
+    "A11-RC": 3.2752,
+    "A12-EDI": 3.04
+  },
+  "other_total": 99.801958,
+  "A10_first": {
+    "input_byte_bound": 12965188,
+    "output_cap": 604000,
+    "modeled_3bytes_output25pct": 10.153458666666666,
+    "modeled_3bytes_output50pct": 11.663458666666665,
+    "all_input_bytes_write_full_output": 38.45297
+  },
+  "A10_small_edit": {
+    "input_byte_bound": 5228585,
+    "output_cap": 194000,
+    "modeled_3bytes_output25pct": 3.9707233333333334,
+    "modeled_3bytes_output50pct": 4.455723333333333,
+    "all_input_bytes_write_full_output": 15.0114625
+  },
+  "compact_handoff_baseline_total_band": [
+    144.24614,
+    153.04613999999998
+  ],
+  "margin_under_150": [
+    5.753860000000003,
+    -3.04613999999998
+  ],
+  "A07_remaining_allowance": 36.07386,
+  "first_plus_five_small_edits_band": [
+    160.12903333333333,
+    168.92903333333334
+  ],
+  "finite_adverse_no_batch_full_A07_and_A10_write_caps_six_versions": 370.6517825,
+  "runtime_downstream_projection": [
+    {
+      "stage": "A07-SYN",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 1415,
+      "usd": 5492.6388,
+      "detail": "bounded registry call envelope including retrieval; no cache savings; per-call admission required"
+    },
+    {
+      "stage": "A08-OL",
+      "basis": "WORST_CASE",
+      "usd": 2.9552,
+      "calls": 1,
+      "detail": "1 calls x (618,800 input tokens + 32,000 output at max_tokens) on gpt-6.1-sol"
+    },
+    {
+      "stage": "A09-WRI",
+      "basis": "WORST_CASE",
+      "usd": 3.8,
+      "calls": 2,
+      "detail": "2 calls x (60,000 input tokens + 64,000 output at max_tokens) on claude-opus-5"
+    },
+    {
+      "stage": "A10-RV",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 759,
+      "usd": 158.34,
+      "detail": "320 estimated candidate occurrences (24-320, corpus-based before manuscript exists); half-full local packets; 1.5 index entries/finding; 20% edited locals; all global pages rechecked; 60k input/call, full output caps and retrieval; no cache savings; actual reservation required"
+    },
+    {
+      "stage": "A11-RC",
+      "basis": "WORST_CASE",
+      "usd": 3.2752,
+      "calls": 2,
+      "detail": "2 calls x (658,800 input tokens + 32,000 output at max_tokens) on kimi-k3.1-pro"
+    },
+    {
+      "stage": "A12-EDI",
+      "basis": "WORST_CASE",
+      "usd": 3.04,
+      "calls": 4,
+      "detail": "4 calls x (60,000 input tokens + 64,000 output at max_tokens) on claude-sonnet-5-5"
+    }
+  ],
+  "caveats": [
+    "No new-run commitments; add spent and outstanding reservations for the actual chosen run.",
+    "Historical A05/A06 costs include observed attempts; batch halves them only if eligible and completed; probes remain interactive.",
+    "A08/A09/A11/A12 baseline figures are inherited projections, not measured live 120-paper costs; expansive handoff overflow is separately demonstrated.",
+    "Reasoning included in modeled output fraction and cap; no extra overlapping thinking allowance.",
+    "No cache hits assumed; adverse is finite scenario, not a bound on unlimited retries/fallbacks."
+  ]
+}
