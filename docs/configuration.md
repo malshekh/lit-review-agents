@@ -308,6 +308,38 @@ The single display item is the comparative table `T1`, built by code with `table
 `output_limits` size A09 and A12 requests to the unit written. Fingerprints of the text, plan and
 evidence-registry version stamp every A10 approval; A11 and A12 refuse a stale one.
 
+**Contrary evidence and the table** (researcher's rule of 2026-10-30). The table is a selective synthesis, not an
+inventory. Every contrary finding (used as CONFLICTING evidence or named by a reconciliation issue) is material
+unless the researcher excludes it with a justification. A supporting row appears only with every contrary finding
+of the claims it supports; the "Role and contrary evidence" column links rows for and against a claim by a set
+letter and says when further contrary evidence is in the text. Contrary findings left out of the table stay in
+the contrary-evidence register (`bridge.contrary_register`, `data/bridge/contrary_register.json`): the plan is
+refused if a written element does not carry each one (`CONTRARY_NOT_CARRIED`), section packets carry each entry
+with a comparability record (the context fields that differ between it and what it challenges), A09 must state
+those differences rather than present unlike systems, doses or arms as like-for-like, and A10's GLOBAL pages carry
+each entry beside its finding (issue codes `CONTRARY_EVIDENCE_UNADDRESSED` and `TABLE_CONCEALS_CONTRARY_EVIDENCE`
+kept at BLOCKING, `TABLE_PROSE_INCONSISTENT` and `FORCED_EQUIVALENCE` at MAJOR). Release (`finalize`) is blocked
+unless each one is in the final table, or in a body sentence A10 VERIFIED that is tagged with an element carrying
+it and cites its paper, or excluded at `CP_CONTRARY` with a justification of at least 20 characters (bound to this
+register and this verified manuscript, recorded in provenance): `litreview approve RUN CP_CONTRARY`.
+
+**Context utilisation** (`context_utilisation`, `src/litreview/context_watch.py`). Before every model call,
+interactive and batch, (input + reserved output) / the model's window is computed and logged with both the byte
+bound and, where `provider_count` enables it (Anthropic's free token count), the provider's count, which then
+decides; the provider's actual usage is logged after the call. At `warn` (default 0.80) the call proceeds with a
+notice; at `review` (default 0.90) the run stops at `CP_CONTEXT` until that exact request is approved
+(`litreview approve RUN CP_CONTEXT`). Thresholds are per model (`models`) and are operational defaults, not
+reliability guarantees. The hard admission ceilings are unchanged.
+
+**Spend review point** (`run.spend_review_usd`, $25 for the pilot). Before the call that would take spent +
+reserved + that call's worst case past it, the run stops at `CP_SPEND` and asks (`litreview approve RUN CP_SPEND`);
+it then continues to `run.spend_cap_usd`, which never moves.
+
+**Projections beyond the largest cohort run** (28 papers, 471 findings) are labelled UNVALIDATED (`forecast.validation`)
+until a larger cohort has run. `litreview calibration-report RUN` reports what a run measured (A06 repeat and theme
+pass, A09 retrieval and redrafts, A10 LOCAL and GLOBAL cost and what each caught, per-call rates, bytes per token);
+it changes nothing.
+
 **Evaluation-only runs** (`src/litreview/publication.py`). `litreview mark-evaluation-only RUN --reason ...`
 stamps the run's synthesis in its own data; CP3, the outline, display tables, verification, critique and
 every later stage refuse a stamped synthesis, in that run or any run it is copied into.

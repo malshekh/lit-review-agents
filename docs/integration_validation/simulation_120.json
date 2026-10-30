@@ -46,7 +46,7 @@
       "occurrences_total": 388,
       "occurrences_reviewed": 388,
       "global_index_entries_reviewed": 2822,
-      "inventory_fingerprint": "93d42c111c2cdcb39621b5f04f59c4635ecd1527639848aee4ebfe8bb9ce24f5"
+      "inventory_fingerprint": "c7b2bbacb8c8b06c6c4ae105f77204d1db69d247c84c904e7897471d7cc0161b"
     },
     "current_for_final_manuscript": true,
     "stamp_matches": true,
@@ -55,22 +55,33 @@
   "table": {
     "rows": 25,
     "notes": [
-      "The rows are a selection by a fixed rule from 1286 eligible findings in 112 papers, not a summary of every study reviewed. A supporting row appears only together with the contrary evidence for the claims it supports."
+      "The rows are a selection by a fixed rule from 1286 eligible findings in 112 papers, not a summary of every study reviewed. A supporting row appears only together with the contrary evidence for the claims it supports; rows sharing a set letter in the role column report evidence for and against the same claim and may differ in system, dose or treatment arm."
     ],
     "columns": [
       "Evidence level",
       "System",
       "Intervention",
       "Key observation",
-      "Role",
+      "Role and contrary evidence",
       "Limitation",
       "Citation"
     ]
   },
+  "contrary_release": {
+    "counts": {
+      "SHOWN_IN_TABLE": 2,
+      "ADDRESSED_IN_PROSE": 0,
+      "EXCLUSION_APPROVED": 0,
+      "UNADDRESSED": 0
+    },
+    "unaddressed": [],
+    "table_conceals": [],
+    "release_blocked": false
+  },
   "calls": {
     "A08-OL": 1,
     "A09-WRI": 17,
-    "A10-RV": 90,
+    "A10-RV": 91,
     "A11-RC": 2,
     "A12-EDI": 4
   },
@@ -97,25 +108,25 @@
   "admissions_by_agent": {
     "A08-OL": {
       "requests": 1,
-      "max_input_bound": 419600,
+      "max_input_bound": 420105,
       "all_fit": true,
       "window": 1050000
     },
     "A09-WRI": {
       "requests": 18,
-      "max_input_bound": 837930,
+      "max_input_bound": 839355,
       "all_fit": true,
       "window": 1000000
     },
     "A12-EDI": {
       "requests": 4,
-      "max_input_bound": 492849,
+      "max_input_bound": 493089,
       "all_fit": true,
       "window": 1000000
     },
     "A11-RC": {
       "requests": 2,
-      "max_input_bound": 491733,
+      "max_input_bound": 491973,
       "all_fit": true,
       "window": 1048576
     }

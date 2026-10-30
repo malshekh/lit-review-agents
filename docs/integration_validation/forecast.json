@@ -1,9 +1,11 @@
 {
+  "label": "UNVALIDATED: every projection here beyond 28 papers is unvalidated until a larger cohort has run",
   "method": "calibrated planning forecast (src/litreview/tools/forecast.py); measured inputs and stated assumptions as documented there and in pipeline.yaml -> forecast; not a bill",
   "spent_usd": 0.0,
   "outstanding_reservations_usd": 0.0,
   "at_120_papers": {
     "papers": 120,
+    "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
     "full_text": 47,
     "abstract": 73,
     "findings": 2017,
@@ -15,12 +17,12 @@
         "A06 per theme": 14.76,
         "A07 synthesis": 45.49,
         "A08 outline": 1.36,
-        "A09 writing": 27.79,
+        "A09 writing": 28.13,
         "A10 verification": 47.05,
         "A11 critique": 1.97,
         "A12 editing": 4.16,
-        "failed and redone calls (A07-A12)": 6.39,
-        "total": 212.56
+        "failed and redone calls (A07-A12)": 6.41,
+        "total": 212.92
       },
       "low": {
         "A02-A04 (pre-CP2)": 2.07,
@@ -29,12 +31,12 @@
         "A06 per theme": 14.76,
         "A07 synthesis": 31.81,
         "A08 outline": 0.57,
-        "A09 writing": 14.16,
+        "A09 writing": 14.36,
         "A10 verification": 27.0,
         "A11 critique": 0.74,
         "A12 editing": 2.24,
         "failed and redone calls (A07-A12)": 0.0,
-        "total": 152.94
+        "total": 153.14
       },
       "high": {
         "A02-A04 (pre-CP2)": 6.0,
@@ -43,12 +45,12 @@
         "A06 per theme": 25.84,
         "A07 synthesis": 63.77,
         "A08 outline": 1.54,
-        "A09 writing": 48.67,
+        "A09 writing": 49.21,
         "A10 verification": 86.98,
         "A11 critique": 2.36,
         "A12 editing": 5.33,
-        "failed and redone calls (A07-A12)": 20.87,
-        "total": 348.62
+        "failed and redone calls (A07-A12)": 20.92,
+        "total": 349.21
       },
       "adverse": {
         "A02-A04 (pre-CP2)": 8.0,
@@ -57,90 +59,99 @@
         "A06 per theme": 25.84,
         "A07 synthesis": 198.58,
         "A08 outline": 1.79,
-        "A09 writing": 167.68,
+        "A09 writing": 169.25,
         "A10 verification": 423.23,
         "A11 critique": 2.84,
         "A12 editing": 8.53,
-        "failed and redone calls (A07-A12)": 120.4,
-        "total": 1147.03
+        "failed and redone calls (A07-A12)": 120.63,
+        "total": 1148.83
       }
     },
-    "baseline_with_margin": 276.33,
+    "baseline_with_margin": 276.8,
     "uncertainty_margin": 0.3,
     "bridge_basis": "REQUEST_BOUND"
   },
   "by_paper_count": {
     "20": {
       "findings": 339,
-      "baseline": 68.86,
-      "low": 43.37,
-      "high": 124.25,
-      "adverse": 513.03,
-      "baseline_with_margin": 89.52
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "baseline": 68.91,
+      "low": 43.39,
+      "high": 124.32,
+      "adverse": 513.23,
+      "baseline_with_margin": 89.58
     },
     "28": {
       "findings": 471,
-      "baseline": 79.96,
-      "low": 51.89,
-      "high": 141.48,
-      "adverse": 561.35,
-      "baseline_with_margin": 103.95
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "baseline": 80.01,
+      "low": 51.92,
+      "high": 141.55,
+      "adverse": 561.56,
+      "baseline_with_margin": 104.01
     },
     "40": {
       "findings": 677,
-      "baseline": 96.02,
-      "low": 64.51,
-      "high": 166.3,
-      "adverse": 628.97,
-      "baseline_with_margin": 124.83
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 96.06,
+      "low": 64.53,
+      "high": 166.37,
+      "adverse": 629.18,
+      "baseline_with_margin": 124.88
     },
     "50": {
       "findings": 847,
-      "baseline": 110.04,
-      "low": 75.49,
-      "high": 187.83,
-      "adverse": 687.49,
-      "baseline_with_margin": 143.05
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 110.08,
+      "low": 75.52,
+      "high": 187.9,
+      "adverse": 687.7,
+      "baseline_with_margin": 143.1
     },
     "60": {
       "findings": 1016,
-      "baseline": 123.7,
-      "low": 86.12,
-      "high": 208.97,
-      "adverse": 746.08,
-      "baseline_with_margin": 160.81
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 123.74,
+      "low": 86.14,
+      "high": 209.04,
+      "adverse": 746.29,
+      "baseline_with_margin": 160.86
     },
     "70": {
       "findings": 1185,
-      "baseline": 137.81,
-      "low": 97.17,
-      "high": 230.58,
-      "adverse": 804.92,
-      "baseline_with_margin": 179.15
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 137.85,
+      "low": 97.2,
+      "high": 230.65,
+      "adverse": 805.13,
+      "baseline_with_margin": 179.21
     },
     "80": {
       "findings": 1339,
-      "baseline": 150.94,
-      "low": 107.4,
-      "high": 250.7,
-      "adverse": 860.09,
-      "baseline_with_margin": 196.22
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 150.98,
+      "low": 107.42,
+      "high": 250.77,
+      "adverse": 860.3,
+      "baseline_with_margin": 196.27
     },
     "100": {
       "findings": 1678,
-      "baseline": 177.98,
-      "low": 128.85,
-      "high": 292.05,
-      "adverse": 972.28,
-      "baseline_with_margin": 231.37
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 178.03,
+      "low": 128.87,
+      "high": 292.12,
+      "adverse": 972.48,
+      "baseline_with_margin": 231.44
     },
     "120": {
       "findings": 2017,
-      "baseline": 207.3,
-      "low": 151.25,
-      "high": 336.62,
-      "adverse": 1092.35,
-      "baseline_with_margin": 269.49
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 207.34,
+      "low": 151.28,
+      "high": 336.69,
+      "adverse": 1092.56,
+      "baseline_with_margin": 269.54
     }
   },
   "largest_paper_count_fitting": {

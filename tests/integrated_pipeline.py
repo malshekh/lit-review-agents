@@ -290,6 +290,8 @@ def report(run, agents, pkg, findings, held, interrupts, exported) -> dict:
                       "stamp_matches": stamps.get(final.get("verification_fingerprint")) == run._bridge_fingerprint(m),
                       "table_occurrences": sum(o["path"][0] == "built_tables" for o in final.get("occurrence_inventory", []))},
         "table": {"rows": len(table["rows"]), "notes": table["notes"], "columns": table["columns"]},
+        "contrary_release": {k: (run.load("bridge/contrary_release.json") or {}).get(k)
+                             for k in ("counts", "unaddressed", "table_conceals", "release_blocked")},
         "calls": dict(sorted({a: sum(1 for x, _ in agents.calls if x == a) for a, _ in agents.calls}.items())),
         "successful_section_calls": dict(sorted(__import__("collections").Counter(
             re.search(r"_(S\d+)_r\d", s).group(1) for a, s in agents.calls
