@@ -126,10 +126,11 @@ class Run:
         p = self.data(name)
         if not p.exists():
             return default
-        # JSON accepts CRLF whitespace directly; universal-newline translation
-        # otherwise duplicates a large decoded document on Windows.
+        # Decode containers incrementally: json.load(stream) calls read() without
+        # a size, retaining a full Unicode document alongside the decoded graph.
+        from .json_stream import load
         with p.open(encoding="utf-8", newline="") as stream:
-            return json.load(stream)
+            return load(stream)
 
     def family(self) -> str:
         p = self.dir / "input" / "topic_family.txt"
