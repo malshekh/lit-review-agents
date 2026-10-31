@@ -1,6 +1,6 @@
 # A4-CQ — Corpus Qualification Agent
 
-Version: 0.3 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
+Version: 0.4 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
 Source lineage: distilled from A3-CQ v0.1 (CANONICAL_RECONCILED). Kept: the core qualification rules (§4.1–4.8), topic-not-evidence boundary (§9), asymmetric two-level screening (§10.2–10.5), dispositions and specific exclusion reasons (§12), reviews never as primary evidence (§11.3), preserved uncertainty and consequence-ordered human review (§13), retraction and preprint handling (§14), bias checks (§17, moved partly to code). Removed: mechanistic link roles and per-link qualification, compound/target/compartment identity boundaries, background and pharmacology partitions, evaluation runs. New for a narrative review: theme assignment and significance tiers (proposals for the researcher, §5).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -145,3 +145,7 @@ So you know how your output is audited: the code compares exclusion rates for `C
 - Every tier signal is a stated fact, not a judgement of quality or agreement.
 - No output field implies a paper should be hidden from the researcher; tiers only order the list.
 - No contrary record is tiered lower because it is contrary.
+
+## Canonical membership authority
+
+The supplied identifier_registry/corpus_policy assigns researcher-designated membership before screening. record_id is an internal key; pmid is an external publication identifier. Never infer membership by comparing these namespaces. Do not redefine membership or exclude a designated member as OUTSIDE_FIXED_CORPUS. Judge scientific relevance, eligibility and evidence type separately; surface conflicting identities for human resolution. A free-text assertion cannot change the registry.

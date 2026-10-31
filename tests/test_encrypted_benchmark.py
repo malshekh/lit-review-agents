@@ -1,4 +1,4 @@
-﻿"""Synthetic-only encrypted benchmark bookkeeping and Stage 1 release gates."""
+"""Synthetic-only encrypted benchmark bookkeeping and Stage 1 release gates."""
 import copy
 import json
 from pathlib import Path
@@ -54,7 +54,7 @@ def test_encrypted_key_never_authorizes_stage2(encrypted):
 
 def test_missing_real_cp3_blocks_evaluation(encrypted):
     with pytest.raises(release.EvaluationNotReady):release.seal_stage1(encrypted)
-    encrypted.save_state({'stage':'cp3','execution_mode':'STAGED_PILOT'})
+    encrypted.save_state({**encrypted.state(),'stage':'cp3','execution_mode':'STAGED_PILOT'})
     with pytest.raises(release.EvaluationNotReady,match='scientific CP3'):release.seal_stage1(encrypted)
 
 
@@ -62,7 +62,7 @@ def test_missing_real_cp3_blocks_evaluation(encrypted):
 def finalized(encrypted,monkeypatch):
     # Isolate seal mechanics. Scientific CP3 correctness is exercised unmocked by
     # test_scientific_integrity_gates; no real reference answers are used here.
-    r=encrypted;r.save_state({'stage':'cp3','execution_mode':'STAGED_PILOT'})
+    r=encrypted;r.save_state({**r.state(),'stage':'cp3','execution_mode':'STAGED_PILOT'})
     for name in ('synthesis_package.json','synthesis_approved.json','validated_findings.json','selected_corpus.json'):
         r.save(name,{'synthetic':name})
     cp=r.dir/'checkpoints';cp.mkdir(exist_ok=True)
@@ -96,4 +96,13 @@ def test_outstanding_hold_blocks_evaluation(finalized):
 def test_tampered_seal_is_rejected(finalized):
     seal=release.seal_stage1(finalized);seal['fingerprint']='0'*64
     finalized.save('evaluation/stage1_seal.json',seal)
+    with pytest.raises(release.EvaluationNotReady):release.require_finalized_stage1(finalized)
+
+
+@pytest.mark.parametrize('name',['fulltext/R0001.json','fulltext_provenance/R0001.json'])
+def test_source_material_and_provenance_are_sealed_before_evaluation(finalized,name):
+    finalized.save(name,{'synthetic':'source-material'})
+    seal=release.seal_stage1(finalized)
+    assert str(Path('data')/name) in seal['snapshot']['files'] and seal['key_access_granted'] is False
+    finalized.save(name,{'synthetic':'changed-source'})
     with pytest.raises(release.EvaluationNotReady):release.require_finalized_stage1(finalized)

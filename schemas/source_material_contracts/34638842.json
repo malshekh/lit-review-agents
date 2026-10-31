@@ -1,0 +1,26 @@
+{
+  "pmid": "34638842",
+  "pmcid": "PMC8508702",
+  "provenance": "Public Europe PMC XML structural inspection, 2026-10-31; not a scientific answer key",
+  "reference_xml_sha256": "fafbbba12ce79bbee78681e32e1e9595ca9d4b261c96ca94131808a0cc5da44d",
+  "body_groups": [
+    "methods",
+    "results",
+    "discussion"
+  ],
+  "table_ids": [
+    "ijms-22-10496-t001"
+  ],
+  "figure_ids": [
+    "ijms-22-10496-f001",
+    "ijms-22-10496-f002",
+    "ijms-22-10496-f003",
+    "ijms-22-10496-f004",
+    "ijms-22-10496-f005",
+    "ijms-22-10496-f006",
+    "ijms-22-10496-f007",
+    "ijms-22-10496-f008",
+    "ijms-22-10496-f009",
+    "ijms-22-10496-f010"
+  ]
+}

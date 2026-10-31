@@ -11,6 +11,8 @@ pytestmark = pytest.mark.projection_guard
 def run(tmp_path,monkeypatch):
     monkeypatch.setattr(orch,'RUNS_DIR',tmp_path/'runs')
     r=orch.Run('pilot');r.save_state({'stage':'scope','status':'READY','counters':{},'execution_mode':'STAGED_PILOT'})
+    from corpus_fixture import install
+    install(r)
     key=tmp_path/'private-evaluator'/'key.txt';key.parent.mkdir();key.write_text('Synthetic evaluator-only fixture; no scientific answer key',encoding='utf-8')
     pa.record_key(r,{'version':'test-1','sha256':hashlib.sha256(key.read_bytes()).hexdigest(),'commit':'test-only-commit',
         'verified_by':'Test human','approved_at':'2026-10-30','store_path':str(key),'human_verified':True})
@@ -126,7 +128,8 @@ def test_approval_never_bypasses_scientific_cp3_gate(run):
 
 def test_new_runs_are_staged_by_default(tmp_path,monkeypatch):
     monkeypatch.setattr(orch,'RUNS_DIR',tmp_path)
-    rid=orch.new_run('test only')
+    from corpus_fixture import authority
+    rid=orch.new_run('test only',budget_authority=authority(tmp_path/'new-authority.json'))
     assert pa.enabled(orch.Run(rid))
 
 def mock_provider(run,monkeypatch,reply=None):

@@ -85,10 +85,18 @@ def record_key(run, metadata):
         raise
     run.prov.human_decision('PILOT_REFERENCE_METADATA', {k:v for k,v in metadata.items() if k!='store_path'}, 'Human attestation; no scientific verification by software')
 
+def source_level(run, record):
+    """Authorized abstract-only access is independent of PMC availability metadata."""
+    expected = {p['pmid']: p['content_level'] for p in PAPERS}
+    if enabled(run) and expected.get(str(record.get('pmid'))) == 'ABSTRACT':
+        return 'ABSTRACT'
+    return cp.content_level(record, run.dir)
+
+
 def selection(run, records=None):
     records=run.load('selected_corpus.json') if records is None else records
     if records is not None:
-        got=sorted((str(r.get('pmid')),cp.content_level(r,run.dir)) for r in records)
+        got=sorted((str(r.get('pmid')),source_level(run,r)) for r in records)
         want=sorted((p['pmid'],p['content_level']) for p in PAPERS)
         if got!=want: raise AuthorizationRequired('Selected papers/source types differ from the authorized three-paper pilot')
         return records
@@ -113,17 +121,21 @@ def _files_digest(paths):
     return {str(p.relative_to(REPO_ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths if p.is_file()}
 
 def identity(run,stage):
+    from . import corpus_policy, evaluation_budget
+    policy = corpus_policy.resolve(run)
+    budget_authority = evaluation_budget.load(run.dir)
     sources=[p for folder in ('src','prompts','schemas','config') for p in sorted((REPO_ROOT/folder).rglob('*'))
              if p.is_file() and p.suffix in ('.py','.md','.json','.yaml')]
     upstream=('spec_approved.json','theme_framework.json','selected_corpus.json','validated_findings.json','theme_records.json')
     if stage==STAGE_2: upstream+=('synthesis_package.json','synthesis_approved.json','manuscript_plan.json','allocation_ledger.json')
     return {'run_id':run.id,'stage':stage,'papers':selection(run),'reference':key_metadata(run),
+            'corpus_policy':policy,'evaluation_budget':budget_authority,
             'config':json.loads(json.dumps(run.cfg)),'prices':run.budget.prices,'versions':_files_digest(sources),
             'routes':{a:dataclasses.asdict(run.route(a)) for a in sorted(FIRST if stage==STAGE_1 else SECOND)},
             'input':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((run.dir/'input').glob('*')) if p.is_file()},
             'upstream':{name:fingerprint(run.load(name)) for name in upstream},
             'evidence':{str(p.relative_to(run.dir)):hashlib.sha256(p.read_bytes()).hexdigest()
-                        for folder in ('fulltext','extractions','validations') for p in sorted((run.dir/'data'/folder).glob('*.json'))},
+                        for folder in ('fulltext','fulltext_provenance','extractions','validations') for p in sorted((run.dir/'data'/folder).glob('*.json'))},
             'plan':run.load('pilot_financial_plan.json'),'calibration':cp.load_rates()}
 
 def work_basis(run):
@@ -177,13 +189,13 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
             lines.append({'stage':'A02-A04 (pre-CP2)','usd':max(0,float(run.cfg['forecast']['scenarios']['baseline']['pre_cp2'])-pre),'calls':26})
         if at<=STAGES.index('cp2'):
             for lv in ('ABSTRACT','FULL_TEXT'):
-                n=sum(cp.content_level(r,run.dir)==lv for r in records)
+                n=sum(source_level(run,r)==lv for r in records)
                 lines.append({'stage':'A05+A06 '+lv,'usd':n*rates['per_paper'][lv]['p90_usd'],'calls':n})
             if run.cfg.get('validation',{}).get('instability_test'):
-                lines.append({'stage':'A06 instability repeats','usd':sum(rates['per_paper'][cp.content_level(r,run.dir)]['a06_p90_usd'] for r in records),'calls':len(records)})
+                lines.append({'stage':'A06 instability repeats','usd':sum(rates['per_paper'][source_level(run,r)]['a06_p90_usd'] for r in records),'calls':len(records)})
             count=max(1,len((run.load('theme_framework.json') or {}).get('primary_themes',[])) or 8)
             lines.append({'stage':'A06 per theme','usd':count*rates['per_theme']['p90_usd'],'calls':count})
-            F=sum(math.ceil(rates['per_paper'][cp.content_level(r,run.dir)]['findings_p90']) for r in records)
+            F=sum(math.ceil(rates['per_paper'][source_level(run,r)]['findings_p90']) for r in records)
         elif at<=STAGES.index('validate'):
             import copy
             proxy=copy.copy(run);proxy.cfg=copy.deepcopy(run.cfg);proxy.cfg['batch']['enabled']=False

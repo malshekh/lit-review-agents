@@ -27,12 +27,12 @@ def _snapshot(run):
     paths = {run.dir / name for name in required}
     if any(not p.is_file() for p in paths):
         raise EvaluationNotReady('Missing finalized Stage 1 artifact')
-    for folder in ('input', 'outputs', 'checkpoints', 'data/extractions', 'data/validations'):
+    for folder in ('input', 'outputs', 'checkpoints', 'data/extractions', 'data/validations', 'data/fulltext', 'data/fulltext_provenance'):
         paths.update(p for p in (run.dir / folder).rglob('*') if p.is_file())
     # Include all A07 job state so a changed accepted turn invalidates the seal.
     for job in (run.dir / 'data').glob('synthesis_job_*'):
         paths.update(p for p in job.rglob('*') if p.is_file())
-    for name in ('spec_approved.json', 'theme_framework.json', 'theme_records.json'):
+    for name in ('spec_approved.json', 'theme_framework.json', 'theme_records.json', 'source_readiness.json', 'corpus_membership.json'):
         p = run.dir / 'data' / name
         if p.exists(): paths.add(p)
     for p in paths:

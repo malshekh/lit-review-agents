@@ -20,7 +20,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import checkpoints, config, evidence, handoff, model_record, notify, publication
+from . import checkpoints, config, evidence, handoff, model_record, notify, publication, corpus_policy
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
 from .budget import BatchGateRefused, BudgetExceeded, BudgetTracker, UnpricedModel
@@ -33,7 +33,7 @@ from .synthesis_job import JobStopped
 from .tools import cost_projection
 from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
                     verification_scope)
-from .tools.fulltext import fetch_sections
+from .tools.fulltext import fetch_sections, fetch_verified_sections, verify_cached_source, FullTextUnavailable
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
 from .tools.literature.expansion import choose_next_seeds, choose_seeds, expand
@@ -57,7 +57,16 @@ class Pause(Exception):
 
 
 # ------------------------------------------------------------------ run setup
-def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified") -> str:
+def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified",
+            budget_authority=None, corpus_mode="FIXED_CORPUS", scope_configuration=None) -> str:
+    from .evaluation_budget import prepare
+    authority = prepare(budget_authority)
+    if authority["authority"].get("corpus_mode", "FIXED_CORPUS") != corpus_mode:
+        raise ValueError("Requested corpus mode differs from reviewed budget authority")
+    if scope_configuration is not None and (not isinstance(scope_configuration, dict) or set(scope_configuration) - {
+            "parent_run_id", "parent_cp1_sha256", "purpose", "central_question", "perspective",
+            "selection_criteria", "theme_framework", "qualifications"}):
+        raise ValueError("Scope configuration accepts human-approved scope only, not prior scientific outputs")
     run_id = time.strftime("%Y%m%d-%H%M%S")
     d = RUNS_DIR / run_id / "input"
     d.mkdir(parents=True)
@@ -66,7 +75,14 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "seeds.txt").write_text("\n".join(seeds or []), encoding="utf-8")
     (d / "topic_family.txt").write_text(family, encoding="utf-8")
     (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
-    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}, "execution_mode": "STAGED_PILOT"})
+    if scope_configuration is not None:
+        (d / "human_scope_configuration.json").write_text(json.dumps(scope_configuration, indent=2), encoding="utf-8")
+    policy_fingerprint = corpus_policy.initialize(d.parent, corpus_policy.default_policy(corpus_mode))
+    if authority:
+        (d / "evaluation_budget.json").write_text(json.dumps(authority, indent=2), encoding="utf-8")
+    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {},
+                           "execution_mode": "STAGED_PILOT" if corpus_mode == "FIXED_CORPUS" else "STANDARD",
+                           "corpus_policy_fingerprint": policy_fingerprint})
     return run_id
 
 
@@ -334,7 +350,30 @@ class Run:
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
               reservation_key: str | None = None) -> dict:
+        try:
+            corpus_policy.resolve(self)
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
         if pilot.enabled(self):
+            try:
+                corpus_policy.resolve(self)
+                if agent_id in {"A04-CQ", "A05-KE"}:
+                    records = payload.get("records") if agent_id == "A04-CQ" else [payload.get("record") or {}]
+                    if not records:
+                        raise ValueError("Publication-bound agent request lacks canonical records")
+                    corpus_policy.require_records(self, records, internal_ids=True)
+                    for rec in records:
+                        level = payload.get("content_level") if agent_id == "A05-KE" else rec.get("content_level")
+                        required = corpus_policy.fixed(self)[str(rec["pmid"])]
+                        if agent_id == "A05-KE" and level != required:
+                            raise ValueError("Extraction access level differs from corpus authority")
+                        if level == "FULL_TEXT":
+                            corpus_policy.require_source(self, rec)
+                            verify_cached_source(rec, rec.get("content") or rec.get("sections"), self.load(f"fulltext_provenance/{rec['record_id']}.json"))
+                        elif agent_id == "A05-KE" and set(rec.get("content") or {}) != {"Abstract"}:
+                            raise ValueError("Abstract-only extraction contains unapproved source sections")
+            except ValueError as exc:
+                raise Pause(str(exc)) from exc
             # Reuse an accepted, version-identical output before considering another paid submission.
             # A logged response settles only its own hold; uncertain provider usage remains held.
             try:pilot.require(self,agent_id,financial=False)
@@ -506,6 +545,7 @@ class Run:
 
     def run(self, until: str | None = None) -> str:
         st = self.state()
+        corpus_policy.resolve(self)
         st["status"] = "RUNNING"
         self.save_state(st)
         try:
@@ -589,9 +629,12 @@ class Run:
             "researcher_notes": (inp / "notes.md").read_text(encoding="utf-8"),
             "seed_papers": [s for s in (inp / "seeds.txt").read_text(encoding="utf-8").splitlines() if s.strip()],
             "journal_profile": pilot.journal(self),
+            "corpus_policy": corpus_policy.resolve(self),
+            "human_scope_configuration": json.loads((inp / "human_scope_configuration.json").read_text(encoding="utf-8")) if (inp / "human_scope_configuration.json").exists() else None,
             "theme_guidance": self.cfg.get("themes", {"primary_min": 5, "primary_max": 8}),
             "revision_feedback": feedback,
         }, step=f"A02-SP_scope_v{self.counter(st, 'scope')}")
+        spec["corpus_policy"] = corpus_policy.resolve(self)
         self.save("spec.json", spec)
         return "cp1"
 
@@ -625,13 +668,26 @@ class Run:
         self.prov.human_decision("THEME_FRAMEWORK", {"version": new["version"], **{k: new["history"][-1][k]
                                  for k in ("added", "removed")}}, upd.get("note", ""))
 
+    def _agent_human_review(self, agent, step, output):
+        if output.get("status") != "NEEDS_HUMAN_INPUT":
+            return
+        from .synthesis_registry import fingerprint
+        digest = fingerprint([agent, step, output, self.load("spec_approved.json"), corpus_policy.resolve(self)])
+        if checkpoints.review_approved(self.dir, "CP_AGENT_REVIEW", digest):
+            return
+        checkpoints.write_agent_review(self.dir, digest, agent, step, output)
+        self.pause_for_checkpoint("CP_AGENT_REVIEW")
+
     def stage_search(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
         sources = enabled_sources()
         rcfg = self.cfg["retrieval"]
         budget = {"max_records_total": rcfg["max_records_total"], "max_records_per_family": rcfg["max_records_per_family"]}
         plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
-                                     "budget": budget}, step="A03-LM_plan")
+                                     "budget": budget, "corpus_policy": corpus_policy.resolve(self),
+                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint")}, step="A03-LM_plan")
+        self.save("search_plan.json", plan)
+        self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
         seeds = spec.get("search_seeds", {}).get("seed_papers", [])
         for i in range(int(self.cfg["loops"]["max_search_repairs"])):
@@ -641,7 +697,9 @@ class Run:
             plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
                                          "budget": budget, "previous_plan": plan,
                                          "execution_report": report["families"],
-                                         "seed_recall": report["seed_recall"]}, step=f"A03-LM_repair{i + 1}")
+                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self)}, step=f"A03-LM_repair{i + 1}")
+            self.save("search_plan.json", plan)
+            self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)
         self.save("search_plan.json", plan)
         all_records = [Record(**{k: v for k, v in r.items() if k in Record.__dataclass_fields__})
@@ -654,12 +712,25 @@ class Run:
 
     def _execute_plan(self, plan: dict, sources: dict) -> list[dict]:
         out = []
+        # Preflight every query before dispatching even the first source request.
+        try:
+            for family in plan.get("query_families", []):
+                for source in family.get("sources", []):
+                    corpus_policy.require_query(self, source, family, family.get("compiled", {}).get(source, ""))
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
         for fam in plan.get("query_families", []):
             for src in fam.get("sources", []):
                 if src not in sources or src not in fam.get("compiled", {}):
                     continue
                 res = search(src, fam["compiled"][src], fam["family_id"],
                              min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"]))
+                try:
+                    corpus_policy.require_records(self, [r.to_dict() for r in res.records])
+                except ValueError as exc:
+                    self.save("retrieval_boundary_error.json", {"source": src, "family_id": fam["family_id"],
+                        "unexpected_pmids": [r.pmid for r in res.records if str(r.pmid) not in corpus_policy.fixed(self)]})
+                    raise Pause(str(exc)) from exc
                 out.append({"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
                             "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
                             "error": res.error, "records": [r.to_dict() for r in res.records]})
@@ -690,6 +761,9 @@ class Run:
         """Citation expansion, one depth at a time: expand, deduplicate, qualify the new records.
         Depth 2 seeds only from depth-1 records A04-CQ qualified, so it follows relevant papers,
         not the whole citation neighbourhood."""
+        if corpus_policy.fixed(self):
+            self.prov.tool_run("citation_expansion_skipped", "expand", {"reason": "FIXED_CORPUS"})
+            return "cp2"
         ecfg = self.cfg["retrieval"].get("citation_expansion", {})
         if not ecfg.get("enabled"):
             return "cp2"
@@ -721,19 +795,46 @@ class Run:
     def _qualify_pending(self) -> None:
         spec = self.load("spec_approved.json")
         records = self.load("records.json")
+        try:
+            corpus_policy.require_records(self, records, internal_ids=True)
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
+        reviews = self.load("screening_review.json", {})
+        for bid, review in reviews.items():
+            self._agent_human_review("A04-CQ", bid, review)
+        identities = corpus_policy.registry(records, corpus_policy.fixed(self))
+        prior_registry = self.load("corpus_membership.json")
+        if prior_registry is not None and prior_registry != identities:
+            raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+        if prior_registry is None:
+            self.save("corpus_membership.json", identities)
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
         fw = self.load("theme_framework.json")
         todo = [r for r in records if r["record_id"] not in quals]
         size = int(self.cfg["loops"]["cq_batch_size"])
         fields = ("record_id", "title", "abstract", "authors", "year", "venue", "publication_type", "doi",
-                  "pmid", "nct_id", "is_preprint", "query_family_ids", "expansion")
+                  "pmid", "pmcid", "nct_id", "is_preprint", "query_family_ids", "expansion")
         for i in range(0, len(todo), size):
             batch = [{**{k: r.get(k) for k in fields},
                       "content_level": "ABSTRACT" if r.get("abstract") else "METADATA_ONLY"} for r in todo[i:i + size]]
             # numbered across resumes, so a rerun batch never overwrites an earlier batch's outputs
             bid = f"B{self.counter(self.state(), 'cq_batch'):03d}"
             out = self.agent("A04-CQ", {"review_spec": spec, "theme_framework": fw, "batch_id": bid,
-                                        "records": batch}, step=f"A04-CQ_{bid}")
+                                        "records": batch, "identifier_registry": identities}, step=f"A04-CQ_{bid}")
+            reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+            reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_{bid}", input_record_ids=[r["record_id"] for r in batch])
+            reviews[bid]["identifier_registry"] = identities
+            self.save("screening_review.json", reviews)
+            known = {x["record_id"] for x in batch}
+            returned = [q.get("record_id") for q in out.get("qualifications", [])]
+            references = [q.get("record_id") for q in out.get("human_review_queue", []) if q.get("record_id")]
+            if (any(i not in known for i in returned) or len(returned) != len(set(returned))
+                    or any(i not in {r["record_id"] for r in records} for i in references)):
+                raise Pause("A04 identifier integrity: record_id must match canonical registry; no PMID substitution")
+            if corpus_policy.fixed(self) and any(q.get("exclusion_code") == "OUTSIDE_FIXED_CORPUS" for q in out.get("qualifications", [])):
+                reviews[bid]["identifier_conflict"] = "Canonical fixed-corpus member incorrectly classified OUTSIDE_FIXED_CORPUS"
+                self.save("screening_review.json", reviews)
+                raise Pause("A04 canonical corpus membership contradicts classification; human correction required")
             got = {q["record_id"]: q for q in out.get("qualifications", [])}
             for r in batch:  # nothing may disappear: any record without a disposition is flagged
                 quals[r["record_id"]] = {**(got.get(r["record_id"]) or {
@@ -742,21 +843,62 @@ class Run:
                     **self._screener()}
                 quals[r["record_id"]] = theme_framework.normalize(quals[r["record_id"]], fw) \
                     if quals[r["record_id"]].get("disposition") == "QUALIFIED" else quals[r["record_id"]]
+                if corpus_policy.fixed(self):
+                    claimed = quals[r["record_id"]].get("in_fixed_corpus")
+                    if claimed is False:
+                        reviews[bid].setdefault("membership_claim_conflicts", []).append({"record_id": r["record_id"],
+                            "pmid": str(r["pmid"]), "model_claim": False, "canonical_membership": True})
+                        self.save("screening_review.json", reviews)
+                    quals[r["record_id"]]["in_fixed_corpus"] = True
+                    quals[r["record_id"]]["membership_source"] = "PERSISTED_RUN_POLICY"
             self.save("qualifications.json", list(quals.values()))
+            self._agent_human_review("A04-CQ", bid, reviews[bid])
         # Level 2: full text for records the agent could not decide from the abstract
         by_id = {r["record_id"]: r for r in records}
         need_ft = [q["record_id"] for q in quals.values() if q["disposition"] == "UNRESOLVED_FULL_TEXT_REQUIRED"
                    and not q.get("_fulltext_checked")]
         for rid in need_ft:
-            sections = fetch_sections(by_id[rid].get("pmcid"))
+            if corpus_policy.fixed(self).get(str(by_id[rid].get("pmid"))) == "ABSTRACT":
+                continue
+            if corpus_policy.fixed(self).get(str(by_id[rid].get("pmid"))) == "FULL_TEXT":
+                try:
+                    corpus_policy.require_source(self, by_id[rid])
+                    sections = self.load(f"fulltext/{rid}.json")
+                    source = self.load(f"fulltext_provenance/{rid}.json")
+                    if sections:
+                        verify_cached_source(by_id[rid], sections, source)
+                    else:
+                        sections, source = fetch_verified_sections(by_id[rid])
+                except ValueError as exc:
+                    raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+                self.save(f"fulltext/{rid}.json", sections)
+                self.save(f"fulltext_provenance/{rid}.json", source)
+            else:
+                sections = fetch_sections(by_id[rid].get("pmcid"))
             quals[rid]["_fulltext_checked"] = True
             if not sections:
                 continue
             out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": f"FT-{rid}", "records": [
-                {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}]},
-                step=f"A04-CQ_FT_{rid}")
-            for q in out.get("qualifications", []):
-                quals[rid] = {**q, "_fulltext_checked": True, **self._screener()}
+                {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}],
+                "identifier_registry": identities}, step=f"A04-CQ_FT_{rid}")
+            bid = f"FT-{rid}"
+            reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+            reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_FT_{rid}", input_record_ids=[rid])
+            reviews[bid]["identifier_registry"] = identities
+            self.save("screening_review.json", reviews)
+            returned = out.get("qualifications", [])
+            if len(returned) != 1 or returned[0].get("record_id") != rid:
+                raise Pause("A04 full-text identifier integrity mismatch")
+            if corpus_policy.fixed(self) and returned[0].get("exclusion_code") == "OUTSIDE_FIXED_CORPUS":
+                raise Pause("A04 canonical corpus membership contradicts full-text classification")
+            quals[rid] = {**returned[0], "_fulltext_checked": True, **self._screener()}
+            if corpus_policy.fixed(self):
+                if returned[0].get("in_fixed_corpus") is False:
+                    reviews[bid]["membership_claim_conflicts"] = [{"record_id": rid, "canonical_membership": True, "model_claim": False}]
+                    self.save("screening_review.json", reviews)
+                quals[rid].update(in_fixed_corpus=True, membership_source="PERSISTED_RUN_POLICY")
+            self.save("qualifications.json", list(quals.values()))
+            self._agent_human_review("A04-CQ", bid, reviews[bid])
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
 
@@ -803,9 +945,17 @@ class Run:
             quals = self.load("qualifications.json")
             checkpoints.write_cp2(self.dir, self.load("records.json"), quals, self.load("bias_report.json"),
                                   emerging=theme_framework.emerging(quals, "record_id"),
-                                  framework=self.load("theme_framework.json"))
+                                  framework=self.load("theme_framework.json"),
+                                  review_issues={"search_plan": {k: (self.load("search_plan.json") or {}).get(k)
+                                      for k in ("status", "warnings", "limitations")},
+                                      "screening": self.load("screening_review.json", {})},
+                                  identities=corpus_policy.registry(self.load("records.json"), corpus_policy.fixed(self)),
+                                  source_readiness={"required": corpus_policy.fixed(self),
+                                      "materialization_stage": "extract before A05 dispatch",
+                                      "verified_sources": self.load("source_readiness.json", {})})
             self._cp2_costs(quals)
             self.pause_for_checkpoint("CP2")
+        checkpoints.require_cp2_current(self.dir)
         self._framework_update(decision, "CP2")
         by_id = {r["record_id"]: r for r in self.load("records.json")}
         quals = {q["record_id"]: q for q in self.load("qualifications.json")}
@@ -841,7 +991,16 @@ class Run:
         else:
             by_id = {r["record_id"]: r for r in self.load("records.json")}
             qualified = [by_id[q["record_id"]] for q in quals if q.get("disposition") == "QUALIFIED" and q["record_id"] in by_id]
-            proj = cost_projection.for_selection(rates, qualified, self.dir, self.budget, self.route, self.cfg)
+            proj = (pilot.project(self, pilot.STAGE_1, records=qualified) if pilot.enabled(self)
+                    else cost_projection.for_selection(rates, qualified, self.dir, self.budget, self.route, self.cfg))
+            if pilot.enabled(self):
+                note = ("\n\n## Stage 1-only cost projection\n\nA02?A07 through CP3 only; Stage 2 excluded. "
+                        "Source levels are planning requirements, not proof of completed retrieval.\n\n```json\n"
+                        + json.dumps(proj, indent=2) + "\n```\n\n"
+                        "Selection/source-level/cost admission is enforced on resume; approval never authorizes Stage 2.\n")
+                p = checkpoints.cp_dir(self.dir) / "CP2_review.md"
+                p.write_text(p.read_text(encoding="utf-8") + note, encoding="utf-8")
+                return
             per = rates["per_paper"]
             note = ("\n\n## Cost projection\n\nEach selected paper adds about "
                     f"${per['ABSTRACT']['p90_usd']:.2f} (abstract only) or ${per['FULL_TEXT']['p90_usd']:.2f} (full text) "
@@ -879,8 +1038,30 @@ class Run:
             rid = rec["record_id"]
             if self.data(f"extractions/{rid}.json").exists():
                 continue
-            sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
-                or {"Abstract": rec.get("abstract") or ""}
+            required = corpus_policy.fixed(self).get(str(rec.get("pmid")))
+            if required == "ABSTRACT":
+                sections = {"Abstract": rec.get("abstract") or ""}
+            elif required == "FULL_TEXT":
+                sections = self.load(f"fulltext/{rid}.json")
+                try:
+                    if sections:
+                        verify_cached_source(rec, sections, self.load(f"fulltext_provenance/{rid}.json"))
+                    else:
+                        corpus_policy.require_source(self, rec)
+                        sections, source = fetch_verified_sections(rec)
+                        self.save(f"fulltext/{rid}.json", sections)
+                        self.save(f"fulltext_provenance/{rid}.json", source)
+                    ready = self.load("source_readiness.json", {})
+                    ready[rid] = {"required": required, "status": "VERIFIED"}
+                    self.save("source_readiness.json", ready)
+                except ValueError as exc:
+                    ready = self.load("source_readiness.json", {})
+                    ready[rid] = {"required": required, "status": "BLOCKED", "reason": str(exc)}
+                    self.save("source_readiness.json", ready)
+                    raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+            else:
+                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
+                    or {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
             rid_of[f"A05-KE_{rid}"] = rid

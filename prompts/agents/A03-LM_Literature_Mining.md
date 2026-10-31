@@ -1,6 +1,6 @@
 # A3-LM — Literature Mining Agent
 
-Version: 0.3 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
+Version: 0.4 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
 Source lineage: distilled from A2-LM v0.1 (access-contract version, incl. Appendix H). Kept: governing rule, retrieval/judgement boundary, concept blocks with verified vs. model-suggested terms, query families instead of one intersection, mandatory contrary-evidence families, precision controls, zero-result diagnosis, review channel, citation count ≠ quality. Removed: mechanistic link tags, drug/target/condensate concept blocks, LLPS terminology safeguards, source registry and access-state machinery, A3-CQ delegation loop, task-scoped appendices. Restored from A2-LM §7 in v0.2: an explicit database registry and source routing (now in `config/sources.yaml`). Added in v0.2: study-context blocks (organism, study system, entity type). Changed in v0.3: required sources are named (PubMed, Europe PMC and OpenAlex on every core and contrary family; Semantic Scholar recommendations on at least one family), and §4.4 gives a tested syntax example per source — a test run had compiled no OpenAlex queries and one Semantic Scholar query. Moved to code: API calls, pagination, rate limits, deduplication, retraction checks, citation expansion.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -188,3 +188,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - Context blocks are used as filters only where the specification restricts scope, and every filter is paired with a free-text equivalent.
 - No family's total exceeds the budget.
 - In REPAIR mode, no technical failure is reported as an absence of literature.
+
+## Authoritative corpus-mode exception
+
+The input `corpus_policy` is deterministic run authority, confirmed at CP1. In FIXED_CORPUS mode, use only KNOWN_ITEM identifier queries for its papers and authorized access levels. Generic requirements for CORE_TOPIC/CONTRARY_EVIDENCE discovery, OpenAlex discovery, Semantic Scholar recommendations and citation expansion do not apply. Do not ask the researcher to reconfirm those already-decided permissions. Preserve genuine unresolved identity/access questions with NEEDS_HUMAN_INPUT; do not infer inaccessible findings or add publications. In explicitly authorized OPEN_CORPUS mode, the normal discovery requirements remain applicable.
