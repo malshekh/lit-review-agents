@@ -43,22 +43,37 @@ def journal(run):
 
 def key_metadata(run):
     m=run.load('pilot_reference_approval.json') or {}
-    needed=('version','sha256','commit','verified_by','approved_at','store_path')
+    base=('version','sha256','commit','verified_by','approved_at')
+    encrypted=m.get('storage_mode') == 'HUMAN_CONTROLLED_ENCRYPTED'
+    needed=base if encrypted else (*base,'store_path')
     if m.get('human_verified') is not True or not all(isinstance(m.get(k),str) and m[k].strip() for k in needed):
         raise AuthorizationRequired('Missing approved human reference-key version/fingerprint and verification record')
+    if len(m['sha256'])!=64 or any(c not in '0123456789abcdef' for c in m['sha256']):
+        raise AuthorizationRequired('Invalid reference-key SHA-256')
+    if encrypted:
+        # The human controls a dismounted encrypted vault. Finance binds the
+        # attested plaintext digest; it must never open, locate or decrypt the key.
+        if ('store_path' in m or m.get('vault_dismounted') is not True
+                or m.get('decryption_control') != 'HUMAN_ONLY'
+                or m.get('evaluation_release') != 'AFTER_FINALIZED_A07_CP3'
+                or not isinstance(m.get('attestation_id'),str) or not m['attestation_id'].strip()):
+            raise AuthorizationRequired('Encrypted reference requires dismounted, human-only, post-CP3 attestation; no plaintext path')
+        return {k:m[k] for k in (*base,'human_verified','storage_mode','vault_dismounted',
+                                 'decryption_control','evaluation_release','attestation_id')}
+    if m.get('storage_mode') not in (None,'LOCAL_HASHED_FILE'):
+        raise AuthorizationRequired('Unknown reference storage mode')
     path=Path(m['store_path']).resolve()
     # This path is read only for a binary hash, never by payload/retrieval construction.
     if path.is_relative_to(REPO_ROOT.parent.resolve()) or path.is_relative_to(run.dir.resolve()):
         raise AuthorizationRequired('Reference key must be outside the repository and run retrieval paths')
-    if len(m['sha256'])!=64 or any(c not in '0123456789abcdef' for c in m['sha256']):
-        raise AuthorizationRequired('Invalid reference-key SHA-256')
     try: actual=hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as exc: raise AuthorizationRequired('Approved external reference key unavailable') from exc
     if actual != m['sha256']: raise AuthorizationRequired('Approved reference key changed; version and affected evaluations must be renewed')
     return {k:m[k] for k in (*needed,'human_verified')}
 
 def record_key(run, metadata):
-    allowed={'version','sha256','commit','verified_by','approved_at','store_path','human_verified'}
+    allowed={'version','sha256','commit','verified_by','approved_at','store_path','human_verified',
+             'storage_mode','vault_dismounted','decryption_control','evaluation_release','attestation_id'}
     if set(metadata)-allowed: raise AuthorizationRequired('Reference approval accepts metadata only, never key contents')
     # Validate before persisting. No assertion of scientific verification is made by this code.
     old=run.load('pilot_reference_approval.json')
