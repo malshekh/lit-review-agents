@@ -1,6 +1,6 @@
 # A5-KE — Knowledge Extraction Agent
 
-Version: 0.5 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
+Version: 0.6 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
 Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check). Added in v0.3: primary themes from the approved framework, free subthemes, an emerging flag. Added in v0.4: the table-cell span rule in the self-check (§11).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -284,3 +284,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - Drugs, tool compounds, natural products and analogues are distinguished; no analogue's result is pooled under the parent compound.
 - No identifier, value or statistic was invented.
 - Abstract-only extraction is labelled as such.
+
+## Source-material availability
+
+When machine-readable table/legend JSON accompanies verbatim source text, use exact original cell/row/legend text for supporting spans; serialization metadata is not an experimental observation. Keep table headings, row labels, units and values associated. Respect the Source access and completeness record: a supplement link does not mean its contents were inspected, and a figure legend does not provide image-only measurements. Record unavailable evidence rather than infer or reconstruct it.

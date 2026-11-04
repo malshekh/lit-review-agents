@@ -224,7 +224,8 @@ def test_a_stopped_a07_job_supersedes_the_projection_until_it_is_redone(tmp_path
 
 def test_a_new_run_records_the_code_it_starts_from(tmp_path, monkeypatch):
     monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
-    run_id = orch.new_run("topic")
+    from corpus_fixture import authority
+    run_id = orch.new_run("topic",budget_authority=authority(tmp_path/"new-authority.json"))
     import json
     v = json.loads((tmp_path / run_id / "input" / "code_version.json").read_text(encoding="utf-8"))
     assert set(v) == {"commit", "clean", "recorded_at"} and (v["commit"] is None or len(v["commit"]) == 40)

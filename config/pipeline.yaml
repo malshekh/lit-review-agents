@@ -79,7 +79,7 @@ agents:
              # cache_payload: [review_spec, record] caches the paper for a re-extraction. Off: extraction
              # and re-extraction are separate stages, often an hour apart, beyond the 5-minute cache,
              # so every paper would pay the 25% write premium without a read.
-  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.0 }  # audits A05 (Claude)
+  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 64000,  temperature: 0.0 }  # audits A05 (Claude)
   A07-SYN: { provider: anthropic, model: claude_opus5,   max_tokens: 128000, effort: high,   temperature: 0.3 }
   A08-OL:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.2 }
   A09-WRI: { provider: anthropic, model: claude_opus5,   max_tokens: 64000,  effort: high,   temperature: 0.5 }
@@ -149,6 +149,8 @@ context_utilisation:
 # settings). Agreement goes to data/instability_test.json; a finding whose two readings give it different
 # roles is quarantined for human review. Priced in the CP2 projection.
 validation:
+  findings_per_call: 15
+  truncation_retries: 1
   instability_test: true
 
 # A10: conservative serialized-byte admission stays below the 272k pricing threshold.

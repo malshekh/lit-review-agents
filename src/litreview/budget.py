@@ -148,7 +148,13 @@ class BudgetTracker:
             return [json.loads(line) for line in fh if line.strip()]
 
     def spent(self) -> float:
-        return sum(e["cost_usd"] or 0.0 for e in self.entries())
+        from .evaluation_budget import prior
+        entries = self.entries()
+        try:
+            carried = prior(self.log_path.parent, entries)
+        except (ValueError, OSError, KeyError) as exc:
+            raise BudgetExceeded("Cumulative evaluation budget invalid: " + str(exc)) from exc
+        return carried + sum(e["cost_usd"] or 0.0 for e in entries)
 
     def ensure_headroom(self, reservation_key: str | None = None) -> None:
         """Raise before a call if the cap is already reached, counting spend reserved by unsettled batches."""

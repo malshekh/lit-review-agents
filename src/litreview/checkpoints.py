@@ -47,10 +47,18 @@ def write_cp1(run_dir: Path, spec: dict) -> None:
               "## Assumptions", *[f"- {a}" for a in spec.get("assumptions", [])], "",
               "## Questions for you", *[f"- {q}" for q in spec.get("questions_for_researcher", [])], "",
               "Fill in `CP1_decision.json`, then run `litreview approve <run_id> CP1`."]
+    policy_path = Path(run_dir) / "input/corpus_policy.json"
+    if policy_path.exists():
+        from .synthesis_registry import fingerprint
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        lines += ["", "## Immutable run-level corpus authority", "```json", json.dumps(policy, indent=2), "```",
+                  "Confirm this policy explicitly; agents cannot change membership or expansion permissions."]
     (d / "CP1_review.md").write_text("\n".join(lines), encoding="utf-8")
     template = {"selected_option_id": None, "edited_angle": None,
                 "approve_selection_criteria": None, "edited_selection_criteria": None,
                 "edited_theme_framework": None, "answers_to_questions": {}, "notes": ""}
+    if policy_path.exists():
+        template.update(confirm_corpus_policy=False, corpus_policy_fingerprint=fingerprint(policy))
     (d / "CP1_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
 
@@ -87,9 +95,26 @@ def _emerging_lines(emerging: list[dict] | None, what: str) -> list[str]:
 
 
 def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report: dict,
-              emerging: list[dict] | None = None, framework: dict | None = None) -> None:
+              emerging: list[dict] | None = None, framework: dict | None = None,
+              review_issues: dict | None = None, identities: list | None = None,
+              source_readiness: dict | None = None) -> None:
     """Every record is listed — qualified (all tiers), unresolved and excluded. Nothing is hidden."""
     d = cp_dir(run_dir)
+    from .synthesis_registry import fingerprint
+    import shutil
+    old_rows = {}
+    csv_path = d / "CP2_records.csv"
+    if csv_path.exists():
+        with csv_path.open(encoding="utf-8", newline="") as existing:
+            old_rows = {(r["record_id"], r.get("pmid") or ""): r for r in csv.DictReader(existing)}
+    old_decision = json.loads((d / "CP2_decision.json").read_text(encoding="utf-8")) if (d / "CP2_decision.json").exists() else {}
+    preserved = [d / name for name in ("CP2_records.csv", "CP2_decision.json", "CP2_review.md", "CP2_review_state.json", "CP2_approved.json") if (d / name).exists()]
+    if preserved:
+        digest = fingerprint({p.name: p.read_text(encoding="utf-8") for p in preserved})
+        archive = d / "history" / "CP2" / digest
+        archive.mkdir(parents=True, exist_ok=True)
+        for p in preserved:
+            if not (archive / p.name).exists(): shutil.copy2(p, archive / p.name)
     by_id = {r["record_id"]: r for r in records}
     order = {"CORE": 0, "SUPPORTING": 1, "CONTEXT": 2, "PERIPHERAL": 3, None: 4}
     quals = sorted(quals, key=lambda q: (q["disposition"] != "QUALIFIED", order.get(q.get("proposed_tier"), 4)))
@@ -98,7 +123,8 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
         w.writeheader()
         for q in quals:
             r = by_id.get(q["record_id"], {})
-            w.writerow({"select": "", "tier_override": "", "record_id": q["record_id"],
+            prior = old_rows.get((q["record_id"], r.get("pmid") or ""), {})
+            w.writerow({"select": prior.get("select", ""), "tier_override": prior.get("tier_override", ""), "record_id": q["record_id"],
                         "disposition": q["disposition"], "proposed_tier": q.get("proposed_tier") or "",
                         "tier_signal": q.get("tier_signal") or "", "contrary": q.get("is_contrary_evidence"),
                         "themes": "; ".join(q.get("themes", [])), "year": r.get("year"),
@@ -125,9 +151,40 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
              "## Bias checks", "```json", json.dumps(bias_report, indent=2), "```", "",
              *_emerging_lines(emerging, "records"), *_framework_lines(framework, "Current theme framework"),
              "Then run `litreview approve <run_id> CP2`."]
+    issue_data = {"issues": review_issues or {}, "identifier_registry": identities or [],
+                  "source_readiness": source_readiness or {}}
+    digest = fingerprint([records, quals, framework, issue_data])
+    needs_ack = bool(review_issues)
+    lines += ["", "## Source readiness, canonical identifiers and unresolved review", "",
+              "Record IDs and PMIDs are distinct namespaces. The registry below is authoritative; raw model claims may be wrong.",
+              "Full text pending at CP2 is not certified by a PMCID. Required source verification occurs before extraction dispatch.",
+              "```json", json.dumps(issue_data, indent=2, ensure_ascii=False), "```",
+              "Acknowledge these issues with review_issues_acknowledged=true and substantive notes before approval."]
     (d / "CP2_review.md").write_text("\n".join(lines), encoding="utf-8")
-    (d / "CP2_decision.json").write_text(json.dumps({"theme_framework_update": None, "notes": ""}, indent=2),
-                                         encoding="utf-8")
+    decision = {"theme_framework_update": None, "notes": "", **old_decision,
+                "review_fingerprint": digest,
+                "review_issues_acknowledged": old_decision.get("review_issues_acknowledged", False)
+                    if old_decision.get("review_fingerprint") == digest else False}
+    import hashlib
+    paths = [Path(run_dir) / "data" / n for n in ("records.json", "qualifications.json", "spec_approved.json",
+             "theme_framework.json", "screening_review.json", "search_plan.json", "source_readiness.json")]
+    source_files = {str(p.relative_to(run_dir)): hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None for p in paths}
+    (d / "CP2_review_state.json").write_text(json.dumps({"fingerprint": digest, "requires_ack": needs_ack,
+                                                        "source_files": source_files}), encoding="utf-8")
+    (d / "CP2_decision.json").write_text(json.dumps(decision, indent=2), encoding="utf-8")
+
+
+def require_cp2_current(run_dir: Path) -> None:
+    import hashlib
+    p = Path(run_dir) / "checkpoints" / "CP2_review_state.json"
+    if not p.exists():
+        return  # legacy run compatibility; new generated reviews always bind their sources
+    state = json.loads(p.read_text(encoding="utf-8"))
+    for name, expected in state.get("source_files", {}).items():
+        source = Path(run_dir) / name
+        actual = hashlib.sha256(source.read_bytes()).hexdigest() if source.exists() else None
+        if actual != expected:
+            raise DecisionIncomplete("CP2: source/review inputs changed; regenerate and review before approval")
 
 
 def read_cp2_selection(run_dir: Path) -> dict:
@@ -259,7 +316,7 @@ def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: 
 # CP_CONTRARY (release: contrary evidence neither in the table nor addressed in prose), CP_CONTEXT (a request near
 # its model's window), CP_SPEND (the run's spend review point). Each approval is bound to the fingerprint it was
 # written for, logged to provenance by `approve`, and kept in <cp>_approvals.json, so a later pause never erases it.
-REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND")
+REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW")
 
 
 def _write_review(run_dir: Path, cp: str, digest: str, lines: list[str], template: dict, state: dict) -> None:
@@ -305,6 +362,15 @@ def write_context_review(run_dir: Path, digest: str, detail: dict) -> None:
     _write_review(run_dir, "CP_CONTEXT", digest, lines, {"approve_request": False}, {"detail": detail})
 
 
+def write_agent_review(run_dir: Path, digest: str, agent: str, step: str, output: dict) -> None:
+    detail = {k: output.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+    _write_review(run_dir, "CP_AGENT_REVIEW", digest,
+                  ["# Agent requests human input", "", f"{agent} ? {step}",
+                   "No retrieval/screening continuation before this review. Corpus/access/finance constraints cannot be waived here.",
+                   "```json", json.dumps(detail, indent=2, ensure_ascii=False), "```"],
+                  {"approve_continue": False}, {"agent": agent, "step": step, "detail": detail})
+
+
 def write_spend_review(run_dir: Path, digest: str, detail: dict) -> None:
     """The run reached its spend review point: it pauses and asks before going further."""
     lines = ["# Spend review point", "",
@@ -329,11 +395,25 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
     d = cp_dir(run_dir)
     decision = json.loads((d / f"{cp}_decision.json").read_text(encoding="utf-8"))
     if cp == "CP1":
+        policy_path = Path(run_dir) / "input/corpus_policy.json"
+        if policy_path.exists():
+            from .synthesis_registry import fingerprint
+            expected = fingerprint(json.loads(policy_path.read_text(encoding="utf-8")))
+            if decision.get("confirm_corpus_policy") is not True or decision.get("corpus_policy_fingerprint") != expected:
+                raise DecisionIncomplete("CP1: explicitly confirm the persisted corpus authority")
         if not decision.get("selected_option_id"):
             raise DecisionIncomplete("CP1: set selected_option_id.")
         if decision.get("approve_selection_criteria") is not True and not decision.get("edited_selection_criteria"):
             raise DecisionIncomplete("CP1: set approve_selection_criteria to true, or supply edited_selection_criteria.")
     elif cp == "CP2":
+        require_cp2_current(run_dir)
+        state_path = d / "CP2_review_state.json"
+        if state_path.exists():
+            review = json.loads(state_path.read_text(encoding="utf-8"))
+            if decision.get("review_fingerprint") != review["fingerprint"]:
+                raise DecisionIncomplete("CP2: stale corpus review fingerprint")
+            if review["requires_ack"] and (decision.get("review_issues_acknowledged") is not True or len(decision.get("notes", "").strip()) < 20):
+                raise DecisionIncomplete("CP2: acknowledge review issues and record their disposition in notes")
         decision.update(read_cp2_selection(run_dir))
         if not decision["selected_record_ids"]:
             raise DecisionIncomplete("CP2: mark at least one paper with Y in CP2_records.csv.")
@@ -355,6 +435,8 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
         state = json.loads((d / f"{cp}_state.json").read_text(encoding="utf-8"))
         if decision.get("fingerprint") != state["fingerprint"]:
             raise DecisionIncomplete(f"{cp}: stale fingerprint (what is under review changed)")
+        if cp == "CP_AGENT_REVIEW" and (decision.get("approve_continue") is not True or len(decision.get("notes", "").strip()) < 20):
+            raise DecisionIncomplete("CP_AGENT_REVIEW: explicit continuation and resolution notes required")
         if cp == "CP_CONTEXT" and decision.get("approve_request") is not True:
             raise DecisionIncomplete("CP_CONTEXT: set approve_request to true, or split the work and run again")
         if cp == "CP_SPEND" and decision.get("approve_continue") is not True:
@@ -393,4 +475,15 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
 
 def approved(run_dir: Path, cp: str) -> dict | None:
     p = cp_dir(run_dir) / f"{cp}_approved.json"
-    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    if not p.exists():
+        return None
+    decision = json.loads(p.read_text(encoding="utf-8"))
+    if cp == "CP2" and (p.parent / "CP2_review_state.json").exists():
+        state = json.loads((p.parent / "CP2_review_state.json").read_text(encoding="utf-8"))
+        if decision.get("review_fingerprint") != state["fingerprint"]:
+            return None
+        try:
+            require_cp2_current(run_dir)
+        except DecisionIncomplete:
+            return None
+    return decision

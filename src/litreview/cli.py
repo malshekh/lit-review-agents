@@ -56,7 +56,8 @@ def cmd_check(args) -> int:
 
 def cmd_new(args) -> int:
     seeds = [s for s in _read(args.seeds).splitlines() if s.strip()]
-    run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family)
+    run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family, budget_authority=args.budget_authority, corpus_mode=args.corpus_mode,
+                     scope_configuration=json.loads(_read(args.scope_configuration)) if args.scope_configuration else None)
     print(f"Created run {run_id}. Start it with:  litreview run {run_id}")
     return 0
 
@@ -279,6 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--seeds")
     n.add_argument("--family", default="unspecified",
                    help="topic family for refusal routing, e.g. oncology-drug-repurposing (see records/model_record.jsonl)")
+    n.add_argument("--scope-configuration", help="human scope configuration with parent CP1 hash; does not approve new checkpoints")
+    n.add_argument("--budget-authority", help="reviewed cumulative evaluation-cost metadata; required for fixed pilot")
+    n.add_argument("--corpus-mode", choices=["FIXED_CORPUS", "OPEN_CORPUS"], default="FIXED_CORPUS")
     n.set_defaults(fn=cmd_new)
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)
@@ -295,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     a = sub.add_parser("approve")
     a.add_argument("run_id")
     a.add_argument("checkpoint", choices=["CP1", "CP2", "CP_SYN", "CP3", "CP_LEDGER", "CP_CONTRARY",
-                                         "CP_CONTEXT", "CP_SPEND"])
+                                         "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW"])
     a.set_defaults(fn=cmd_approve)
     aa = sub.add_parser("approve-alternate", help="accept a costlier alternate model after a refusal (this run only)")
     aa.add_argument("run_id")

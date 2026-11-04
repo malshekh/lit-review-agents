@@ -43,22 +43,37 @@ def journal(run):
 
 def key_metadata(run):
     m=run.load('pilot_reference_approval.json') or {}
-    needed=('version','sha256','commit','verified_by','approved_at','store_path')
+    base=('version','sha256','commit','verified_by','approved_at')
+    encrypted=m.get('storage_mode') == 'HUMAN_CONTROLLED_ENCRYPTED'
+    needed=base if encrypted else (*base,'store_path')
     if m.get('human_verified') is not True or not all(isinstance(m.get(k),str) and m[k].strip() for k in needed):
         raise AuthorizationRequired('Missing approved human reference-key version/fingerprint and verification record')
+    if len(m['sha256'])!=64 or any(c not in '0123456789abcdef' for c in m['sha256']):
+        raise AuthorizationRequired('Invalid reference-key SHA-256')
+    if encrypted:
+        # The human controls a dismounted encrypted vault. Finance binds the
+        # attested plaintext digest; it must never open, locate or decrypt the key.
+        if ('store_path' in m or m.get('vault_dismounted') is not True
+                or m.get('decryption_control') != 'HUMAN_ONLY'
+                or m.get('evaluation_release') != 'AFTER_FINALIZED_A07_CP3'
+                or not isinstance(m.get('attestation_id'),str) or not m['attestation_id'].strip()):
+            raise AuthorizationRequired('Encrypted reference requires dismounted, human-only, post-CP3 attestation; no plaintext path')
+        return {k:m[k] for k in (*base,'human_verified','storage_mode','vault_dismounted',
+                                 'decryption_control','evaluation_release','attestation_id')}
+    if m.get('storage_mode') not in (None,'LOCAL_HASHED_FILE'):
+        raise AuthorizationRequired('Unknown reference storage mode')
     path=Path(m['store_path']).resolve()
     # This path is read only for a binary hash, never by payload/retrieval construction.
     if path.is_relative_to(REPO_ROOT.parent.resolve()) or path.is_relative_to(run.dir.resolve()):
         raise AuthorizationRequired('Reference key must be outside the repository and run retrieval paths')
-    if len(m['sha256'])!=64 or any(c not in '0123456789abcdef' for c in m['sha256']):
-        raise AuthorizationRequired('Invalid reference-key SHA-256')
     try: actual=hashlib.sha256(path.read_bytes()).hexdigest()
     except OSError as exc: raise AuthorizationRequired('Approved external reference key unavailable') from exc
     if actual != m['sha256']: raise AuthorizationRequired('Approved reference key changed; version and affected evaluations must be renewed')
     return {k:m[k] for k in (*needed,'human_verified')}
 
 def record_key(run, metadata):
-    allowed={'version','sha256','commit','verified_by','approved_at','store_path','human_verified'}
+    allowed={'version','sha256','commit','verified_by','approved_at','store_path','human_verified',
+             'storage_mode','vault_dismounted','decryption_control','evaluation_release','attestation_id'}
     if set(metadata)-allowed: raise AuthorizationRequired('Reference approval accepts metadata only, never key contents')
     # Validate before persisting. No assertion of scientific verification is made by this code.
     old=run.load('pilot_reference_approval.json')
@@ -70,10 +85,18 @@ def record_key(run, metadata):
         raise
     run.prov.human_decision('PILOT_REFERENCE_METADATA', {k:v for k,v in metadata.items() if k!='store_path'}, 'Human attestation; no scientific verification by software')
 
+def source_level(run, record):
+    """Authorized abstract-only access is independent of PMC availability metadata."""
+    expected = {p['pmid']: p['content_level'] for p in PAPERS}
+    if enabled(run) and expected.get(str(record.get('pmid'))) == 'ABSTRACT':
+        return 'ABSTRACT'
+    return cp.content_level(record, run.dir)
+
+
 def selection(run, records=None):
     records=run.load('selected_corpus.json') if records is None else records
     if records is not None:
-        got=sorted((str(r.get('pmid')),cp.content_level(r,run.dir)) for r in records)
+        got=sorted((str(r.get('pmid')),source_level(run,r)) for r in records)
         want=sorted((p['pmid'],p['content_level']) for p in PAPERS)
         if got!=want: raise AuthorizationRequired('Selected papers/source types differ from the authorized three-paper pilot')
         return records
@@ -98,17 +121,21 @@ def _files_digest(paths):
     return {str(p.relative_to(REPO_ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths if p.is_file()}
 
 def identity(run,stage):
+    from . import corpus_policy, evaluation_budget
+    policy = corpus_policy.resolve(run)
+    budget_authority = evaluation_budget.load(run.dir)
     sources=[p for folder in ('src','prompts','schemas','config') for p in sorted((REPO_ROOT/folder).rglob('*'))
              if p.is_file() and p.suffix in ('.py','.md','.json','.yaml')]
     upstream=('spec_approved.json','theme_framework.json','selected_corpus.json','validated_findings.json','theme_records.json')
     if stage==STAGE_2: upstream+=('synthesis_package.json','synthesis_approved.json','manuscript_plan.json','allocation_ledger.json')
     return {'run_id':run.id,'stage':stage,'papers':selection(run),'reference':key_metadata(run),
+            'corpus_policy':policy,'evaluation_budget':budget_authority,
             'config':json.loads(json.dumps(run.cfg)),'prices':run.budget.prices,'versions':_files_digest(sources),
             'routes':{a:dataclasses.asdict(run.route(a)) for a in sorted(FIRST if stage==STAGE_1 else SECOND)},
             'input':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted((run.dir/'input').glob('*')) if p.is_file()},
             'upstream':{name:fingerprint(run.load(name)) for name in upstream},
             'evidence':{str(p.relative_to(run.dir)):hashlib.sha256(p.read_bytes()).hexdigest()
-                        for folder in ('fulltext','extractions','validations') for p in sorted((run.dir/'data'/folder).glob('*.json'))},
+                        for folder in ('fulltext','fulltext_provenance','extractions','validations') for p in sorted((run.dir/'data'/folder).glob('*.json'))},
             'plan':run.load('pilot_financial_plan.json'),'calibration':cp.load_rates()}
 
 def work_basis(run):
@@ -162,13 +189,13 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
             lines.append({'stage':'A02-A04 (pre-CP2)','usd':max(0,float(run.cfg['forecast']['scenarios']['baseline']['pre_cp2'])-pre),'calls':26})
         if at<=STAGES.index('cp2'):
             for lv in ('ABSTRACT','FULL_TEXT'):
-                n=sum(cp.content_level(r,run.dir)==lv for r in records)
+                n=sum(source_level(run,r)==lv for r in records)
                 lines.append({'stage':'A05+A06 '+lv,'usd':n*rates['per_paper'][lv]['p90_usd'],'calls':n})
             if run.cfg.get('validation',{}).get('instability_test'):
-                lines.append({'stage':'A06 instability repeats','usd':sum(rates['per_paper'][cp.content_level(r,run.dir)]['a06_p90_usd'] for r in records),'calls':len(records)})
+                lines.append({'stage':'A06 instability repeats','usd':sum(rates['per_paper'][source_level(run,r)]['a06_p90_usd'] for r in records),'calls':len(records)})
             count=max(1,len((run.load('theme_framework.json') or {}).get('primary_themes',[])) or 8)
             lines.append({'stage':'A06 per theme','usd':count*rates['per_theme']['p90_usd'],'calls':count})
-            F=sum(math.ceil(rates['per_paper'][cp.content_level(r,run.dir)]['findings_p90']) for r in records)
+            F=sum(math.ceil(rates['per_paper'][source_level(run,r)]['findings_p90']) for r in records)
         elif at<=STAGES.index('validate'):
             import copy
             proxy=copy.copy(run);proxy.cfg=copy.deepcopy(run.cfg);proxy.cfg['batch']['enabled']=False
@@ -214,6 +241,12 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
                           'long_context_calls':0 if agent=='A10-RV' else long_calls,
                           'completed_forecast_usd':credit,'gross_forecast_usd':cost})
     else: raise AuthorizationRequired('Unknown pilot stage')
+    if stage==STAGE_1 and run.state()['stage']=='validate':
+        from .a06_batches import forecast_increment as a06_batch_increment
+        extra,count=a06_batch_increment(run,in_flight)
+        if count:
+            lines.append({'stage':'A06 bounded audit increment','basis':'MEASURED_INPUT_DENSITY_AND_A06_P90_OUTPUT',
+                          'usd':extra,'calls':count,'note':'Replaces R0001 paper/repeat allowances; actual attempts reserve full caps'})
     # A pending interactive/A07/A10 submission must be reconciled before generating another request.
     # Batches carry their exact steps; _per_paper_remaining excludes them above.
     reservations=run.budget.reservations()
