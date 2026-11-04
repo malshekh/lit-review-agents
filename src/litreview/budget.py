@@ -386,7 +386,7 @@ class BudgetTracker:
         v = s["savings_usd"]
         if any(v.values()):
             lines.append(f"  cache: reads saved ${v['cache_read_saved']:.2f}; writes cost ${v['cache_write_premium']:.2f} "
-                         f"(5-minute) + ${v['cache_write_1h_premium']:.2f} (1-hour) over the input price; net "
+                         f"(default retention) + ${v['cache_write_1h_premium']:.2f} (Anthropic 1-hour) over the input price; net "
                          f"${v['cache_net']:.2f}.  Batch discount, separately: ${v['batch_discount']:.2f}")
         for agent, a in sorted(s["by_agent"].items()):
             cache = (f"  (cache: {a['cache_hits']}/{a['cache_calls']} calls hit, {a['cached_input_tokens']:,d} "

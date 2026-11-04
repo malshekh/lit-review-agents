@@ -28,7 +28,7 @@ def _refs(value,suffix):
     return found
 
 
-def batches(payload,size=SIZE):
+def batches(payload,size=SIZE,shared_prefix=False):
     if not isinstance(size,int) or not 1<=size<=SIZE:raise ValueError('A06 batch size must be between 1 and 15')
     ext=payload['extraction'];findings=ext['findings'];ids=[f['finding_id'] for f in findings]
     if len(ids)!=len(set(ids)):raise ValueError('Duplicate input finding IDs')
@@ -36,6 +36,10 @@ def batches(payload,size=SIZE):
     index=[{**{k:f.get(k) for k in ('finding_id','span_location','predicate')},
             'subject_mention':entities.get(f.get('subject_entity_id'),{}).get('mention'),
             'object_mention':entities.get(f.get('object_entity_id'),{}).get('mention')} for f in findings]
+    prefix=None
+    if shared_prefix:
+        from .a06_request import shared_prefix as build_prefix
+        prefix=build_prefix({**payload,'paper_finding_index':index})
     result=[]
     for start in range(0,len(findings),size):
         selected=findings[start:start+size];sub={k:copy.deepcopy(v) for k,v in ext.items() if not k.startswith('_') and k not in ('entities','contexts','findings')}
@@ -52,6 +56,7 @@ def batches(payload,size=SIZE):
                'paper_finding_index':index,
                'a06_validation_batch':{'version':1,'finding_ids':[f['finding_id'] for f in selected],
                  'instruction':'Audit exactly these finding IDs using the full supplied paper. Return one disposition per requested ID. Preserve source inconsistencies and normalization conflicts, including relationships to other IDs in paper_finding_index; never infer that separate audit batches are independent studies.'}}
+        if prefix is not None:value['_a06_shared_prefix']=prefix
         result.append(value)
     return result
 
@@ -107,7 +112,7 @@ def audit(run,payload,root_step,overrides=None,schema_file=None,exclude=frozense
     if int(run.cfg['validation'].get('truncation_retries',1))!=TRUNCATION_RETRIES:raise ValueError('Only one truncation retry is authorized per A06 batch')
     rid=payload['extraction']['record_id']
     if payload['paper_text']!=run.load('fulltext/'+rid+'.json'):raise ValueError('A06 batch source differs from cached paper')
-    size=int(run.cfg['validation']['findings_per_call']);parts=batches(payload,size)
+    size=int(run.cfg['validation']['findings_per_call']);parts=batches(payload,size,shared_prefix=bool(run.cfg['validation'].get('shared_prefix',False)))
     model=run.route('A06-SV',exclude)
     if overrides:model=dataclasses.replace(model,**overrides)
     manifest=manifest_for(run,payload,root_step,model,parts)
@@ -166,7 +171,7 @@ def forecast_increment(run,in_flight=frozenset()):
     from .tools import cost_projection as cp
     saved=run.load('a06_inputs/'+rid+'.json')
     if not saved:raise ValueError('Missing exact A06 recovery input')
-    payload=saved['payload'];parts=batches(payload,int(run.cfg['validation']['findings_per_call']))
+    payload=saved['payload'];parts=batches(payload,int(run.cfg['validation']['findings_per_call']),shared_prefix=bool(run.cfg['validation'].get('shared_prefix',False)))
     model=run.route('A06-SV',frozenset({run._extraction_vendor(rid)}));rates=cp.load_rates();original=rates['per_paper']['FULL_TEXT']['a06_p90_usd']
     scenario=run.cfg['forecast']['scenarios']['baseline'];label=policy.get('forecast_calibration','measured')
     modeled=0.;count=0;replaced=0.

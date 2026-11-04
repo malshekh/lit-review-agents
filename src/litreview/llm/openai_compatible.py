@@ -24,8 +24,8 @@ def _get_client(provider: str):
 
 def chat_params(system: str, user, model: str, max_tokens: int, temperature: float, provider: str = "openai") -> dict:
     """The Chat Completions request body, shared by complete() and a batch line's `body`."""
-    # `effort` and `cache_system` are Claude settings; OpenAI and Kimi cache repeated prompt prefixes
-    # automatically, so blocks are simply joined in order (the stable prefix stays first).
+    # `effort` and `cache_system` are Claude settings. Ordinary OpenAI/Kimi calls
+    # preserve their existing implicit caching; marked A06 work units use an explicit shared boundary.
     p = config.load("pipeline")["providers"][provider]
     kwargs: dict = {
         "model": model,
@@ -33,6 +33,24 @@ def chat_params(system: str, user, model: str, max_tokens: int, temperature: flo
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": "\n\n".join(x["text"] for x in as_parts(user))}],
     }
+    blocks=as_parts(user)
+    if provider=='openai' and any(x.get('a06_shared_prefix') for x in blocks):
+        # Current Chat Completions supports a 30m request TTL. Do not send Anthropic TTLs.
+        settings=p.get('a06_cache',{'mode':'explicit','ttl':'30m'})
+        mode=settings.get('mode','explicit');ttl=settings.get('ttl','30m')
+        if mode not in ('explicit','off','implicit') or ttl!='30m':
+            raise ValueError('A06 Chat Completions caching supports explicit/off/implicit with 30m TTL only')
+        if not (model.startswith('gpt-6') or model.startswith('gpt-5.6')):
+            raise ValueError('Explicit A06 cache settings require a supported OpenAI model')
+        content=[]
+        for block in blocks:
+            item={'type':'text','text':block['text']}
+            if mode=='explicit' and block.get('a06_shared_prefix'):
+                item['prompt_cache_breakpoint']={'mode':'explicit'}
+            content.append(item)
+        kwargs['messages'][1]['content']=content
+        kwargs['prompt_cache_options']={'mode':'explicit' if mode=='off' else mode,'ttl':ttl}
+        # No explicit breakpoint + explicit-only mode disables caching for the control.
     if p.get("send_temperature", False):
         kwargs["temperature"] = temperature
     if p.get("json_mode", True):
