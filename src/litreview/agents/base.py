@@ -79,6 +79,9 @@ def _json(obj) -> str:
 def user_parts(payload: dict, cache_keys: tuple[str, ...] = ()) -> list[dict]:
     """The user message as text blocks. With cache_keys, those payload keys go first in their own
     cacheable block (e.g. the paper, reread by a repair call) and the rest follow uncached."""
+    if '_a06_shared_prefix' in payload:
+        from ..a06_request import parts
+        return parts(payload)
     head = {k: payload[k] for k in cache_keys if k in payload}
     if not head:
         return [{"text": _json(payload), "cache": False}]

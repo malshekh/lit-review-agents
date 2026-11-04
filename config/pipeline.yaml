@@ -149,6 +149,7 @@ context_utilisation:
 # settings). Agreement goes to data/instability_test.json; a finding whose two readings give it different
 # roles is quarantined for human review. Priced in the CP2 projection.
 validation:
+  shared_prefix: true          # development only; requires separate frozen-runtime promotion
   findings_per_call: 15
   truncation_retries: 1
   instability_test: true

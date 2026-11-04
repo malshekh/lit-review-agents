@@ -8,7 +8,7 @@ from test_pilot_authorization import run
 
 @pytest.fixture
 def ready(run):
-    r=run;r.cfg=copy.deepcopy(r.cfg);r.cfg['validation']['findings_per_call']=15;r.cfg['validation']['truncation_retries']=1
+    r=run;r.cfg=copy.deepcopy(r.cfg);r.cfg['validation']['shared_prefix']=False;r.cfg['validation']['findings_per_call']=15;r.cfg['validation']['truncation_retries']=1
     r.save_state({**r.state(),'stage':'validate'})
     source={'Abstract':'Synthetic study','Results':'Synthetic finding.','Methods':'Synthetic conditions.'}
     ext={'record_id':'R0001','content_level':'FULL_TEXT','entities':[{'entity_id':'E1','mention':'Synthetic entity'}],
