@@ -349,7 +349,11 @@ class Run:
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
-              reservation_key: str | None = None) -> dict:
+              reservation_key: str | None = None, repair_limit: int | None = None) -> dict:
+        from . import a06_batches
+        if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
+            try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
+            except ValueError as exc:raise Pause("A06 batch validation rejected: " + str(exc)) from exc
         try:
             corpus_policy.resolve(self)
         except ValueError as exc:
@@ -410,6 +414,7 @@ class Run:
                 m.model, watched["input_counted"] or watched["input_byte_bound"], watched["output_reserve"]) or 0.0)
         try:
             extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+            if repair_limit is not None:extra['repair_limit']=repair_limit
             if pilot.enabled(self):
                 from .synthesis_registry import fingerprint
                 request_id=fingerprint([agent_id,payload,dataclasses.asdict(m),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
@@ -1019,6 +1024,10 @@ class Run:
         exclude = exclude or (lambda step: frozenset())
         pending = []
         for step, payload in items:
+            from . import a06_batches
+            if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
+                on_output(step,self.agent(agent_id,payload,step,exclude_providers=frozenset(exclude(step))))
+                continue
             done = self.dir / "outputs" / f"{step}.json"
             if done.exists():
                 on_output(step, json.loads(done.read_text(encoding="utf-8")))
@@ -1396,6 +1405,10 @@ class Run:
         entries = self.budget.entries()
 
         def how(step: str) -> dict:
+            merged=self.load('a06_batch_receipts/'+step+'.json')
+            if merged:
+                return {'step':step,'channel':'bounded_interactive','model':merged['model'],'json_repair':False,
+                        'batch_steps':[b['step'] for b in merged['batches']]}
             calls = [e for e in entries if e["step"] == step]
             return {"step": step, "channel": ("batch" if calls and calls[-1].get("batch_id") else
                                               "interactive" if calls else "unknown"),

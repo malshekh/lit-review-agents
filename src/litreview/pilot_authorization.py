@@ -241,6 +241,12 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
                           'long_context_calls':0 if agent=='A10-RV' else long_calls,
                           'completed_forecast_usd':credit,'gross_forecast_usd':cost})
     else: raise AuthorizationRequired('Unknown pilot stage')
+    if stage==STAGE_1 and run.state()['stage']=='validate':
+        from .a06_batches import forecast_increment as a06_batch_increment
+        extra,count=a06_batch_increment(run,in_flight)
+        if count:
+            lines.append({'stage':'A06 bounded audit increment','basis':'MEASURED_INPUT_DENSITY_AND_A06_P90_OUTPUT',
+                          'usd':extra,'calls':count,'note':'Replaces R0001 paper/repeat allowances; actual attempts reserve full caps'})
     # A pending interactive/A07/A10 submission must be reconciled before generating another request.
     # Batches carry their exact steps; _per_paper_remaining excludes them above.
     reservations=run.budget.reservations()
