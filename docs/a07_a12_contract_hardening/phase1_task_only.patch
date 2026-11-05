@@ -1,0 +1,378 @@
+--- a/prompts/agents/A07-SYN_Synthesis.md
++++ b/prompts/agents/A07-SYN_Synthesis.md
+@@ -110,3 +110,34 @@
+ 
+ Respect the mode's output limit including reasoning. Atomic complete JSON only, no long reports.
+ If evidence is insufficient, say so rather than supplying plausible science.
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A07-SYN.bounded-plan.schema.json**
++$ required=["agent_id","prompt_version","mode","status","warnings","limitations","theme_change_proposals","scope_drift","fivew1h"]; $.agent_id const="A07-SYN"; $.prompt_version const="1.0"; $.mode const="PLAN"; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE"]; $.warnings maxItems=8; $.warnings[] minLength=1; $.warnings[] maxLength=240; $.limitations maxItems=8; $.limitations[] minLength=1; $.limitations[] maxLength=240; $.theme_change_proposals maxItems=8; $.theme_change_proposals[] required=["proposal","rationale","finding_ids"]; $.theme_change_proposals[].proposal minLength=1; $.theme_change_proposals[].proposal maxLength=480; $.theme_change_proposals[].rationale minLength=1; $.theme_change_proposals[].rationale maxLength=480; $.theme_change_proposals[].finding_ids maxItems=12; $.theme_change_proposals[].finding_ids[] minLength=1; $.theme_change_proposals[].finding_ids[] maxLength=120; $.scope_drift maxItems=8; $.scope_drift[] minLength=1; $.scope_drift[] maxLength=480; $.fivew1h maxItems=9; $.fivew1h[] required=["theme_id","unresolved"]; $.fivew1h[].theme_id minLength=1; $.fivew1h[].theme_id maxLength=120; $.fivew1h[].unresolved minLength=1; $.fivew1h[].unresolved maxLength=480; $.fivew1h[].unresolved type=string
++Example shape only:
++```json
++{"agent_id":"A07-SYN","prompt_version":"1.0","mode":"PLAN","status":"COMPLETE","warnings":[],"limitations":[],"theme_change_proposals":[],"scope_drift":[],"fivew1h":[]}
++```
++
++**A07-SYN.bounded-group.schema.json**
++$ required=["agent_id","prompt_version","mode","status","warnings","limitations","propositions","knowledge_gaps","findings_not_used","retrieval_requests"]; $.agent_id const="A07-SYN"; $.prompt_version const="1.0"; $.mode const="GROUP"; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE"]; $.warnings maxItems=8; $.warnings[] minLength=1; $.warnings[] maxLength=240; $.limitations maxItems=8; $.limitations[] minLength=1; $.limitations[] maxLength=240; $.propositions maxItems=12; $.propositions[] required=["type","assertion","evidence","source_item_ids","satisfies","prominence"]; $.propositions[].type enum=["SOURCE_GROUNDED","CLAIM_APPRAISAL","THEME_GROUNDED","REPORTING_ONLY_INTEGRATION"]; $.propositions[].assertion minLength=1; $.propositions[].assertion maxLength=480; $.propositions[].evidence maxItems=24; $.propositions[].evidence[] required=["finding_id","role"]; $.propositions[].evidence[].finding_id minLength=1; $.propositions[].evidence[].finding_id maxLength=120; $.propositions[].evidence[].role enum=["SUPPORTING","CONFLICTING","SUBJECT_OF_APPRAISAL"]; $.propositions[].evidence[].appraisal required=["statement","claim_source_record_id","a06_rationale"]; $.propositions[].evidence[].appraisal.statement minLength=1; $.propositions[].evidence[].appraisal.statement maxLength=600; $.propositions[].evidence[].appraisal.claim_source_record_id minLength=1; $.propositions[].evidence[].appraisal.claim_source_record_id maxLength=120; $.propositions[].evidence[].appraisal.a06_rationale minLength=1; $.propositions[].evidence[].appraisal.a06_rationale maxLength=1200; $.propositions[].source_item_ids maxItems=8; $.propositions[].source_item_ids[] minLength=1; $.propositions[].source_item_ids[] maxLength=120; $.propositions[].satisfies maxItems=8; $.propositions[].satisfies[] minLength=1; $.propositions[].satisfies[] maxLength=120; $.propositions[].prominence enum=["HEADLINE","NARRATIVE_PRIMARY","NARRATIVE_SUPPORTING","DISPLAY","SUPPLEMENTARY"]; $.knowledge_gaps maxItems=16; $.knowledge_gaps[] required=["type","statement","source_item_ids","established_by","satisfies"]; $.knowledge_gaps[].type minLength=1; $.knowledge_gaps[].type maxLength=60; $.knowledge_gaps[].statement minLength=1; $.knowledge_gaps[].statement maxLength=480; $.knowledge_gaps[].source_item_ids maxItems=8; $.knowledge_gaps[].source_item_ids[] minLength=1; $.knowledge_gaps[].source_item_ids[] maxLength=120; $.knowledge_gaps[].established_by maxItems=24; $.knowledge_gaps[].established_by[] minLength=1; $.knowledge_gaps[].established_by[] maxLength=120; $.knowledge_gaps[].satisfies maxItems=8; $.knowledge_gaps[].satisfies[] minLength=1; $.knowledge_gaps[].satisfies[] maxLength=120; $.findings_not_used maxItems=24; $.findings_not_used[] required=["finding_id","reason"]; $.findings_not_used[].finding_id minLength=1; $.findings_not_used[].finding_id maxLength=120; $.findings_not_used[].reason minLength=1; $.findings_not_used[].reason maxLength=240; $.retrieval_requests maxItems=4; $.retrieval_requests[] required=[]; $.retrieval_requests[].finding_ids maxItems=12; $.retrieval_requests[].finding_ids[] minLength=1; $.retrieval_requests[].finding_ids[] maxLength=120; $.retrieval_requests[].query maxLength=160
++Example shape only:
++```json
++{"agent_id":"A07-SYN","prompt_version":"1.0","mode":"GROUP","status":"COMPLETE","warnings":[],"limitations":[],"propositions":[],"knowledge_gaps":[],"findings_not_used":[],"retrieval_requests":[]}
++```
++
++**A07-SYN.bounded-reconcile.schema.json**
++$ required=["agent_id","prompt_version","mode","status","warnings","limitations","reviews","issues","retrieval_requests"]; $.agent_id const="A07-SYN"; $.prompt_version const="1.0"; $.mode const="RECONCILE"; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE"]; $.warnings maxItems=8; $.warnings[] minLength=1; $.warnings[] maxLength=240; $.limitations maxItems=8; $.limitations[] minLength=1; $.limitations[] maxLength=240; $.reviews maxItems=32; $.reviews[] required=["proposition_id","outcome","rationale"]; $.reviews[].proposition_id minLength=1; $.reviews[].proposition_id maxLength=120; $.reviews[].outcome enum=["NO_CONFLICT_IDENTIFIED","ISSUES_IDENTIFIED"]; $.reviews[].rationale minLength=1; $.reviews[].rationale maxLength=240; $.issues maxItems=32; $.issues[] required=["kind","proposition_ids","finding_ids","limitation"]; $.issues[].kind enum=["UNRESOLVED_CONTRADICTION","CONTEXT_DEPENDENT","SHARED_EVIDENCE","DUPLICATE_PUBLICATION","UNSUPPORTED_INTERPRETATION"]; $.issues[].proposition_ids maxItems=12; $.issues[].proposition_ids[] minLength=1; $.issues[].proposition_ids[] maxLength=120; $.issues[].finding_ids maxItems=24; $.issues[].finding_ids[] minLength=1; $.issues[].finding_ids[] maxLength=120; $.issues[].limitation minLength=1; $.issues[].limitation maxLength=480; $.retrieval_requests maxItems=4; $.retrieval_requests[] required=[]; $.retrieval_requests[].finding_ids maxItems=12; $.retrieval_requests[].finding_ids[] minLength=1; $.retrieval_requests[].finding_ids[] maxLength=120; $.retrieval_requests[].query maxLength=160
++Example shape only:
++```json
++{"agent_id":"A07-SYN","prompt_version":"1.0","mode":"RECONCILE","status":"COMPLETE","warnings":[],"limitations":[],"reviews":[],"issues":[],"retrieval_requests":[]}
++```
++
++**A07-SYN.bounded-final.schema.json**
++$ required=["agent_id","prompt_version","mode","status","warnings","limitations","thesis_options","proposed_interpretations","beyond_prose_bindings"]; $.agent_id const="A07-SYN"; $.prompt_version const="1.0"; $.mode const="FINAL"; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE"]; $.warnings maxItems=8; $.warnings[] minLength=1; $.warnings[] maxLength=240; $.limitations maxItems=8; $.limitations[] minLength=1; $.limitations[] maxLength=240; $.thesis_options maxItems=3; $.thesis_options[] required=["option_id","type","text","title_draft","contribution_statement_draft","proposition_ids"]; $.thesis_options[].option_id minLength=1; $.thesis_options[].option_id maxLength=40; $.thesis_options[].type enum=["CONCLUSION_THESIS","ORGANIZING_THESIS"]; $.thesis_options[].text minLength=1; $.thesis_options[].text maxLength=480; $.thesis_options[].title_draft minLength=1; $.thesis_options[].title_draft maxLength=160; $.thesis_options[].contribution_statement_draft minLength=1; $.thesis_options[].contribution_statement_draft maxLength=320; $.thesis_options[].proposition_ids maxItems=24; $.thesis_options[].proposition_ids[] minLength=1; $.thesis_options[].proposition_ids[] maxLength=120; $.proposed_interpretations maxItems=8; $.proposed_interpretations[] required=["pi_id","kind","statement","what_it_goes_beyond","premise_proposition_ids"]; $.proposed_interpretations[].pi_id minLength=1; $.proposed_interpretations[].pi_id maxLength=40; $.proposed_interpretations[].kind minLength=1; $.proposed_interpretations[].kind maxLength=80; $.proposed_interpretations[].statement minLength=1; $.proposed_interpretations[].statement maxLength=480; $.proposed_interpretations[].what_it_goes_beyond minLength=1; $.proposed_interpretations[].what_it_goes_beyond maxLength=480; $.proposed_interpretations[].premise_proposition_ids maxItems=24; $.proposed_interpretations[].premise_proposition_ids[] minLength=1; $.proposed_interpretations[].premise_proposition_ids[] maxLength=120; $.beyond_prose_bindings maxItems=8; $.beyond_prose_bindings[] required=["surface","proposition_ids"]; $.beyond_prose_bindings[].surface minLength=1; $.beyond_prose_bindings[].surface maxLength=80; $.beyond_prose_bindings[].proposition_ids maxItems=24; $.beyond_prose_bindings[].proposition_ids[] minLength=1; $.beyond_prose_bindings[].proposition_ids[] maxLength=120
++Example shape only:
++```json
++{"agent_id":"A07-SYN","prompt_version":"1.0","mode":"FINAL","status":"COMPLETE","warnings":[],"limitations":[],"thesis_options":[],"proposed_interpretations":[],"beyond_prose_bindings":[]}
++```
+--- a/prompts/agents/A08-OL_Outline.md
++++ b/prompts/agents/A08-OL_Outline.md
+@@ -126,3 +126,13 @@
+ - Every selected paper is cited; no heading, title or abstract binds an appraised claim or an element that is not written.
+ - One display item, `T1`; `writing_order` lists every section once.
+ - Nothing in the plan restates, shortens or merges an assertion: elements are referenced by ID only.
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A08-OL.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","plan_version","title","abstract_plan","keywords","writing_order","sections","allocation_ledger","display_items","budget_summary","readability"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.title required=["text","proposition_ids"]; $.abstract_plan required=["target_words","ordered_proposition_ids","contribution_statement"]; $.keywords maxItems=6; $.writing_order minItems=1; $.sections minItems=1; $.sections[] required=["section_id","level","heading","heading_kind","heading_proposition_ids","purpose","word_budget","theme_ids","ordered_items","display_item_ids","transition_in","transition_out","wording_restrictions"]; $.sections[].heading_kind enum=["DESCRIPTIVE","CLAIM_BEARING","REPORTING_ONLY","RELATIONSHIP_UNRESOLVED"]; $.sections[].ordered_items[] required=["item_id","item_type","group","note_to_writer"]; $.sections[].ordered_items[].item_type enum=["PROPOSITION","GAP","AUTHOR_INTERPRETATION"]; $.allocation_ledger[] required=["item_id","outcome","section_id","grouped_with","reason"]; $.allocation_ledger[].outcome enum=["DISCUSSED","GROUPED_WITH","TABLE_ONLY","NOT_INDIVIDUALLY_DISCUSSED"]; $.display_items maxItems=1; $.display_items[] required=["display_id","type","placement_section_id","purpose"]; $.display_items[].display_id const="T1"; $.display_items[].type const="TABLE_COMPARISON"; $.readability required=["background_concepts","abbreviations","nomenclature"]; $.readability.abbreviations[] required=["abbr","expansion"]; $.readability.nomenclature[] required=["entity","form_to_use","alternative_at_first_mention"]
++Example shape only:
++```json
++{"agent_id":"A08-OL","prompt_version":"0.5","status":"COMPLETE","warnings":[],"limitations":[],"plan_version":"x","title":{"text":"x","proposition_ids":[]},"abstract_plan":{"target_words":0,"ordered_proposition_ids":[],"contribution_statement":"x"},"keywords":[],"writing_order":["x"],"sections":[{"section_id":"x","level":1,"heading":"x","heading_kind":"DESCRIPTIVE","heading_proposition_ids":[],"purpose":"x","word_budget":0,"theme_ids":[],"ordered_items":[],"display_item_ids":[],"transition_in":"x","transition_out":"x","wording_restrictions":[]}],"allocation_ledger":[],"display_items":[],"budget_summary":{},"readability":{"background_concepts":[],"abbreviations":[],"nomenclature":[]}}
++```
+--- a/prompts/agents/A09-WRI_Writing.md
++++ b/prompts/agents/A09-WRI_Writing.md
+@@ -145,3 +145,20 @@
+   "table_captions": [{ "display_id": "T1", "caption": "tagged caption" }]
+ }
+ ```
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A09-WRI.section.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","mode","section","retrieval_requests","plan_gaps","ceiling_unclear"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode const="SECTION"; $.section/anyOf0 required=["section_id","heading","text_markdown","word_count"]; $.retrieval_requests maxItems=4; $.retrieval_requests[] required=["element_ids","finding_ids","reason"]; $.plan_gaps[] required=["gap_marker","section_id","missing","why_needed"]; $.ceiling_unclear[] required=["proposition_id","question"]
++Example shape only:
++```json
++{"agent_id":"A09-WRI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"SECTION","section":{"section_id":"x","heading":"x","text_markdown":"x","word_count":0},"retrieval_requests":[],"plan_gaps":[],"ceiling_unclear":[]}
++```
++
++**A09-WRI.front.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","mode","title","abstract","keywords","table_captions"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode const="FRONT_MATTER"; $.keywords maxItems=6; $.table_captions maxItems=1; $.table_captions[] required=["display_id","caption"]
++Example shape only:
++```json
++{"agent_id":"A09-WRI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"FRONT_MATTER","title":"x","abstract":"x","keywords":[],"table_captions":[]}
++```
+--- a/prompts/agents/A10-RV_Verification.md
++++ b/prompts/agents/A10-RV_Verification.md
+@@ -66,3 +66,19 @@
+ return an UNRESOLVED occurrence or blocking global issue; never pretend verification completed.
+ Completed responses must have retrieval_requests []. Keep output within the configured allowance,
+ including reasoning. Incomplete or oversized output will not establish coverage or release approval.
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A10-RV.bounded.schema.json**
++$ required=["agent_id","prompt_version","mode","status","verdicts","issues","retrieval_requests","inventory_fingerprint","reviewed_index_ids"]; $.agent_id const="A10-RV"; $.prompt_version const="2.0"; $.mode enum=["LOCAL","GLOBAL"]; $.status enum=["COMPLETE","NEEDS_EVIDENCE"]; $.inventory_fingerprint maxLength=64; $.reviewed_index_ids maxItems=1000; $.reviewed_index_ids[] maxLength=160; $.verdicts maxItems=12; $.verdicts[] required=["occurrence_id","verdict","rationale","checks","appraisal_checks","evidence_finding_ids","source_item_ids"]; $.verdicts[].occurrence_id maxLength=80; $.verdicts[].verdict enum=["VERIFIED","DEFECT","UNRESOLVED","NON_SCIENTIFIC"]; $.verdicts[].rationale minLength=1; $.verdicts[].rationale maxLength=240; $.verdicts[].checks maxItems=10; $.verdicts[].checks[] enum=["SOURCE","NUMBERS_UNITS","MECHANISM_CAUSALITY","CERTAINTY","CHEMICAL_IDENTITY","MODEL_GBM","CLINICAL_REACH","COUNTER_EVIDENCE","ATTRIBUTION_INDEPENDENCE","CITATION"]; $.verdicts[].evidence_finding_ids maxItems=24; $.verdicts[].evidence_finding_ids[] maxLength=120; $.verdicts[].source_item_ids maxItems=16; $.verdicts[].source_item_ids[] maxLength=120; $.verdicts[].appraisal_checks maxItems=24; $.verdicts[].appraisal_checks[] required=["binding_id","preserved"]; $.verdicts[].appraisal_checks[].binding_id maxLength=240; $.issues maxItems=24; $.issues[] required=["occurrence_ids","finding_ids","code","severity","rationale","correction"]; $.issues[].occurrence_ids minItems=1; $.issues[].occurrence_ids maxItems=24; $.issues[].occurrence_ids[] maxLength=80; $.issues[].finding_ids maxItems=24; $.issues[].finding_ids[] maxLength=120; $.issues[].code minLength=1; $.issues[].code maxLength=80; $.issues[].severity enum=["MINOR","MAJOR","BLOCKING"]; $.issues[].rationale minLength=1; $.issues[].rationale maxLength=240; $.issues[].correction minLength=1; $.issues[].correction maxLength=360; $.retrieval_requests maxItems=4; $.retrieval_requests[].finding_ids maxItems=12; $.retrieval_requests[].finding_ids[] maxLength=120; $.retrieval_requests[].query minLength=1; $.retrieval_requests[].query maxLength=160; $.retrieval_requests[].source_item_ids maxItems=12; $.retrieval_requests[].source_item_ids[] maxLength=120; $.retrieval_requests[].proposition_ids maxItems=12; $.retrieval_requests[].proposition_ids[] maxLength=160
++Example shape only:
++```json
++{"agent_id":"A10-RV","prompt_version":"2.0","mode":"LOCAL","status":"COMPLETE","verdicts":[],"issues":[],"retrieval_requests":[],"inventory_fingerprint":"x","reviewed_index_ids":[]}
++```
++
++## Additional mode examples (development hardening)
++**A10-RV.bounded.schema.json GLOBAL shape example**
++```json
++{"agent_id":"A10-RV","prompt_version":"2.0","mode":"GLOBAL","status":"COMPLETE","verdicts":[],"issues":[],"retrieval_requests":[],"inventory_fingerprint":"x","reviewed_index_ids":[]}
++```
+--- a/prompts/agents/A11-RC_Critique.md
++++ b/prompts/agents/A11-RC_Critique.md
+@@ -162,3 +162,13 @@
+ - No concern duplicates an A10-RV finding; none is a preference or a disagreement with the evidence.
+ - No proposal adds scientific content or weakens a protected item.
+ - The non-specialist pass names concrete barriers, not general impressions.
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A11-RC.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","manuscript_version","reader_passes","strengths","concerns","decision","decision_rationale"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.decision enum=["ACCEPT","MINOR_REVISION","MAJOR_REVISION","HOLD_FOR_UPSTREAM_REVIEW","INCOMPLETE_CRITIQUE"]
++Example shape only:
++```json
++{"agent_id":"A11-RC","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"manuscript_version":"x","reader_passes":{},"strengths":[],"concerns":[],"decision":"ACCEPT","decision_rationale":"x"}
++```
+--- a/prompts/agents/A12-EDI_Editing.md
++++ b/prompts/agents/A12-EDI_Editing.md
+@@ -117,3 +117,51 @@
+ - In REVISION, only assigned findings and their dependent edits were made; in PROOF, only corrections.
+ - Every ambiguity was queried, not resolved by guessing.
+ - Journal limits respected, or the overrun reported.
++
++## Exact output contracts (development hardening)
++Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
++
++**A12-EDI.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","mode","output_manuscript_version","title","abstract","sections","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
++Example shape only:
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.unit.schema.json**
++$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","output_manuscript_version","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
++Example shape only:
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
++```
++
++## Additional mode examples (development hardening)
++**A12-EDI.schema.json LINE shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.schema.json PROOF shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.schema.json INTEGRATION shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.unit.schema.json LINE shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.unit.schema.json PROOF shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
++```
++
++**A12-EDI.unit.schema.json INTEGRATION shape example**
++```json
++{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
++```
+--- a/src/litreview/orchestrator.py
++++ b/src/litreview/orchestrator.py
+@@ -8,6 +8,7 @@
+   -> outline -> draft -> review_loop -> finish_edit -> finalize -> done
+ """
+ from __future__ import annotations
++from decimal import Decimal
+ 
+ import dataclasses
+ import hashlib
+@@ -318,6 +319,9 @@
+         return g
+ 
+     def _reserve(self,key,usd,agent_id,note="",steps=()):
++        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
++            # Hold the future-work margin, not merely check it. Actual charges settle this hold.
++            usd = float(Decimal(str(usd)) * Decimal("1.30"))
+         if pilot.enabled(self):
+             try:
+                 pilot.require(self,agent_id)
+@@ -436,13 +440,18 @@
+                     try: pilot.require(self,agent_id,financial=False)
+                     except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+                     if reservation_key:
++                        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
++                            from .writing_admission import quote_call, require_hold
++                            required = quote_call(system, message, model, self.cfg['admission'], self.budget)
++                            require_hold(self.budget, reservation_key, required)
+                         meta=self.load('pilot_reservations.json',{}).get(reservation_key,{})
+                         if meta.get('scope')!=pilot.stage_for(self,agent_id) or meta.get('authorization')!=(self.load('pilot_'+meta.get('scope','')+'.json') or {}).get('fingerprint'):
+                             raise Pause('Reservation lacks current stage authorization')
+                         return reservation_key
+                     from .synthesis_registry import offline_tokens
+                     tokens=offline_tokens(system)+offline_tokens(message)
+-                    amount=self.budget.cost(model.model,0,model.max_tokens,0,0,tokens)
++                    from .admission import output_reserve
++                    amount=self.budget.cost(model.model,0,output_reserve(model,self.cfg['admission']),0,0,tokens)
+                     key='pilot-'+request_id[:24]+'-'+str(attempt)
+                     if key in self.budget.reservations():raise Pause('Unsettled pilot request; reconcile before retry')
+                     self._spend_review(agent_id,step,amount)
+@@ -2219,6 +2228,8 @@
+             m = dataclasses.replace(m, **overrides)
+         a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
+         usd = self.budget.cost(m.model, a["input_bound"], a["output_reserve"])
++        if m.provider == "anthropic":
++            usd = self.budget.cost(m.model, 0, a["output_reserve"], 0, 0, a["input_bound"])
+         if usd is None:
+             raise UnpricedModel(m.model)
+         self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})
+--- a/tests/integrated_pipeline.py
++++ b/tests/integrated_pipeline.py
+@@ -199,7 +199,10 @@
+     orch.RUNS_DIR = root
+     run = orch.Run(f"sim-{n}")
+     corpus, findings, held = workload(n)
+-    run.cfg = {**run.cfg, "batch": {**run.cfg["batch"], "gate_usd": 1e6}}   # nothing is spent; controls stay live
++    # This scripted integration scenario requires revision then ACCEPT and an injected redraft.
++    # Do not inherit the separate single-paper pilot's one-cycle configuration.
++    run.cfg = {**run.cfg, "batch": {**run.cfg["batch"], "gate_usd": 1e6},
++               "loops": {**run.cfg["loops"], "max_critique_cycles": 2, "max_redrafts": 1}}
+     run.budget.cap = 1e6
+     run.save("selected_corpus.json", corpus["selected_corpus"])
+     run.save("validated_findings.json", findings)
+--- a/src/litreview/llm/router.py
++++ b/src/litreview/llm/router.py
+@@ -17,7 +17,7 @@
+     except KeyError as exc:
+         raise ValueError(f"Unknown provider '{provider}'. Use anthropic, openai or kimi.") from exc
+     trace = trace or {}
+-    if provider == "anthropic" and trace.get("agent") == "A07-SYN" and str(trace.get("step", "")).endswith("_PLAN"):
++    if provider == "anthropic" and trace.get("agent") in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+         # Never export PLAN thinking/signatures through external tracing.
+         return fn(provider=provider, trace=trace, **kwargs)
+     return tracing.traced_call(lambda: fn(provider=provider, **kwargs, **({"trace": trace} if provider == "anthropic" else {})),
+--- a/src/litreview/llm/anthropic_client.py
++++ b/src/litreview/llm/anthropic_client.py
+@@ -69,7 +69,8 @@
+ 
+ def _preserve_plan_response(resp, trace):
+     from ..paths import REPO_ROOT
+-    folder = Path(config.load("pipeline")["providers"]["anthropic"]["plan_response_audit_dir"]).resolve()
++    pcfg = config.load("pipeline")["providers"]["anthropic"]
++    folder = Path(pcfg.get("writing_response_audit_dir") or pcfg["plan_response_audit_dir"]).resolve()
+     if not folder.is_dir() or folder.is_relative_to(REPO_ROOT.resolve()):
+         raise ValueError("PLAN raw response requires a private audit directory outside runtime/retrieval paths")
+     names = [str(trace.get(k, "")) for k in ("run_id", "step")]
+@@ -99,7 +100,10 @@
+     with _get_client().messages.stream(**kwargs) as s:
+         resp = s.get_final_message()
+     private_path = metadata = None
+-    if (trace or {}).get("agent") == "A07-SYN" and str((trace or {}).get("step", "")).endswith("_PLAN"):
++    if ((trace or {}).get("agent") == "A07-SYN" and str((trace or {}).get("step", "")).endswith("_PLAN")) or (
++            (config.load("pipeline")["providers"]["anthropic"].get("writing_response_audit_dir")
++             or config.load("pipeline")["providers"]["anthropic"].get("plan_response_audit_dir"))
++            and (trace or {}).get("agent") in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}):
+         private_path, metadata = _preserve_plan_response(resp, trace)
+     result = parse_message(resp, model)
+     result.raw_provider_response_path = private_path
+--- a/src/litreview/writing_admission.py
++++ b/src/litreview/writing_admission.py
+@@ -0,0 +1,20 @@
++"""Actual-request cold-cache quotes; no network, forecast envelope or credential access."""
++from decimal import Decimal
++from .admission import output_reserve, AdmissionRefused
++from .synthesis_registry import offline_tokens
++
++
++def quote_call(system, message, model, cfg, budget):
++    inp = offline_tokens(system) + offline_tokens(message)
++    out = output_reserve(model, cfg)  # Anthropic thinking already shares max_tokens.
++    cost = (budget.cost(model.model, 0, out, 0, 0, inp) if model.provider == "anthropic"
++            else budget.cost(model.model, inp, out))
++    if cost is None:
++        raise AdmissionRefused("Unpriced writing request")
++    return float(Decimal(str(cost)) * Decimal("1.30"))
++
++
++def require_hold(budget, key, required):
++    held = budget.reservations().get(key)
++    if not held or Decimal(str(held['usd'])) + Decimal('0.000001') < Decimal(str(required)):
++        raise AdmissionRefused("Actual writing request exceeds its margin-inclusive reservation; reproject before send")
+--- a/tests/test_contract_hardening.py
++++ b/tests/test_contract_hardening.py
+@@ -0,0 +1,86 @@
++"""Offline schema and financial refusal regressions; no providers or live runs."""
++import copy
++import json
++from pathlib import Path
++from types import SimpleNamespace
++import pytest
++from litreview.agents.base import validate
++from litreview.writing_admission import quote_call, require_hold
++from litreview.admission import AdmissionRefused
++from litreview.budget import BudgetTracker
++ROOT=Path(__file__).resolve().parents[1]
++EXAMPLES=json.loads((ROOT/'docs/a07_a12_contract_hardening/schema_examples.json').read_text(encoding='utf-8'))
++
++@pytest.mark.parametrize('name',sorted(EXAMPLES))
++def test_real_schema_good_and_missing_required_bad(name):
++    import jsonschema
++    good=copy.deepcopy(EXAMPLES[name])
++    validate(name.split('.')[0],good,name)
++    schema=json.loads((ROOT/'schemas'/name).read_text(encoding='utf-8'))
++    bad=copy.deepcopy(good);bad.pop(schema['required'][0])
++    with pytest.raises(jsonschema.ValidationError):validate(name.split('.')[0],bad,name)
++
++@pytest.mark.parametrize('kind',['missing_mode','long_rationale','long_proposal','fifteen_ids','array_unresolved'])
++def test_v10_violation_types_fail_production_validator(kind):
++    import jsonschema
++    name='A07-SYN.bounded-plan.schema.json';p=copy.deepcopy(EXAMPLES[name])
++    if kind=='missing_mode':p.pop('mode')
++    elif kind=='array_unresolved':p['fivew1h']=[{'theme_id':'T1','unresolved':['Preserve this uncertainty']}]
++    else:
++        q={'proposal':'Formatting fixture','rationale':'Formatting fixture','finding_ids':['R0001:F1']}
++        if kind=='long_rationale':q['rationale']='x'*481
++        if kind=='long_proposal':q['proposal']='x'*481
++        if kind=='fifteen_ids':q['finding_ids']=['R0001:F'+str(i) for i in range(15)]
++        p['theme_change_proposals']=[q]
++    with pytest.raises(jsonschema.ValidationError):validate('A07-SYN',p,name)
++
++def test_real_reserve_blocks_subcap_before_send(tmp_path):
++    b=BudgetTracker(tmp_path);b.operational_ceiling=.01
++    model=SimpleNamespace(provider='anthropic',model='claude-opus-5',max_tokens=12000)
++    amount=quote_call('system',[{'text':'payload','cache':False}],model,{'reasoning_reserve_tokens':{'anthropic':0}},b)
++    sent=[]
++    ok,_=b.reserve('synthetic-only',amount,'A07-SYN')
++    if ok:sent.append('provider would run')
++    assert not ok and not sent and not b.reservations()
++
++def test_actual_hold_check_and_settlement(tmp_path):
++    b=BudgetTracker(tmp_path);b.operational_ceiling=1
++    assert b.reserve('synthetic-only',.5,'A09-WRI')[0]
++    require_hold(b,'synthetic-only',.5)
++    with pytest.raises(AdmissionRefused):require_hold(b,'synthetic-only',.51)
++    b.record('A09-WRI','anthropic','claude-opus-5',10,10,step='synthetic',reservation_key='synthetic-only')
++    b.release('synthetic-only')
++    assert not b.reservations() and b.spent()>0
++
++
++def test_private_provider_audit_retains_all_blocks_without_overwrite(tmp_path,monkeypatch):
++    from litreview.llm import anthropic_client
++    folder=tmp_path/'private';folder.mkdir()
++    monkeypatch.setattr(anthropic_client.config,'load',lambda _: {'providers':{'anthropic':{'writing_response_audit_dir':str(folder)}}})
++    raw={'id':'synthetic','stop_reason':'end_turn','usage':{'output_tokens':17,'output_tokens_details':{'thinking_tokens':7}},'content':[{'type':'thinking','thinking':'synthetic private fixture'},{'type':'text','text':'{}'},{'type':'redacted_thinking','data':'synthetic'}]}
++    response=SimpleNamespace(model_dump=lambda **kw:raw)
++    trace={'run_id':'offline','step':'A09-WRI_section','attempt':0}
++    path,meta=anthropic_client._preserve_plan_response(response,trace)
++    assert json.loads(Path(path).read_text(encoding='utf-8'))==raw
++    assert meta['content_block_types']==['thinking','text','redacted_thinking']
++    assert meta['usage']['output_tokens_details']['thinking_tokens']==7
++    with pytest.raises(ValueError,match='overwrite'):anthropic_client._preserve_plan_response(response,trace)
++
++
++def test_native_writing_reservation_holds_margin_and_blocks_subcap(tmp_path,monkeypatch):
++    from litreview.orchestrator import Run
++    from litreview import pilot_authorization
++    monkeypatch.setattr(pilot_authorization,'enabled',lambda _:False)
++    b=BudgetTracker(tmp_path);b.operational_ceiling=.12
++    r=SimpleNamespace(budget=b)
++    assert Run._reserve(r,'too-large',.1,'A07-SYN')[0] is False
++    b.operational_ceiling=.14
++    assert Run._reserve(r,'fits',.1,'A09-WRI')[0]
++    assert b.reservations()['fits']['usd']==.13
++    b.release('fits')
++
++
++MODE_EXAMPLES=json.loads((ROOT/'docs/a07_a12_contract_hardening/mode_examples.json').read_text())
++@pytest.mark.parametrize('row',MODE_EXAMPLES,ids=lambda row:row['schema']+':'+row['mode'])
++def test_every_a10_a12_mode_shape(row):
++    validate(row['schema'].split('.')[0],row['payload'],row['schema'])

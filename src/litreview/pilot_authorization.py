@@ -94,13 +94,15 @@ def source_level(run, record):
 
 
 def selection(run, records=None):
+    from .singlepaper_eval import policy
+    papers = PAPERS[:1] if policy(run) else PAPERS
     records=run.load('selected_corpus.json') if records is None else records
     if records is not None:
         got=sorted((str(r.get('pmid')),source_level(run,r)) for r in records)
-        want=sorted((p['pmid'],p['content_level']) for p in PAPERS)
+        want=sorted((p['pmid'],p['content_level']) for p in papers)
         if got!=want: raise AuthorizationRequired('Selected papers/source types differ from the authorized three-paper pilot')
         return records
-    return [{'record_id':'PILOT'+p['pmid'],'pmid':p['pmid'],**({'pmcid':'PMC8508702'} if p['content_level']=='FULL_TEXT' else {})} for p in PAPERS]
+    return [{'record_id':'PILOT'+p['pmid'],'pmid':p['pmid'],**({'pmcid':'PMC8508702'} if p['content_level']=='FULL_TEXT' else {})} for p in papers]
 
 def scientific_ready(run):
     from .scientific_validation import require_package
@@ -181,6 +183,9 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
         raise AuthorizationRequired('Pilot requires unchanged $35 cap and $25 spending-review checkpoint')
     if float(run.cfg['forecast']['uncertainty_margin'])!=.30: raise AuthorizationRequired('Pilot requires 30% future-work admission margin')
     records=selection(run,records);at=STAGES.index(run.state()['stage']); lines=[]
+    if (run.dir/'input/plan_retry_authority.json').exists():
+        from .plan_retry import projection
+        return projection(run,stage,candidate)
     if stage==STAGE_1:
         if at>STAGES.index('cp3'): raise AuthorizationRequired('Stage 1 cannot authorize manuscript stages')
         rates=cp.load_rates()
@@ -310,6 +315,9 @@ def partial(run,reason):
 
 def require(run,agent, financial=True):
     if not enabled(run):return
+    from .singlepaper_eval import policy, WritingRun
+    if policy(run) and not isinstance(run, WritingRun):
+        raise AuthorizationRequired("Single-paper evaluation requires its guarded continue_stage1.py harness")
     stage=stage_for(run,agent)
     if agent in SECOND: scientific_ready(run)
     a=run.load('pilot_'+stage+'.json') or {}

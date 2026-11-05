@@ -225,6 +225,8 @@ class BudgetTracker:
         Returns (reserved, what was available before this reservation)."""
         with self._lock():
             available = self.cap - self.spent() - self.reserved()
+            if getattr(self, "operational_ceiling", None) is not None:
+                available = min(available, self.operational_ceiling - self.spent() - self.reserved())
             if usd > available:
                 return False, available
             res = self.reservations()

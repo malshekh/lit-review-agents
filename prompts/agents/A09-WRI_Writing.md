@@ -145,3 +145,20 @@ For `mode: FRONT_MATTER`:
   "table_captions": [{ "display_id": "T1", "caption": "tagged caption" }]
 }
 ```
+
+## Exact output contracts (development hardening)
+Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
+
+**A09-WRI.section.schema.json**
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","section","retrieval_requests","plan_gaps","ceiling_unclear"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_EVIDENCE","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode const="SECTION"; $.section/anyOf0 required=["section_id","heading","text_markdown","word_count"]; $.retrieval_requests maxItems=4; $.retrieval_requests[] required=["element_ids","finding_ids","reason"]; $.plan_gaps[] required=["gap_marker","section_id","missing","why_needed"]; $.ceiling_unclear[] required=["proposition_id","question"]
+Example shape only:
+```json
+{"agent_id":"A09-WRI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"SECTION","section":{"section_id":"x","heading":"x","text_markdown":"x","word_count":0},"retrieval_requests":[],"plan_gaps":[],"ceiling_unclear":[]}
+```
+
+**A09-WRI.front.schema.json**
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","title","abstract","keywords","table_captions"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode const="FRONT_MATTER"; $.keywords maxItems=6; $.table_captions maxItems=1; $.table_captions[] required=["display_id","caption"]
+Example shape only:
+```json
+{"agent_id":"A09-WRI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"FRONT_MATTER","title":"x","abstract":"x","keywords":[],"table_captions":[]}
+```

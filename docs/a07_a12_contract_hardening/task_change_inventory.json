@@ -1,0 +1,37 @@
+{
+  "branch": "fix/a07-a12-contract-hardening",
+  "task_code_files": [
+    "prompts/agents/A07-SYN_Synthesis.md",
+    "prompts/agents/A08-OL_Outline.md",
+    "prompts/agents/A09-WRI_Writing.md",
+    "prompts/agents/A10-RV_Verification.md",
+    "prompts/agents/A11-RC_Critique.md",
+    "prompts/agents/A12-EDI_Editing.md",
+    "src/litreview/orchestrator.py",
+    "tests/integrated_pipeline.py",
+    "src/litreview/llm/router.py",
+    "src/litreview/llm/anthropic_client.py",
+    "src/litreview/writing_admission.py",
+    "tests/test_contract_hardening.py"
+  ],
+  "preexisting_changes_excluded": [
+    "config/pipeline.yaml",
+    "src/litreview/agents/base.py",
+    "src/litreview/budget.py",
+    "src/litreview/llm/base.py",
+    "src/litreview/pilot_authorization.py",
+    "src/litreview/plan_retry.py",
+    "src/litreview/r0001_evaluation_driver.py",
+    "src/litreview/singlepaper_eval.py",
+    "tests/test_plan_retry.py",
+    "tests/test_r0001_evaluation_driver.py",
+    "tests/test_singlepaper_eval.py"
+  ],
+  "patch_sha256": "c450ba097cf2b22c61b0165d0741c599da2a237a184cc96666e80e20a41bcde6",
+  "tests": {
+    "full_suite": "818 passed, 3 skipped; prior fixture errors corrected without production changes",
+    "final_focused": "91 passed",
+    "network": "autouse socket refusal fixture active"
+  },
+  "no_commit_push_or_pr": true
+}

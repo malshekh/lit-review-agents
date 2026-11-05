@@ -139,6 +139,9 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                       prompt_chars=len(system) + sum(len(p["text"]) for p in message),
                       **({"reservation_key":held} if dispatch_guard else {}))
         if dispatch_guard and held!=reservation_key:budget.release(held)
+        if getattr(resp, "provider_response_metadata", None) is not None:
+            receipt = {**resp.provider_response_metadata, "private_raw_response_path":resp.raw_provider_response_path}
+            (out_dir / f"{step}.provider.receipt{attempt}.json").write_text(json.dumps(receipt,indent=2),encoding="utf-8")
         (out_dir / f"{step}.raw{attempt}.txt").write_text(resp.text, encoding="utf-8")
         if resp.stop_reason == "refusal":
             # a policy decline, not a formatting error: never retried (same model, same request, same answer)

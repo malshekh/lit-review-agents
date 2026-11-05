@@ -17,6 +17,9 @@ def complete(provider: str, trace: dict | None = None, **kwargs) -> LLMResponse:
     except KeyError as exc:
         raise ValueError(f"Unknown provider '{provider}'. Use anthropic, openai or kimi.") from exc
     trace = trace or {}
-    return tracing.traced_call(lambda: fn(provider=provider, **kwargs),
+    if provider == "anthropic" and trace.get("agent") in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+        # Never export PLAN thinking/signatures through external tracing.
+        return fn(provider=provider, trace=trace, **kwargs)
+    return tracing.traced_call(lambda: fn(provider=provider, **kwargs, **({"trace": trace} if provider == "anthropic" else {})),
                                name=f"{trace.get('agent', 'llm')} · {kwargs.get('model')}",
                                provider=provider, model=kwargs.get("model", ""), metadata=trace)
