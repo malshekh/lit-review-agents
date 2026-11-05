@@ -21,6 +21,14 @@ class AlignmentRequired(JobStopped):
     """The human thematic decision has not been made for these exact inputs."""
 
 
+class ImportApprovalRequired(JobStopped):
+    """An imported researcher-repaired PLAN exists but the researcher has not approved it for GROUP."""
+
+
+IMPORT_RECORD = "plan_import.json"
+IMPORT_APPROVAL = "plan_import_approval.json"
+
+
 class RegistrySynthesisJob(SynthesisJob):
     def __init__(self, job_dir, registry, call, count, cfg, identity, approve,
                  served_by=lambda: None):
@@ -69,10 +77,14 @@ class RegistrySynthesisJob(SynthesisJob):
     def limit(self, mode):
         return int(self.cfg.get("output_limits", {}).get(mode, self.cfg.get("max_tokens_per_turn", 12000)))
 
+    def _marker(self, turn):
+        return next((e for e in self.ledger.events()
+                     if e["event"] in ("TURN_ACCEPTED", "TURN_IMPORTED_REPAIR") and e["turn"] == turn), None)
+
     def _committed(self, turn):
         out = super()._committed(turn)
         if out is not None:
-            marker = next((e for e in self.ledger.events() if e["event"] == "TURN_ACCEPTED" and e["turn"] == turn), None)
+            marker = self._marker(turn)
             if not marker or fingerprint(out) != marker["output_sha256"]:
                 raise JobStopped(f"accepted turn hash mismatch: {turn}")
         return out
@@ -97,14 +109,8 @@ class RegistrySynthesisJob(SynthesisJob):
             raise JobStopped(f"{turn}: context admission {projected} exceeds {self.cfg['context_ceiling_tokens']}")
         try:
             out = self.call(mode, payload, turn)
-            schema = json.loads((SCHEMAS_DIR / f"A07-SYN.bounded-{mode.lower()}.schema.json").read_text(encoding="utf-8"))
-            jsonschema.validate(out, schema)
-            if out["mode"] != mode or out["status"] not in ("COMPLETE", "COMPLETE_WITH_WARNINGS", "NEEDS_EVIDENCE"):
-                raise ValueError("incomplete or mismatched synthesis response")
-            # Schema bounds also apply to mocked/offline models. Never accept an oversized response.
+            self.validate_output(mode, out)
             from .synthesis_registry import offline_tokens
-            if offline_tokens(out) > self.limit(mode):
-                raise ValueError("response exceeds conservative output allowance")
             self.ledger.append({"event": "CALL_VALIDATED", "turn": turn, "mode": mode,
                                 "input_upper_tokens": self.count(payload),
                                 "response_upper_tokens": offline_tokens(out), "output_cap": self.limit(mode)})
@@ -119,19 +125,75 @@ class RegistrySynthesisJob(SynthesisJob):
                 raise JobStopped(f"{turn}: {exc}") from exc
             raise
 
-    def plan(self):
-        done = self._committed("PLAN")
-        if done:
-            return done
-        out = self._run_turn("PLAN", "PLAN", self.registry.plan_payload(self.packets))
+    def validate_output(self, mode, out):
+        """The production per-mode output contract (schema, mode/status, output allowance). Raises ValueError or
+        jsonschema.ValidationError. Shared by model calls and by the repaired-PLAN import."""
+        schema = json.loads((SCHEMAS_DIR / f"A07-SYN.bounded-{mode.lower()}.schema.json").read_text(encoding="utf-8"))
+        jsonschema.validate(out, schema)
+        if out["mode"] != mode or out["status"] not in ("COMPLETE", "COMPLETE_WITH_WARNINGS", "NEEDS_EVIDENCE"):
+            raise ValueError("incomplete or mismatched synthesis response")
+        # Schema bounds also apply to mocked/offline models. Never accept an oversized response.
+        from .synthesis_registry import offline_tokens
+        if offline_tokens(out) > self.limit(mode):
+            raise ValueError("response exceeds conservative output allowance")
+
+    def check_plan(self, out):
         if out["status"] == "NEEDS_EVIDENCE":
             raise JobStopped("PLAN must complete or explicitly stop for human review")
         for change in out["theme_change_proposals"]:
             if not change["finding_ids"] or set(change["finding_ids"]) - self.finding_ids:
                 raise JobStopped("thematic proposal lacks valid evidence anchors")
+
+    def plan(self):
+        done = self._committed("PLAN")
+        if done:
+            marker = self._marker("PLAN")
+            if marker and marker["event"] == "TURN_IMPORTED_REPAIR":
+                self.require_import_approval(marker)
+            return done
+        out = self._run_turn("PLAN", "PLAN", self.registry.plan_payload(self.packets))
+        self.check_plan(out)
         out["groups"] = self.packets
         self._commit("PLAN", out, self.empty())
         return out
+
+    def import_plan(self, out, provenance):
+        """Commit a researcher-repaired PLAN through the production PLAN validators, as TURN_IMPORTED_REPAIR
+        (never TURN_ACCEPTED). provenance: the import record (hashes, paths, identities), written beside the
+        ledger and bound to the event by its hash. GROUP stays blocked until require_import_approval passes."""
+        if self._committed("PLAN") is not None or self._marker("PLAN") is not None:
+            raise JobStopped("PLAN already committed for this job; refusing a second PLAN")
+        rpath = self.dir / IMPORT_RECORD
+        if rpath.exists():
+            raise JobStopped("an import record already exists; refusing overwrite")
+        out = json.loads(canonical(out))
+        self.validate_output("PLAN", out)
+        self.check_plan(out)
+        out["groups"] = self.packets
+        record = {**provenance, "researcher_approved": False, "imported_output_sha256": fingerprint(out),
+                  "event": "TURN_IMPORTED_REPAIR"}
+        rpath.write_text(canonical(record), encoding="utf-8")
+        path = self._turn_file("PLAN")
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(canonical(out), encoding="utf-8")
+        os.replace(tmp, path)
+        self.ledger.append({"event": "TURN_IMPORTED_REPAIR", "turn": "PLAN",
+                            "model": "researcher-repair-of:" + provenance["original_raw_sha256"],
+                            "output_sha256": fingerprint(out), "import_record_sha256": fingerprint(record),
+                            "repaired_sha256": provenance["repaired_sha256"], **self.empty()})
+        return record
+
+    def require_import_approval(self, marker):
+        rpath, apath = self.dir / IMPORT_RECORD, self.dir / IMPORT_APPROVAL
+        if not rpath.exists() or fingerprint(json.loads(rpath.read_text(encoding="utf-8"))) != marker.get("import_record_sha256"):
+            raise JobStopped("imported PLAN record missing or changed")
+        approval = json.loads(apath.read_text(encoding="utf-8")) if apath.exists() else {}
+        if (approval.get("researcher_approved") is not True
+                or approval.get("repaired_sha256") != marker.get("repaired_sha256")
+                or approval.get("import_record_sha256") != marker.get("import_record_sha256")
+                or not str(approval.get("approved_by") or "").strip()):
+            raise ImportApprovalRequired("imported researcher-repaired PLAN is not approved; GROUP is blocked "
+                                         "(approve-plan-import with the repaired SHA-256)")
 
     def _with_retrieval(self, mode, turn, payload):
         retrieved = set()

@@ -74,7 +74,9 @@ class Ledger:
             elif t == "TURN_STAGED":
                 pending = [p for p in pending if p["turn"] != e["turn"]]
                 pending.append(e)
-            elif t == "TURN_ACCEPTED":
+            elif t in ("TURN_ACCEPTED", "TURN_IMPORTED_REPAIR"):
+                # TURN_IMPORTED_REPAIR: a researcher-repaired model output imported with its provenance
+                # (synthesis_bounded.import_plan). It is never recorded as a model acceptance.
                 if e["turn"] not in st["committed"]:
                     self._apply(st, e)
                     st["committed"].append(e["turn"])
