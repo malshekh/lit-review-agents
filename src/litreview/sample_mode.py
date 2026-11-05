@@ -333,10 +333,8 @@ def approve_plan_import(run, repaired_sha: str, approved_by: str, live=False) ->
 def worst_case_usd(budget, model, input_bound: int, output_reserve: int) -> float:
     """Cold worst case: every input token at the cache-WRITE rate (1h for Anthropic, which is above the input
     rate; OpenAI's cache write is also above input), every output token at the output rate."""
-    if model.provider == "anthropic":
-        usd = budget.cost(model.model, 0, output_reserve, 0, 0, input_bound)
-    else:
-        usd = budget.cost(model.model, 0, output_reserve, 0, input_bound)
+    from .writing_admission import worst_case_usd as shared
+    usd = shared(budget, model, input_bound, output_reserve)
     if usd is None:
         raise SampleRefused(f"unpriced model {model.model}")
     return usd

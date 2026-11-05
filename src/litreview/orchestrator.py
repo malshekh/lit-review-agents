@@ -318,8 +318,10 @@ class Run:
                 f"the scope and re-project (`litreview project {self.id}`); scientific checks are not cut to fit.")
         return g
 
-    def _reserve(self,key,usd,agent_id,note="",steps=()):
-        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+    def _reserve(self,key,usd,agent_id,note="",steps=(),margin_included=False):
+        # margin_included: the caller's amount already carries the 30% margin (plan_retry's approved hold);
+        # adding it again would over-hold and break the exact-candidate check in the stage projection.
+        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"} and not margin_included:
             # Hold the future-work margin, not merely check it. Actual charges settle this hold.
             usd = float(Decimal(str(usd)) * Decimal("1.30"))
         if pilot.enabled(self):
@@ -2264,9 +2266,8 @@ class Run:
             overrides = {**overrides, **extra}
             m = dataclasses.replace(m, **extra)
         a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
-        usd = self.budget.cost(m.model, a["input_bound"], a["output_reserve"])
-        if m.provider == "anthropic":
-            usd = self.budget.cost(m.model, 0, a["output_reserve"], 0, 0, a["input_bound"])
+        from .writing_admission import worst_case_usd
+        usd = worst_case_usd(self.budget, m, a["input_bound"], a["output_reserve"])   # input at cache-write rate
         if usd is None:
             raise UnpricedModel(m.model)
         self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})

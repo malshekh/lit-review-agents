@@ -4,6 +4,34 @@ Status: development only, not promoted. No paid or free provider call was made. 
 checkpoint approved, no financial hold placed. Frozen v10 was only read: `runtime_integrity.verify` reports
 6,015 immutable files with zero mismatches, manifest SHA-256 `9c2cb648d3c38e14b0a90ae68d5237dd96346ef2cfab9d494b040ca7c3c72bc1`.
 
+## Researcher decision (2026-11-04)
+
+May chose the **3-GROUP, one-section sample**. Its worst case, with the margin held, is $10.77 and leaves
+$3.42 of the $14.191105 writing sub-cap. The two-section variant was rejected: its $0.83 of room is too little
+if any estimate is off.
+
+Three pricing and config defects were fixed on this branch before promotion, so they are not carried forward.
+
+| Defect | Effect | Fix |
+|---|---|---|
+| The PLAN-retry harness passed its margin-inclusive hold to `Run._reserve`, which added 30% again | Over-held at about 1.69x. It could also break the exact-candidate check in the PLAN projection | `Run._reserve(..., margin_included=True)` from `plan_retry`. Every other caller still gets the 30% exactly once. |
+| `writing_admission.quote_call` and `Run._admitted` priced OpenAI input at $2.00, while cache writes bill at $2.50 | Under-reserved A08/A10/A11 calls whose prefix is cached | One shared `writing_admission.worst_case_usd` prices all input at the cache-write rate: Anthropic 1-hour write, OpenAI 30-minute write, long-context tier by size. |
+| `notify: on:` in `config/pipeline.yaml` | YAML 1.1 loads a bare `on` as boolean `True`. `notify.py` looks up `"on"`, finds nothing, and **every alert (checkpoint, failure, budget warning) was silently off** | The key is quoted as `"on"`. A test fails if any config YAML key loads as a non-string. |
+
+New tests:
+- the PLAN hold runs through the real `Run._reserve` and is held once;
+- an ordinary writing hold still adds 30% once;
+- the OpenAI quote and the native downstream reservation use $2.50;
+- the YAML key scan;
+- the one-section outline check.
+
+Codex's `test_limits_other_than_plan_unchanged` now names the quoted key as the one intended config change. The
+full suite gives **858 passed, 3 skipped**. The free one-section rehearsal on a copy was re-run and prices one
+A09 call.
+
+`init` now requires `--max-sections 1|2`. The sample authority must say 1: the Stage 2 projection prices
+`max_sections` A09 calls and the outline check enforces it.
+
 ## Go / no-go
 
 **Conditional GO for a 3-GROUP, 1-section sample.** Its worst case, with the 30% margin held, is $10.77
@@ -264,7 +292,7 @@ $env:ANTHROPIC_API_KEY=""; $env:OPENAI_API_KEY=""; $env:MOONSHOT_API_KEY=""; $en
 cd C:\Users\maykh\Desktop\lit-review-agents\lit-review-agents-claude-phase15
 $env:PYTHONPATH="src"; $py="..\lit-review-agents\.venv\Scripts\python.exe"; $rid="20261031-213324-r0001-writing-v1"
 & $py -B a07_a09_sample.py copy-run --source "C:\Users\maykh\LitReviewStage1\execution-20261104-v10-a07-plan-retry\runs\$rid"
-& $py -B a07_a09_sample.py init --run-id $rid --max-groups 3 --created-by "May Khalid Alshekhlee"
+& $py -B a07_a09_sample.py init --run-id $rid --max-groups 3 --max-sections 1 --created-by "May Khalid Alshekhlee"
 & $py -B a07_a09_sample.py import-plan --run-id $rid
 & $py -B a07_a09_sample.py dry-run --run-id $rid
 ```
@@ -277,7 +305,7 @@ for May's review before the next.
 cd C:\Users\maykh\LitReviewStage1\<vNEXT runtime>
 $b="python -I -S -B bootstrap.py a07_a09_sample.py"; $rid="20261031-213324-r0001-writing-v1"
 # 1. sample scope (writes input/a07_a09_sample.json; invalidates older stage authorizations by design)
-iex "$b init --run-id $rid --max-groups 3 --created-by 'May Khalid Alshekhlee' --live"
+iex "$b init --run-id $rid --max-groups 3 --max-sections 1 --created-by 'May Khalid Alshekhlee' --live"
 # 2. import (free); then READ data/synthesis_job_<tag>/plan_repair_audit.json
 iex "$b import-plan --run-id $rid --live"
 # 3. RESEARCHER: approve the exact repair
@@ -296,7 +324,7 @@ iex "$b approve-checkpoint --run-id $rid --checkpoint CP3 --live"
 iex "$b request-authorization --run-id $rid --stage 2 --live"
 iex "$b authorize --run-id $rid --stage 2 --fingerprint <printed> --reviewer 'May Khalid Alshekhlee' --live"
 iex "$b continue --run-id $rid --max-groups 3 --paid --live"
-# 8. RESEARCHER approves CP_LEDGER; PAID A09 for the 1-2 approved sections, then COMPLETE_SAMPLE
+# 8. RESEARCHER approves CP_LEDGER; PAID A09 for the one approved section, then COMPLETE_SAMPLE
 iex "$b approve-checkpoint --run-id $rid --checkpoint CP_LEDGER --live"
 iex "$b dry-run --run-id $rid"
 iex "$b continue --run-id $rid --max-groups 3 --paid --live"
@@ -305,9 +333,8 @@ iex "$b continue --run-id $rid --max-groups 3 --paid --live"
 Step 6 is a paid command only once CP_SYN is approved. Before that, the job stops at the CP_SYN gate without
 calling a model, because the PLAN is imported.
 
-For a 1-section sample, May approves a 1-section A08 outline at CP_LEDGER. The cap check accepts 1 or 2
-sections. Step 8 accepts the A08 output only if it plans 1–2 sections and 800–1,000 words. Otherwise the run
-pauses before any A09 call.
+With `--max-sections 1`, the A08 outline is accepted only if it plans exactly one section of 800–1,000 words.
+Otherwise the run pauses before any A09 call.
 
 ## Not verified, not done, and quality limits
 
@@ -321,12 +348,8 @@ pauses before any A09 call.
   critique, A12 editing or front matter. Interpretive inflation or errors can remain. It shows only that the
   machinery can produce a gated section; it does not show multi-paper synthesis quality, verification or
   readiness to publish. It must never be labelled a review or a validated manuscript.
-- **Observations, not changed:**
-  - `PlanRetryRun._reserve` passes an amount that already includes the margin to `Run._reserve`, which adds 30%
-    again. That overstates the hold at about 1.69x.
-  - Codex's `writing_admission.quote_call` prices OpenAI input at the plain $2.00 rate, while cache writes bill
-    at $2.50. The sample floor uses $2.50.
-  - In the dev `config/pipeline.yaml`, `notify.on` has become `true:`, because YAML reads the bare word `on` as
-    a boolean. That key probably no longer drives notifications.
+- **Promotion note for Codex.** The three defects above are fixed in this branch's latest commit, so promote
+  that commit, not `715c353`. Frozen v10 still has the unquoted `on` key and the double margin. It is read-only
+  and was not changed.
 - **Recommendation if the gates do not hold.** If Stage 2 re-pricing of the real package exceeds the sub-cap,
   defer prose until after the post-pilot fixes rather than cutting evidence.

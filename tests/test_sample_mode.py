@@ -263,6 +263,9 @@ class StubBudget(BudgetTracker):
     def reserved(self):
         return 0.0
 
+    def reservations(self):
+        return {}
+
 
 def writing_run(sample=True, spent=7.3163356):
     r = se.WritingRun.__new__(se.WritingRun)
@@ -424,3 +427,78 @@ def test_sample_authority_bounds_are_enforced(tmp_path):
         with pytest.raises(sm.SampleRefused):
             sm.write_policy(run, ["G0001"], created_by="t", **bad)
     assert not (tmp_path / sm.POLICY).exists()
+
+
+# ------------------------------------------------------------------ promotion fixes (2026-11-04 review)
+def test_plan_retry_hold_carries_the_margin_once_through_the_real_run_reserve(tmp_path):
+    """The previous test replaced Run._reserve, where the second 30% was added. This one runs it."""
+    from litreview import plan_retry as pr
+    r = pr.PlanRetryRun.__new__(pr.PlanRetryRun)
+    r.quote_only, r.baseline, r.dir = False, Decimal("7.3163356"), tmp_path      # no state.json: pilot off
+    r.retry = {"allowed_step": "synthetic_PLAN", "cold_plan_usd": 1.624021, "reservation_with_margin_usd": 2.111228}
+    held = []
+    r.budget = SimpleNamespace(spent=lambda: 7.6957206, reserved=lambda: 0,
+                               reserve=lambda key, usd, agent, note="": held.append(usd) or (True, 14))
+    r._reserve("key", 1.62402, "A07-SYN", steps=["synthetic_PLAN"])
+    assert held == [pytest.approx(2.111228)]                                  # not 2.111228 x 1.30
+
+
+def test_ordinary_writing_reserve_still_adds_the_margin_once(tmp_path):
+    r = Run.__new__(Run)
+    r.dir, held = tmp_path, []
+    r.budget = SimpleNamespace(reserve=lambda key, usd, agent, note="": held.append(usd) or (True, 1))
+    r._reserve("k", 1.0, "A09-WRI")
+    assert held == [pytest.approx(1.30)]
+
+
+def test_openai_writing_quote_and_hold_use_the_cache_write_rate():
+    from litreview.writing_admission import quote_call, worst_case_usd
+    b, gpt = StubBudget(), config.agent_model("A08-OL")
+    assert worst_case_usd(b, gpt, 100_000, 0) == pytest.approx(0.25)          # $2.50/M write, not $2.00 input
+    cfg = config.load("pipeline")["admission"]
+    q = quote_call("s", "m", gpt, cfg, b)
+    tokens = offline_tokens("s") + offline_tokens("m")
+    assert q == pytest.approx(1.30 * (tokens * 2.50 + gpt.max_tokens * 10.0) / 1e6)
+
+
+def test_native_downstream_admission_reserves_openai_input_at_the_cache_write_rate(monkeypatch):
+    from litreview import admission
+    r = Run.__new__(Run)
+    r.budget, r.cfg = StubBudget(), copy.deepcopy(config.load("pipeline"))
+    r.route = lambda agent, exclude=frozenset(): config.agent_model(agent)
+    r.prov = SimpleNamespace(tool_run=lambda *a: None)
+    monkeypatch.setattr(admission, "assess", lambda *a, **k: {"input_bound": 100_000, "output_reserve": 0, "fits": True,
+                                                              "crosses_threshold": False, "window": 1, "agent": "A08-OL"})
+    seen = {}
+    r._require_projection = r._check_request_line = lambda *a: None
+    r._downstream_gate = lambda agent, usd: seen.setdefault("usd", usd)
+    r._reserve = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop before dispatch"))
+    with pytest.raises(RuntimeError, match="stop before dispatch"):
+        r._admitted("A08-OL", {}, "A08-OL_v1")
+    assert seen["usd"] == pytest.approx(0.25)
+
+
+def test_no_config_yaml_key_is_parsed_as_a_non_string():
+    """YAML 1.1 turns bare on/off/yes/no keys into booleans; notify.py's .get("on") then finds nothing."""
+    import yaml
+    from litreview.paths import CONFIG_DIR
+
+    def bad(node, path):
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if not isinstance(k, str):
+                    yield f"{path}.{k!r}"
+                yield from bad(v, f"{path}.{k}")
+        elif isinstance(node, list):
+            for n, v in enumerate(node):
+                yield from bad(v, f"{path}[{n}]")
+    found = [x for f in sorted(CONFIG_DIR.glob("*.yaml"))
+             for x in bad(yaml.safe_load(f.read_text(encoding="utf-8")), f.name)]
+    assert found == []
+    assert "checkpoint" in config.load("pipeline")["notify"]["on"]
+
+
+def test_one_section_authority_and_outline_check():
+    sample = {"max_sections": 1, "min_words": 800, "max_words": 1000}
+    assert sm.check_outline({"sections": [{"word_budget": 900}]}, sample) == []
+    assert sm.check_outline({"sections": [{"word_budget": 450}, {"word_budget": 450}]}, sample)

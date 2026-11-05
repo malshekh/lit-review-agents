@@ -155,6 +155,8 @@ def test_limits_other_than_plan_unchanged():
     changed=copy.deepcopy(new);changed["synthesis"]["output_limits"]["PLAN"]=4000
     changed["synthesis"].pop("plan_request")
     changed["providers"]["anthropic"].pop("plan_response_audit_dir")
+    # The only other intended difference: the notify trigger key is quoted, so it loads as "on", not True.
+    changed["notify"][True]=changed["notify"].pop("on")
     assert changed==old
     assert new["synthesis"]["output_limits"]["PLAN"]==32000
 

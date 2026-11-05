@@ -5,7 +5,7 @@ bootstrap (`python -I -S -B bootstrap.py a07_a09_sample.py <subcommand> ...`); i
 with PYTHONPATH=src. Writes into a live runtime need --live, which only the researcher passes.
 
   copy-run     --source DIR                         copy a run folder into this tree's runs/ (never the reverse)
-  init         --run-id ID --max-groups N --created-by NAME [--live]
+  init         --run-id ID --max-groups N --max-sections 1|2 --created-by NAME [--min-words W --max-words W] [--live]
   import-plan  --run-id ID [--live]                 repaired PLAN -> TURN_IMPORTED_REPAIR (not approved)
   approve-plan-import --run-id ID --sha SHA --by NAME [--live]     RESEARCHER ONLY
   approve-checkpoint  --run-id ID --checkpoint CP_SYN|CP3|CP_LEDGER  RESEARCHER ONLY (decision file edited first)
@@ -54,6 +54,8 @@ def main(argv=None) -> int:
     c = sub.add_parser("copy-run"); c.add_argument("--source", required=True)
     i = sub.add_parser("init"); i.add_argument("--run-id", required=True); i.add_argument("--max-groups", type=int, required=True)
     i.add_argument("--created-by", required=True); i.add_argument("--live", action="store_true")
+    i.add_argument("--max-sections", type=int, required=True, choices=[1, 2])
+    i.add_argument("--min-words", type=int, default=800); i.add_argument("--max-words", type=int, default=1000)
     for name in ("import-plan", "dry-run"):
         p = sub.add_parser(name); p.add_argument("--run-id", required=True); p.add_argument("--live", action="store_true")
     a = sub.add_parser("approve-plan-import"); a.add_argument("--run-id", required=True)
@@ -93,7 +95,9 @@ def main(argv=None) -> int:
             ids = sm.first_groups(full.packets, args.max_groups)
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-        print(json.dumps(sm.write_policy(r, ids, created_by=args.created_by, live=args.live), indent=2)); return 0
+        print(json.dumps(sm.write_policy(r, ids, max_sections=args.max_sections, min_words=args.min_words,
+                                         max_words=args.max_words, created_by=args.created_by, live=args.live),
+                         indent=2)); return 0
     r = _run(args.run_id)
     if args.cmd == "import-plan":
         out = sm.import_repaired_plan(r, live=args.live)
