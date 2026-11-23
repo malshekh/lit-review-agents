@@ -223,7 +223,7 @@ def table_problems(tables: list[dict], corpus: dict[str, dict], max_pages: float
 
 # --------------------------------------------------------------------------------------------------- status
 def status(final_dir: Path, reference_problems: dict, table_issues: list[str], compliance: dict,
-           retraction: dict | None = None) -> dict:
+           retraction: dict | None = None, science_flags: list[dict] | None = None) -> dict:
     """Recompute submission readiness from what is on disk and the checks the export ran."""
     blockers: list[str] = []
     for key, s in declaration_state(final_dir).items():
@@ -238,6 +238,13 @@ def status(final_dir: Path, reference_problems: dict, table_issues: list[str], c
             blockers.append(f"Journal limit {c['rule']}: {c['detail']}")
     for r in (retraction or {}).get("unchecked", []):
         blockers.append(f"Retraction status unknown for {r['record_id']}: {r['reason']}")
+    if science_flags:
+        from . import science_lint
+        reviewed_path = Path(final_dir) / "science_lint_reviewed.json"
+        reviewed = json.loads(reviewed_path.read_text(encoding="utf-8")) if reviewed_path.exists() else {}
+        for f in science_lint.unreviewed(science_flags, reviewed):
+            blockers.append(f"Wording to check ({f['rule']}, {f['where']}, key {f['key']}): \"{f['sentence'][:140]}\" "
+                            f"{f['advice']} Record your review in final/science_lint_reviewed.json.")
     return {"submission_ready": not blockers, "blockers": blockers,
             "note": "submission_ready is a checklist result, not a judgement of the science: the authors remain "
                     "responsible for reading the manuscript and every reference before submitting."}

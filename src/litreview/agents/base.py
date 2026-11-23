@@ -305,11 +305,13 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             if ledger is not None:
                 ledger.record(step, attempt, "RESERVED", reservation=held)
                 ledger.record(step, attempt, "DISPATCHED", reservation=held)   # before the send: a crash here is ambiguous
+            from .. import structured
+            shape = structured.response_schema(agent_id, schema_file, call_model.provider, call_model.model)
             try:
                 resp = complete(call_model.provider, system=call_system, user=message, model=call_model.model,
                                 max_tokens=call_model.max_tokens, temperature=call_model.temperature,
                                 effort=call_model.effort, cache_system=call_model.cache_system,
-                                cache_ttl=call_model.cache_ttl,
+                                cache_ttl=call_model.cache_ttl, **({"response_schema": shape} if shape else {}),
                                 trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
                                        "attempt": attempt, "prompt_version": version})
             except Exception as exc:  # noqa: BLE001 — provider SDKs raise unrelated families; all end the call with a status

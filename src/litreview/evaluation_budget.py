@@ -65,7 +65,8 @@ def load(run_dir):
     path = Path(run_dir) / "input/evaluation_budget.json"
     policy_path = Path(run_dir) / "input/corpus_policy.json"
     if not path.exists():
-        if policy_path.exists():
+        text = policy_path.read_text(encoding="utf-8") if policy_path.exists() else ""
+        if "FIXED_CORPUS" in text and '"MANIFEST"' not in text:   # the staged pilot; a manifest run starts from zero
             raise ValueError("Fixed pilot missing reviewed cumulative-budget authority")
         return None  # pre-existing legacy fixtures/runs never silently become replacement runs
     context = json.loads(path.read_text(encoding="utf-8"))

@@ -1,6 +1,6 @@
 # Language Policy — Narrative Review Pipeline
 
-Version: 0.2 (draft) · Supplied to A9-WRI, A10-RV, A11-RC and A12-EDI. All four must use the same version; if the writer, verifier and editor apply different rules, they disagree about what is permitted and loop.
+Version: 0.3 (draft) · Supplied to A9-WRI, A10-RV, A11-RC and A12-EDI. All four must use the same version; if the writer, verifier and editor apply different rules, they disagree about what is permitted and loop.
 Source lineage: consolidates the LanguagePolicy role described in A14-WRI v0.1 §5.3–5.4, and the writing rules of A14-WRI §6, §8–§11 and A15-EDI §9, generalized from condensate biology to any biomedical or life-science review.
 
 ## 1. The failure this policy is written against
@@ -37,7 +37,11 @@ Verbs carry evidential weight. Choose by what the proposition establishes, never
 
 Hedge exactly once, at the strength the evidence warrants. A strong, replicated finding is stated plainly. A single small study is described as a single small study — not hedged into vagueness.
 
-**A non-significant result is not a null result.** When a comparison did not reach statistical significance, say so in those terms and give what the source gives: the values, n and the test. Write "had no effect", "did not alter" or "was equivalent" only when the proposition's qualifiers say the source established the absence of an effect. When the source reports no test, say that, in either direction: an untested difference is not a significant one, and an untested similarity is not equivalence. A median survival that was "not reached" or "not defined" is reported as not reached within the observation period; without a reported test it is neither a survival benefit nor a null result.
+**A non-significant result is not a null result.** When a comparison did not reach statistical significance, say so in those terms and give what the source gives: the values, n and the test. Write "had no effect", "did not alter" or "was equivalent" only when the proposition's qualifiers say the source established the absence of an effect. When the source reports no test, say that, in either direction: an untested difference is not a significant one, and an untested similarity is not equivalence. A median survival the source calls "not defined" or "undefined" is reported in the source's words: it is "not reached" only if the source says so, and without a reported test it is neither a survival benefit nor a null result.
+
+**A percentage needs its reference.** "85% viability" says nothing until the comparator is named. Give the comparator the source states ("relative to untreated cells"); if the source gives a percentage without naming its control, say that the control is not stated. Never supply the usual control from general knowledge.
+
+**Independence is counted, not assumed.** "Replicated", "confirmed independently" and "consistent across studies" need the independence count from the theme audit. Several papers that report the same study, cohort, trial or dataset are one study, however many times it is cited.
 
 ## 3. Attribution matches authority
 

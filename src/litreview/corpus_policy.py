@@ -3,6 +3,7 @@
 Scientific prose never overrides these identifier/access constraints. Open-corpus
 legacy runs retain their existing discovery behavior.
 """
+import json
 import re
 from . import pilot_authorization as pilot
 
@@ -13,6 +14,16 @@ def default_policy(mode="FIXED_CORPUS"):
     papers = [{**p, **({"pmcid": "PMC8508702"} if p["pmid"] == "34638842" else {})} for p in pilot.PAPERS]
     return {"mode": mode, "papers": papers if mode == "FIXED_CORPUS" else [],
             "broad_discovery": mode == "OPEN_CORPUS", "citation_expansion": mode == "OPEN_CORPUS"}
+
+
+def manifest_policy(manifest):
+    """The corpus authority of a run created with a corpus manifest (run_spec.py): the manifest's papers and
+    reading levels, retrieved by identifier only. No discovery search, no screening of other records and no
+    citation expansion: the researcher has already chosen the corpus."""
+    return {"mode": "FIXED_CORPUS", "source": "MANIFEST",
+            "papers": [{"pmid": p["pmid"], "content_level": p["intended_reading_level"], "paper_id": p["paper_id"]}
+                       for p in manifest["papers"]],
+            "broad_discovery": False, "citation_expansion": False}
 
 
 def initialize(run_dir, policy=None):
@@ -39,6 +50,15 @@ def resolve(run):
     value = json.loads(policy.read_text(encoding="utf-8"))
     if value.get("mode") not in {"FIXED_CORPUS", "OPEN_CORPUS"} or run.state().get("corpus_policy_fingerprint") != fingerprint(value):
         raise ValueError("Corpus policy missing/stale; researcher resolution required")
+    if value.get("source") == "MANIFEST":
+        # A manifest corpus runs on the standard path. Its authority is the manifest stored with the run: the
+        # policy must still say exactly what that manifest says.
+        if pilot.enabled(run):
+            raise ValueError("A manifest corpus cannot run as the staged pilot")
+        manifest_path = run.dir / "input/corpus_manifest.json"
+        if not manifest_path.exists() or value != manifest_policy(json.loads(manifest_path.read_text(encoding="utf-8"))):
+            raise ValueError("Corpus policy differs from the run's corpus manifest; create a new run for a changed corpus")
+        return value
     if value["mode"] == "FIXED_CORPUS" and not pilot.enabled(run):
         raise ValueError("Fixed corpus cannot be downgraded to non-pilot execution")
     if value["mode"] == "OPEN_CORPUS" and pilot.enabled(run):
@@ -62,6 +82,10 @@ def require_source(run, record):
     if not policy or policy["mode"] != "FIXED_CORPUS":
         return
     expected = next((p for p in policy["papers"] if p["pmid"] == str(record.get("pmid"))), None)
+    if policy.get("source") == "MANIFEST":   # the manifest names the paper, not a PMC identifier
+        if not expected or expected["content_level"] != "FULL_TEXT":
+            raise ValueError("The corpus manifest does not mark this paper for full-text reading")
+        return
     if not expected or expected["content_level"] != "FULL_TEXT" or record.get("pmcid") != expected.get("pmcid"):
         raise ValueError("Full-text retrieval is not authorized for this publication/source identifier")
 

@@ -148,7 +148,8 @@ def a07(F: int, cfg: dict, budget, route, s: dict | None) -> tuple[float, int]:
     return usd, calls
 
 
-def a10(F: int, cfg: dict, budget, route, s: dict, bytes_per_token: float | None = None) -> tuple[float, int]:
+def a10(F: int, cfg: dict, budget, route, s: dict, bytes_per_token: float | None = None,
+        words: int | None = None) -> tuple[float, int]:
     """(usd, requests) for A10 over the executions in s["a10_local_rerun"] (share of LOCAL packets rerun per
     verification; every execution reruns every GLOBAL page)."""
     vc = cfg["scientific_verification"]
@@ -159,8 +160,11 @@ def a10(F: int, cfg: dict, budget, route, s: dict, bytes_per_token: float | None
     rounds = int(vc.get("max_retrieval_rounds", 2))
     extra = rounds if r >= 1.0 else 1
     usd, calls = 0.0, 0
+    # LOCAL packets hold reader-facing sentences: 42 were measured for a 5,000-word manuscript. A shorter
+    # manuscript (an outline with a smaller word budget) has proportionally fewer; never fewer than 4.
+    local_calls = A10_LOCAL_CALLS if not words else max(4, math.ceil(A10_LOCAL_CALLS * min(1.0, words / 5000)))
     for share in s["a10_local_rerun"]:
-        for n, size, cap, mode in ((A10_LOCAL_CALLS * share, A10_LOCAL_BYTES, vc["output_limits"]["LOCAL"], "LOCAL"),
+        for n, size, cap, mode in ((local_calls * share, A10_LOCAL_BYTES, vc["output_limits"]["LOCAL"], "LOCAL"),
                                    (pages, A10_PAGE_BYTES, vc["output_limits"]["GLOBAL"], "GLOBAL")):
             mult = 1 + r * sum(1 + k * A10_RETRIEVAL_SHARE for k in range(1, extra + 1))
             rates = budget._rates(m.model, int(size / bpt))
@@ -195,7 +199,7 @@ def calibrated_line(stage: str, F: int, cfg: dict, budget, route, done_share: fl
 
 
 def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, rates: dict,
-             downstream_inputs: dict | None = None) -> dict:
+             downstream_inputs: dict | None = None, explicit: dict | None = None) -> dict:
     """Every stage of a run of n_papers, per scenario, in USD (planning; measured inputs as documented above)."""
     from .downstream_projection import lines as bridge_lines
     from .downstream_projection import requests as bridge_requests, _price, _weight
@@ -208,6 +212,9 @@ def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, ra
     retest_core_only = (cfg.get("validation") or {}).get("instability_tiers") == ["CORE"]
     n_core = round(n_papers * core_share)
     n_ft = round((n_core if ft_core_only else n_papers) * full_text_share)
+    if explicit:   # a corpus manifest: the counts are the researcher's, no CORE share or availability multiplier
+        n_ft, n_papers = int(explicit["full_text"]), int(explicit["full_text"]) + int(explicit["abstract"])
+        n_core = int(explicit.get("retested", n_papers))   # with no tier count given, every paper may be retested
     n_ab = n_papers - n_ft
     F = round(n_ft * pp["FULL_TEXT"]["findings_mean"] + n_ab * pp["ABSTRACT"]["findings_mean"])
     batch_f = max((rates.get("batch_factor") or {"x": 1.0}).values())
@@ -226,7 +233,7 @@ def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, ra
         repeats *= batch_f if s["batch"] else 1.0
         themes, theme_calls, theme_warnings = a06_themes(F, n_papers, cfg, budget, route, s)
         a07_usd = a07(F, cfg, budget, route, s)[0]
-        a10_usd = a10(F, cfg, budget, route, s)[0]
+        a10_usd = a10(F, cfg, budget, route, s, words=(explicit or {}).get("words"))[0]
         def scen(a, k):   # the scenario with this request's output share taken from the expected-token table
             cap = int((cfg.get("bridge") or {}).get("output_limits", {}).get(k) or route(a).max_tokens)
             return {**s, "output": output_share(f"{a}.{k}" if k else a, cap, s)}

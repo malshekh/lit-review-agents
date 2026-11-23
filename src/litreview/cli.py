@@ -61,7 +61,10 @@ def cmd_new(args) -> int:
     seeds = [s for s in _read(args.seeds).splitlines() if s.strip()]
     run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family, budget_authority=args.budget_authority, corpus_mode=args.corpus_mode,
                      scope_configuration=json.loads(_read(args.scope_configuration)) if args.scope_configuration else None,
-                     profile=args.profile)
+                     profile=args.profile,
+                     outline=json.loads(_read(args.outline)) if args.outline else None,
+                     corpus_manifest=json.loads(_read(args.corpus)) if args.corpus else None,
+                     spec_base_dir=Path(args.corpus).resolve().parent if args.corpus else None)
     print(f"Created run {run_id}. Next: litreview run {run_id}")
     print(f"Created run {run_id}. Start it with:  litreview run {run_id}")
     return 0
@@ -167,6 +170,48 @@ def cmd_resolve_dispatch(args) -> int:
         run.budget.release(event["reservation"])
     print(f"Recorded. `litreview run {args.run_id}` will send {args.step} again.")
     return 0
+
+
+def cmd_spec_check(args) -> int:
+    from . import config, run_spec
+    try:
+        summary = run_spec.check(json.loads(_read(args.outline)), json.loads(_read(args.corpus)),
+                                 config.load("pipeline").get("run_spec") or {}, Path(args.corpus).resolve().parent)
+    except run_spec.SpecError as e:
+        print(f"{len(e.problems)} problem(s):")
+        for p in e.problems:
+            print(f"  - {p}")
+        return 1
+    except (OSError, ValueError) as e:
+        print(f"cannot read the files: {e}")
+        return 1
+    print(json.dumps(summary, indent=2))
+    print("The outline and the corpus manifest are valid. No model was called.")
+    return 0
+
+
+def cmd_smoke_test(args) -> int:
+    import tempfile
+    from . import structured
+    budget = BudgetTracker(Path(tempfile.mkdtemp()))
+    usd, todo = structured.smoke_estimate(budget)
+    print(f"{len(todo)} provider/model/schema combination(s) not yet confirmed; worst case ${usd:.2f}:")
+    for t in todo:
+        print(f"  {t['agent']:8s} {t['provider']:9s} {t['model']:18s} {t['schema_file']}")
+    if args.approve_usd is None:
+        print("Nothing was sent. To run it: litreview smoke-test --approve-usd <amount> --by <your name>")
+        return 0
+    try:
+        result = structured.smoke_test(budget, args.approve_usd, args.by or "")
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Tested {result['tested']}, accepted {result['accepted']}, spent ${result['spent_usd']:.4f} "
+          "(records/smoke_tests.jsonl; records/structured_output.json).")
+    for r in result["results"]:
+        if not r["accepted"]:
+            print(f"  NOT accepted: {r['provider']} {r['model']} {r['schema_file']}: {r.get('error') or r.get('stop_reason')}")
+    return 0 if result["tested"] == result["accepted"] else 1
 
 
 def cmd_submission_check(args) -> int:
@@ -403,6 +448,8 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--scope-configuration", help="human scope configuration with parent CP1 hash; does not approve new checkpoints")
     n.add_argument("--budget-authority", help="reviewed cumulative evaluation-cost metadata; required for fixed pilot")
     n.add_argument("--corpus-mode", choices=["FIXED_CORPUS", "OPEN_CORPUS"], default="FIXED_CORPUS")
+    n.add_argument("--outline", help="your outline (JSON; template in docs/run_spec/outline.template.json)")
+    n.add_argument("--corpus", help="your corpus manifest (JSON; template in docs/run_spec/corpus.template.json)")
     n.add_argument("--profile", help="spend profile from config/pipeline.yaml -> profiles (pilot, sample, manuscript); "
                                      "recorded with the run, so its cap travels with it")
     n.set_defaults(fn=cmd_new)
@@ -513,6 +560,14 @@ def main(argv: list[str] | None = None) -> int:
     rd.add_argument("--billed", action="store_true"); rd.add_argument("--not-billed", action="store_true")
     rd.add_argument("--by"); rd.add_argument("--note")
     rd.set_defaults(fn=cmd_resolve_dispatch)
+    sk = sub.add_parser("spec-check", help="validate your outline and corpus manifest (free; no model call)")
+    sk.add_argument("--outline", required=True)
+    sk.add_argument("--corpus", required=True)
+    sk.set_defaults(fn=cmd_spec_check)
+    sm = sub.add_parser("smoke-test", help="list, or run with approval, one tiny live request per model/schema pair")
+    sm.add_argument("--approve-usd", type=float, help="the amount you approve; without it nothing is sent")
+    sm.add_argument("--by", help="your name")
+    sm.set_defaults(fn=cmd_smoke_test)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

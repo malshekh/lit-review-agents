@@ -60,15 +60,29 @@ class Pause(Exception):
 # ------------------------------------------------------------------ run setup
 def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified",
             budget_authority=None, corpus_mode="FIXED_CORPUS", scope_configuration=None,
-            profile: str | None = None) -> str:
+            profile: str | None = None, outline: dict | None = None, corpus_manifest: dict | None = None,
+            spec_base_dir: Path | None = None) -> str:
     from .evaluation_budget import prepare
+    from . import run_spec
+    if (outline is None) != (corpus_manifest is None):
+        raise ValueError("give both the outline and the corpus manifest, or neither")
+    if outline is not None:
+        if corpus_mode == "FIXED_CORPUS":
+            raise ValueError("a run with an outline and a corpus manifest uses --corpus-mode OPEN_CORPUS (the manifest "
+                             "fixes the corpus; FIXED_CORPUS is the closed staged pilot)")
+        run_spec.check(outline, corpus_manifest, config.load("pipeline").get("run_spec") or {}, spec_base_dir)
     profile = config.run_settings(profile).get("profile")   # an unknown profile is refused here, before any file
     if profile == "manuscript" and corpus_mode == "FIXED_CORPUS":
         raise ValueError("The manuscript profile is for the full run: use --corpus-mode OPEN_CORPUS. FIXED_CORPUS "
                          "is the staged pilot, which keeps its own $35 authorization.")
-    authority = prepare(budget_authority)
-    if authority["authority"].get("corpus_mode", "FIXED_CORPUS") != corpus_mode:
-        raise ValueError("Requested corpus mode differs from reviewed budget authority")
+    if budget_authority is None and corpus_mode == "OPEN_CORPUS":
+        # A standard run starts from zero under its spend profile. The $35 evaluation authority belongs to the
+        # staged pilot: no earlier spend, approval or financial authorization is carried into a fresh run.
+        authority = None
+    else:
+        authority = prepare(budget_authority)
+        if authority["authority"].get("corpus_mode", "FIXED_CORPUS") != corpus_mode:
+            raise ValueError("Requested corpus mode differs from reviewed budget authority")
     if scope_configuration is not None and (not isinstance(scope_configuration, dict) or set(scope_configuration) - {
             "parent_run_id", "parent_cp1_sha256", "purpose", "central_question", "perspective",
             "selection_criteria", "theme_framework", "qualifications"}):
@@ -83,7 +97,13 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
     if scope_configuration is not None:
         (d / "human_scope_configuration.json").write_text(json.dumps(scope_configuration, indent=2), encoding="utf-8")
-    policy_fingerprint = corpus_policy.initialize(d.parent, corpus_policy.default_policy(corpus_mode))
+    if outline is not None:
+        run_spec.install(d.parent, outline, corpus_manifest, config.load("pipeline").get("run_spec") or {}, spec_base_dir)
+        seeds = sorted({p["pmid"] for p in corpus_manifest["papers"] if p.get("pmid")} | set(seeds or []))
+        (d / "seeds.txt").write_text("\n".join(seeds), encoding="utf-8")
+    policy_fingerprint = corpus_policy.initialize(
+        d.parent, corpus_policy.manifest_policy(corpus_manifest) if corpus_manifest is not None
+        else corpus_policy.default_policy(corpus_mode))
     if authority:
         (d / "evaluation_budget.json").write_text(json.dumps(authority, indent=2), encoding="utf-8")
     Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {},
@@ -1151,12 +1171,24 @@ class Run:
                         'under "retraction_exceptions" in CP2_approved.json, then approve CP2 again.')
         quals = {q["record_id"]: q for q in self.load("qualifications.json")}
         corpus = []
+        from . import run_spec
+        _, manifest = run_spec.load(self.dir)
+        if manifest:
+            mismatch = run_spec.selection_problems(manifest, [by_id[rid] for rid in decision["selected_record_ids"]])
+            if mismatch:
+                raise Pause("CP2 selection differs from the corpus manifest (input/corpus_manifest.json): "
+                            + "; ".join(mismatch) + ". The manifest is the corpus: fix the selection, or change the "
+                            "manifest in a new run.")
         for rid in decision["selected_record_ids"]:
             q = quals.get(rid, {})
+            paper = run_spec.paper_for(manifest, by_id[rid])
             corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
                            "subthemes": q.get("subthemes", []),
-                           "tier": decision["tier_overrides"].get(rid) or q.get("proposed_tier"),
-                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence")})
+                           "tier": (paper["scientific_importance"] if paper else
+                                    decision["tier_overrides"].get(rid) or q.get("proposed_tier")),
+                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence"),
+                           **({"manifest_paper_id": paper["paper_id"],
+                               "intended_reading_level": paper["intended_reading_level"]} if paper else {})})
         # the projection decides here, where changing the selection is still cheap
         if pilot.enabled(self):
             try:proj=pilot.project(self,pilot.STAGE_1,records=corpus)
@@ -1166,12 +1198,37 @@ class Run:
                                                  self.cfg)
         self.save("cost_projection.json", proj)
         self.prov.tool_run("cost_projection", "cp2", {k: proj[k] for k in ("projected_total_usd", "cap_usd", "verdict", "papers")})
+        self._derive_stage_caps(proj)
         if proj["verdict"] != "WITHIN_CAP":
             raise Pause(f"CP2 selection of {len(corpus)} papers is projected at ${proj['projected_total_usd']:.2f}, over "
                         f"the ${proj['cap_usd']:.2f} cap (data/cost_projection.json). Deselect papers or raise the cap, "
                         "then approve CP2 again.")
         self.save("selected_corpus.json", corpus)
         return "extract"
+
+    def _derive_stage_caps(self, proj: dict) -> None:
+        """Profiles with `stage_caps_usd: derived`: sub-caps from this run's own projection, so a stage can never be
+        capped below what the projection says it costs. If the caps together exceed the run's cap, the run stops
+        here, where the selection can still change."""
+        from .budget import derive_stage_caps
+        settings = config.run_settings(self.state().get("profile"))
+        if settings.get("stage_caps_usd") != "derived":
+            return
+        stage_usd = {x["stage"]: x["usd"] for x in proj.get("lines", []) if x.get("stage") in self.cfg["agents"]}
+        spent = {}
+        for e in self.budget.entries():   # stages already paid for keep at least what they spent
+            spent[e["agent"]] = spent.get(e["agent"], 0.0) + (e["cost_usd"] or 0.0)
+        for agent, usd in spent.items():
+            stage_usd[agent] = stage_usd.get(agent, 0.0) + usd
+        derived = derive_stage_caps(stage_usd, float(settings.get("recovery_allowance", 0.15)))
+        self.save("stage_caps.json", {**derived, "from_projection_created": proj.get("created"),
+                                      "run_cap_usd": self.budget.cap})
+        self.budget = BudgetTracker(self.dir)
+        self.prov.tool_run("stage_caps", "cp2", derived)
+        if derived["total_usd"] > self.budget.cap:
+            raise Pause(f"the stage sub-caps this projection needs add up to ${derived['total_usd']:.2f}, over the run's "
+                        f"${self.budget.cap:.2f} cap (data/stage_caps.json). Reduce the corpus or the word budgets, or "
+                        "choose a profile with a higher cap; raising one sub-cap would only move the shortfall.")
 
     def _retraction_check(self, records: list[dict], label: str) -> dict:
         """Crossref retraction status of the given records (free; cached in data/crossref_cache). Written to
@@ -1278,6 +1335,14 @@ class Run:
                     ready[rid] = {"required": required, "status": "BLOCKED", "reason": str(exc)}
                     self.save("source_readiness.json", ready)
                     raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+            elif rec.get("intended_reading_level") == "ABSTRACT":
+                sections = {"Abstract": rec.get("abstract") or ""}   # the manifest says abstract, whatever its importance
+            elif rec.get("intended_reading_level") == "FULL_TEXT":
+                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid"))
+                if not sections or len(sections) < 2:
+                    raise Pause(f"{rid} ({rec.get('manifest_paper_id')}) is marked for full-text reading in the corpus "
+                                "manifest, but no full text could be loaded. It is not silently read as an abstract: "
+                                f"place its sections in data/fulltext/{rid}.json, or start a run whose manifest says ABSTRACT.")
             elif not self._tier_allows("extraction", "full_text_tiers", rec):
                 sections = {"Abstract": rec.get("abstract") or ""}   # not a full-text tier: abstract only, labelled so
             else:
@@ -1286,8 +1351,20 @@ class Run:
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
             rid_of[f"A05-KE_{rid}"] = rid
-            items.append((f"A05-KE_{rid}", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
-                                            "content_level": level, "record": {**rec, "content": sections}}))
+            payload = {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
+                       "content_level": level, "record": {**rec, "content": sections}}
+            from . import run_spec
+            outline, manifest = run_spec.load(self.dir)
+            paper = run_spec.paper_for(manifest, rec)
+            if paper:   # what was actually accessible, so nothing is described that was never read
+                payload["source_access"] = run_spec.source_access(paper, level)
+                access = self.load("source_access.json", {})
+                access[rid] = {"paper_id": paper["paper_id"], **payload["source_access"]}
+                self.save("source_access.json", access)
+            if outline:
+                payload["outline_questions"] = [{"section_id": s["section_id"], "heading": s["heading"],
+                                                 "questions": s["questions"]} for s in outline["sections"]]
+            items.append((f"A05-KE_{rid}", payload))
         self.run_many("A05-KE", items, lambda step, out: self.save(
             f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out)))
         return "validate"
@@ -2216,6 +2293,23 @@ class Run:
                 raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
                             "adjust the selection or plan, then run again")
             problems, report = bridge.validate_plan(plan, ledger, pkg, corpus, table, journal, bcfg, findings)
+            from . import run_spec
+            outline, _ = run_spec.load(self.dir)
+            if outline:
+                extra, coverage = run_spec.plan_problems(plan, outline)
+                problems = problems + extra
+                queue = run_spec.unmapped(ledger)
+                self.save("unmapped_evidence.json", {"status": "NEEDS_RESEARCHER_REVIEW" if queue else "EMPTY",
+                                                     "items": queue, "outline_coverage": coverage})
+                (checkpoints.cp_dir(self.dir) / "CP_LEDGER_unmapped_evidence.md").write_text(
+                    "# Evidence outside the outline\n\n"
+                    f"{len(queue)} item(s) fit no section of your outline. They are not written about and not lost. "
+                    "Decide for each: extend the outline (new run specification), or leave it out and say why.\n\n"
+                    + "\n".join(f"- {q['item_id']}: {q.get('reason') or 'no reason given'}" for q in queue)
+                    + "\n\n## Outline sections the evidence does not fill\n\n"
+                    + ("\n".join(f"- {s}" for s in coverage["sections_without_evidence"]) or "- none")
+                    + "\n\nA section without evidence is reported as such; it is not padded.\n", encoding="utf-8")
+                self.prov.tool_run("unmapped_evidence", "outline", {"items": len(queue), **coverage})
             check = {"basis": basis, "plan_version": bridge.plan_version(plan, ledger), "problems": problems,
                      "report": report}
             self.save("bridge/plan_check.json", check)
@@ -2459,7 +2553,8 @@ class Run:
             raise ValueError(f"run {self.id} has no export yet (final/export_checks.json): finish the run first")
         checks = json.loads(checks_path.read_text(encoding="utf-8"))
         ready = submission.status(final_dir, checks["reference_problems"], checks["table_problems"],
-                                  checks["compliance"], self.load("retraction_cp2_selection.json"))
+                                  checks["compliance"], self.load("retraction_cp2_selection.json"),
+                                  checks.get("science_lint"))
         (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
         self.prov.tool_run("submission_status", "recheck", {"submission_ready": ready["submission_ready"],
                                                             "blockers": len(ready["blockers"])})
@@ -2470,8 +2565,13 @@ class Run:
         return pilot.journal(self)
 
     def _outline_payload(self, pkg, corpus, journal, table, bcfg, findings) -> dict:
-        from . import bridge
-        return bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
+        from . import bridge, run_spec
+        payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
+        outline, _ = run_spec.load(self.dir)
+        if outline:
+            payload["researcher_outline"] = outline
+            payload["source_access"] = self.load("source_access.json", {})
+        return payload
 
     def _sample_mode(self) -> bool:
         return False
@@ -3088,9 +3188,14 @@ class Run:
         table_issues = submission.table_problems(
             [{**t, "caption": exported[t["display_id"]]["caption"], "notes": exported[t["display_id"]]["notes"]}
              for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
+        from .tools import science_lint
+        access = {rid: a.get("level") for rid, a in (self.load("source_access.json", {}) or {}).items()}
+        lint = science_lint.check_manuscript(m, access or None)
+        (final_dir / "science_lint.json").write_text(json.dumps(lint, ensure_ascii=False, indent=2), encoding="utf-8")
         ready = submission.status(final_dir, ref_problems, table_issues, comp,
-                                  self.load("retraction_cp2_selection.json"))
-        export_checks = {"reference_problems": ref_problems, "table_problems": table_issues, "compliance": comp}
+                                  self.load("retraction_cp2_selection.json"), lint)
+        export_checks = {"reference_problems": ref_problems, "table_problems": table_issues, "compliance": comp,
+                         "science_lint": lint}
         (final_dir / "export_checks.json").write_text(json.dumps(export_checks, indent=2), encoding="utf-8")
         (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
         self.prov.tool_run("submission_status", "export", {"submission_ready": ready["submission_ready"],

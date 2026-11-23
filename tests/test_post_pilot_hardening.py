@@ -120,7 +120,7 @@ def test_profiles_set_cap_review_points_and_stage_caps(tmp_path, monkeypatch):
     assert (run_block["spend_cap_usd"], run_block["spend_review_usd"]) == (35.0, 25.0)   # the staged pilot reads these
     ms = config.run_settings("manuscript")
     assert (ms["target_usd"], ms["spend_review_points_usd"], ms["spend_cap_usd"]) == (150.0, [120.0, 150.0], 200.0)
-    assert sum(ms["stage_caps_usd"].values()) == 150.0               # the sub-caps add up to the target, not the hard stop
+    assert ms["stage_caps_usd"] == "derived"                         # sub-caps come from the run's own projection at CP2
     assert config.run_settings("sample")["non_representative"] is True
     with pytest.raises(ValueError, match="Unknown spend profile 'big'"):
         config.run_settings("big")
@@ -132,6 +132,9 @@ def test_profiles_set_cap_review_points_and_stage_caps(tmp_path, monkeypatch):
 
 def test_a_stage_cannot_borrow_from_a_later_stage(tmp_path):
     (tmp_path / "state.json").write_text(json.dumps({"profile": "manuscript"}), encoding="utf-8")
+    assert BudgetTracker(tmp_path).stage_caps == {}                                  # before CP2: no projection, no sub-caps
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "stage_caps.json").write_text(json.dumps({"caps_usd": {"A07": 30.0, "A08-A09": 20.0}}))
     b = BudgetTracker(tmp_path)
     b.record("A07-SYN", "anthropic", "claude-opus-5", 1_000_000, 900_000, "s1")      # $27.50 of the $30 A07 sub-cap
     assert b.reserve("k1", 2.0, "A07-SYN")[0]                                        # 29.50: fits

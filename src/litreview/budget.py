@@ -38,6 +38,20 @@ class StalePrice(UnpricedModel):
     """The model's prices.yaml entry has no source or check date, or was checked too long ago."""
 
 
+def derive_stage_caps(stage_usd: dict[str, float], recovery_allowance: float, floor_usd: float = 1.0) -> dict:
+    """Stage sub-caps that the projected work fits by construction: each stage group's projected spend (already
+    including the uncertainty margin) plus an allowance for retries and repairs. A fixed table of sub-caps set
+    before the projection existed stopped stages the projection itself said would cost more."""
+    groups: dict[str, float] = {}
+    for agent, usd in stage_usd.items():
+        g = config.stage_group(agent)
+        if g:
+            groups[g] = groups.get(g, 0.0) + float(usd)
+    caps = {g: round(max(floor_usd, usd * (1 + recovery_allowance)) + 0.005, 2) for g, usd in sorted(groups.items())}
+    return {"caps_usd": caps, "projected_usd": {g: round(v, 4) for g, v in sorted(groups.items())},
+            "recovery_allowance": recovery_allowance, "total_usd": round(sum(caps.values()), 2)}
+
+
 def today() -> _dt.date:
     """Today's date. Under pytest only, LITREVIEW_TEST_TODAY pins it so the price-age gate is testable."""
     pinned = os.environ.get("LITREVIEW_TEST_TODAY") if "PYTEST_CURRENT_TEST" in os.environ else None
@@ -75,7 +89,11 @@ class BudgetTracker:
         self.profile = pipeline.get("profile")
         self.cap = float(pipeline["spend_cap_usd"])
         self.review_points = [float(x) for x in pipeline.get("spend_review_points_usd") or []]
-        self.stage_caps = {k: float(v) for k, v in (pipeline.get("stage_caps_usd") or {}).items()}
+        caps = pipeline.get("stage_caps_usd") or {}
+        if caps == "derived":   # written at CP2 from the approved projection (Run._derive_stage_caps)
+            derived = Path(run_dir) / "data" / "stage_caps.json"
+            caps = json.loads(derived.read_text(encoding="utf-8"))["caps_usd"] if derived.exists() else {}
+        self.stage_caps = {k: float(v) for k, v in caps.items()}
         self.price_max_age_days = pipeline.get("price_max_age_days")
         self.warn_fraction = float(pipeline.get("warn_at_fraction", 0.8))
         self.allow_unpriced = bool(pipeline.get("allow_unpriced_models", False))

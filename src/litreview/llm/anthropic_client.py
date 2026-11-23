@@ -53,7 +53,8 @@ def count_tokens(system: str, user, model: str, cache_system: bool = False, cach
 
 
 def message_params(system: str, user, model: str, max_tokens: int, temperature: float,
-                   effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m", trace: dict | None = None) -> dict:
+                   effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m", trace: dict | None = None,
+                   response_schema: dict | None = None) -> dict:
     """The Messages request, shared by complete() and a batch item's `params` (identical by construction)."""
     pcfg = config.load("pipeline")["providers"]["anthropic"]
     kwargs: dict = {"model": model, "max_tokens": max_tokens, **request_body(system, user, cache_system, cache_ttl)}
@@ -67,6 +68,8 @@ def message_params(system: str, user, model: str, max_tokens: int, temperature: 
             raise ValueError("Controlled PLAN requires adaptive thinking, medium effort and no manual budget")
         kwargs["thinking"] = {"type":"adaptive"}
         kwargs["output_config"] = {"effort":"medium"}
+    if response_schema:   # structured output: shape, types, required keys and enumerations (structured.py)
+        kwargs.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": response_schema["schema"]}
     return kwargs
 
 
@@ -94,12 +97,13 @@ def _preserve_plan_response(resp, trace):
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
              provider: str = "anthropic", effort: str | None = None, cache_system: bool = False,
-             cache_ttl: str = "5m", trace: dict | None = None) -> LLMResponse:
+             cache_ttl: str = "5m", trace: dict | None = None, response_schema: dict | None = None) -> LLMResponse:
     """Streams the request (so large max_tokens never hits the SDK's non-streaming timeout) and
     returns the final message. Thinking counts toward max_tokens; `effort` (per agent in
     pipeline.yaml) controls how much of it is spent. Prompt caching: `cache_system` marks the system
     prompt, and user blocks with "cache": True are marked too (the prefix up to each mark is cached)."""
-    kwargs = message_params(system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl, trace)
+    kwargs = message_params(system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl, trace,
+                            response_schema)
     with _get_client().messages.stream(**kwargs) as s:
         resp = s.get_final_message()
     private_path = metadata = None

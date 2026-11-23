@@ -127,6 +127,14 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - One display item, `T1`; `writing_order` lists every section once.
 - Nothing in the plan restates, shortens or merges an assertion: elements are referenced by ID only.
 
+## The researcher's outline
+
+When the task input contains `researcher_outline`, it is the structure of the manuscript. Use its `section_id` values and headings exactly; create no section it does not have and rename none. For each section, plan from its `questions`: state in `purpose` the question the section answers, the message the evidence supports and where that message stops, and order the supporting, contrary and unresolved items under it. The questions are things to investigate, not results to deliver: if the evidence answers a question with "not established" or "cannot be answered from this corpus", plan exactly that. A section the evidence cannot fill keeps a `word_budget` of 0 and no items; say so in `warnings`. Never pad a section to reach a budget, and treat every `word_budget` as a ceiling.
+
+Evidence that fits no section of the outline is not forced into one and not dropped: record it in `allocation_ledger` with `outcome: "NOT_INDIVIDUALLY_DISCUSSED"`, `section_id: null` and a `reason` that begins `OUTSIDE_OUTLINE:`. Code places these in a review queue for the researcher.
+
+Use `source_access` to bound every planned message: a message that rests only on abstract-level papers is planned as such.
+
 ## Exact output contracts (development hardening)
 Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
 

@@ -18,11 +18,23 @@ profiles:
     spend_cap_usd: 35.0
     spend_review_points_usd: [25.0]
     non_representative: true
+  # stage_caps_usd: derived  -> the sub-caps are computed at CP2 from the run's own projection (each stage's
+  # projected spend, margin included, plus recovery_allowance for retries and repairs) and written to
+  # data/stage_caps.json. A fixed table conflicted with the projection it sat beside (A07 and A10 were projected
+  # above their caps); raising the total would not have fixed that.
   manuscript:    # the full run: target $150, review at $120 and again at the target, hard stop $200
     target_usd: 150.0
     spend_cap_usd: 200.0
     spend_review_points_usd: [120.0, 150.0]
-    stage_caps_usd: {A02-A04: 6.0, A05-A06: 50.0, A07: 30.0, A08-A09: 20.0, A10: 24.0, A11-A12: 20.0}
+    stage_caps_usd: derived
+    recovery_allowance: 0.15
+  corpus15:      # the outlined run: 5 full texts + 10 abstracts (scripts/plan_budget.py prints its plan)
+    target_usd: 70.0
+    spend_cap_usd: 80.0
+    spend_review_points_usd: [50.0, 70.0]
+    stage_caps_usd: derived
+    recovery_allowance: 0.15
+    smoke_test_allowance_usd: 1.0
 loops:
   max_json_repair_attempts: 1
   reserved_call_repairs: 1       # A07-A12 calls: one audited format repair from the saved reply (was 0: fail the stage)
@@ -52,20 +64,21 @@ providers:
     key_env: ANTHROPIC_API_KEY
     send_temperature: false
     base_url: https://api.anthropic.com   # explicit, so ANTHROPIC_BASE_URL cannot redirect paid calls
+    structured_output: json_schema        # used only for (model, schema) pairs `litreview smoke-test` confirmed
     plan_response_audit_dir: C:\Users\maykh\LitReviewStage1\PrivateProviderAudit-A07-PLAN-v10
   openai:
     key_env: OPENAI_API_KEY
     base_url: https://api.openai.com/v1   # explicit, so OPENAI_BASE_URL in the environment cannot redirect it
     send_temperature: false
     json_mode: true
-    structured_output: json_schema        # strict schema where the schema qualifies; else json_object
+    structured_output: json_schema        # used only for (model, schema) pairs `litreview smoke-test` confirmed
     reasoning_effort: {send: true, allowed: [low, medium, high]}
   kimi:
     key_env: MOONSHOT_API_KEY
     base_url: https://api.moonshot.ai/v1
     send_temperature: false
     json_mode: true
-    structured_output: json_object
+    structured_output: json_object        # Kimi: JSON mode only until its schema support is confirmed
     # K3.1 Pro always reasons and defaults to max when the field is omitted (guides, read 2026-11-23;
     # Moonshot's own page did not render). `medium` is not an accepted value: an agent on Kimi sets low or high.
     reasoning_effort: {send: true, allowed: [low, high, max], default: high}   # default: for an alternate whose agent says medium
@@ -191,6 +204,11 @@ context_utilisation:
   models: {}
   provider_count:
     anthropic: true
+run_spec:
+  # A run created with an outline and a corpus manifest (run_spec.py). The manifest fixes the corpus and each
+  # paper's reading level; the tier policy below applies only to runs without one.
+  max_papers: 15
+  max_full_text: 5
 extraction:
   # Full text is read for these tiers only; other papers are extracted from their abstract and labelled
   # ABSTRACT, which every later stage sees. null: full text for every paper that has it (the old behaviour).

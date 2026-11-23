@@ -49,7 +49,7 @@ def reasoning_effort(provider: str, effort: str | None) -> str | None:
 
 
 def chat_params(system: str, user, model: str, max_tokens: int, temperature: float, provider: str = "openai",
-                effort: str | None = None) -> dict:
+                effort: str | None = None, response_schema: dict | None = None) -> dict:
     """The Chat Completions request body, shared by complete() and a batch line's `body`."""
     # `cache_system` is a Claude setting. Ordinary OpenAI/Kimi calls
     # preserve their existing implicit caching; marked A06 work units use an explicit shared boundary.
@@ -83,17 +83,21 @@ def chat_params(system: str, user, model: str, max_tokens: int, temperature: flo
     sent_effort = reasoning_effort(provider, effort)
     if sent_effort:
         kwargs["reasoning_effort"] = sent_effort
-    if p.get("json_mode", True):
+    if response_schema:   # structured output for a combination the smoke test confirmed (structured.py)
+        kwargs["response_format"] = {"type": "json_schema", "json_schema": {
+            "name": response_schema["name"], "schema": response_schema["schema"], "strict": False}}
+    elif p.get("json_mode", True):
         kwargs["response_format"] = {"type": "json_object"}
     return kwargs
 
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
              provider: str = "openai", effort: str | None = None, cache_system: bool = False,
-             cache_ttl: str = "5m", trace: dict | None = None) -> LLMResponse:
+             cache_ttl: str = "5m", trace: dict | None = None, response_schema: dict | None = None) -> LLMResponse:
     # `trace` identifies the agent and run for launchers that wrap this route; it is not sent to the provider.
     resp = _get_client(provider).chat.completions.create(**chat_params(system, user, model, max_tokens,
-                                                                       temperature, provider, effort))
+                                                                       temperature, provider, effort,
+                                                                       response_schema))
     return parse_completion(resp, provider, model)
 
 
