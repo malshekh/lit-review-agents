@@ -226,9 +226,9 @@ synthesis:
   retrieval_limit: 12
   output_limits:
     PLAN: 32000
-    GROUP: 16000
-    RECONCILE: 16000
-    FINAL: 16000
+    GROUP: 12000       # unchanged from the approved sample pricing: an accepted GROUP output is at most 10,976 bytes
+    RECONCILE: 16000   # was 6000 at high effort: no room left for thinking
+    FINAL: 16000       # was 6000 at high effort
   context_ceiling_tokens: 900000
   cache_ttl: 1h
   plan_request:

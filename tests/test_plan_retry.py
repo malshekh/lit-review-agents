@@ -152,7 +152,7 @@ def test_plan_limits_and_post_pilot_caps():
     was resized after the pilot (2026-11-23): no call leaves less than 12k for thinking plus output, and no agent
     default is above 48k (the old 64k-128k defaults priced every worst case at an output nobody produced)."""
     new=config.load("pipeline")
-    assert new["synthesis"]["output_limits"]=={"PLAN":32000,"GROUP":16000,"RECONCILE":16000,"FINAL":16000}
+    assert new["synthesis"]["output_limits"]=={"PLAN":32000,"GROUP":12000,"RECONCILE":16000,"FINAL":16000}
     assert new["synthesis"]["plan_request"]=={"thinking":{"type":"adaptive"},"effort":"medium"}
     assert new["scientific_verification"]["output_limits"]=={"LOCAL":16000,"GLOBAL":16000}
     caps={a:v["max_tokens"] for a,v in new["agents"].items()}
