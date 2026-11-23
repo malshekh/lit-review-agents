@@ -32,7 +32,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CHECKS = {
     "faults": ["tests/test_job_ledger_recovery.py", "tests/test_post_pilot_hardening.py::test_a_truncation_retry_gets_its_own_larger_reservation",
                "tests/test_refusal_routing.py", "tests/test_batch_stage.py",
-               "tests/test_post_pilot_hardening.py::test_a_truncated_batch_item_keeps_its_reply_and_is_redone_at_a_larger_cap"],
+               "tests/test_post_pilot_hardening.py::test_a_truncated_batch_item_keeps_its_reply_and_is_redone_at_a_larger_cap",
+               "tests/test_post_pilot_hardening.py::test_batch_results_are_matched_by_request_id_not_by_returned_order"],
     "resume": ["tests/test_decisions_paging_contracts.py", "tests/test_post_pilot_hardening.py::test_a_resume_reuses_the_accepted_output_and_pays_nothing",
                "tests/test_integrated_pipeline.py::test_interrupted_calls_resume_without_repeating_paid_work"],
     "accounting": ["tests/test_integrated_pipeline.py", "tests/test_contrary_evidence.py", "tests/test_verification_job.py",

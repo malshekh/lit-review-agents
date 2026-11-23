@@ -513,3 +513,33 @@ def test_tier_policy_limits_full_text_and_the_instability_retest_to_core(run):
     assert run._tier_allows("extraction", "full_text_tiers", {"tier": "CORE"})
     assert not run._tier_allows("extraction", "full_text_tiers", {"tier": "SUPPORTING"})
     assert run._tier_allows("extraction", "missing_key", {"tier": "CONTEXT"})    # no policy: every paper
+
+
+def test_batch_results_are_matched_by_request_id_not_by_returned_order(tmp_path, monkeypatch):
+    """Providers may return batch results in any order (Anthropic says so explicitly), and a result can be missing.
+    Each result must reach the step whose request it answers; a missing one is redone, never misattributed."""
+    import test_batch_stage as tb
+    from litreview import batch_stage
+    monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
+    monkeypatch.setattr(batch_stage, "validate", lambda *a, **k: None)
+    monkeypatch.setattr(batch_stage.time, "sleep", lambda s: None)
+    r = orch.Run("t")
+    r.save_state({"stage": "extract", "status": "READY", "counters": {}})
+    (r.dir / "input").mkdir(parents=True, exist_ok=True)
+    (r.dir / "input" / "topic_family.txt").write_text("onc", encoding="utf-8")
+    (r.dir / "outputs").mkdir(parents=True, exist_ok=True)
+    fake, calls, got = tb.FakeVendor(), [], {}
+    tb.install(monkeypatch, fake)
+    tb.fake_interactive(monkeypatch, calls)
+    original = fake.results
+
+    def shuffled(provider, bid, model):
+        out = list(reversed(original(provider, bid, model)))
+        return out[1:]                                                      # reversed, and one result never arrives
+    monkeypatch.setattr(batch_stage.batch, "results", shuffled)
+    r.run_many("A05-KE", tb.items(), lambda s, o: got.__setitem__(s, o))
+    assert sorted(got) == sorted(tb.STEPS)
+    assert all(out["id"] == step for step, out in got.items() if out.get("status") == "OK")   # each to its own step
+    batched = [e["step"] for e in r.budget.entries() if e.get("batch_id")]
+    assert len(batched) == len(set(batched)) == len(tb.STEPS) - 2          # probe + the missing one ran interactively
