@@ -18,12 +18,12 @@
         "A06 theme pass": 14.96,
         "A07 synthesis": 35.9,
         "A08 outline": 1.25,
-        "A09 writing": 23.55,
+        "A09 writing": 23.64,
         "A10 verification": 41.49,
         "A11 critique": 0.85,
-        "A12 editing": 2.77,
-        "failed and redone calls (A07-A12)": 5.29,
-        "total": 151.62
+        "A12 editing": 2.78,
+        "failed and redone calls (A07-A12)": 5.3,
+        "total": 151.72
       },
       "low": {
         "A02-A04 (pre-CP2)": 2.07,
@@ -32,12 +32,12 @@
         "A06 theme pass": 13.98,
         "A07 synthesis": 28.42,
         "A08 outline": 0.55,
-        "A09 writing": 15.36,
+        "A09 writing": 15.42,
         "A10 verification": 25.39,
         "A11 critique": 0.71,
         "A12 editing": 1.73,
         "failed and redone calls (A07-A12)": 0.0,
-        "total": 109.77
+        "total": 109.84
       },
       "high": {
         "A02-A04 (pre-CP2)": 6.0,
@@ -46,12 +46,12 @@
         "A06 theme pass": 16.92,
         "A07 synthesis": 50.84,
         "A08 outline": 1.36,
-        "A09 writing": 32.94,
+        "A09 writing": 33.05,
         "A10 verification": 77.98,
         "A11 critique": 1.0,
-        "A12 editing": 3.05,
-        "failed and redone calls (A07-A12)": 16.72,
-        "total": 238.64
+        "A12 editing": 3.06,
+        "failed and redone calls (A07-A12)": 16.73,
+        "total": 238.77
       },
       "adverse": {
         "A02-A04 (pre-CP2)": 8.0,
@@ -60,12 +60,12 @@
         "A06 theme pass": 18.87,
         "A07 synthesis": 159.32,
         "A08 outline": 1.49,
-        "A09 writing": 84.92,
+        "A09 writing": 85.16,
         "A10 verification": 389.69,
         "A11 critique": 1.19,
-        "A12 editing": 3.5,
-        "failed and redone calls (A07-A12)": 96.02,
-        "total": 828.51
+        "A12 editing": 3.51,
+        "failed and redone calls (A07-A12)": 96.06,
+        "total": 828.79
       }
     },
     "a06_theme_calls": 9,
@@ -85,7 +85,7 @@
       "A11-RC",
       "A12-EDI.A12_UNIT"
     ],
-    "baseline_with_margin": 197.11,
+    "baseline_with_margin": 197.24,
     "uncertainty_margin": 0.3,
     "bridge_basis": "REQUEST_BOUND"
   },
@@ -93,83 +93,83 @@
     "20": {
       "findings": 261,
       "validation": "within the largest cohort run; per-call rates still provisional",
-      "baseline": 54.13,
-      "low": 35.62,
-      "high": 97.73,
-      "adverse": 435.84,
-      "baseline_with_margin": 70.37
+      "baseline": 54.18,
+      "low": 35.66,
+      "high": 97.79,
+      "adverse": 435.97,
+      "baseline_with_margin": 70.43
     },
     "28": {
       "findings": 362,
       "validation": "within the largest cohort run; per-call rates still provisional",
-      "baseline": 61.22,
-      "low": 40.87,
-      "high": 108.35,
-      "adverse": 467.92,
-      "baseline_with_margin": 79.59
+      "baseline": 61.27,
+      "low": 40.9,
+      "high": 108.42,
+      "adverse": 468.06,
+      "baseline_with_margin": 79.65
     },
     "40": {
       "findings": 522,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 69.93,
-      "low": 47.72,
-      "high": 121.01,
-      "adverse": 503.39,
-      "baseline_with_margin": 90.91
+      "baseline": 69.98,
+      "low": 47.75,
+      "high": 121.08,
+      "adverse": 503.52,
+      "baseline_with_margin": 90.97
     },
     "50": {
       "findings": 660,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 78.79,
-      "low": 54.43,
-      "high": 134.11,
-      "adverse": 541.94,
-      "baseline_with_margin": 102.43
+      "baseline": 78.85,
+      "low": 54.47,
+      "high": 134.18,
+      "adverse": 542.08,
+      "baseline_with_margin": 102.5
     },
     "60": {
       "findings": 783,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 85.81,
-      "low": 59.93,
-      "high": 144.27,
-      "adverse": 570.23,
-      "baseline_with_margin": 111.55
+      "baseline": 85.86,
+      "low": 59.97,
+      "high": 144.34,
+      "adverse": 570.36,
+      "baseline_with_margin": 111.62
     },
     "70": {
       "findings": 921,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 94.89,
-      "low": 66.78,
-      "high": 157.76,
-      "adverse": 610.39,
-      "baseline_with_margin": 123.36
+      "baseline": 94.95,
+      "low": 66.82,
+      "high": 157.82,
+      "adverse": 610.53,
+      "baseline_with_margin": 123.44
     },
     "80": {
       "findings": 1059,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 102.69,
-      "low": 72.93,
-      "high": 169.0,
-      "adverse": 641.71,
-      "baseline_with_margin": 133.5
+      "baseline": 102.74,
+      "low": 72.97,
+      "high": 169.06,
+      "adverse": 641.84,
+      "baseline_with_margin": 133.56
     },
     "100": {
       "findings": 1320,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 119.09,
-      "low": 85.54,
-      "high": 193.0,
-      "adverse": 711.06,
-      "baseline_with_margin": 154.82
+      "baseline": 119.14,
+      "low": 85.58,
+      "high": 193.07,
+      "adverse": 711.19,
+      "baseline_with_margin": 154.88
     },
     "120": {
       "findings": 1581,
       "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
-      "baseline": 142.52,
-      "low": 104.86,
-      "high": 224.68,
-      "adverse": 789.49,
-      "baseline_with_margin": 185.28
+      "baseline": 142.58,
+      "low": 104.89,
+      "high": 224.75,
+      "adverse": 789.62,
+      "baseline_with_margin": 185.35
     }
   },
   "largest_paper_count_fitting": {
