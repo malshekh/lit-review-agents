@@ -1,7 +1,10 @@
 # The outlined 5 + 10 paper run: what is ready, what you provide, and what still pauses
 
 Date: 2026-11-23. Branch `claude/post-pilot-hardening`, PR #5. No paid call has been made. Tests: 985 passed,
-0 skipped, every provider key blank.
+0 skipped locally, every provider key blank; CI 982 passed (the three reference-run tests skip there).
+
+Runtime v12: `C:\Users\maykh\LitReviewStage1\execution-20261123-v12-outlined-run`, commit `51869da`, manifest
+SHA-256 `9496ed19860f89ccf100cb78b11f568c14780c1f7af276e0c7107840892c7cf0`, `runs/` empty.
 
 "No stopping" is implemented as: no avoidable technical interruption. Scientific uncertainty, budget limits and
 your approvals still stop the run, on purpose.
@@ -66,10 +69,10 @@ From `scripts/plan_budget.py`, for a 5,000-word manuscript, with the four parts 
 | A02 to A04 | $4.00 | $5.98 |
 | A05 and A06 | $5.52 | $8.26 |
 | A07 | $8.35 | $12.49 |
-| A08 and A09 | $6.47 | $9.68 |
+| A08 and A09 | $6.48 | $9.69 |
 | A10 | $24.83 | $37.13 |
 | A11 and A12 | $2.49 | $3.73 |
-| **Total** | **$51.66** | **$77.27** |
+| **Total** | **$51.67** | **$77.28** |
 
 Uncertainty allowance $15.50; recovery allowance $10.11; smoke test $1.00. Largest single reservation: $2.08
 (an A07 reconciliation). Profile `corpus15`: review at $50 and $70, hard stop $80; the sub-caps and the
