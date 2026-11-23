@@ -84,6 +84,14 @@ def agent_model(agent_id: str) -> AgentModel:
     )
 
 
+def level_cap(agent_id: str, payload: dict | None, default: int) -> int:
+    """The output cap for one request of an agent that sizes its cap by content level (A05: a full-text paper
+    yields far more findings than an abstract). pipeline.yaml -> agents.<id>.max_tokens_by_level."""
+    by_level = (load("pipeline")["agents"].get(agent_id) or {}).get("max_tokens_by_level") or {}
+    level = (payload or {}).get("content_level")
+    return int(by_level.get(level, default))
+
+
 def agent_candidates(agent_id: str) -> list[AgentModel]:
     """The agent's configured model, then its alternates (pipeline.yaml -> routing.alternates), in order.
     An alternate gives provider and model; other settings come from the agent unless it overrides them."""

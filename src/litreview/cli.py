@@ -57,7 +57,9 @@ def cmd_check(args) -> int:
 def cmd_new(args) -> int:
     seeds = [s for s in _read(args.seeds).splitlines() if s.strip()]
     run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family, budget_authority=args.budget_authority, corpus_mode=args.corpus_mode,
-                     scope_configuration=json.loads(_read(args.scope_configuration)) if args.scope_configuration else None)
+                     scope_configuration=json.loads(_read(args.scope_configuration)) if args.scope_configuration else None,
+                     profile=args.profile)
+    print(f"Created run {run_id}. Next: litreview run {run_id}")
     print(f"Created run {run_id}. Start it with:  litreview run {run_id}")
     return 0
 
@@ -66,6 +68,22 @@ def cmd_run(args) -> int:
     status = Run(args.run_id).run(until=args.until)
     print(status)
     return 0
+
+
+def cmd_submission_check(args) -> int:
+    try:
+        ready = Run(args.run_id).submission_check()
+    except ValueError as e:
+        print(e)
+        return 1
+    if ready["submission_ready"]:
+        print("Submission checklist: all items pass. Re-run `litreview run` to write the final declarations into "
+              "the manuscript files if you edited them after the export.")
+        return 0
+    print(f"NOT submission-ready: {len(ready['blockers'])} blocker(s)")
+    for b in ready["blockers"]:
+        print(f"  - {b}")
+    return 1
 
 
 def cmd_verify(args) -> int:
@@ -283,6 +301,8 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--scope-configuration", help="human scope configuration with parent CP1 hash; does not approve new checkpoints")
     n.add_argument("--budget-authority", help="reviewed cumulative evaluation-cost metadata; required for fixed pilot")
     n.add_argument("--corpus-mode", choices=["FIXED_CORPUS", "OPEN_CORPUS"], default="FIXED_CORPUS")
+    n.add_argument("--profile", help="spend profile from config/pipeline.yaml -> profiles (pilot, sample, manuscript); "
+                                     "recorded with the run, so its cap travels with it")
     n.set_defaults(fn=cmd_new)
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)
@@ -348,12 +368,22 @@ def main(argv: list[str] | None = None) -> int:
     au=sub.add_parser('authorize-stage',help='explicit human financial approval of the exact pending stage projection')
     au.add_argument('run_id');au.add_argument('stage',choices=['1','2'])
     au.add_argument('--fingerprint',required=True);au.add_argument('--reviewer',required=True);au.set_defaults(fn=cmd_authorize_stage)
+    sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
+    sc.add_argument("run_id")
+    sc.set_defaults(fn=cmd_submission_check)
     me = sub.add_parser("mark-evaluation-only", help="stamp a run's synthesis so no publication stage accepts it")
     me.add_argument("run_id")
     me.add_argument("--reason", required=True)
     me.set_defaults(fn=cmd_mark_evaluation_only)
     args = p.parse_args(argv)
-    return args.fn(args)
+    from .preflight import PreflightRefused, require_clean_endpoints
+    try:
+        if args.cmd not in ("check", "status", "costs"):   # reading is always allowed; nothing else starts
+            require_clean_endpoints()
+        return args.fn(args)
+    except PreflightRefused as exc:
+        print(f"REFUSED: {exc}")
+        return 2
 
 
 if __name__ == "__main__":

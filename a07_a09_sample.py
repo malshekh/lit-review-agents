@@ -31,8 +31,10 @@ def _run(run_id):
 
 def _paid_guard(run):
     """Only the routes the sample uses are reachable, and only for the sample's agents; no SDK retries."""
+    from litreview import preflight
     from litreview.llm import router
     from litreview.orchestrator import Pause
+    preflight.require_start(run.dir)   # ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN / OPENAI_BASE_URL set: refuse
     allowed = {"A07-SYN": "anthropic", "A08-OL": "openai", "A09-WRI": "anthropic"}
     originals = dict(router._PROVIDERS)
 

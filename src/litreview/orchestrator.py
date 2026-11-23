@@ -32,8 +32,8 @@ from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
 from .synthesis_job import JobStopped
 from .tools import cost_projection
-from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
-                    verification_scope)
+from .tools import (compliance, display_items, manuscript_export, references, span_check, submission, tags,
+                    themes, verification_scope)
 from .tools.fulltext import fetch_sections, fetch_verified_sections, verify_cached_source, FullTextUnavailable
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
@@ -59,8 +59,13 @@ class Pause(Exception):
 
 # ------------------------------------------------------------------ run setup
 def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified",
-            budget_authority=None, corpus_mode="FIXED_CORPUS", scope_configuration=None) -> str:
+            budget_authority=None, corpus_mode="FIXED_CORPUS", scope_configuration=None,
+            profile: str | None = None) -> str:
     from .evaluation_budget import prepare
+    profile = config.run_settings(profile).get("profile")   # an unknown profile is refused here, before any file
+    if profile == "manuscript" and corpus_mode == "FIXED_CORPUS":
+        raise ValueError("The manuscript profile is for the full run: use --corpus-mode OPEN_CORPUS. FIXED_CORPUS "
+                         "is the staged pilot, which keeps its own $35 authorization.")
     authority = prepare(budget_authority)
     if authority["authority"].get("corpus_mode", "FIXED_CORPUS") != corpus_mode:
         raise ValueError("Requested corpus mode differs from reviewed budget authority")
@@ -83,7 +88,8 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
         (d / "evaluation_budget.json").write_text(json.dumps(authority, indent=2), encoding="utf-8")
     Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {},
                            "execution_mode": "STAGED_PILOT" if corpus_mode == "FIXED_CORPUS" else "STANDARD",
-                           "corpus_policy_fingerprint": policy_fingerprint})
+                           "corpus_policy_fingerprint": policy_fingerprint,
+                           **({"profile": profile} if profile else {})})
     return run_id
 
 
@@ -356,7 +362,7 @@ class Run:
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
               reservation_key: str | None = None, repair_limit: int | None = None,
-              truncation_retries: int | None = None) -> dict:
+              truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
         from . import a06_batches
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
@@ -411,6 +417,8 @@ class Run:
         self._require_projection()
         self._check_worst_case_line(agent_id)
         m = self.route(agent_id, exclude_providers)
+        if "max_tokens" not in (overrides or {}):   # a cap sized to the content level (A05: abstract or full text)
+            m = dataclasses.replace(m, max_tokens=config.level_cap(agent_id, payload, m.max_tokens))
         if overrides:
             m = dataclasses.replace(m, **overrides)
         staged = pilot.enabled(self)
@@ -440,6 +448,7 @@ class Run:
                 extra["dispatch_guard"] = self._call_guard(agent_id, step, reservation_key)
             if repair_limit is not None:extra['repair_limit']=repair_limit
             if truncation_retries is not None:extra['truncation_retries']=truncation_retries
+            if repair_from is not None:extra['repair_from']=repair_from
             if pilot.enabled(self):
                 from .synthesis_registry import fingerprint
                 request_id=fingerprint([agent_id,payload,dataclasses.asdict(m),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
@@ -660,6 +669,8 @@ class Run:
                                                          "verified": True}, statement)
 
     def run(self, until: str | None = None) -> str:
+        from . import preflight
+        preflight.require_start(self.dir)   # redirected provider endpoints or an archived run: nothing starts
         st = self.state()
         corpus_policy.resolve(self)
         st["status"] = "RUNNING"
@@ -1070,10 +1081,18 @@ class Run:
                                       "materialization_stage": "extract before A05 dispatch",
                                       "verified_sources": self.load("source_readiness.json", {})})
             self._cp2_costs(quals)
+            self._retraction_check([r for r in self.load("records.json")], "cp2")
             self.pause_for_checkpoint("CP2")
         checkpoints.require_cp2_current(self.dir)
         self._framework_update(decision, "CP2")
         by_id = {r["record_id"]: r for r in self.load("records.json")}
+        report = self._retraction_check([by_id[rid] for rid in decision["selected_record_ids"]], "cp2_selection")
+        excused = decision.get("retraction_exceptions") or {}
+        retracted = [r["record_id"] for r in report["retracted"] if not str(excused.get(r["record_id"]) or "").strip()]
+        if retracted:
+            raise Pause(f"CP2 selection includes retracted paper(s) {', '.join(retracted)} (Crossref; see "
+                        "checkpoints/CP2_retractions.md). Deselect them, or record a reason for citing each one "
+                        'under "retraction_exceptions" in CP2_approved.json, then approve CP2 again.')
         quals = {q["record_id"]: q for q in self.load("qualifications.json")}
         corpus = []
         for rid in decision["selected_record_ids"]:
@@ -1097,6 +1116,30 @@ class Run:
                         "then approve CP2 again.")
         self.save("selected_corpus.json", corpus)
         return "extract"
+
+    def _retraction_check(self, records: list[dict], label: str) -> dict:
+        """Crossref retraction status of the given records (free; cached in data/crossref_cache). Written to
+        data/retraction_<label>.json and, for the researcher, checkpoints/CP2_retractions.md. A record that cannot
+        be checked (no DOI, DOI unknown, Crossref unreachable) is listed as unchecked, never assumed clean."""
+        report = references.retraction_report(records, os.environ.get("CROSSREF_MAILTO"),
+                                              cache_dir=self.data("crossref_cache"))
+        self.save(f"retraction_{label}.json", report)
+        self.prov.tool_run("retraction_check", label, {"checked": report["checked"],
+                                                       "retracted": [r["record_id"] for r in report["retracted"]],
+                                                       "concern": [r["record_id"] for r in report["concern"]],
+                                                       "unchecked": len(report["unchecked"])})
+        lines = [f"# Retraction check ({label})", "",
+                 f"Checked against Crossref: {report['checked']} of {len(records)} records.", "",
+                 "## Retracted", *[f"- {r['record_id']} ({r['doi']}): {r.get('title')}" for r in report["retracted"]],
+                 *([] if report["retracted"] else ["- none found"]), "",
+                 "## Expression of concern", *[f"- {r['record_id']} ({r['doi']}): {r.get('title')}"
+                                               for r in report["concern"]],
+                 *([] if report["concern"] else ["- none found"]), "",
+                 "## Not checked (treat as unknown, not as clean)",
+                 *[f"- {r['record_id']}: {r['reason']}" for r in report["unchecked"]],
+                 *([] if report["unchecked"] else ["- none"])]
+        (checkpoints.cp_dir(self.dir) / "CP2_retractions.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return report
 
     def _cp2_costs(self, quals: list[dict]) -> None:
         """Cost lines in CP2_review.md: the projection for every qualified paper, and per paper by level."""
@@ -2317,6 +2360,24 @@ class Run:
     def _bridge_cfg(self) -> dict:
         return self.cfg.get("bridge") or {}
 
+    def _journal_limits(self) -> dict:
+        return config.load("journal_scirev").get("limits") or {}
+
+    def submission_check(self) -> dict:
+        """Recompute final/submission_status.json after the researcher edited the declarations (no model call).
+        A finalised declaration is written into the exported manuscript's back matter by re-running the export."""
+        final_dir = self.dir / "final"
+        checks_path = final_dir / "export_checks.json"
+        if not checks_path.exists():
+            raise ValueError(f"run {self.id} has no export yet (final/export_checks.json): finish the run first")
+        checks = json.loads(checks_path.read_text(encoding="utf-8"))
+        ready = submission.status(final_dir, checks["reference_problems"], checks["table_problems"],
+                                  checks["compliance"], self.load("retraction_cp2_selection.json"))
+        (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
+        self.prov.tool_run("submission_status", "recheck", {"submission_ready": ready["submission_ready"],
+                                                            "blockers": len(ready["blockers"])})
+        return ready
+
     def _journal(self) -> dict:
         """Journal profile handed to A08/A09 (pilot limits applied). Sample mode narrows the word limit."""
         return pilot.journal(self)
@@ -2827,11 +2888,24 @@ class Run:
         proof = self._edit("PROOF", line, ps, "A12-EDI_proof", verification_findings=rv.get('findings', []))
         self._binding_gate(proof, ps, "proof")
         self._save_manuscript(proof, "m04_proof")
+        self._compliance_gate(proof, "A12-EDI PROOF")
         final = self._stamp(self._verify(proof, "FINAL", "A10-RV_final"), proof, ps)
         self.save("rv_final.json", final)
         if final.get("release_disposition") not in ("APPROVED", "APPROVED_WITH_MINOR_FINDINGS"):
             raise Pause(f"final verification: {final.get('release_disposition')} (see data/rv_final.json)")
         return "finalize"
+
+    def _compliance_gate(self, m: dict, where: str) -> None:
+        """A broken hard journal limit (tools/compliance.py) stops the run after editing: the edited manuscript is
+        saved for inspection, but it is not verified, exported or called complete over the limit."""
+        cited = tags.cited_records("\n".join(s.get("text_markdown", "") for s in m.get("sections", [])))
+        comp = compliance.check({**m, "references": cited,
+                                 "display_items": self.load("manuscript_plan.json", {}).get("display_items", [])})
+        self.save("compliance_latest.json", {"where": where, **comp})
+        if not comp["all_pass"]:
+            detail = "; ".join(f"{c['rule']} ({c['detail']})" for c in comp["checks"] if c["hard"] and not c["pass"])
+            raise Pause(f"{where}: the manuscript breaks journal limits: {detail}. See data/compliance_latest.json; "
+                        "revise at CP3/CP_LEDGER or edit the saved manuscript, then run again.")
 
     def stage_finalize(self, st: dict) -> str:
         m = self._current()
@@ -2847,24 +2921,45 @@ class Run:
         texts = [s["text_markdown"] for s in m["sections"]] + [" ".join(c for row in t["rows"] for c in row)
                                                                 for t in tables]
         numbers = references.number_citations(texts)
+        missing = sorted(rid for rid in numbers if rid not in corpus)
+        if missing:
+            raise Pause(f"export stopped: the manuscript cites record ID(s) not in the selected corpus: "
+                        f"{', '.join(missing)}. A citation to an unknown record cannot be numbered or referenced; "
+                        "correct the text (data/manuscripts) and run again.")
 
-        def cite(match):
-            ids = [p.strip().lstrip("@") for p in match.group(1).split(";")]
-            return "[" + ",".join(str(numbers[i]) for i in ids if i in numbers) + "]"
+        def render(text: str, where: str) -> str:
+            try:
+                return references.render_citations(text, numbers, where)
+            except references.UnknownCitation as exc:
+                raise Pause(f"export stopped: {exc}") from exc
 
         levels = {s.get("section_id"): s.get("level", 1) for s in plan.get("sections", [])}
         body = []
         for s in m["sections"]:
             t = tags.strip_tags(s["text_markdown"])
-            t = tags.CITE_RE.sub(cite, t)
+            t = render(t, f"section '{s['heading']}'")
             t = tags.DISPLAY_RE.sub(lambda x: ("Fig. " if x.group(1)[0] == "F" else "Table ") + x.group(1)[1:], t)
             body.append({"heading": s["heading"], "level": levels.get(s.get("section_id"), 1), "text": t})
-        refs = []
+        refs, ref_problems, retracted = [], {}, []
         for rid, n in sorted(numbers.items(), key=lambda x: x[1]):
-            r = corpus.get(rid, {})
-            meta = references.crossref_lookup(r["doi"], os.environ.get("CROSSREF_MAILTO")) if r.get("doi") else None
-            refs.append(f"{n}. " + (references.format_nature(meta) if meta else
-                                    f"{', '.join(r.get('authors', [])[:1])} et al. {r.get('title')}. {r.get('venue')} ({r.get('year')}). [CHECK FORMAT]"))
+            try:
+                text, problems, meta = references.build_reference(corpus[rid], os.environ.get("CROSSREF_MAILTO"),
+                                                                  cache_dir=self.data("crossref_cache"))
+            except references.UnknownCitation as exc:
+                raise Pause(f"export stopped: {exc}") from exc
+            if meta is not None and references.is_retracted(meta):
+                retracted.append(rid)
+            refs.append(f"{n}. {text}")
+            if problems:
+                ref_problems[str(n)] = [f"{rid}: {p}" for p in problems]
+        excused = (checkpoints.approved(self.dir, "CP2") or {}).get("retraction_exceptions") or {}
+        retracted = [rid for rid in retracted if not str(excused.get(rid) or "").strip()]
+        self.prov.tool_run("retraction_check", "export", {"cited": len(numbers), "retracted": retracted,
+                                                          "references_with_problems": len(ref_problems)})
+        if retracted:
+            raise Pause(f"export stopped: cited paper(s) {', '.join(retracted)} are retracted according to Crossref "
+                        "(retracted after CP2, or not checkable then). Remove the citations, or record a reason "
+                        'under "retraction_exceptions" in CP2_approved.json, then run again.')
         final_dir = self.dir / "final"
         final_dir.mkdir(exist_ok=True)
         src_items, out_items = self.dir / "data" / "display_items", final_dir / "display_items"
@@ -2877,18 +2972,19 @@ class Run:
             figures.append({"display_id": leg["display_id"], "legend": tags.strip_tags(leg["legend"]),
                             "image": out_items / b["image"] if b.get("image") else None, "brief": b.get("brief")})
         captions = {c["display_id"]: tags.strip_tags(c["caption"]) for c in m.get("table_captions", [])}
+        provenance_summary = self._provenance_summary()
+        declarations = submission.write_declaration_drafts(final_dir, provenance_summary)
         doc = {"title": m["title"], "abstract": m["abstract"], "keywords": m.get("keywords", []),
                "sections": body, "references": refs,
-               "back_matter": [("Author contributions and biographies", "[TO BE WRITTEN BY THE AUTHORS]"),
-                               ("AI use disclosure", "[TO BE WRITTEN BY THE AUTHORS — see provenance_summary.json]"),
-                               ("Competing interests", "[TO BE WRITTEN BY THE AUTHORS]")],
+               "back_matter": submission.back_matter(declarations),
                "figures": figures,
                "tables": [{"display_id": t["display_id"], "columns": t["columns"],
                            "caption": captions.get(t["display_id"], "[CAPTION TO BE WRITTEN]"),
-                           "rows": [[tags.CITE_RE.sub(cite, c) for c in row] for row in t["rows"]],
+                           "rows": [[render(c, f"table {t['display_id']}") for c in row] for row in t["rows"]],
                            "notes": ["NR, not reported. Values are taken from validated findings; "
                                      "check against the source papers before submission."]
-                                    + [tags.CITE_RE.sub(cite, n["text"]) for n in t.get("inconsistency_notes", [])]
+                                    + [render(n["text"], f"table {t['display_id']} note")
+                                       for n in t.get("inconsistency_notes", [])]
                                     + [tags.strip_tags(n) for n in t.get("notes", [])]
                                     + ([f"Left blank for the authors: {', '.join(t['unmapped_columns'])}."]
                                        if t.get("unmapped_columns") else [])}
@@ -2899,10 +2995,25 @@ class Run:
                                  "display_items": self.load("manuscript_plan.json").get("display_items", [])})
         (final_dir / "compliance.json").write_text(json.dumps(comp, indent=2), encoding="utf-8")
         (final_dir / "costs.txt").write_text(self.budget.summary_text(), encoding="utf-8")
-        (final_dir / "provenance_summary.json").write_text(json.dumps(self._provenance_summary(), indent=2),
+        (final_dir / "provenance_summary.json").write_text(json.dumps(provenance_summary, indent=2),
                                                            encoding="utf-8")
-        notify.send("complete", f"Run {self.id}: review draft complete",
-                    f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
+        exported = {d["display_id"]: d for d in doc["tables"]}
+        table_issues = submission.table_problems(
+            [{**t, "caption": exported[t["display_id"]]["caption"], "notes": exported[t["display_id"]]["notes"]}
+             for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
+        ready = submission.status(final_dir, ref_problems, table_issues, comp,
+                                  self.load("retraction_cp2_selection.json"))
+        export_checks = {"reference_problems": ref_problems, "table_problems": table_issues, "compliance": comp}
+        (final_dir / "export_checks.json").write_text(json.dumps(export_checks, indent=2), encoding="utf-8")
+        (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
+        self.prov.tool_run("submission_status", "export", {"submission_ready": ready["submission_ready"],
+                                                           "blockers": len(ready["blockers"])})
+        notify.send("complete", f"Run {self.id}: review draft exported ("
+                    + ("submission-ready" if ready["submission_ready"] else f"{len(ready['blockers'])} blockers") + ")",
+                    ("Submission checklist: all items pass.\n" if ready["submission_ready"] else
+                     "NOT submission-ready. Blockers (final/submission_status.json):\n- "
+                     + "\n- ".join(ready["blockers"][:40]) + "\n\n")
+                    + f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
                     f"Main text: {comp['main_text_words']} words, {comp['references']} references\n\n"
                     f"{self.budget.summary_text()}\n\n"
                     f"{verification_scope.detail_report_text(self._a10_detail_report())}",

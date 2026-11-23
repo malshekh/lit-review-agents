@@ -1,8 +1,17 @@
 """OpenAI Chat Completions, also used for Kimi (Moonshot exposes an OpenAI-compatible API).
 
 Docs: https://developers.openai.com/api/reference  ·  Kimi: https://platform.kimi.ai/docs
-Per-provider settings (base_url, key, whether to send temperature, JSON mode) come from
+Per-provider settings (base_url, key, whether to send temperature, JSON mode, reasoning effort) come from
 config/pipeline.yaml -> providers.
+
+Temperature: `temperature` is accepted by every function here and sent only when the provider's
+`send_temperature` is true. It is false for all three providers (their reasoning models reject a non-default
+value), so the per-agent temperature in pipeline.yaml is a provenance record, not a request field.
+
+Reasoning effort: an agent's `effort` is sent as `reasoning_effort` when the provider's
+`reasoning_effort.send` is true, and only if the value is in its `allowed` list. A value the provider does not
+accept raises before any request is built: Kimi K3.1 Pro runs at `max` when the field is omitted, so silently
+dropping it would buy the most expensive reasoning on every call.
 """
 from __future__ import annotations
 
@@ -17,14 +26,32 @@ _clients: dict[str, object] = {}
 def _get_client(provider: str):
     if provider not in _clients:
         from openai import OpenAI
+        from ..preflight import require_clean_endpoints
+        require_clean_endpoints()
         p = config.load("pipeline")["providers"][provider]
-        _clients[provider] = OpenAI(api_key=os.environ.get(p["key_env"]), base_url=p.get("base_url") or None)
+        _clients[provider] = OpenAI(api_key=os.environ.get(p["key_env"]),
+                                    base_url=p.get("base_url") or "https://api.openai.com/v1")
     return _clients[provider]
 
 
-def chat_params(system: str, user, model: str, max_tokens: int, temperature: float, provider: str = "openai") -> dict:
+def reasoning_effort(provider: str, effort: str | None) -> str | None:
+    """The `reasoning_effort` value to send for this provider, or None when it sends none."""
+    setting = (config.load("pipeline")["providers"][provider].get("reasoning_effort") or {})
+    if not setting.get("send") or not effort:
+        if setting.get("send") and setting.get("required"):
+            raise ValueError(f"{provider}: an effort is required on every call (providers.{provider}.reasoning_effort)")
+        return None
+    allowed = list(setting.get("allowed") or [])
+    if effort not in allowed:
+        raise ValueError(f"{provider} does not accept reasoning effort '{effort}'; allowed: {', '.join(allowed)}. "
+                         "Set the agent's `effort` in config/pipeline.yaml to one of them.")
+    return effort
+
+
+def chat_params(system: str, user, model: str, max_tokens: int, temperature: float, provider: str = "openai",
+                effort: str | None = None) -> dict:
     """The Chat Completions request body, shared by complete() and a batch line's `body`."""
-    # `effort` and `cache_system` are Claude settings. Ordinary OpenAI/Kimi calls
+    # `cache_system` is a Claude setting. Ordinary OpenAI/Kimi calls
     # preserve their existing implicit caching; marked A06 work units use an explicit shared boundary.
     p = config.load("pipeline")["providers"][provider]
     kwargs: dict = {
@@ -53,6 +80,9 @@ def chat_params(system: str, user, model: str, max_tokens: int, temperature: flo
         # No explicit breakpoint + explicit-only mode disables caching for the control.
     if p.get("send_temperature", False):
         kwargs["temperature"] = temperature
+    sent_effort = reasoning_effort(provider, effort)
+    if sent_effort:
+        kwargs["reasoning_effort"] = sent_effort
     if p.get("json_mode", True):
         kwargs["response_format"] = {"type": "json_object"}
     return kwargs
@@ -60,9 +90,10 @@ def chat_params(system: str, user, model: str, max_tokens: int, temperature: flo
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
              provider: str = "openai", effort: str | None = None, cache_system: bool = False,
-             cache_ttl: str = "5m") -> LLMResponse:
+             cache_ttl: str = "5m", trace: dict | None = None) -> LLMResponse:
+    # `trace` identifies the agent and run for launchers that wrap this route; it is not sent to the provider.
     resp = _get_client(provider).chat.completions.create(**chat_params(system, user, model, max_tokens,
-                                                                       temperature, provider))
+                                                                       temperature, provider, effort))
     return parse_completion(resp, provider, model)
 
 

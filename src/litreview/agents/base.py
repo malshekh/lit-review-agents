@@ -150,7 +150,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
               budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None,
               schema_file: str | None = None, reservation_key: str | None = None,
               repair_limit: int | None = None, dispatch_guard=None,
-              truncation_retries: int | None = None) -> dict:
+              truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
     `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
     overrides its output schema (A07 job turns).
@@ -160,7 +160,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     (loops.max_truncation_retries, truncation_retry_factor, max_output_tokens_ceiling). Schema failure: the saved
     reply is repaired from itself (repair_message), not by resending the task input. `dispatch_guard(attempt,
     system, message, model)` runs before every send, the retry and the repair included, and returns the
-    reservation that send is held under."""
+    reservation that send is held under. `repair_from=(saved reply, validator error)`: skip the primary call
+    and repair that saved reply (a batch item that came back invalid; `litreview repair-import --model`)."""
     if agent_id not in AGENTS:
         raise AgentError(f"Unknown agent {agent_id}")
     m = model or config.agent_model(agent_id)
@@ -183,6 +184,18 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     repairing: dict | None = None   # set once the call is a repair of a saved reply
     last_error = ""
     attempt = 0
+    if repair_from is not None:
+        bad_text, last_error = repair_from
+        try:
+            before = parse_json(bad_text)
+        except json.JSONDecodeError:
+            before = None
+        repairing = {"error": last_error, "before": before, "source": "saved reply"}
+        call_system, message = REPAIR_SYSTEM, repair_message(agent_id, schema_file, bad_text, last_error)
+        call_model = dataclasses.replace(m, max_tokens=min(int(m.max_tokens), len(bad_text.encode("utf-8")) // 2 + 4000),
+                                         cache_system=False, effort=_repair_effort(m))
+        max_repairs = 0   # this call is the repair
+        attempt = 1       # raw0 is the saved reply
     while True:
         if reservation_key:
             budget.ensure_headroom(reservation_key)

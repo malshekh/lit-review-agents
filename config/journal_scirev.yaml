@@ -1,6 +1,8 @@
 # Scientific Reviews (Nature Portfolio) — submission limits
 # Source: https://www.nature.com/scirev/author-instructions/submission-guidelines
-# Checked: 2026-10-16. Re-check before submission; journal policies change.
+# Checked: 2026-11-23 (re-read the live page; title, abstract, keywords, display items, legend, table, footnote
+# and reference rules unchanged since 2026-10-16). The page words the main-text limit as "roughly 5,000 words";
+# the pipeline enforces 5,000 as a hard limit by the researcher's choice. Re-check before submission.
 
 journal: Scientific Reviews
 article_type: narrative_review   # the only type the journal accepts

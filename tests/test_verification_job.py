@@ -287,6 +287,7 @@ def test_line_verification_is_preserved_before_proof_or_scientific_hold(tmp_path
     from bridge_fixtures import bridge_stubs
     bridge_stubs(run,monkeypatch)   # A10/A12 sequencing only; the bridge's own checks are tested in test_bridge.py
     monkeypatch.setattr(run,'_current',lambda:{'sections':[]})
+    monkeypatch.setattr(run,'_compliance_gate',lambda *a:None)   # journal limits are tested in test_submission_integrity.py
     line_report={'finding_severity':severity,'findings':[{'code':'EVALUATION_CORRECTION'}],
                  'verification_fingerprint':'line-version'}
     monkeypatch.setattr(run,'_maybe_verify',lambda *a,**k:line_report)

@@ -40,7 +40,7 @@ def request(provider: str, custom_id: str, system: str, user, model: str, max_to
             system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl)}
     if provider == "openai":
         return {"custom_id": custom_id, "method": "POST", "url": "/v1/chat/completions",
-                "body": openai_compatible.chat_params(system, user, model, max_tokens, temperature, provider)}
+                "body": openai_compatible.chat_params(system, user, model, max_tokens, temperature, provider, effort)}
     raise ValueError(f"no batch support for provider '{provider}'")
 
 

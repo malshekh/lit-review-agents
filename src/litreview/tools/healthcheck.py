@@ -37,6 +37,13 @@ def config_lines() -> tuple[list[str], bool, set[str]]:
             gaps[model] = missing
     for model, missing in sorted(gaps.items()):
         lines.append(f"  {INFO} {model:18s} no {' or '.join(missing)} rate: billed at the input price until set")
+    from .. import preflight
+    for problem in preflight.price_problems():
+        lines.append(f"  {BAD} {problem}")
+        ok = False
+    for problem in preflight.endpoint_problems():
+        lines.append(f"  {BAD} {problem}: the pipeline refuses to start until it is cleared")
+        ok = False
     from .. import model_record
     blocked = model_record.blocked()
     for family, models in sorted(model_record.summary().items()):
@@ -105,7 +112,8 @@ def ping_llms(providers: set[str]) -> tuple[list[str], bool]:
     for m, label in targets:
         try:
             r = complete(m.provider, system="Reply with the JSON object {\"ok\": true} and nothing else.",
-                         user="ping", model=m.model, max_tokens=200, temperature=0.0, trace={"agent": "healthcheck"})
+                         user="ping", model=m.model, max_tokens=2000, temperature=0.0, effort=m.effort,
+                         trace={"agent": "healthcheck"})   # the agent's own effort: an effort value the provider rejects fails here, for free
             good = "ok" in r.text
             lines.append(f"  {OK if good else BAD} {m.provider:9s} {m.model:18s} replied "
                          f"({r.input_tokens} in / {r.output_tokens} out tokens){label}")

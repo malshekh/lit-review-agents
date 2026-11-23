@@ -69,3 +69,15 @@ def _no_network(monkeypatch):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "projection_guard: run with the CP2 cost-projection spend guard on")
+
+
+@pytest.fixture(autouse=True)
+def _stable_environment(monkeypatch):
+    """Tests never depend on the day they run or on the shell they run in: the price-age gate sees a fixed date,
+    Crossref answers "unknown DOI" unless a test installs its own lookup, and the variables that redirect provider
+    SDKs are cleared (preflight tests set them deliberately)."""
+    from litreview.tools import references
+    monkeypatch.setenv("LITREVIEW_TEST_TODAY", "2026-11-23")
+    for name in ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "OPENAI_BASE_URL", "LITREVIEW_PROFILE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(references, "crossref_lookup", lambda *a, **k: None)
