@@ -447,6 +447,9 @@ class Run:
                           "repair_limit": int(self.cfg["loops"].get("reserved_call_repairs", 0))}
                          if reservation_key else {})
                 extra["dispatch_guard"] = self._call_guard(agent_id, step, reservation_key)
+                from .job_ledger import Ledger
+                extra["ledger"] = Ledger(self.dir)
+                extra["request_id"] = receipt_id
             if repair_limit is not None:extra['repair_limit']=repair_limit
             if truncation_retries is not None:extra['truncation_retries']=truncation_retries
             if repair_from is not None:extra['repair_from']=repair_from
@@ -494,6 +497,11 @@ class Run:
                             schema_file=schema_file, **extra)
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
+            raise
+        except Exception as e:   # noqa: BLE001 — only to turn one named state into a pause; everything else re-raises
+            from .job_ledger import AmbiguousDispatch
+            if isinstance(e, AmbiguousDispatch):
+                raise Pause(str(e)) from e
             raise
         if pilot.enabled(self):
             requests=self.load('pilot_requests.json',{})
@@ -671,7 +679,14 @@ class Run:
 
     def run(self, until: str | None = None) -> str:
         from . import preflight
+        from .job_ledger import RunLock
         preflight.require_start(self.dir)   # redirected provider endpoints or an archived run: nothing starts
+        with RunLock(self.dir) as lock:     # two processes never dispatch for one run
+            if lock.took_over:
+                self.prov.tool_run("run_lock_takeover", "run", lock.took_over)
+            return self._run(until)
+
+    def _run(self, until: str | None = None) -> str:
         st = self.state()
         corpus_policy.resolve(self)
         st["status"] = "RUNNING"

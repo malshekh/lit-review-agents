@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -125,6 +126,58 @@ def changed_paths(before, after, path: str = "$", limit: int = 200) -> list[str]
     return out
 
 
+ID_RE = re.compile(r"\b[A-Z]{1,4}\d+(?::[A-Z]{1,3}\d+)?\b|\[@[^\]]+\]")
+NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])\d+(?:[.,]\d+)*(?:\s?%)?")
+
+
+def _tokens(obj) -> tuple[set[str], set[str]]:
+    """(identifiers, numbers) found in every string of a JSON document, keys included."""
+    ids: set[str] = set()
+    numbers: set[str] = set()
+
+    def walk(x):
+        if isinstance(x, dict):
+            for k, v in x.items():
+                walk(str(k))
+                walk(v)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v)
+        elif isinstance(x, str):
+            ids.update(ID_RE.findall(x))
+            numbers.update(n.replace(" ", "") for n in NUMBER_RE.findall(ID_RE.sub(" ", x)))
+        elif isinstance(x, (int, float)) and not isinstance(x, bool):
+            numbers.add(str(x))
+    walk(obj)
+    return ids, numbers
+
+
+def preservation_problems(before, after) -> list[str]:
+    """What a format repair lost. A repair may change structure, never evidence: every identifier (finding,
+    record, proposition, section, citation) and every number of the original must still be present. A repair
+    that drops one is rejected: the task was too large for its limits and must be resized, not shortened."""
+    ids_before, numbers_before = _tokens(before)
+    ids_after, numbers_after = _tokens(after)
+    problems = []
+    lost = sorted(ids_before - ids_after)
+    if lost:
+        problems.append(f"{len(lost)} identifier(s) dropped: {', '.join(lost[:12])}")
+    gone = sorted(numbers_before - numbers_after)
+    if gone:
+        problems.append(f"{len(gone)} numeric value(s) dropped or altered: {', '.join(gone[:12])}")
+    invented = sorted(ids_after - ids_before)
+    if invented:
+        problems.append(f"{len(invented)} identifier(s) not in the original: {', '.join(invented[:12])}")
+    return problems
+
+
+def _not_sent(exc: Exception) -> bool:
+    """True when the provider definitely rejected the request before running it (HTTP 4xx other than a timeout):
+    nothing was generated and nothing billed. Anything else (timeout, dropped connection, 5xx) is ambiguous."""
+    status = getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+    return isinstance(status, int) and 400 <= status < 500 and status != 408
+
+
 def _schema_text(agent_id: str, schema_file: str | None) -> str:
     return _read(SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file))
 
@@ -150,7 +203,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
               budget: BudgetTracker, provenance: ProvenanceLog, model: config.AgentModel | None = None,
               schema_file: str | None = None, reservation_key: str | None = None,
               repair_limit: int | None = None, dispatch_guard=None,
-              truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
+              truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None,
+              ledger=None, request_id: str | None = None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
     `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
     overrides its output schema (A07 job turns).
@@ -196,32 +250,93 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                                          cache_system=False, effort=_repair_effort(m))
         max_repairs = 0   # this call is the repair
         attempt = 1       # raw0 is the saved reply
+    # A restart: was a call of this step in flight, or answered but not yet accounted? (job_ledger.py)
+    recovered = None
+    if ledger is not None and repair_from is None:
+        from ..job_ledger import AmbiguousDispatch
+        kind, event = ledger.recovery(step)
+        if kind == "AMBIGUOUS":
+            raise AmbiguousDispatch(
+                f"{agent_id} ({step}): a request was sent at {event['time']} and no reply was saved. It may have "
+                "completed and been billed. It is not resent: check the provider's usage page, then run "
+                f"`litreview resolve-dispatch {Path(run_dir).name} {step} --billed|--not-billed --by NAME --note TEXT`.")
+        if kind in ("RESUME_SAVED", "RESUME_ACCOUNTED"):
+            saved = ledger.load_response(step, event["attempt"])
+            request = saved.get("request") or {}
+            usable = request.get("kind") != "REPAIR" and request.get("request_id") == request_id and request_id is not None
+            if kind == "RESUME_SAVED" and not usable:
+                # paid for, but it answers a different request (or was a repair): log its cost, do not use it
+                budget.record(agent_id, saved["provider"], saved["model"], saved["input_tokens"], saved["output_tokens"],
+                              step=step, cached_input_tokens=saved["cached_input_tokens"],
+                              cache_write_tokens=saved["cache_write_tokens"],
+                              cache_write_1h_tokens=saved["cache_write_1h_tokens"],
+                              **({"reservation_key": request["reservation"]}
+                                 if request.get("reservation") in budget.reservations() else {}))
+                if request.get("reservation") and request["reservation"] != reservation_key:
+                    budget.release(request["reservation"])
+                ledger.record(step, event["attempt"], "ACCOUNTED", note="recovered; reply not reusable for this request")
+            elif usable:
+                recovered, attempt = {**saved, "accounted": kind == "RESUME_ACCOUNTED"}, event["attempt"]
+                call_model = dataclasses.replace(m, max_tokens=int(request.get("max_tokens") or m.max_tokens))
     while True:
-        if reservation_key:
-            budget.ensure_headroom(reservation_key)
+        if recovered is not None:
+            from ..llm.base import LLMResponse
+            resp = LLMResponse(**{k: recovered[k] for k in ("text", "provider", "model", "input_tokens", "output_tokens",
+                                                            "stop_reason", "refusal_category", "cached_input_tokens",
+                                                            "cache_write_tokens", "cache_write_1h_tokens")})
+            started, held = None, recovered["request"].get("reservation") or reservation_key
+            guarded = held != reservation_key and held in budget.reservations()
+            already_accounted = recovered["accounted"]
+            provenance.tool_run("recovered_saved_response", step, {"attempt": attempt, "resent": False,
+                                                                   "already_accounted": already_accounted})
+            recovered = None
         else:
-            budget.ensure_headroom()
-        started = time.time()
-        held = dispatch_guard(attempt, call_system, message, call_model) if dispatch_guard else reservation_key
-        try:
-            resp = complete(call_model.provider, system=call_system, user=message, model=call_model.model,
-                            max_tokens=call_model.max_tokens, temperature=call_model.temperature,
-                            effort=call_model.effort, cache_system=call_model.cache_system,
-                            cache_ttl=call_model.cache_ttl,
-                            trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
-                                   "attempt": attempt, "prompt_version": version})
-        except Exception as exc:  # noqa: BLE001 — provider SDKs raise unrelated families; all end the call with a status
-            provenance.agent_call(agent_id, step, call_model.model, version, "", "FAILED")
-            raise AgentError(f"{agent_id} ({step}): API error: {type(exc).__name__}: {str(exc)[:400]}") from exc
-        budget.record(agent_id, resp.provider, resp.model, resp.input_tokens, resp.output_tokens, step=step,
-                      cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens,
-                      cache_write_1h_tokens=resp.cache_write_1h_tokens, started_at=started,
-                      cache_requested=call_model.provider == "anthropic" and (
-                          call_model.cache_system or any(p["cache"] for p in message)),
-                      prompt_chars=len(call_system) + sum(len(p["text"]) for p in message),
-                      **({"reservation_key": held} if dispatch_guard else {}))
-        if dispatch_guard and held != reservation_key:
+            if reservation_key:
+                budget.ensure_headroom(reservation_key)
+            else:
+                budget.ensure_headroom()
+            started = time.time()
+            already_accounted = False
+            if ledger is not None:
+                ledger.record(step, attempt, "PREPARED", model=call_model.model, max_tokens=call_model.max_tokens,
+                              kind="REPAIR" if repairing is not None else "PRIMARY", request_id=request_id)
+            held = dispatch_guard(attempt, call_system, message, call_model) if dispatch_guard else reservation_key
+            guarded = bool(dispatch_guard) and held != reservation_key
+            if ledger is not None:
+                ledger.record(step, attempt, "RESERVED", reservation=held)
+                ledger.record(step, attempt, "DISPATCHED", reservation=held)   # before the send: a crash here is ambiguous
+            try:
+                resp = complete(call_model.provider, system=call_system, user=message, model=call_model.model,
+                                max_tokens=call_model.max_tokens, temperature=call_model.temperature,
+                                effort=call_model.effort, cache_system=call_model.cache_system,
+                                cache_ttl=call_model.cache_ttl,
+                                trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
+                                       "attempt": attempt, "prompt_version": version})
+            except Exception as exc:  # noqa: BLE001 — provider SDKs raise unrelated families; all end the call with a status
+                provenance.agent_call(agent_id, step, call_model.model, version, "", "FAILED")
+                if _not_sent(exc):   # rejected before it ran: nothing billed, so the hold is given back
+                    if ledger is not None:
+                        ledger.record(step, attempt, "API_ERROR", error=f"{type(exc).__name__}: {str(exc)[:200]}")
+                    if guarded:
+                        budget.release(held)
+                # otherwise the ledger stays at DISPATCHED: completion is unknown and the hold stays
+                raise AgentError(f"{agent_id} ({step}): API error: {type(exc).__name__}: {str(exc)[:400]}") from exc
+            if ledger is not None:   # the reply is on disk before anything else can fail
+                ledger.save_response(step, attempt, resp, {"kind": "REPAIR" if repairing is not None else "PRIMARY",
+                                                           "max_tokens": call_model.max_tokens, "reservation": held,
+                                                           "request_id": request_id})
+        if not already_accounted:
+            budget.record(agent_id, resp.provider, resp.model, resp.input_tokens, resp.output_tokens, step=step,
+                          cached_input_tokens=resp.cached_input_tokens, cache_write_tokens=resp.cache_write_tokens,
+                          cache_write_1h_tokens=resp.cache_write_1h_tokens, started_at=started,
+                          cache_requested=call_model.provider == "anthropic" and (
+                              call_model.cache_system or any(p["cache"] for p in message)),
+                          prompt_chars=len(call_system) + sum(len(p["text"]) for p in message),
+                          **({"reservation_key": held} if (dispatch_guard or guarded) and held else {}))
+        if guarded:
             budget.release(held)
+        if ledger is not None and not already_accounted:
+            ledger.record(step, attempt, "ACCOUNTED")
         if getattr(resp, "provider_response_metadata", None) is not None:
             receipt = {**resp.provider_response_metadata, "private_raw_response_path": resp.raw_provider_response_path}
             (out_dir / f"{step}.provider.receipt{attempt}.json").write_text(json.dumps(receipt, indent=2),
@@ -230,6 +345,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         if resp.stop_reason == "refusal":
             # a policy decline, not a formatting error: never retried (same model, same request, same answer)
             provenance.agent_call(agent_id, step, resp.model, version, "", "REFUSED")
+            if ledger is not None:
+                ledger.record(step, attempt, "REFUSED", category=resp.refusal_category)
             raise RefusalError(
                 f"{agent_id} ({step}): {resp.model} declined the request (category: "
                 f"{resp.refusal_category or 'unspecified'}). Recorded for this topic family; the next run "
@@ -242,6 +359,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                  "partial_output": f"{step}.raw{attempt}.txt", "partial_chars": len(resp.text)}, indent=2),
                 encoding="utf-8")
             larger = min(int(cap * factor + 0.999), ceiling)
+            if ledger is not None:
+                ledger.record(step, attempt, "TRUNCATED", max_tokens=cap)
             if truncations_left > 0 and larger > cap:
                 truncations_left -= 1
                 provenance.tool_run("truncation_retry", step, {"attempt": attempt, "max_tokens": cap,
@@ -257,6 +376,8 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             validate(agent_id, output, schema_file)
         except (json.JSONDecodeError, jsonschema.ValidationError) as exc:
             last_error = str(exc)[:2000]
+            if ledger is not None:
+                ledger.record(step, attempt, "INVALID", error=last_error[:300])
             if max_repairs <= 0:
                 break
             max_repairs -= 1
@@ -272,6 +393,18 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             call_model = dataclasses.replace(m, max_tokens=room, cache_system=False, effort=_repair_effort(m))
             attempt += 1
             continue
+        if repairing is not None and repairing["before"] is not None:
+            lost = preservation_problems(repairing["before"], output)
+            if lost:   # a repair that loses evidence is not a repair
+                (out_dir / f"{step}.repair.rejected.json").write_text(json.dumps(
+                    {"problems": lost, "repair_reply": f"{step}.raw{attempt}.txt", "original": repairing["source"]},
+                    indent=2), encoding="utf-8")
+                if ledger is not None:
+                    ledger.record(step, attempt, "REPAIR_REJECTED", problems=lost)
+                last_error = ("the format repair was rejected because it did not preserve the original's content ("
+                              + "; ".join(lost) + "). The original reply is kept. The task is too large for its "
+                              "output limits: resize it (smaller packets) or repair it by hand with `litreview repair-import`.")
+                break
         if repairing is not None:
             audit = {"repaired_from": repairing["source"], "validator_error": repairing["error"],
                      "changed_paths": (changed_paths(repairing["before"], output)
@@ -281,9 +414,15 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                                                                encoding="utf-8")
             provenance.tool_run("json_repair", step, {"changed_paths": len(audit["changed_paths"]),
                                                       "audit": f"outputs/{step}.repair.audit.json"})
-        out_file.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+        if ledger is not None:
+            ledger.record(step, attempt, "VALIDATED")
+        tmp = out_file.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps(output, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, out_file)   # atomic: an accepted output is whole or absent
         provenance.agent_call(agent_id, step, m.model, version,
                               str(out_file.relative_to(run_dir)), output.get("status", "UNKNOWN"))
+        if ledger is not None:
+            ledger.record(step, attempt, "COMMITTED")
         return output
 
     provenance.agent_call(agent_id, step, m.model, version, "", "FAILED")

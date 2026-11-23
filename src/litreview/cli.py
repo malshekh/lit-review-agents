@@ -141,6 +141,34 @@ def cmd_revise_framework(args) -> int:
     return 0
 
 
+def cmd_resolve_dispatch(args) -> int:
+    from .job_ledger import Ledger
+    run = Run(args.run_id)
+    ledger = Ledger(run.dir)
+    if not args.step:
+        rows = ledger.ambiguous()
+        for e in rows:
+            print(f"  {e['step']}  sent {e['time']}  (attempt {e['attempt']}, reservation {e.get('reservation')})")
+        print(f"{len(rows)} request(s) in flight with no saved reply." if rows else "No request is in an ambiguous state.")
+        return 0
+    if args.billed == args.not_billed:
+        print("Say what the provider's usage page shows: --billed or --not-billed")
+        return 1
+    try:
+        event = ledger.resolve(args.step, args.billed, args.by or "", args.note or "")
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    run.prov.human_decision("DISPATCH_RESOLVED", {"step": args.step, "billed": args.billed, "by": args.by}, args.note)
+    if event.get("reservation") and event["reservation"] in run.budget.reservations():
+        if args.billed:
+            print(f"The hold {event['reservation']} stays: the provider billed a reply this run never received. Record "
+                  "the billed amount with scripts/reconcile_billing.py; the call will be sent again when you run.")
+        run.budget.release(event["reservation"])
+    print(f"Recorded. `litreview run {args.run_id}` will send {args.step} again.")
+    return 0
+
+
 def cmd_submission_check(args) -> int:
     try:
         ready = Run(args.run_id).submission_check()
@@ -479,6 +507,12 @@ def main(argv: list[str] | None = None) -> int:
     rf.add_argument("--by", required=True)
     rf.add_argument("--reason", required=True)
     rf.set_defaults(fn=cmd_revise_framework)
+    rd = sub.add_parser("resolve-dispatch", help="list, or settle, a request that was in flight when a run stopped")
+    rd.add_argument("run_id")
+    rd.add_argument("step", nargs="?")
+    rd.add_argument("--billed", action="store_true"); rd.add_argument("--not-billed", action="store_true")
+    rd.add_argument("--by"); rd.add_argument("--note")
+    rd.set_defaults(fn=cmd_resolve_dispatch)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

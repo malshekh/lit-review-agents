@@ -184,26 +184,30 @@ def test_reconciliation_sees_every_packet_the_global_index_and_the_originals_it_
 
 
 def test_reconciliation_can_retrieve_originals_and_is_bounded():
+    many = [_finding(f"R{r:04d}", n) for r in range(1, 21) for n in range(1, 5)]      # 80 findings
+    s6 = {**S, "max_input_tokens": 30000, "output_tokens_per_finding": 2400}          # six findings per packet
+    base = {"mode": "PER_THEME", "theme": "T4"}
+    wanted = []
+
+    def missing(payload):
+        have = {f["finding_id"] for f in payload["validated_findings"]}
+        return next(f["finding_id"] for f in many if f["finding_id"] not in have)
+
     def ask_once(payload, n):
         if payload["theme_reconcile"]["retrieval_round"] == 0:
-            have = {f["finding_id"] for f in payload["validated_findings"]}
-            wanted.append(next(f["finding_id"] for f in FINDINGS if f["finding_id"] not in have))
-            return {"mode": "PER_THEME", "theme": "T4", "status": "COMPLETE", "conflicts": [], "independence": [],
-                    "evidence_reach": {}, "retrieval_requests": wanted[-1:]}
-    wanted = []
+            wanted.append(missing(payload))
+            return {**base, "status": "COMPLETE", "conflicts": [], "independence": [], "evidence_reach": {},
+                    "retrieval_requests": wanted[-1:]}
     call, seen = _theme_model(ask_once)
-    theme_paging.run("T4", FINDINGS, {"mode": "PER_THEME", "theme": "T4"}, S, 24000, 500, call)
+    theme_paging.run("T4", many, base, s6, 24000, 500, call)
     assert seen[-1][0] == "reconcile_r1" and wanted[0] in {f["finding_id"] for f in seen[-1][1]["validated_findings"]}
 
     def always(payload, n):
-        have = {f["finding_id"] for f in payload["validated_findings"]}
-        want = next(f["finding_id"] for f in many if f["finding_id"] not in have)
-        return {"mode": "PER_THEME", "theme": "T4", "status": "COMPLETE", "conflicts": [], "independence": [],
-                "evidence_reach": {}, "retrieval_requests": [want]}
-    many = [_finding(f"R{r:04d}", n) for r in range(1, 21) for n in range(1, 5)]
+        return {**base, "status": "COMPLETE", "conflicts": [], "independence": [], "evidence_reach": {},
+                "retrieval_requests": [missing(payload)]}
     call, _ = _theme_model(always)
     with pytest.raises(theme_paging.PagingError, match="after 2 retrieval rounds"):
-        theme_paging.run("T4", many, {"mode": "PER_THEME", "theme": "T4"}, S, 24000, 500, call)
+        theme_paging.run("T4", many, base, s6, 24000, 500, call)
 
 
 def test_a_conflict_found_in_a_packet_cannot_silently_disappear():
