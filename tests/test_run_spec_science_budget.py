@@ -104,8 +104,8 @@ def test_plan_must_use_the_outline_and_unplaced_evidence_goes_to_a_queue():
 def test_a_new_run_stores_the_specification_and_seeds_the_search_with_the_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
     monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
-    with pytest.raises(ValueError, match="both the outline and the corpus manifest"):
-        orch.new_run("topic", outline=outline(), corpus_mode="OPEN_CORPUS")
+    with pytest.raises(ValueError, match="a corpus manifest needs an outline"):
+        orch.new_run("topic", corpus_manifest=manifest(), corpus_mode="OPEN_CORPUS")
     with pytest.raises(ValueError, match="OPEN_CORPUS"):
         orch.new_run("topic", outline=outline(), corpus_manifest=manifest())
     bad = manifest()

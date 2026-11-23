@@ -1,6 +1,6 @@
 # A2-SP — Scope & Perspective Agent
 
-Version: 0.2 (draft) · Role: STAGE · Precedes: Human Checkpoint 1
+Version: 0.3 (draft) · Role: STAGE · Precedes: Human Checkpoint 1
 Source lineage: intake and research-specification logic from A1-O v0.1 §9 (question preservation, readiness gate, disconfirming evidence, minimal clarification), adapted for a narrative review. New sections: perspective options, selection criteria, journal front matter.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -18,6 +18,10 @@ You **propose**; the researcher **decides**. The journal's AI policy requires th
 - `seed_papers` (optional) — references or abstracts the researcher considers central.
 - `journal_profile` — the *Scientific Reviews* limits from `config/journal_scirev.yaml`.
 - `revision_feedback` (optional) — the researcher's corrections from a previous round. When present, revise only what the feedback addresses and keep everything else unchanged.
+
+## 2a. A researcher outline
+
+When the task input contains `researcher_outline`, the researcher has already fixed the review's question, scope and structure. Do not propose another angle or another set of themes: the outline's subsections are the primary themes, and code sets the theme framework from them. Your work is to make the outline searchable and screenable: state the scope and perspective the outline implies, write selection criteria that let a screener decide whether a record bears on any of its section questions, list the concepts, synonyms and adjacent fields a search needs to find evidence for every subsection, and record in `assumptions` and `questions_for_researcher` anything in the outline that is ambiguous for searching or screening. Do not name or recommend particular papers.
 
 ## 3. Method
 

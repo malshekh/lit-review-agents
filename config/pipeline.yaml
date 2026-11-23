@@ -28,6 +28,22 @@ profiles:
     spend_review_points_usd: [120.0, 150.0]
     stage_caps_usd: derived
     recovery_allowance: 0.15
+  pilot7:        # paid end-to-end pilot: the pipeline finds its own 7 papers from the outline (docs/pilot7)
+    target_usd: 30.0
+    spend_cap_usd: 40.0
+    spend_review_points_usd: [20.0, 30.0]
+    stage_caps_usd: derived
+    recovery_allowance: 0.25
+    smoke_test_allowance_usd: 1.0
+    overrides:                         # this profile's settings; other runs are unaffected (config.effective)
+      run_spec: {max_papers: 7, max_full_text: null, first_tranche: {full_text: 1, abstract: 2}, chapter_tolerance: 0.15}
+      extraction: {full_text_tiers: null}     # full text for every selected paper that has an open-access copy
+      validation: {instability_tiers: null}   # retest every paper with a blocked finding: 7 papers make this affordable
+      loops: {max_critique_cycles: 2}         # one revision, then a second critique that can accept it
+      retrieval:
+        max_records_total: 150
+        max_records_per_family: 60
+        citation_expansion: {enabled: true, depth: 1, max_per_seed: 15, max_total: 40}
   corpus15:      # the outlined run: 5 full texts + 10 abstracts (scripts/plan_budget.py prints its plan)
     target_usd: 70.0
     spend_cap_usd: 80.0

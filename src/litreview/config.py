@@ -44,6 +44,24 @@ def run_settings(recorded: str | None = None) -> dict:
             "spend_review_usd": points[0] if points else None}
 
 
+def _merge(base, over):
+    if isinstance(base, dict) and isinstance(over, dict):
+        return {k: _merge(base.get(k), v) if k in base else v for k, v in over.items()} | \
+               {k: v for k, v in base.items() if k not in over}
+    return over
+
+
+def effective(recorded: str | None = None) -> dict:
+    """pipeline.yaml with the active profile's `overrides` merged in (a copy; the loaded config is not changed).
+    A run reads its settings through this, so a profile such as pilot7 changes that run and nothing else."""
+    import copy
+    cfg = copy.deepcopy(load("pipeline"))
+    profiles = cfg.get("profiles") or {}
+    name = profile_name(recorded) if profiles else None
+    over = (profiles.get(name) or {}).get("overrides") if name else None
+    return _merge(cfg, over) if over else cfg
+
+
 def stage_group(agent_id: str) -> str | None:
     return next((g for g, agents in STAGE_GROUPS.items() if agent_id in agents), None)
 

@@ -187,6 +187,33 @@ def require_cp2_current(run_dir: Path) -> None:
             raise DecisionIncomplete("CP2: source/review inputs changed; regenerate and review before approval")
 
 
+def prefill_cp2(run_dir: Path, proposed: dict[str, str], limit: int) -> None:
+    """Mark the proposed selection in CP2_records.csv (rows the researcher has not touched only) and explain it."""
+    d = cp_dir(run_dir)
+    path = d / "CP2_records.csv"
+    rows = list(csv.DictReader(open(path, encoding="utf-8")))
+    touched = any(r["select"].strip() for r in rows)
+    fields = list(rows[0].keys()) if rows else CP2_COLUMNS
+    if "proposed_reason" not in fields:
+        fields.append("proposed_reason")
+    for r in rows:
+        r["proposed_reason"] = proposed.get(r["record_id"], "")
+        if not touched and r["record_id"] in proposed:
+            r["select"] = "Y"
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    with open(d / "CP2_review.md", "a", encoding="utf-8") as fh:
+        fh.write("\n\n## Proposed selection\n\n"
+                 f"This run allows at most {limit} papers. The pipeline proposes {len(proposed)}, marked `Y` in "
+                 "`CP2_records.csv` with the reason in `proposed_reason` (screening tier, coverage of your outline's "
+                 "subsections, contrary evidence). Access was not a criterion. Change the marks freely; more than "
+                 f"{limit}, or two versions of one publication, is refused. On approval the selection is frozen as the "
+                 "corpus manifest (`data/corpus_manifest.json`).\n\n"
+                 + "\n".join(f"- {rid}: {why}" for rid, why in proposed.items()) + "\n")
+
+
 def read_cp2_selection(run_dir: Path) -> dict:
     rows = list(csv.DictReader(open(cp_dir(run_dir) / "CP2_records.csv", encoding="utf-8")))
     selected = [r["record_id"] for r in rows if r["select"].strip().upper() in {"Y", "YES", "X", "1"}]

@@ -204,7 +204,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
               schema_file: str | None = None, reservation_key: str | None = None,
               repair_limit: int | None = None, dispatch_guard=None,
               truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None,
-              ledger=None, request_id: str | None = None) -> dict:
+              ledger=None, request_id: str | None = None, loops: dict | None = None) -> dict:
     """Call an agent and return its validated JSON output. Output is saved to runs/<id>/outputs/.
     `model` overrides the agent's configured model (refusal routing, per-call limits); `schema_file`
     overrides its output schema (A07 job turns).
@@ -220,7 +220,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
         raise AgentError(f"Unknown agent {agent_id}")
     m = model or config.agent_model(agent_id)
     budget.check_priced(m.model)
-    loops = config.load("pipeline")["loops"]
+    loops = loops if loops is not None else config.load("pipeline")["loops"]   # the run's own limits when given
     max_repairs = int(loops.get("max_json_repair_attempts", 1)) if repair_limit is None else int(repair_limit)
     truncations_left = (int(loops.get("max_truncation_retries", 0)) if truncation_retries is None
                         else int(truncation_retries))

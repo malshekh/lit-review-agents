@@ -64,13 +64,18 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
             spec_base_dir: Path | None = None) -> str:
     from .evaluation_budget import prepare
     from . import run_spec
-    if (outline is None) != (corpus_manifest is None):
-        raise ValueError("give both the outline and the corpus manifest, or neither")
-    if outline is not None:
+    if corpus_manifest is not None and outline is None:
+        raise ValueError("a corpus manifest needs an outline")
+    spec_limits = config.effective(profile).get("run_spec") or {}
+    if outline is not None and corpus_manifest is None:
+        if corpus_mode != "OPEN_CORPUS":
+            raise ValueError("a discovery run (an outline without a corpus manifest) uses --corpus-mode OPEN_CORPUS")
+        run_spec.check_outline(outline, spec_limits)
+    elif outline is not None:
         if corpus_mode == "FIXED_CORPUS":
             raise ValueError("a run with an outline and a corpus manifest uses --corpus-mode OPEN_CORPUS (the manifest "
                              "fixes the corpus; FIXED_CORPUS is the closed staged pilot)")
-        run_spec.check(outline, corpus_manifest, config.load("pipeline").get("run_spec") or {}, spec_base_dir)
+        run_spec.check(outline, corpus_manifest, spec_limits, spec_base_dir)
     profile = config.run_settings(profile).get("profile")   # an unknown profile is refused here, before any file
     if profile == "manuscript" and corpus_mode == "FIXED_CORPUS":
         raise ValueError("The manuscript profile is for the full run: use --corpus-mode OPEN_CORPUS. FIXED_CORPUS "
@@ -97,8 +102,10 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
     if scope_configuration is not None:
         (d / "human_scope_configuration.json").write_text(json.dumps(scope_configuration, indent=2), encoding="utf-8")
-    if outline is not None:
-        run_spec.install(d.parent, outline, corpus_manifest, config.load("pipeline").get("run_spec") or {}, spec_base_dir)
+    if outline is not None and corpus_manifest is None:
+        run_spec.install_discovery(d.parent, outline, spec_limits)
+    elif outline is not None:
+        run_spec.install(d.parent, outline, corpus_manifest, spec_limits, spec_base_dir)
         seeds = sorted({p["pmid"] for p in corpus_manifest["papers"] if p.get("pmid")} | set(seeds or []))
         (d / "seeds.txt").write_text("\n".join(seeds), encoding="utf-8")
     policy_fingerprint = corpus_policy.initialize(
@@ -136,7 +143,12 @@ class Run:
         self.dir = RUNS_DIR / run_id
         self.budget = BudgetTracker(self.dir)
         self.prov = ProvenanceLog(self.dir)
-        self.cfg = config.load("pipeline")
+        recorded = None
+        try:
+            recorded = json.loads((self.dir / "state.json").read_text(encoding="utf-8")).get("profile")
+        except (OSError, ValueError):
+            pass
+        self.cfg = config.effective(recorded)
         self.last_model: str | None = None   # model that served the most recent agent call
 
     # --- state and data helpers ---------------------------------------
@@ -513,6 +525,8 @@ class Run:
                         raise BudgetExceeded('Pilot request exceeds remaining $35 authorization')
                     return key
                 extra['dispatch_guard']=guard
+            if not staged:
+                extra["loops"] = self.cfg["loops"]
             out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
                             schema_file=schema_file, **extra)
         except RefusalError as e:
@@ -796,8 +810,15 @@ class Run:
             "human_scope_configuration": json.loads((inp / "human_scope_configuration.json").read_text(encoding="utf-8")) if (inp / "human_scope_configuration.json").exists() else None,
             "theme_guidance": self.cfg.get("themes", {"primary_min": 5, "primary_max": 8}),
             "revision_feedback": feedback,
+            **self._outline_input(),
         }, step=f"A02-SP_scope_v{self.counter(st, 'scope')}")
         spec["corpus_policy"] = corpus_policy.resolve(self)
+        from . import run_spec
+        outline, _ = run_spec.load(self.dir)
+        if outline:   # the researcher's subsections are the themes; A02's proposal is kept for the record only
+            spec["theme_framework_proposed_by_A02"] = spec.get("theme_framework")
+            spec["theme_framework"] = run_spec.framework_from_outline(outline)
+            spec["researcher_outline"] = run_spec.outline_brief(outline)
         self.save("spec.json", spec)
         return "cp1"
 
@@ -888,7 +909,8 @@ class Run:
         budget = {"max_records_total": rcfg["max_records_total"], "max_records_per_family": rcfg["max_records_per_family"]}
         plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
                                      "budget": budget, "corpus_policy": corpus_policy.resolve(self),
-                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint")}, step="A03-LM_plan")
+                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
+                                     **self._outline_input()}, step="A03-LM_plan")
         self.save("search_plan.json", plan)
         self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
@@ -900,7 +922,8 @@ class Run:
             plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
                                          "budget": budget, "previous_plan": plan,
                                          "execution_report": report["families"],
-                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self)}, step=f"A03-LM_repair{i + 1}")
+                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
+                                         **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
             self.save("search_plan.json", plan)
             self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)
@@ -1023,7 +1046,8 @@ class Run:
             # numbered across resumes, so a rerun batch never overwrites an earlier batch's outputs
             bid = f"B{self.counter(self.state(), 'cq_batch'):03d}"
             out = self.agent("A04-CQ", {"review_spec": spec, "theme_framework": fw, "batch_id": bid,
-                                        "records": batch, "identifier_registry": identities}, step=f"A04-CQ_{bid}")
+                                        "records": batch, "identifier_registry": identities, **self._outline_input()},
+                             step=f"A04-CQ_{bid}")
             reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
             reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_{bid}", input_record_ids=[r["record_id"] for r in batch])
             reviews[bid]["identifier_registry"] = identities
@@ -1158,6 +1182,7 @@ class Run:
                                       "verified_sources": self.load("source_readiness.json", {})})
             self._cp2_costs(quals)
             self._retraction_check([r for r in self.load("records.json")], "cp2")
+            self._propose_selection(quals)
             self.pause_for_checkpoint("CP2")
         checkpoints.require_cp2_current(self.dir)
         self._framework_update(decision, "CP2")
@@ -1173,22 +1198,28 @@ class Run:
         corpus = []
         from . import run_spec
         _, manifest = run_spec.load(self.dir)
+        outline, _ = run_spec.load(self.dir)
+        if outline and not manifest:   # a discovery run: the selection becomes the frozen corpus manifest
+            manifest = self._freeze_discovered_corpus(decision, by_id, quals)
         if manifest:
             mismatch = run_spec.selection_problems(manifest, [by_id[rid] for rid in decision["selected_record_ids"]])
             if mismatch:
                 raise Pause("CP2 selection differs from the corpus manifest (input/corpus_manifest.json): "
                             + "; ".join(mismatch) + ". The manifest is the corpus: fix the selection, or change the "
                             "manifest in a new run.")
+        discovered = bool(manifest and manifest.get("generated_from") == "DISCOVERY_AND_SCREENING")
         for rid in decision["selected_record_ids"]:
             q = quals.get(rid, {})
-            paper = run_spec.paper_for(manifest, by_id[rid])
+            paper = run_spec.paper_for(manifest, by_id[rid]) if not discovered else next(
+                p for p in manifest["papers"] if p["record_id"] == rid)
             corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
                            "subthemes": q.get("subthemes", []),
                            "tier": (paper["scientific_importance"] if paper else
                                     decision["tier_overrides"].get(rid) or q.get("proposed_tier")),
                            "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence"),
                            **({"manifest_paper_id": paper["paper_id"],
-                               "intended_reading_level": paper["intended_reading_level"]} if paper else {})})
+                               "intended_reading_level": paper["intended_reading_level"]} if paper else {}),
+                           **({"corpus_source": "DISCOVERY"} if discovered else {})})
         # the projection decides here, where changing the selection is still cheap
         if pilot.enabled(self):
             try:proj=pilot.project(self,pilot.STAGE_1,records=corpus)
@@ -1229,6 +1260,109 @@ class Run:
             raise Pause(f"the stage sub-caps this projection needs add up to ${derived['total_usd']:.2f}, over the run's "
                         f"${self.budget.cap:.2f} cap (data/stage_caps.json). Reduce the corpus or the word budgets, or "
                         "choose a profile with a higher cap; raising one sub-cap would only move the shortfall.")
+
+    def _outline_input(self) -> dict:
+        """{"researcher_outline": ...} for the agents before A08, in an outlined run; {} otherwise."""
+        from . import run_spec
+        outline, _ = run_spec.load(self.dir)
+        return {"researcher_outline": run_spec.outline_brief(outline)} if outline else {}
+
+    def _propose_selection(self, quals: list[dict]) -> None:
+        """A discovery run: propose the corpus from the screening results and pre-mark it in CP2_records.csv. Only
+        rows the researcher has not touched are marked; the researcher confirms or changes the selection."""
+        from . import run_spec
+        outline, manifest = run_spec.load(self.dir)
+        if not outline or manifest:
+            return
+        limit = int((self.cfg.get("run_spec") or {}).get("max_papers", 15))
+        proposal = run_spec.propose_selection(quals, self.load("records.json"), self.load("theme_framework.json"), limit)
+        self.save("selection_proposal.json", {"max_papers": limit, "proposed": proposal,
+                                              "rule": "qualified records, strongest tier first, greedy coverage of the "
+                                                      "outline's subsections, one contrary-evidence paper if screening "
+                                                      "found any; access level not considered"})
+        checkpoints.prefill_cp2(self.dir, {p["record_id"]: p["reason"] for p in proposal}, limit)
+        self.prov.tool_run("selection_proposal", "cp2", {"proposed": [p["record_id"] for p in proposal], "max_papers": limit})
+
+    def _freeze_discovered_corpus(self, decision: dict, by_id: dict, quals: dict) -> dict:
+        """Check the CP2 selection of a discovery run (at most max_papers unique publications) and freeze it as the
+        corpus manifest (data/corpus_manifest.json). Frozen once: a later CP2 approval that changes it stops."""
+        from . import run_spec
+        from .synthesis_registry import fingerprint
+        limit = int((self.cfg.get("run_spec") or {}).get("max_papers", 15))
+        selected = [by_id[rid] for rid in decision["selected_record_ids"]]
+        if len(selected) > limit:
+            raise Pause(f"CP2 selects {len(selected)} papers; this run allows at most {limit}. Unmark papers in "
+                        "checkpoints/CP2_records.csv and approve CP2 again.")
+        seen: dict[str, str] = {}
+        for r in selected:
+            for key in ([f"doi:{r['doi'].lower()}"] if r.get("doi") else []) + ([f"pmid:{r['pmid']}"] if r.get("pmid") else []) \
+                    + [f"title:{run_spec._norm_title(r.get('title'))}"]:
+                if key in seen and seen[key] != r["record_id"]:
+                    raise Pause(f"CP2 selects {seen[key]} and {r['record_id']}, which look like versions of one publication "
+                                f"(same {key.split(':')[0]}). Keep one and approve CP2 again.")
+                seen[key] = r["record_id"]
+        proposals = {p["record_id"]: p["reason"] for p in (self.load("selection_proposal.json", {}) or {}).get("proposed", [])}
+        manifest = run_spec.build_manifest(selected, quals, proposals, self.load("theme_framework.json"),
+                                           run_spec.load(self.dir)[0], decision.get("review_fingerprint") or fingerprint(decision))
+        prior = run_spec.generated_manifest(self.dir)
+        if prior is not None and [p["record_id"] for p in prior["papers"]] != [p["record_id"] for p in manifest["papers"]]:
+            raise Pause("the corpus was frozen at an earlier CP2 approval (data/corpus_manifest.json) and this approval "
+                        "selects different papers. Start a new run to change the corpus.")
+        if prior is None:
+            self.save("corpus_manifest.json", manifest)
+            self.prov.human_decision("CORPUS_FROZEN", {"papers": [p["record_id"] for p in manifest["papers"]],
+                                                       "manifest_sha256": fingerprint(manifest)},
+                                     "corpus manifest generated from discovery and screening, frozen at CP2")
+        return prior or manifest
+
+    def _retrieve_discovered(self, rec: dict) -> tuple[dict, dict]:
+        """Full text for a discovered paper if an open-access copy can be found and verified, else its abstract.
+        Every attempt is logged (data/retrieval_log.json). A retrieval failure is a limitation of access, recorded
+        as such, never a scientific exclusion; a paper with neither full text nor an abstract stops the run."""
+        from .tools.fulltext import find_pmcid
+        rid = rec["record_id"]
+        log = self.load("retrieval_log.json", {})
+        entry = log.get(rid) or {"record_id": rid, "paper_id": rec.get("manifest_paper_id"), "pmid": rec.get("pmid"),
+                                 "doi": rec.get("doi"), "attempts": []}
+        cached = self.load(f"fulltext/{rid}.json")
+        if cached and len(cached) > 1:
+            sections = cached
+        else:
+            sections = None
+            pmcid = rec.get("pmcid")
+            if not pmcid:
+                pmcid, why = find_pmcid(rec.get("pmid"), rec.get("doi"))
+                entry["attempts"].append({"source": "NCBI ID converter", "outcome": "FOUND" if pmcid else "NOT_FOUND",
+                                          "detail": pmcid or why})
+            if pmcid:
+                try:
+                    sections, source = fetch_verified_sections({**rec, "pmcid": pmcid})
+                    self.save(f"fulltext_provenance/{rid}.json", source)
+                    entry["attempts"].append({"source": "PMC open-access XML", "outcome": "RETRIEVED", "detail": pmcid})
+                except FullTextUnavailable as exc:
+                    entry["attempts"].append({"source": "PMC open-access XML", "outcome": "FAILED", "detail": str(exc)})
+            if not sections:
+                if not (rec.get("abstract") or "").strip():
+                    entry["category"] = "NO_SOURCE_TEXT"
+                    log[rid] = entry
+                    self.save("retrieval_log.json", log)
+                    raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
+                                "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
+                                f"data/fulltext/{rid}.json, or start a new run without it.")
+                sections = {"Abstract": rec["abstract"]}
+        level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
+        names = " ".join(sections).lower()
+        entry.update(level_read=level, category="FULL_TEXT_RETRIEVED" if level == "FULL_TEXT"
+                     else "RETRIEVAL_LIMITATION_ABSTRACT_ONLY",
+                     figures_inspected=level == "FULL_TEXT" and "figure legend" in names,
+                     supplements_inspected=False,
+                     note="Figure legends are read as text; figure images and supplementary files are not retrieved.")
+        log[rid] = entry
+        self.save("retrieval_log.json", log)
+        return sections, {"level": level, "figures_inspected": entry["figures_inspected"],
+                          "supplements_inspected": False, "scientific_importance": rec.get("tier"),
+                          "note": entry["note"] + ("" if level == "FULL_TEXT" else
+                                                   " No open-access full text was found: abstract only.")}
 
     def _retraction_check(self, records: list[dict], label: str) -> dict:
         """Crossref retraction status of the given records (free; cached in data/crossref_cache). Written to
@@ -1335,6 +1469,8 @@ class Run:
                     ready[rid] = {"required": required, "status": "BLOCKED", "reason": str(exc)}
                     self.save("source_readiness.json", ready)
                     raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+            elif rec.get("corpus_source") == "DISCOVERY":
+                sections, access_now = self._retrieve_discovered(rec)
             elif rec.get("intended_reading_level") == "ABSTRACT":
                 sections = {"Abstract": rec.get("abstract") or ""}   # the manifest says abstract, whatever its importance
             elif rec.get("intended_reading_level") == "FULL_TEXT":
@@ -1356,14 +1492,20 @@ class Run:
             from . import run_spec
             outline, manifest = run_spec.load(self.dir)
             paper = run_spec.paper_for(manifest, rec)
-            if paper:   # what was actually accessible, so nothing is described that was never read
+            if rec.get("corpus_source") == "DISCOVERY":   # what retrieval actually obtained
+                payload["source_access"] = access_now
+                access = self.load("source_access.json", {})
+                access[rid] = {"paper_id": rec.get("manifest_paper_id"), **access_now}
+                self.save("source_access.json", access)
+            elif paper:   # what was actually accessible, so nothing is described that was never read
                 payload["source_access"] = run_spec.source_access(paper, level)
                 access = self.load("source_access.json", {})
                 access[rid] = {"paper_id": paper["paper_id"], **payload["source_access"]}
                 self.save("source_access.json", access)
             if outline:
                 payload["outline_questions"] = [{"section_id": s["section_id"], "heading": s["heading"],
-                                                 "questions": s["questions"]} for s in outline["sections"]]
+                                                 "questions": s["questions"], "guidance": s.get("guidance") or []}
+                                                for s in outline["sections"]]
             items.append((f"A05-KE_{rid}", payload))
         save = lambda step, out: self.save(f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out))  # noqa: E731
         first = self._first_tranche()
@@ -1379,7 +1521,7 @@ class Run:
         the manifest's order within each reading level, so the researcher decides which papers come first."""
         from . import run_spec
         want = (self.cfg.get("run_spec") or {}).get("first_tranche") or {}
-        _, manifest = run_spec.load(self.dir)
+        manifest = run_spec.manifest_of(self.dir)
         if not manifest or not want:
             return []
         order = {p["paper_id"]: i for i, p in enumerate(manifest["papers"])}
@@ -1388,7 +1530,9 @@ class Run:
         out = []
         for level, n in (("FULL_TEXT", int(want.get("full_text", 0))), ("ABSTRACT", int(want.get("abstract", 0)))):
             out += [r["record_id"] for r in corpus if r.get("intended_reading_level") == level][:n]
-        return out
+        total = int(want.get("full_text", 0)) + int(want.get("abstract", 0))
+        out += [r["record_id"] for r in corpus if r["record_id"] not in out][:max(0, total - len(out))]
+        return out if len(out) < len(corpus) else []   # a tranche that is the whole corpus is no early check
 
     def _early_check(self, first: list[str]) -> None:
         """Stop after the first papers until the researcher has looked at them (CP_EARLY). Approved once per tranche."""
@@ -1397,7 +1541,7 @@ class Run:
         if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
             return
         from . import run_spec
-        _, manifest = run_spec.load(self.dir)
+        manifest = run_spec.manifest_of(self.dir)
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json", [])}
         proj = self.load("cost_projection.json") or {}
         per_level = {}
@@ -3257,6 +3401,12 @@ class Run:
         table_issues = submission.table_problems(
             [{**t, "caption": exported[t["display_id"]]["caption"], "notes": exported[t["display_id"]]["notes"]}
              for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
+        from . import run_spec
+        outline_now, _ = run_spec.load(self.dir)
+        lengths = (run_spec.chapter_word_report(outline_now, m["sections"], compliance.word_count,
+                                                float((self.cfg.get("run_spec") or {}).get("chapter_tolerance", 0.15)))
+                   if outline_now else [])
+        (final_dir / "chapter_lengths.json").write_text(json.dumps(lengths, indent=2), encoding="utf-8")
         from .tools import science_lint
         access = {rid: a.get("level") for rid, a in (self.load("source_access.json", {}) or {}).items()}
         lint = science_lint.check_manuscript(m, access or None)

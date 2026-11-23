@@ -92,6 +92,26 @@ def verify_cached_source(record, sections, source):
         raise FullTextUnavailable("Cached source body/section mapping mismatch")
 
 
+IDCONV = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
+
+
+def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[str | None, str]:
+    """(PMCID or None, why) from NCBI's ID converter, by PMID, else DOI. An error is reported, never raised: a
+    missing open-access copy is a retrieval limitation, not a failure of the run."""
+    ident = str(pmid or "").strip() or str(doi or "").strip()
+    if not ident:
+        return None, "no PMID or DOI to look up"
+    try:
+        r = requests.get(IDCONV, params={"ids": ident, "format": "json", "tool": "litreview"}, timeout=timeout)
+        if r.status_code != 200:
+            return None, f"ID converter HTTP {r.status_code}"
+        recs = r.json().get("records") or []
+    except (requests.RequestException, ValueError) as exc:
+        return None, f"ID converter unavailable: {type(exc).__name__}"
+    pmcid = next((x.get("pmcid") for x in recs if x.get("pmcid")), None)
+    return (pmcid, "found") if pmcid else (None, "no PMC copy listed for this identifier")
+
+
 def fetch_verified_sections(record, timeout=60):
     """Materialize the required article only after verifying XML identity and body.
 

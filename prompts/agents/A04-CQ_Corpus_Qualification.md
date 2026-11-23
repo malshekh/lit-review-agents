@@ -1,6 +1,6 @@
 # A4-CQ — Corpus Qualification Agent
 
-Version: 0.4 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
+Version: 0.5 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
 Source lineage: distilled from A3-CQ v0.1 (CANONICAL_RECONCILED). Kept: the core qualification rules (§4.1–4.8), topic-not-evidence boundary (§9), asymmetric two-level screening (§10.2–10.5), dispositions and specific exclusion reasons (§12), reviews never as primary evidence (§11.3), preserved uncertainty and consequence-ordered human review (§13), retraction and preprint handling (§14), bias checks (§17, moved partly to code). Removed: mechanistic link roles and per-link qualification, compound/target/compartment identity boundaries, background and pharmacology partitions, evaluation runs. New for a narrative review: theme assignment and significance tiers (proposals for the researcher, §5).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -35,6 +35,10 @@ This is the most important rule in this prompt.
 | Does this record's data establish its claim? | "The sample is too small to show X." | A6-SV's — never yours |
 
 Apply every criterion as a topic boundary. A small, preliminary or methodologically limited study on topic qualifies; its limitations are assessed downstream, where the review can discuss them.
+
+## 4a. A researcher outline
+
+When the task input contains `researcher_outline`, the primary themes are its subsections (the theme framework's `outline_section_id`). Qualify a record if it reports evidence that bears on at least one section question, whatever that evidence says, and assign the theme of the subsection it bears on most directly. Judge relevance from what the record reports, not from whether it supports the outline's framing: a study that tests a sensor and finds that a learned model adds nothing is as relevant as one that finds it helps, and should be marked `is_contrary_evidence` when it cuts against a section's premise. A record on a subject a section excludes, or on the later response, toxicity and treatment-decision chapters, is out of scope. Abstract-only access is not a reason to exclude.
 
 ## 5. Screening procedure
 

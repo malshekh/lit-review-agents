@@ -36,6 +36,10 @@ OUTLINE_SCHEMA = {
         "outline_version": {"type": "integer", "minimum": 1},
         "working_title": {"type": "string", "minLength": 3},
         "review_question": {"type": "string"},
+        "scope_statement": {"type": "string"},
+        "length_policy": {"enum": ["TARGET", "CEILING"]},
+        "length_note": {"type": "string"},
+        "global_instructions": {"type": "array", "items": {"type": "string", "minLength": 3}},
         "sections": {"type": "array", "minItems": 1, "items": {
             "type": "object", "additionalProperties": False,
             "required": ["section_id", "heading", "questions", "intended_contribution", "word_budget", "scope"],
@@ -46,6 +50,8 @@ OUTLINE_SCHEMA = {
                 "questions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 8}},
                 "intended_contribution": {"type": "string", "minLength": 8},
                 "word_budget": {"type": "integer", "minimum": 0},
+                "guidance": {"type": "array", "items": {"type": "string", "minLength": 3}},
+                "avoid": {"type": "array", "items": {"type": "string", "minLength": 3}},
                 "scope": {"type": "object", "additionalProperties": False, "required": ["includes", "excludes"],
                           "properties": {"includes": {"type": "array", "items": {"type": "string"}},
                                          "excludes": {"type": "array", "items": {"type": "string"}}}}}}}}}
@@ -97,6 +103,10 @@ def outline_problems(outline: dict) -> list[str]:
     for s in outline["sections"]:
         if s.get("parent_section_id") and s["parent_section_id"] not in ids:
             problems.append(f"outline {s['section_id']}: parent {s['parent_section_id']} does not exist")
+        children = [c for c in outline["sections"] if c.get("parent_section_id") == s["section_id"]]
+        if children and sum(c["word_budget"] for c in children) > s["word_budget"]:
+            problems.append(f"outline {s['section_id']}: its subsections' budgets ({sum(c['word_budget'] for c in children)}) "
+                            f"exceed its own ({s['word_budget']}); a chapter budget includes its subsections")
         for q in s["questions"]:
             if not q.strip().endswith("?"):
                 problems.append(f"outline {s['section_id']}: \"{q[:70]}\" is not a question. A section lists questions to "
@@ -155,7 +165,7 @@ def check(outline: dict, manifest: dict, limits: dict, base_dir: Path | None = N
         raise SpecError(problems)
     papers = manifest["papers"]
     informed = {sid for p in papers for sid in p.get("informs_sections") or []}
-    return {"sections": len(outline["sections"]), "word_budget": sum(s["word_budget"] for s in outline["sections"]),
+    return {"sections": len(outline["sections"]), "word_budget": total_words(outline),
             "papers": len(papers),
             "full_text": sum(p["intended_reading_level"] == "FULL_TEXT" for p in papers),
             "abstract": sum(p["intended_reading_level"] == "ABSTRACT" for p in papers),
@@ -164,6 +174,147 @@ def check(outline: dict, manifest: dict, limits: dict, base_dir: Path | None = N
             "sections_no_paper_is_expected_to_inform": sorted(
                 s["section_id"] for s in outline["sections"] if informed and s["section_id"] not in informed),
             "outline_sha256": _fp(outline), "corpus_sha256": _fp(manifest)}
+
+
+def total_words(outline: dict) -> int:
+    """The manuscript's word budget: top-level sections only (a chapter's budget includes its subsections)."""
+    return sum(s["word_budget"] for s in outline["sections"] if not s.get("parent_section_id"))
+
+
+def chapters(outline: dict) -> list[dict]:
+    """Top-level sections with their subsection IDs."""
+    return [{**s, "children": [c["section_id"] for c in outline["sections"] if c.get("parent_section_id") == s["section_id"]]}
+            for s in outline["sections"] if not s.get("parent_section_id")]
+
+
+def check_outline(outline: dict, limits: dict) -> dict:
+    """A discovery run: the outline alone. The corpus is found by the pipeline and frozen at CP2."""
+    problems = outline_problems(outline)
+    if problems:
+        raise SpecError(problems)
+    return {"mode": "DISCOVERY", "sections": len(outline["sections"]), "word_budget": total_words(outline),
+            "max_papers": int(limits.get("max_papers", 15)), "outline_sha256": _fp(outline)}
+
+
+def install_discovery(run_dir: Path, outline: dict, limits: dict) -> dict:
+    summary = check_outline(outline, limits)
+    d = Path(run_dir) / "input"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "outline.json").write_text(json.dumps(outline, ensure_ascii=False, indent=2), encoding="utf-8")
+    spec = {**summary, "configuration": configuration_snapshot()}
+    (d / "run_spec.json").write_text(json.dumps(spec, ensure_ascii=False, indent=2), encoding="utf-8")
+    return spec
+
+
+def framework_from_outline(outline: dict) -> dict:
+    """The theme framework for an outlined run: one primary theme per leaf section (a section with no
+    subsections), in outline order. A02 may propose others; the researcher's outline decides."""
+    parents = {s.get("parent_section_id") for s in outline["sections"]}
+    leaves = [s for s in outline["sections"] if s["section_id"] not in parents]
+    themes = []
+    for n, s in enumerate(leaves, 1):
+        themes.append({"theme_id": f"T{n}", "name": s["heading"], "outline_section_id": s["section_id"],
+                       "scope": " ".join(s["questions"] + (s.get("guidance") or [])),
+                       "includes": "; ".join(s["scope"]["includes"]) or "as the section's questions describe",
+                       "excludes": "; ".join(s["scope"]["excludes"] + (s.get("avoid") or [])) or "none stated"})
+    return {"primary_themes": themes,
+            "count_justification": f"One theme per subsection of the researcher's outline ({len(themes)} subsections)."}
+
+
+def outline_brief(outline: dict) -> dict:
+    """The outline as agents before A08 receive it: questions, guidance and scope, without word budgets."""
+    return {"review_question": outline.get("review_question"), "scope_statement": outline.get("scope_statement"),
+            "global_instructions": outline.get("global_instructions") or [],
+            "sections": [{k: s.get(k) for k in ("section_id", "parent_section_id", "heading", "questions", "guidance",
+                                                "avoid", "scope") if s.get(k) is not None} for s in outline["sections"]]}
+
+
+def generated_manifest(run_dir: Path) -> dict | None:
+    p = Path(run_dir) / "data" / "corpus_manifest.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+def manifest_of(run_dir: Path) -> dict | None:
+    """The run's corpus manifest: the researcher's (input/) or, in a discovery run, the one generated at CP2."""
+    return load(run_dir)[1] or generated_manifest(run_dir)
+
+
+def _norm_title(t: str) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", (t or "").lower()).split())
+
+
+def propose_selection(quals: list[dict], records: list[dict], framework: dict | None, max_papers: int) -> list[dict]:
+    """A proposed selection for CP2, from the screening results alone: qualified records, strongest tier first,
+    chosen greedily to cover as many outline subsections (themes) as possible, with at least one contrary-evidence
+    paper when screening found any. Access does not enter: an important paper available only as an abstract is
+    proposed like any other. Returns [{record_id, reason}] in selection order. The researcher confirms or changes it."""
+    rank = {"CORE": 0, "SUPPORTING": 1, "CONTEXT": 2, "PERIPHERAL": 3}
+    by_id = {r["record_id"]: r for r in records}
+    pool = [q for q in quals if q.get("disposition") == "QUALIFIED" and q["record_id"] in by_id]
+    pool.sort(key=lambda q: (rank.get(q.get("proposed_tier"), 4), -int(by_id[q["record_id"]].get("year") or 0)))
+    theme_names = {t["theme_id"]: t.get("outline_section_id") or t["theme_id"] for t in (framework or {}).get("primary_themes", [])}
+    chosen, covered, titles = [], set(), set()
+
+    def take(q, why):
+        title = _norm_title(by_id[q["record_id"]].get("title"))
+        if title in titles:
+            return
+        titles.add(title)
+        themes = [t for t in q.get("themes") or [] if t in theme_names]
+        covered.update(themes)
+        chosen.append({"record_id": q["record_id"],
+                       "reason": f"{why}; screened {q.get('proposed_tier') or 'untiered'}; covers "
+                                 + (", ".join(f"{t} ({theme_names[t]})" for t in themes) or "no outline subsection")
+                                 + (f"; screening reason: {q.get('reason')}" if q.get("reason") else "")})
+    contrary = [q for q in pool if q.get("is_contrary_evidence") and rank.get(q.get("proposed_tier"), 4) <= 1]
+    if contrary and max_papers:
+        take(contrary[0], "contrary evidence")
+    while len(chosen) < max_papers:
+        left = [q for q in pool if q["record_id"] not in {c["record_id"] for c in chosen}
+                and _norm_title(by_id[q["record_id"]].get("title")) not in titles]
+        if not left:
+            break
+        gain = lambda q: len(set(q.get("themes") or []) - covered)   # noqa: E731
+        best = max(left, key=lambda q: (gain(q) > 0, -rank.get(q.get("proposed_tier"), 4), gain(q)))
+        take(best, "adds uncovered subsections" if gain(best) else "strongest remaining")
+    return chosen
+
+
+def build_manifest(selected: list[dict], quals: dict, proposals: dict, framework: dict | None, outline: dict | None,
+                   cp2_fingerprint: str) -> dict:
+    """The corpus manifest generated from discovery and screening, frozen when CP2 is approved. The reading level
+    is what is expected (full text when an open-access copy is identified); what was actually read is recorded at
+    extraction (data/retrieval_log.json, data/source_access.json)."""
+    section_of = {t["theme_id"]: t.get("outline_section_id") for t in (framework or {}).get("primary_themes", [])}
+    papers = []
+    for n, r in enumerate(selected, 1):
+        q = quals.get(r["record_id"], {})
+        papers.append({
+            "paper_id": f"P{n:02d}", "record_id": r["record_id"], "pmid": str(r["pmid"]) if r.get("pmid") else None,
+            "doi": r.get("doi"), "title": r.get("title"),
+            "selection_reason": proposals.get(r["record_id"]) or ("selected by the researcher at CP2; screening reason: "
+                                                                   + str(q.get("reason") or "not given")),
+            "scientific_importance": q.get("proposed_tier") or "SUPPORTING",
+            "intended_reading_level": "FULL_TEXT" if r.get("pmcid") else "ABSTRACT",
+            "informs_sections": sorted({section_of[t] for t in q.get("themes") or [] if section_of.get(t)}),
+            "actual_access": None})
+    return {"manifest_version": 1, "generated_from": "DISCOVERY_AND_SCREENING", "frozen_at_checkpoint": "CP2",
+            "cp2_fingerprint": cp2_fingerprint, "papers": papers}
+
+
+def chapter_word_report(outline: dict, sections: list[dict], words_of, tolerance: float = 0.15) -> list[dict]:
+    """Words written per chapter against its target. sections: manuscript sections with section_id and text."""
+    written = {}
+    for s in sections:
+        written[s.get("section_id")] = written.get(s.get("section_id"), 0) + words_of(s.get("text_markdown") or "")
+    out = []
+    for ch in chapters(outline):
+        n = written.get(ch["section_id"], 0) + sum(written.get(c, 0) for c in ch["children"])
+        target = ch["word_budget"]
+        out.append({"section_id": ch["section_id"], "heading": ch["heading"], "target": target, "written": n,
+                    "within_tolerance": abs(n - target) <= tolerance * target,
+                    "by_subsection": {c: written.get(c, 0) for c in ch["children"]}})
+    return out
 
 
 def configuration_snapshot() -> dict:

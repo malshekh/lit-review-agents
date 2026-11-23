@@ -1,6 +1,6 @@
 # A8-OL — Outline & Allocation Agent
 
-Version: 0.5 (draft) · Role: STAGE · Follows: Human Checkpoint 3 · Precedes: the allocation-ledger checkpoint (CP_LEDGER), then A9-WRI
+Version: 0.6 (draft) · Role: STAGE · Follows: Human Checkpoint 3 · Precedes: the allocation-ledger checkpoint (CP_LEDGER), then A9-WRI
 Source lineage: v0.4 (outline stage of A11-SYN v0.1 fitted to *Scientific Reviews*). v0.5: you plan from a compact argument map and element index instead of the full package; you allocate every element in an **allocation ledger**; grouping is an instruction to the writer, never a new claim; you no longer copy assertions, qualifiers or appraisals into the plan (code attaches A7's records verbatim, by ID); the only display item is the code-built comparative table.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -129,7 +129,9 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 
 ## The researcher's outline
 
-When the task input contains `researcher_outline`, it is the structure of the manuscript. Use its `section_id` values and headings exactly; create no section it does not have and rename none. For each section, plan from its `questions`: state in `purpose` the question the section answers, the message the evidence supports and where that message stops, and order the supporting, contrary and unresolved items under it. The questions are things to investigate, not results to deliver: if the evidence answers a question with "not established" or "cannot be answered from this corpus", plan exactly that. A section the evidence cannot fill keeps a `word_budget` of 0 and no items; say so in `warnings`. Never pad a section to reach a budget, and treat every `word_budget` as a ceiling.
+When the task input contains `researcher_outline`, it is the structure of the manuscript. Use its `section_id` values and headings exactly; create no section it does not have and rename none. For each section, plan from its `questions`, `guidance` and `avoid` lists: state in `purpose` the question the section answers, the message the evidence supports and where that message stops, and order the supporting, contrary and unresolved items under it. The questions are things to investigate, not results to deliver: if the evidence answers a question with "not established" or "cannot be answered from this corpus", plan exactly that, as a gap. A section the evidence cannot fill keeps a `word_budget` of 0 and no items; say so in `warnings`.
+
+Length: a chapter's `word_budget` includes its subsections, transitions and introductory sentences. When `length_policy` is `TARGET`, plan each chapter to approach its budget where the evidence supports it, moving words between its subsections as the evidence warrants; the subsection budgets are guides. When the evidence cannot fill a chapter, plan less and name the gap; never pad. When `length_policy` is `CEILING`, treat every budget as a ceiling. Honour the outline's `global_instructions`.
 
 Evidence that fits no section of the outline is not forced into one and not dropped: record it in `allocation_ledger` with `outcome: "NOT_INDIVIDUALLY_DISCUSSED"`, `section_id: null` and a `reason` that begins `OUTSIDE_OUTLINE:`. Code places these in a review queue for the researcher.
 
