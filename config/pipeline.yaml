@@ -325,7 +325,7 @@ checkpoints:
     after: A07-SYN
     purpose: Approve thesis, adopt or reject interpretations
 notify:
-  true:
+  "on":   # quoted: YAML 1.1 reads a bare `on` as boolean true and notify.py would find no events
   - checkpoint
   - complete
   - budget_warning

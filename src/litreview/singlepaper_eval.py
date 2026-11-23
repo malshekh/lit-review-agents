@@ -49,7 +49,23 @@ class WritingRun(Run):
         self.evaluation = policy(self)
         if not self.evaluation:
             raise Pause("Explicit single-paper evaluation authority required")
-        if self.cfg["loops"]["max_redrafts"] != 0 or self.cfg["loops"]["max_critique_cycles"] != 1:
+        from . import sample_mode
+        try:
+            self.sample = sample_mode.policy(self)
+        except sample_mode.SampleRefused as exc:
+            raise Pause(str(exc)) from exc
+        if self.sample:
+            # Sample mode stops after A09: A10-A12 never run, so there is no critique or redraft loop to bound.
+            # Zero is applied here, in the run's own configuration, and the control flow (continue_evaluation)
+            # has no verify/critique/edit handler at all. No lookup round is paid for: NEEDS_EVIDENCE stops.
+            import copy
+            self.cfg = copy.deepcopy(self.cfg)
+            self.cfg["loops"].update(self.sample["loops"])
+            self.cfg["synthesis"]["max_retrieval_rounds"] = 0
+            self.cfg.setdefault("bridge", {})["max_retrieval_rounds"] = 0
+            if self.cfg["loops"]["max_redrafts"] != 0 or self.cfg["loops"]["max_critique_cycles"] != 0:
+                raise Pause("Sample mode requires 0 redrafts / 0 critique cycles")
+        elif self.cfg["loops"]["max_redrafts"] != 0 or self.cfg["loops"]["max_critique_cycles"] != 1:
             raise Pause("Native one-cycle configuration must be 0 redrafts / 1 critique")
         # A stricter operational ceiling on the EXISTING native cumulative ledger.
         # The recorded parent authority/config remains $35. Every post-baseline
@@ -73,26 +89,109 @@ class WritingRun(Run):
         return super()._reserve(key, usd, agent_id, note, steps)
 
     def _admitted(self, agent_id, payload, step, schema_file=None,
-                  exclude=frozenset(), limit=None):
-        # Reuse native admission/dispatch, but cold-price all Anthropic input at
-        # the 1h-write rate so cache creation cannot exceed a plain-input quote.
+                  exclude=frozenset(), limit=None, extra=None):
+        # Reuse native admission/dispatch, but cold-price all input at the cache-WRITE rate (Anthropic 1h
+        # write; OpenAI's cache write is also above its input rate) so cache creation cannot exceed the quote.
         import dataclasses
         from . import admission
+        from .sample_mode import worst_case_usd, SampleRefused
+        if self._sample_mode():
+            if agent_id == "A08-OL":
+                extra = {**(extra or {}), "max_tokens": int(self.sample["a08_max_tokens"])}
+            elif agent_id == "A09-WRI":
+                extra = {**(extra or {}), "max_tokens": int(self.sample["a09_max_tokens"]),
+                         "effort": self.sample["a09_effort"]}
+            else:
+                raise Pause(f"Sample mode never runs {agent_id}")
         m = self.route(agent_id, exclude)
         if limit:
             m = dataclasses.replace(m, max_tokens=int(self._bridge_cfg()["output_limits"][limit]))
+        if extra:
+            m = dataclasses.replace(m, **extra)
         a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
-        floor = None
-        if m.provider == "anthropic":
-            floor = self.budget.cost(m.model, 0, a["output_reserve"], 0, 0, a["input_bound"])
-            if floor is None: raise Pause("Unpriced cache-write reservation")
-        self._cache_reservation_floor = (agent_id, floor) if floor is not None else None
         try:
-            return super()._admitted(agent_id, payload, step, schema_file, exclude, limit)
+            floor = worst_case_usd(self.budget, m, a["input_bound"], a["output_reserve"])
+        except SampleRefused as exc:
+            raise Pause("Unpriced cache-write reservation") from exc
+        self._cache_reservation_floor = (agent_id, floor)
+        try:
+            return super()._admitted(agent_id, payload, step, schema_file, exclude, limit, extra)
         finally:
             self._cache_reservation_floor = None
 
+    # --- sample mode (sample_mode.py): A07 subset -> CP3 -> A08 -> A09 sections -> COMPLETE_SAMPLE --------
+    def _sample_mode(self):
+        return bool(getattr(self, "sample", None))
+
+    def _synthesis_settings(self):
+        s = super()._synthesis_settings()
+        if self._sample_mode():
+            from .sample_mode import LABEL
+            s = {**s, "max_retrieval_rounds": 0,
+                 "sample": {"version": self.sample["version"], "label": LABEL, "group_ids": self.sample["group_ids"]}}
+        return s
+
+    def _synthesis_job_class(self):
+        if self._sample_mode():
+            from .sample_mode import SampleSynthesisJob
+            return SampleSynthesisJob
+        return super()._synthesis_job_class()
+
+    def _journal(self):
+        j = super()._journal()
+        if self._sample_mode():
+            j["limits"]["main_text_max_words"] = int(self.sample["max_words"])
+        return j
+
+    def _outline_payload(self, pkg, corpus, journal, table, bcfg, findings):
+        payload = super()._outline_payload(pkg, corpus, journal, table, bcfg, findings)
+        if self._sample_mode():
+            from .sample_mode import LABEL
+            payload["sample_scope"] = {
+                "label": LABEL, "max_sections": self.sample["max_sections"],
+                "min_words": self.sample["min_words"], "max_words": self.sample["max_words"],
+                "instruction": (f"NON-REPRESENTATIVE writing sample: plan 1-{self.sample['max_sections']} sections "
+                                f"totalling {self.sample['min_words']}-{self.sample['max_words']} words. Every "
+                                "element still needs an allocation-ledger outcome; contrary evidence keeps its "
+                                "placement rules. Do not plan front matter text.")}
+        return payload
+
+    def _sample_outline(self, st):
+        from .sample_mode import check_outline
+        try:
+            nxt = self.stage_outline(st)
+        except Pause:
+            plan = self.load("manuscript_plan.json")
+            problems = check_outline(plan, self.sample) if plan is not None else []
+            if problems:
+                raise Pause("A08 sample outline outside the approved sample bounds: " + "; ".join(problems))
+            raise
+        problems = check_outline(self.load("manuscript_plan.json"), self.sample)
+        if problems:
+            raise Pause("A08 sample outline outside the approved sample bounds: " + "; ".join(problems))
+        return nxt
+
+    def _sample_write(self, st):
+        """A09 for the approved outline's 1-2 sections only, each through the native section gate. No front
+        matter, no A10-A12. The output is labelled NON-REPRESENTATIVE and unverified."""
+        from .sample_mode import check_outline, LABEL
+        self._reproject("draft")
+        ps = self._plan_state()  # CP_LEDGER approval and native evidence binding are still required
+        problems = check_outline(ps["plan"], self.sample)
+        if problems:
+            raise Pause("A08 sample outline outside the approved sample bounds: " + "; ".join(problems))
+        sections = self._write_sections(ps, "sample1")
+        self.save("sample_output.json", {
+            "label": LABEL, "statement": "NON-REPRESENTATIVE, UNVERIFIED single-paper writing sample. Not a review; "
+            "no A10 verification, A11 critique or A12 editing was run; no front matter.",
+            "group_ids": self.sample["group_ids"], "plan_version": ps["pv"], "evidence_version": ps["ev"],
+            "sections": sections, "word_count": sum(int(s.get("word_count") or 0) for s in sections),
+            "verified": False, "a10_a12_run": False, "front_matter_written": False})
+        return "sample_complete"
+
     def agent(self, agent_id, payload, step, **kwargs):
+        if self._sample_mode() and agent_id in ("A10-RV", "A11-RC", "A12-EDI"):
+            raise Pause(f"Sample mode never runs {agent_id}")
         st = self.state()
         expected = AGENTS.get(st.get("evaluation_phase") or st["stage"])
         if agent_id != expected:
@@ -183,6 +282,13 @@ class WritingRun(Run):
                     "outline":self.stage_outline, "write_once":self._draft_once,
                     "verify_once":self._verify_once, "critique_once":self._critique_once,
                     "edit_once":self._edit_once}
+        label = {}
+        if self._sample_mode():
+            from .sample_mode import LABEL
+            # No verify/critique/edit handler exists in sample mode: reaching one is a Pause, never a call.
+            handlers = {"synthesize":self.stage_synthesize, "cp3":self.stage_cp3,
+                        "outline":self._sample_outline, "write_once":self._sample_write}
+            label = {"sample": LABEL, "sample_group_ids": self.sample["group_ids"]}
         # A process-wide exclusive lock prevents overlapping evaluation commands.
         lock = self.dir / "r0001_writing.lock"
         import os
@@ -192,6 +298,10 @@ class WritingRun(Run):
             while True:
                 st = self.state()
                 stage = st["stage"]
+                if stage == "sample_complete":
+                    self.save_state({**st, **label, "status": "COMPLETE_SAMPLE"})
+                    print("STOPPED: COMPLETE_SAMPLE (NON-REPRESENTATIVE, unverified); A10-A12 not run")
+                    return
                 if stage == "evaluation_done":
                     print("STOPPED: single evaluation cycle finished; no post-edit verification claimed")
                     return
@@ -201,7 +311,7 @@ class WritingRun(Run):
                 # The native financial stage is derived from the agent, while
                 # custom single-cycle state names must not bypass stage policy.
                 nxt = handlers[phase](st)
-                updated = {**self.state(), "stage":nxt, "status":"READY"}
+                updated = {**self.state(), **label, "stage":nxt, "status":"READY"}
                 if nxt == "draft" and stage == "outline": updated["evaluation_phase"] = "write_once"
                 self.save_state(updated)
                 if nxt == "cp3":
@@ -209,7 +319,7 @@ class WritingRun(Run):
                     self.stage_cp3(self.state())
                     raise Pause("Review CP3 before manuscript execution")
         except (Pause, BudgetExceeded, AgentError, pilot.AuthorizationRequired) as exc:
-            self.save_state({**self.state(), "status":"PAUSED: "+str(exc)})
+            self.save_state({**self.state(), **label, "status":"PAUSED: "+str(exc)})
             print("PAUSED: "+str(exc))
         finally:
             os.close(fd)

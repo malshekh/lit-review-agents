@@ -182,7 +182,12 @@ def project(run,stage,records=None,in_flight=frozenset(),candidate=None):
     if run.budget.cap!=35 or run.cfg['run'].get('spend_review_usd')!=25:
         raise AuthorizationRequired('Pilot requires unchanged $35 cap and $25 spending-review checkpoint')
     if float(run.cfg['forecast']['uncertainty_margin'])!=.30: raise AuthorizationRequired('Pilot requires 30% future-work admission margin')
-    records=selection(run,records);at=STAGES.index(run.state()['stage']); lines=[]
+    records=selection(run,records)
+    if (run.dir/'input/a07_a09_sample.json').exists():
+        # NON-REPRESENTATIVE sample: price only the calls it can make (sample_mode.projection).
+        from .sample_mode import projection as sample_projection
+        return sample_projection(run,stage,candidate,in_flight)
+    at=STAGES.index(run.state()['stage']); lines=[]
     if (run.dir/'input/plan_retry_authority.json').exists():
         from .plan_retry import projection
         return projection(run,stage,candidate)

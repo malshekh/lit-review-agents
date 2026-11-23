@@ -104,7 +104,8 @@ class PlanRetryRun(WritingRun):
             raise Pause("PLAN exceeds $15 sub-cap")
         # Native reserve enforces BOTH ceilings atomically; this amount includes
         # the complete 30% margin, not just an admission-only comparison.
-        return Run._reserve(self,key,total,agent_id,"PLAN cold full-output quote plus 30% margin",steps)
+        return Run._reserve(self,key,total,agent_id,"PLAN cold full-output quote plus 30% margin",steps,
+                            margin_included=True)
 
     def agent(self, agent_id, payload, step, **kwargs):
         if agent_id != "A07-SYN" or payload.get("mode") != "PLAN":

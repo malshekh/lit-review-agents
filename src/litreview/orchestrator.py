@@ -318,8 +318,10 @@ class Run:
                 f"the scope and re-project (`litreview project {self.id}`); scientific checks are not cut to fit.")
         return g
 
-    def _reserve(self,key,usd,agent_id,note="",steps=()):
-        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+    def _reserve(self,key,usd,agent_id,note="",steps=(),margin_included=False):
+        # margin_included: the caller's amount already carries the 30% margin (plan_retry's approved hold);
+        # adding it again would over-hold and break the exact-candidate check in the stage projection.
+        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"} and not margin_included:
             # Hold the future-work margin, not merely check it. Actual charges settle this hold.
             usd = float(Decimal(str(usd)) * Decimal("1.30"))
         if pilot.enabled(self):
@@ -1688,10 +1690,57 @@ class Run:
             out["primary_theme_id"] = (rec.get("themes") or [None])[0]
         return out
 
+    def _synthesis_settings(self) -> dict:
+        """The A07 settings that enter the job identity. Sample mode (singlepaper_eval) adds its scope here,
+        so a sample job never shares a job directory, ledger or turn with a full synthesis."""
+        return self.cfg["synthesis"]
+
+    def _synthesis_job_class(self):
+        from .synthesis_bounded import RegistrySynthesisJob
+        return RegistrySynthesisJob
+
+    def _a07_quote(self, mode: str, payload: dict, count) -> tuple[int, int, float]:
+        """(input bound, output cap, pre-margin reservation USD) for one A07 call. No cache hit assumed: the whole
+        prefix is charged as a 1h cache write. Run._reserve adds and HOLDS the 30% margin for A07-A12."""
+        scfg = self.cfg["synthesis"]
+        limit = int(scfg["output_limits"][mode])
+        tokens = count(payload)
+        m = self.route("A07-SYN")
+        usd = self.budget.cost(m.model, 0, limit, 0, 0, tokens)
+        if usd is None:
+            raise UnpricedModel(m.model)
+        return tokens, limit, usd
+
     def stage_synthesize(self, st: dict) -> str:
         """Bounded registry-backed A07 with a human alignment stop before detailed synthesis."""
+        from .synthesis_bounded import AlignmentRequired
+        job, tag = self._synthesis_job()
+        try:
+            pkg = job.run()
+        except AlignmentRequired as exc:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            raise Pause(str(exc)) from exc
+        except JobStopped as exc:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            self._supersede_projection(f"A07 stopped: {exc}")
+            raise Pause(f"A07 stopped: {exc}; inspect the report and re-project before resuming") from exc
+        if pkg["status"] != "COMPLETE":
+            raise Pause("incomplete synthesis cannot proceed to CP3")
+        report = self._job_report(tag, pkg)
+        ev = self.state().get("evaluation_only")
+        if ev:
+            pkg = publication.stamp(pkg, ev["reason"], self.id)
+            report = publication.stamp(report, ev["reason"], self.id)
+        self.save(f"synthesis_job_{tag}/report.json", report)
+        self.save("synthesis_package.json", pkg)
+        self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
+                           {"models": pkg["models"], "models_by_turn": pkg["models_by_turn"], "identity": tag})
+        return "cp3"
+
+    def _synthesis_job(self):
+        """The A07 registry job for this run's current inputs, and its tag. Builds the registry and the job (which
+        writes only its own identity and registry snapshot); makes no model call."""
         from .synthesis_registry import EvidenceRegistry, fingerprint, offline_tokens
-        from .synthesis_bounded import RegistrySynthesisJob, AlignmentRequired
         from .paths import SCHEMAS_DIR
         corpus = self.load("selected_corpus.json")
         if self.load("theme_records_stale.json", []):
@@ -1720,7 +1769,7 @@ class Run:
         frozen["validated_findings"] = [{k: v for k, v in f.items() if k != "context"} for f in findings]
         frozen["revision_feedback"] = self.load("cp3_feedback.json")
         registry = EvidenceRegistry(frozen)
-        scfg = self.cfg["synthesis"]
+        scfg = self._synthesis_settings()
         identity = {"prompt": build_system_prompt("A07-SYN"),
                     "schemas": {p.name: p.read_text(encoding="utf-8") for p in sorted(SCHEMAS_DIR.glob("A07-SYN*.json"))},
                     "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices}
@@ -1731,15 +1780,9 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
-            limit = int(scfg["output_limits"][mode])
-            tokens = count(payload)
+            tokens, limit, usd = self._a07_quote(mode, payload, count)
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")
-            m = self.route("A07-SYN")
-            # No cache hit assumed. Charge the entire prefix as a 1h write for a conservative bound.
-            usd = self.budget.cost(m.model, 0, limit, 0, 0, tokens)
-            if usd is None:
-                raise UnpricedModel(m.model)
             key = f"a07-{tag}-{name}"
             if key in self.budget.reservations():
                 raise Pause("unsettled A07 call reservation: reconcile provider usage before retrying " + key)
@@ -1769,29 +1812,9 @@ class Run:
             checkpoints.write_synthesis_alignment(self.dir, digest, alignment)
             return False
 
-        job = RegistrySynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
-                                   identity, approve, served_by=lambda: self.last_model)
-        try:
-            pkg = job.run()
-        except AlignmentRequired as exc:
-            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            raise Pause(str(exc)) from exc
-        except JobStopped as exc:
-            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            self._supersede_projection(f"A07 stopped: {exc}")
-            raise Pause(f"A07 stopped: {exc}; inspect the report and re-project before resuming") from exc
-        if pkg["status"] != "COMPLETE":
-            raise Pause("incomplete synthesis cannot proceed to CP3")
-        report = self._job_report(tag, pkg)
-        ev = self.state().get("evaluation_only")
-        if ev:
-            pkg = publication.stamp(pkg, ev["reason"], self.id)
-            report = publication.stamp(report, ev["reason"], self.id)
-        self.save(f"synthesis_job_{tag}/report.json", report)
-        self.save("synthesis_package.json", pkg)
-        self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
-                           {"models": pkg["models"], "models_by_turn": pkg["models_by_turn"], "identity": tag})
-        return "cp3"
+        job = self._synthesis_job_class()(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
+                                          identity, approve, served_by=lambda: self.last_model)
+        return job, tag
 
     def _provenance_summary(self) -> dict:
         """The source for the AI-use disclosure. Names every model that produced output, per agent, and
@@ -1910,6 +1933,8 @@ class Run:
             self.pause_for_checkpoint("CP3")
         self._framework_update(decision, "CP3")
         pkg = self._publishable("synthesis_package.json")
+        if pkg.get("sample") and not self._sample_mode():
+            raise Pause("a NON-REPRESENTATIVE sample synthesis can never feed a full writing run")
         if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
             raise Pause("incomplete synthesis cannot proceed to A08")
         from .scientific_validation import require_package
@@ -1936,7 +1961,7 @@ class Run:
         from .synthesis_registry import fingerprint
         self._reproject("outline")
         pkg, findings, corpus = self._bridge_inputs()
-        bcfg, journal = self._bridge_cfg(), pilot.journal(self)
+        bcfg, journal = self._bridge_cfg(), self._journal()
         try:
             table = bridge.comparative_table(pkg, findings, corpus, int(bcfg.get("table_max_rows", 25)))
         except bridge.BridgeError as exc:
@@ -1948,7 +1973,7 @@ class Run:
         reuse = (plan is not None and ledger is not None and check.get("basis") == basis and not check.get("problems")
                  and check.get("plan_version") == bridge.plan_version(plan, ledger))
         if not reuse:
-            payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
+            payload = self._outline_payload(pkg, corpus, journal, table, bcfg, findings)
             try:
                 out = self._admitted("A08-OL", payload, step=f"A08-OL_v{self.counter(st, 'outline')}")
             except AdmissionRefused as exc:
@@ -2192,6 +2217,17 @@ class Run:
     def _bridge_cfg(self) -> dict:
         return self.cfg.get("bridge") or {}
 
+    def _journal(self) -> dict:
+        """Journal profile handed to A08/A09 (pilot limits applied). Sample mode narrows the word limit."""
+        return pilot.journal(self)
+
+    def _outline_payload(self, pkg, corpus, journal, table, bcfg, findings) -> dict:
+        from . import bridge
+        return bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
+
+    def _sample_mode(self) -> bool:
+        return False
+
     def _bridge_inputs(self) -> tuple[dict, list[dict], list[dict]]:
         pkg = self._publishable("synthesis_approved.json")
         if not pkg:
@@ -2215,7 +2251,7 @@ class Run:
                                                    "verdict": proj["verdict"]})
 
     def _admitted(self, agent_id: str, payload: dict, step: str, schema_file: str | None = None,
-                  exclude: frozenset = frozenset(), limit: str | None = None) -> dict:
+                  exclude: frozenset = frozenset(), limit: str | None = None, extra: dict | None = None) -> dict:
         """One downstream request: bounded and checked against the model's window (admission.py), the pricing
         threshold, the projection line, the runtime gate and the cap (an existing reservation, held for the call).
         Raises AdmissionRefused when the request does not fit; the caller subdivides by its fixed rule or stops."""
@@ -2226,10 +2262,12 @@ class Run:
         if limit:   # an output cap sized to the unit requested (pipeline.yaml -> bridge.output_limits)
             overrides = {"max_tokens": int(self._bridge_cfg()["output_limits"][limit])}
             m = dataclasses.replace(m, **overrides)
+        if extra:   # sample mode only: its own output cap / effort (singlepaper_eval.SAMPLE); default runs pass none
+            overrides = {**overrides, **extra}
+            m = dataclasses.replace(m, **extra)
         a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
-        usd = self.budget.cost(m.model, a["input_bound"], a["output_reserve"])
-        if m.provider == "anthropic":
-            usd = self.budget.cost(m.model, 0, a["output_reserve"], 0, 0, a["input_bound"])
+        from .writing_admission import worst_case_usd
+        usd = worst_case_usd(self.budget, m, a["input_bound"], a["output_reserve"])   # input at cache-write rate
         if usd is None:
             raise UnpricedModel(m.model)
         self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})
@@ -2356,7 +2394,7 @@ class Run:
             if saved and saved.get("evidence_version") == ev:
                 packet["retrieved"] = saved.get("retrieved") or {}
         return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
-                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": pilot.journal(self),
+                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": self._journal(),
                 "table": (self.load("display_items.json") or [None])[0]}
 
     def _contrary_register(self, pkg: dict, findings: list, plan: dict | None, ledger: list | None) -> list | None:
