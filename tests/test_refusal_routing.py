@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace as NS
 
 import pytest
@@ -71,14 +72,16 @@ def test_openai_refusal_is_detected(monkeypatch):
 def test_cache_pricing(tmp_path):
     b = BudgetTracker(tmp_path)
     # gpt-6-luna: input 0.10, cached 0.01, write 0.125 per M
-    assert b.cost("gpt-6-luna", 1_000_000, 0, 1_000_000, 1_000_000) == pytest.approx(0.10 + 0.01 + 0.125)
+    assert b.cost("gpt-6-luna", 50_000, 0, 50_000, 50_000) == pytest.approx((0.10 + 0.01 + 0.125) / 20)
+    # above 272k prompt tokens gpt-6-luna switches to its long-context tier (pricing page, 2026-11-23)
+    assert b.cost("gpt-6-luna", 1_000_000, 0, 1_000_000, 1_000_000) == pytest.approx(0.20 + 0.02 + 0.25)
     # verified Anthropic rates (pricing page, 2026-10-25): Sonnet 5.5 reads at 0.05x input = $0.10/M
     assert b.cost("claude-sonnet-5-5", 0, 0, 1_000_000, 0) == pytest.approx(0.10)
     # the live test call: 25 uncached, 10,629 read, 4 out on Sonnet 5.5
     assert b.cost("claude-sonnet-5-5", 25, 4, 10629) == pytest.approx(0.0010629 + 0.00005 + 0.00004)  # $0.00115
-    # gpt-6-astra has no cache rates: reads billed at input, never undercounted
-    assert b.cost("gpt-6-astra", 0, 0, 1_000_000, 0) == pytest.approx(10.00)
-    assert b.missing_cache_rates("gpt-6-astra") == ["cached_input", "cache_write"]
+    # kimi-k3 has no cache rates: reads billed at input, never undercounted
+    assert b.cost("kimi-k3", 0, 0, 1_000_000, 0) == pytest.approx(3.00)
+    assert b.missing_cache_rates("kimi-k3") == ["cached_input", "cache_write"]
 
 
 def test_long_context_tier_applies_in_both_standard_and_batch_tables(tmp_path):
@@ -98,7 +101,7 @@ def test_long_context_tier_applies_in_both_standard_and_batch_tables(tmp_path):
 def test_one_hour_writes_priced_separately_and_never_undercounted(tmp_path):
     b = BudgetTracker(tmp_path)
     assert b.cost("claude-sonnet-5-5", 0, 0, 0, 0, 1_000_000) == pytest.approx(4.00)     # listed 1h rate
-    assert b.cost("gpt-6-astra", 0, 0, 0, 0, 1_000_000) == pytest.approx(50.00)          # no rate: output, upper bound
+    assert b.cost("kimi-k3", 0, 0, 0, 0, 1_000_000) == pytest.approx(15.00)              # no rate: output, upper bound
     # Haiku above 100k tokens switches every rate, cache rates included
     assert b.cost("claude-haiku-5-5", 0, 0, 200_000, 0) == pytest.approx(200_000 * 0.05 / 1e6)
 
@@ -267,17 +270,55 @@ def test_anthropic_cache_markers(monkeypatch):
     assert sent["system"] == "SYS" and "cache_control" not in sent["messages"][0]["content"][0]
 
 
-def test_json_repair_keeps_cached_prefix_identical(monkeypatch, tmp_path):
+def test_json_repair_is_made_from_the_saved_reply_not_the_task_input(monkeypatch, tmp_path):
+    """A schema failure is repaired from the saved reply: the repair request carries the schema, the invalid
+    document and the error, never the paper. It runs at low effort with room for the document only."""
     seen = []
     replies = iter(["not json", '{"agent_id": "A05-KE"}'])
-    monkeypatch.setattr(agent_base, "complete", lambda provider, **kw: seen.append(kw["user"]) or
+    monkeypatch.setattr(agent_base, "complete", lambda provider, **kw: seen.append(kw) or
                         LLMResponse(next(replies), "anthropic", kw["model"], 1, 1, "end_turn"))
     monkeypatch.setattr(agent_base, "validate", lambda a, o, s=None: None)
-    m = config.AgentModel("A05-KE", "anthropic", "claude-sonnet-5-5", 100, 0.0, cache_system=True,
+    m = config.AgentModel("A05-KE", "anthropic", "claude-sonnet-5-5", 48000, 0.0, effort="medium", cache_system=True,
                           cache_payload=("record",))
-    agent_base.run_agent("A05-KE", {"record": {"r": 1}, "other": 2}, tmp_path, "s",
-                         BudgetTracker(tmp_path), ProvenanceLog(tmp_path), model=m)
-    assert seen[1][:2] == seen[0] and len(seen[1]) == 3 and not seen[1][2]["cache"]
+    out = agent_base.run_agent("A05-KE", {"record": {"r": "PAPER TEXT"}, "other": 2}, tmp_path, "s",
+                               BudgetTracker(tmp_path), ProvenanceLog(tmp_path), model=m)
+    assert out == {"agent_id": "A05-KE"} and len(seen) == 2
+    repair = seen[1]
+    text = "".join(p["text"] for p in repair["user"])
+    assert "PAPER TEXT" not in text and "not json" in text and "JSON Schema" in text
+    assert repair["system"] == agent_base.REPAIR_SYSTEM and not repair["cache_system"]
+    assert repair["effort"] == "low" and repair["max_tokens"] < 48000
+    assert (tmp_path / "outputs" / "s.raw0.txt").read_text(encoding="utf-8") == "not json"
+    audit = json.loads((tmp_path / "outputs" / "s.repair.audit.json").read_text(encoding="utf-8"))
+    assert audit["repaired_from"] == "s.raw0.txt" and audit["changed_paths"]
+
+
+def test_truncation_keeps_the_partial_output_and_retries_once_with_a_larger_cap(monkeypatch, tmp_path):
+    seen = []
+    replies = iter([("{\"agent_id\": \"A0", "max_tokens"), ('{"agent_id": "A05-KE"}', "end_turn")])
+
+    def complete(provider, **kw):
+        seen.append(kw["max_tokens"])
+        text, stop = next(replies)
+        return LLMResponse(text, "anthropic", kw["model"], 1, 1, stop)
+    monkeypatch.setattr(agent_base, "complete", complete)
+    monkeypatch.setattr(agent_base, "validate", lambda a, o, s=None: None)
+    m = config.AgentModel("A05-KE", "anthropic", "claude-sonnet-5-5", 16000, 0.0)
+    b = BudgetTracker(tmp_path)
+    out = agent_base.run_agent("A05-KE", {"x": 1}, tmp_path, "s", b, ProvenanceLog(tmp_path), model=m)
+    assert out == {"agent_id": "A05-KE"} and seen == [16000, 24000] and len(b.entries()) == 2
+    assert (tmp_path / "outputs" / "s.raw0.txt").read_text(encoding="utf-8") == '{"agent_id": "A0'
+    assert json.loads((tmp_path / "outputs" / "s.truncated0.json").read_text())["max_tokens"] == 16000
+
+
+def test_a_second_truncation_fails_and_never_exceeds_the_ceiling(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(agent_base, "complete", lambda provider, **kw: seen.append(kw["max_tokens"]) or
+                        LLMResponse("{", "anthropic", kw["model"], 1, 1, "max_tokens"))
+    m = config.AgentModel("A05-KE", "anthropic", "claude-sonnet-5-5", 60000, 0.0)
+    with pytest.raises(agent_base.AgentError, match="truncated at max_tokens"):
+        agent_base.run_agent("A05-KE", {"x": 1}, tmp_path, "s", BudgetTracker(tmp_path), ProvenanceLog(tmp_path), model=m)
+    assert seen == [60000, 64000]   # one retry, capped at loops.max_output_tokens_ceiling
 
 
 def test_openai_joins_blocks(monkeypatch):

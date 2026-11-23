@@ -232,7 +232,7 @@ def test_stage_synthesize_uses_bounded_packets_and_requires_alignment(tmp_path, 
     seed_sources(r, findings)
     def fake_run_agent(agent_id, payload, run_dir, step, budget, prov, **kwargs):
         assert kwargs["reservation_key"] in budget.reservations()
-        assert kwargs["repair_limit"] == 0
+        assert kwargs["repair_limit"] == 1 and callable(kwargs["dispatch_guard"])   # one audited format repair, reserved
         return model(payload["mode"], payload, step.split("_",2)[2])
     monkeypatch.setattr(orch, "run_agent", fake_run_agent)
     with pytest.raises(orch.Pause, match="alignment"):

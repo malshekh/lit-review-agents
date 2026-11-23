@@ -44,7 +44,7 @@ Other changes:
 - Kimi K3.1 Pro's window is recorded from Moonshot's endpoint.
 - The measured batch factor (0.5) and instability-repeat share (0.643) are added to `records/cost_rates.json`.
 - The `forecast` configuration key is new.
-- New tools: `tests/integrated_pipeline.py`, `tests/full_run_forecast.py` and `tests/model_window_probe.py`.
+- New tools: `tests/integrated_pipeline.py`, `tests/full_run_forecast.py` and `scripts/live/model_window_probe.py`.
 - New tests: `tests/test_integrated_pipeline.py` and `tests/test_integration_safeguards.py`.
 
 ## 2. Scientific safeguards preserved

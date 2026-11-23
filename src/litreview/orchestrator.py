@@ -355,7 +355,8 @@ class Run:
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
-              reservation_key: str | None = None, repair_limit: int | None = None) -> dict:
+              reservation_key: str | None = None, repair_limit: int | None = None,
+              truncation_retries: int | None = None) -> dict:
         from . import a06_batches
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
@@ -412,6 +413,16 @@ class Run:
         m = self.route(agent_id, exclude_providers)
         if overrides:
             m = dataclasses.replace(m, **overrides)
+        staged = pilot.enabled(self)
+        receipt_id = None
+        if not staged:
+            # A resume never pays twice: an accepted output saved under this step for this exact request is reused.
+            receipt_id = self._receipt_request(agent_id, payload, m, schema_file)
+            reused = self._receipt_reuse(agent_id, step, receipt_id, schema_file)
+            if reused is not None:
+                if reservation_key:
+                    self.budget.release(reservation_key)
+                return reused
         watched = self._context_check(agent_id, payload, step, m)
         if reservation_key:   # the call's cost is already held under the cap
             self._spend_review(agent_id, step, 0.0)
@@ -419,8 +430,16 @@ class Run:
             self._spend_review(agent_id, step, self.budget.cost(
                 m.model, watched["input_counted"] or watched["input_byte_bound"], watched["output_reserve"]) or 0.0)
         try:
-            extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+            if staged:   # the staged pilot's approved holds cover exactly one attempt per call
+                extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+                extra["truncation_retries"] = 0
+            else:        # every send, a truncation retry and a repair included, is reserved by the guard below
+                extra = ({"reservation_key": reservation_key,
+                          "repair_limit": int(self.cfg["loops"].get("reserved_call_repairs", 0))}
+                         if reservation_key else {})
+                extra["dispatch_guard"] = self._call_guard(agent_id, step, reservation_key)
             if repair_limit is not None:extra['repair_limit']=repair_limit
+            if truncation_retries is not None:extra['truncation_retries']=truncation_retries
             if pilot.enabled(self):
                 from .synthesis_registry import fingerprint
                 request_id=fingerprint([agent_id,payload,dataclasses.asdict(m),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
@@ -476,12 +495,87 @@ class Run:
                                               int(output_reserve(m,self.cfg['admission'])*float(s['output'])))
                 requests[step].update(agent=agent_id,projection_basis=pilot.work_basis(self),forecast_usd=forecast_usd)
             pilot.atomic(self.data('pilot_requests.json'),requests)
+        if receipt_id is not None:
+            self._receipt_save(step, receipt_id, out, m)
         self._context_actual(watched)
         model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
         self.last_model = m.model
         if self.budget.should_warn():
             notify.send("budget_warning", f"Run {self.id}: 80% of budget used", self.budget.summary_text())
         return out
+
+    # --- receipts: what was paid for and accepted, so a resume reuses it ---------------------------------
+    def _receipt_request(self, agent_id: str, payload: dict, m, schema_file: str | None) -> str:
+        """Identity of a request for reuse: agent, payload, vendor and model, system prompt and schema. Output caps
+        and effort are left out: an output accepted under one cap is the same accepted output under another."""
+        from .agents.registry import AGENTS
+        from .synthesis_registry import fingerprint
+        schema = (SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)).read_bytes()
+        return fingerprint([agent_id, payload, m.provider, m.model,
+                            hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),
+                            hashlib.sha256(schema).hexdigest()])
+
+    def _receipt_reuse(self, agent_id: str, step: str, request_id: str, schema_file: str | None):
+        """The accepted output saved for this step, if its receipt matches this request (or it is a researcher's
+        repair import, which binds to the first request that asks for the step). None: the call must be made."""
+        from .agents.base import validate
+        from .synthesis_registry import fingerprint
+        receipts = self.load("receipts.json", {})
+        rec = receipts.get(step)
+        path = self.dir / "outputs" / f"{step}.json"
+        if not rec or not path.exists():
+            return None
+        if rec.get("imported") and not rec.get("request"):
+            rec["request"] = request_id
+            receipts[step] = rec
+            pilot.atomic(self.data("receipts.json"), receipts)
+        if rec.get("request") != request_id:
+            return None   # the input, prompt, schema or model changed: this is a different request
+        accepted = json.loads(path.read_text(encoding="utf-8"))
+        if rec.get("output_sha256") != fingerprint(accepted):
+            raise Pause(f"{step}: the saved output no longer matches its receipt (data/receipts.json). It was edited "
+                        "after acceptance; restore it or import it with `litreview repair-import`.")
+        try:
+            validate(agent_id, accepted, schema_file)
+        except Exception as exc:   # noqa: BLE001 — jsonschema raises several families; any means "not reusable"
+            raise Pause(f"{step}: the saved output fails its current schema ({str(exc)[:200]}). Repair it with "
+                        "`litreview repair-import` or delete its receipt to pay for a fresh call.") from exc
+        self.prov.tool_run("receipt_reuse", step, {"request": request_id[:16], "imported": bool(rec.get("imported")),
+                                                   "paid_again": False})
+        return accepted
+
+    def _receipt_save(self, step: str, request_id: str, out: dict, m) -> None:
+        from .synthesis_registry import fingerprint
+        receipts = self.load("receipts.json", {})
+        receipts[step] = {"request": request_id, "output_sha256": fingerprint(out), "model": m.model,
+                          "provider": m.provider, "accepted_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        pilot.atomic(self.data("receipts.json"), receipts)
+
+    def _call_guard(self, agent_id: str, step: str, reservation_key: str | None):
+        """reserve() before every send on the standard path. The first send uses the caller's reservation when it
+        made one; every other send (a first send with none, a truncation retry, a repair) holds its own cold worst
+        case, input at the cache-write rate and output at the cap, and is refused if that does not fit."""
+        from .synthesis_registry import fingerprint, offline_tokens
+        from .writing_admission import worst_case_usd
+
+        def guard(attempt, system, message, model):
+            if attempt == 0 and reservation_key:
+                return reservation_key
+            reserve = (self.cfg.get("admission") or {}).get("reasoning_reserve_tokens") or {}
+            out_tokens = int(model.max_tokens) + int(reserve.get(model.provider) or 0)
+            usd = worst_case_usd(self.budget, model, offline_tokens(system) + offline_tokens(message), out_tokens)
+            if usd is None:
+                raise UnpricedModel(model.model)
+            key = "call-" + fingerprint([step, attempt, model.model, model.max_tokens])[:24]
+            if key in self.budget.reservations():
+                raise Pause(f"unsettled reservation {key} for {step}: a previous attempt ended without a logged "
+                            "response. Reconcile provider billing (scripts/reconcile_billing.py) before retrying.")
+            ok, available = self._reserve(key, usd, agent_id, "pre-call reservation", steps=[step])
+            if not ok:
+                raise BudgetExceeded(f"{agent_id} {step}: this call reserves ${usd:.2f}; only ${available:.2f} "
+                                     f"remains under the ${self.budget.cap:.2f} cap")
+            return key
+        return guard
 
     def _context_check(self, agent_id: str, payload: dict, step: str, m) -> dict:
         """(input + reserved output) / window for this exact request (context_watch.py), logged with both the byte
@@ -517,15 +611,21 @@ class Run:
         (spent + reserved + this call's worst case not yet reserved) past it, the run stops and asks (CP_SPEND,
         recorded in provenance); after approval it continues to the hard cap, which never moves."""
         from .synthesis_registry import fingerprint
-        point = (self.cfg.get("run") or {}).get("spend_review_usd")
-        if point is None:
-            return
+        legacy = (self.cfg.get("run") or {}).get("spend_review_usd")
+        points = sorted(set(getattr(self.budget, "review_points", None) or [])) \
+            if getattr(self.budget, "profile", None) not in (None, "pilot", "sample") else \
+            ([float(legacy)] if legacy is not None else [])
         spent, reserved = self.budget.spent(), self.budget.reserved()
         after = spent + reserved + float(request_usd)
-        if after <= float(point):
-            return
-        digest = fingerprint({"run": self.id, "spend_review_usd": float(point)})
-        if checkpoints.review_approved(self.dir, "CP_SPEND", digest):
+        point = digest = None
+        for candidate in points:   # the lowest point passed and not yet approved
+            if after <= candidate:
+                break
+            d = fingerprint({"run": self.id, "spend_review_usd": float(candidate)})
+            if not checkpoints.review_approved(self.dir, "CP_SPEND", d):
+                point, digest = candidate, d
+                break
+        if point is None:
             return
         detail = {"agent": agent_id, "step": step, "spent_usd": round(spent, 4), "reserved_usd": round(reserved, 4),
                   "request_usd": round(float(request_usd), 4), "committed_after_usd": round(after, 4),

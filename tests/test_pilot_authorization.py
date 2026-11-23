@@ -1,7 +1,7 @@
 import hashlib,json
 from pathlib import Path
 import pytest
-from litreview import orchestrator as orch, pilot_authorization as pa, checkpoints
+from litreview import config, orchestrator as orch, pilot_authorization as pa, checkpoints
 from litreview.synthesis_registry import fingerprint
 
 # Exercise real financial gates; the repository otherwise disables them in its autouse fixture.
@@ -262,7 +262,7 @@ def test_staged_projection_preserves_conservative_long_context_pricing(run,monke
     p=pa.project(run,pa.STAGE_2)
     line=next(x for x in p['lines'] if x['stage']=='A08-OL')
     assert line['long_context_calls']==1 and line['basis']=='STAGED_FORECAST'
-    assert line['gross_forecast_usd']==pytest.approx((300000/2.1*4+16000*15)/1e6)
+    assert line['gross_forecast_usd']==pytest.approx((300000/2.1*4+config.agent_model('A08-OL').max_tokens*.5*15)/1e6)
     run._reproject('outline')
     saved=run.load('cost_projection.json');assert saved['created']
     run.prov.tool_run('admission','test',{'agent':'A08-OL','crosses_threshold':True})

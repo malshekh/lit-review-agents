@@ -621,11 +621,11 @@ def test_the_projection_prices_long_context_requests_at_the_long_rates(fx):
     assert a08["basis"] == "REQUEST_BOUND" and a08["max_input_bound"] > 272_000 and a08["long_context_calls"] == 1
     long = b._rates("gpt-6.1-sol", 300_000)
     assert a08["adverse_usd"] == pytest.approx((a08["max_input_bound"] / dp.BYTES_PER_TOKEN * long["input"]
-                                                + 32_000 * long["output"]) / 1e6, abs=1e-4)
+                                                + route("A08-OL").max_tokens * long["output"]) / 1e6, abs=1e-4)
     base = cfg["forecast"]["scenarios"]["baseline"]
     tokens = a08["max_input_bound"] / base["bytes_per_token"]
     tier = b._rates("gpt-6.1-sol", int(tokens))                    # 302k tokens: still the long-context tier
-    assert a08["baseline_usd"] == pytest.approx((tokens * tier["input"] + 32_000 * base["output"] * tier["output"]) / 1e6,
+    assert a08["baseline_usd"] == pytest.approx((tokens * tier["input"] + route("A08-OL").max_tokens * base["output"] * tier["output"]) / 1e6,
                                                 abs=1e-4)
     assert a08["usd"] == pytest.approx(a08["baseline_usd"] * 1.3, abs=1e-3)
     assert lines["A11-RC"]["over_window_calls"] == 0                          # within Kimi's 1,048,576

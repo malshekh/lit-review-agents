@@ -84,7 +84,7 @@ def run(tmp_path, monkeypatch):
 
 
 def fake_interactive(monkeypatch, calls, refuse=()):
-    def run_agent(agent_id, payload, run_dir, step, budget, prov, model=None, schema_file=None):
+    def run_agent(agent_id, payload, run_dir, step, budget, prov, model=None, schema_file=None, **_guards):
         calls.append((step, model.model))
         if step in refuse:
             raise RefusalError("declined", model.model, "bio")
@@ -120,7 +120,7 @@ def test_probe_then_one_batch_logged_at_batch_rates(run, monkeypatch):
     assert len(entries) == 4 and entries[0]["cost_usd"] == pytest.approx((1000 * 1.00 + 500 * 5.00) / 1e6)
     rec = state(run)[0]
     assert rec["status"] == "INGESTED" and rec["succeeded"] == 4
-    assert rec["estimate"]["output_tokens_per_item"] == 64000             # configured max, not history
+    assert rec["estimate"]["output_tokens_per_item"] == 48000             # configured max, not history
     assert sum(e["outcome"] == "COMPLETED" for e in model_record.entries()) == 5      # probe + 4 batched
     run.run_many("A05-KE", items(), lambda s, o: None)                    # rerun: outputs reused, nothing paid
     assert len(fake.created) == 1 and len(calls) == 1
@@ -456,8 +456,8 @@ def _chunk_run(run, monkeypatch, cap, in_flight):
 
 
 def test_chunks_each_reserve_their_worst_case_and_settle_before_the_next(run, monkeypatch):
-    # a chunk of 2 reserves about $0.64 (2 x 64k at $5/M): one fits under $1.00, two do not
-    fake, events, got = _chunk_run(run, monkeypatch, cap=1.00, in_flight=2)
+    # a chunk of 2 reserves about $0.48 (2 x 48k at $5/M): one fits under $0.75, two do not
+    fake, events, got = _chunk_run(run, monkeypatch, cap=0.75, in_flight=2)
     assert [[step_of(c) for c in b] for b in fake.created] == [STEPS7[1:3], STEPS7[3:5], STEPS7[5:7]]
     assert [e[0] for e in events] == ["create", "settle"] * 3              # waits instead of refusing
     assert sorted(got) == STEPS7 and run.budget.reservations() == {}

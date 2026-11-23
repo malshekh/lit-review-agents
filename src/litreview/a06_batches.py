@@ -129,8 +129,16 @@ def audit(run,payload,root_step,overrides=None,schema_file=None,exclude=frozense
         out=None
         for attempt in range(first,TRUNCATION_RETRIES+2):
             step=root_step+'_B'+str(i).zfill(3)+'_'+digest[:10]+'_try'+str(attempt)
+            attempt_overrides=dict(overrides or {})
+            if attempt>1:
+                # The one authorized retry asks for a larger cap: resending at the cap that truncated pays for
+                # the same truncation. The first attempt's partial output stays saved under its own step.
+                loops=run.cfg.get('loops') or {}
+                attempt_overrides['max_tokens']=min(int(model.max_tokens*float(loops.get('truncation_retry_factor',1.5))+0.999),
+                                                    int(loops.get('max_output_tokens_ceiling',64000)))
             try:
-                out=run.agent('A06-SV',part,step,overrides=overrides,exclude_providers=exclude,repair_limit=0)
+                out=run.agent('A06-SV',part,step,overrides=attempt_overrides or None,exclude_providers=exclude,repair_limit=0,
+                              truncation_retries=0)
             except AgentError as exc:
                 if 'Output was truncated at max_tokens' not in str(exc):raise
                 raw=run.dir/'outputs'/(step+'.raw0.txt')

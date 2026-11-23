@@ -1,6 +1,7 @@
 """Load YAML configuration and resolve per-agent model settings."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -15,6 +16,36 @@ def load(name: str) -> dict[str, Any]:
     """Load config/<name>.yaml."""
     with open(CONFIG_DIR / f"{name}.yaml", encoding="utf-8") as fh:
         return yaml.safe_load(fh) or {}
+
+
+STAGE_GROUPS = {"A02-A04": ("A02-SP", "A03-LM", "A04-CQ"), "A05-A06": ("A05-KE", "A06-SV"), "A07": ("A07-SYN",),
+                "A08-A09": ("A08-OL", "A09-WRI"), "A10": ("A10-RV",), "A11-A12": ("A11-RC", "A12-EDI")}
+
+
+def profile_name(recorded: str | None = None) -> str:
+    """The active spend profile: the one a run was created under, else LITREVIEW_PROFILE, else run.profile."""
+    return recorded or os.environ.get("LITREVIEW_PROFILE") or (load("pipeline").get("run") or {}).get("profile") or "pilot"
+
+
+def run_settings(recorded: str | None = None) -> dict:
+    """run.* merged with the active profile (pipeline.yaml -> profiles). An unknown profile is an error, never a
+    silent fall back to another cap. With no `profiles` section the run block is used as it stands."""
+    cfg = load("pipeline")
+    run = dict(cfg.get("run") or {})
+    profiles = cfg.get("profiles")
+    if not profiles:
+        return run
+    name = profile_name(recorded)
+    if name not in profiles:
+        raise ValueError(f"Unknown spend profile '{name}'. Profiles in config/pipeline.yaml: {', '.join(profiles)}.")
+    prof = profiles[name] or {}
+    points = [float(x) for x in prof.get("spend_review_points_usd") or []]
+    return {**run, **prof, "profile": name, "spend_review_points_usd": points,
+            "spend_review_usd": points[0] if points else None}
+
+
+def stage_group(agent_id: str) -> str | None:
+    return next((g for g, agents in STAGE_GROUPS.items() if agent_id in agents), None)
 
 
 @dataclass(frozen=True)
@@ -45,7 +76,7 @@ def agent_model(agent_id: str) -> AgentModel:
         provider=entry["provider"],
         model=model_id,
         max_tokens=int(entry.get("max_tokens", 8000)),
-        temperature=float(entry.get("temperature", 0.0)),
+        temperature=float(entry.get("temperature", 0.0)),   # provenance only: no request carries it
         effort=entry.get("effort"),
         cache_system=bool(entry.get("cache_system", False)),
         cache_payload=tuple(entry.get("cache_payload") or ()),

@@ -1,10 +1,34 @@
 run:
-  spend_cap_usd: 35.0
+  # The active profile sets the cap, the review point and the stage sub-caps (profiles below).
+  # LITREVIEW_PROFILE overrides it for one process; a run records the profile it was created under.
+  profile: pilot
+  spend_cap_usd: 35.0      # kept equal to profiles.pilot (a test fails if they drift)
   spend_review_usd: 25.0
   warn_at_fraction: 0.8
   allow_unpriced_models: false
+  price_max_age_days: 30   # a model whose prices.yaml `checked` date is older is refused before any call
+profiles:
+  # spend_cap_usd is absolute: no call is dispatched past it. Each spend_review_points_usd value pauses the
+  # run for a recorded CP_SPEND approval. stage_caps_usd bound what each stage group may commit (spent + held):
+  # a stage that would pass its sub-cap stops for the researcher instead of borrowing from a later stage.
+  pilot:         # the staged pilot keeps its own stage authorizations (pilot_authorization.py)
+    spend_cap_usd: 35.0
+    spend_review_points_usd: [25.0]
+  sample:        # NON-REPRESENTATIVE A07->A09 sample: governed by its sample authority; never enters the forecast
+    spend_cap_usd: 35.0
+    spend_review_points_usd: [25.0]
+    non_representative: true
+  manuscript:    # the full run: target $150, review at $120 and again at the target, hard stop $200
+    target_usd: 150.0
+    spend_cap_usd: 200.0
+    spend_review_points_usd: [120.0, 150.0]
+    stage_caps_usd: {A02-A04: 6.0, A05-A06: 50.0, A07: 30.0, A08-A09: 20.0, A10: 24.0, A11-A12: 20.0}
 loops:
   max_json_repair_attempts: 1
+  reserved_call_repairs: 1       # A07-A12 calls: one audited format repair from the saved reply (was 0: fail the stage)
+  max_truncation_retries: 1      # one retry at truncation_retry_factor x the cap; the partial output is kept
+  truncation_retry_factor: 1.5
+  max_output_tokens_ceiling: 64000   # a truncation retry never asks for more than this
   max_search_repairs: 2
   max_reextractions: 0
   max_critique_cycles: 1
@@ -27,87 +51,108 @@ providers:
   anthropic:
     key_env: ANTHROPIC_API_KEY
     send_temperature: false
+    base_url: https://api.anthropic.com   # explicit, so ANTHROPIC_BASE_URL cannot redirect paid calls
     plan_response_audit_dir: C:\Users\maykh\LitReviewStage1\PrivateProviderAudit-A07-PLAN-v10
   openai:
     key_env: OPENAI_API_KEY
-    base_url: null
+    base_url: https://api.openai.com/v1   # explicit, so OPENAI_BASE_URL in the environment cannot redirect it
     send_temperature: false
     json_mode: true
+    structured_output: json_schema        # strict schema where the schema qualifies; else json_object
+    reasoning_effort: {send: true, allowed: [low, medium, high]}
   kimi:
     key_env: MOONSHOT_API_KEY
     base_url: https://api.moonshot.ai/v1
     send_temperature: false
     json_mode: true
+    structured_output: json_object
+    # K3.1 Pro always reasons and defaults to max when the field is omitted (guides, read 2026-11-23;
+    # Moonshot's own page did not render). `medium` is not an accepted value: an agent on Kimi sets low or high.
+    reasoning_effort: {send: true, allowed: [low, high, max]}
 models:
   claude_strong: claude-opus-5-5
   claude_default: claude-sonnet-5-5
   claude_fast: claude-haiku-5-5
   claude_opus5: claude-opus-5
   openai_strong: gpt-6.1-sol
-  openai_fast: gpt-5-mini
+  openai_fast: gpt-6.1-terra   # gpt-5-mini shuts down 2026-12-11; this is OpenAI's named replacement
   openai_luna: gpt-6-luna
   kimi_strong: kimi-k3
   kimi_pro: kimi-k3.1-pro
-  kimi_default: kimi-k2.6
 agents:
+  # max_tokens: the output cap of a call that has no per-mode cap. Thinking (Anthropic) and reasoning (OpenAI)
+  # count inside it. Per-mode caps live with their stage: synthesis.output_limits, bridge.output_limits,
+  # scientific_verification.output_limits, validation.output_limits and max_tokens_by_level below.
+  # Every cap is sized from measured outputs (records/output_shares.json); a truncated call keeps its
+  # partial output and is retried once at loops.truncation_retry_factor.
+  # temperature: recorded for provenance only. No provider request carries it (send_temperature: false:
+  # the reasoning models reject a non-default value), so changing it here changes nothing.
   A02-SP:
     provider: openai
     model: openai_strong
-    max_tokens: 32000
+    max_tokens: 12000
     temperature: 0.4
   A03-LM:
     provider: openai
     model: openai_strong
-    max_tokens: 32000
+    max_tokens: 12000
     temperature: 0.2
   A04-CQ:
     provider: anthropic
     model: claude_fast
-    max_tokens: 32000
+    max_tokens: 16000
     temperature: 0.0
   A05-KE:
     provider: anthropic
     model: claude_default
-    max_tokens: 64000
+    max_tokens: 48000
+    max_tokens_by_level: {FULL_TEXT: 48000, ABSTRACT: 24000}
     effort: medium
     temperature: 0.0
     cache_system: true
   A06-SV:
     provider: openai
     model: openai_strong
-    max_tokens: 64000
+    max_tokens: 24000
+    effort: medium
     temperature: 0.0
   A07-SYN:
     provider: anthropic
     model: claude_opus5
-    max_tokens: 128000
-    effort: high
+    max_tokens: 16000
+    effort: medium
     temperature: 0.3
+    cache_system: true
+    cache_ttl: 1h
   A08-OL:
     provider: openai
     model: openai_strong
-    max_tokens: 32000
+    max_tokens: 12000
+    effort: medium
     temperature: 0.2
   A09-WRI:
     provider: anthropic
     model: claude_opus5
-    max_tokens: 64000
-    effort: high
+    max_tokens: 16000
+    effort: medium
     temperature: 0.5
+    cache_system: true
   A10-RV:
     provider: openai
     model: openai_strong
-    max_tokens: 32000
+    max_tokens: 16000
+    effort: medium
     temperature: 0.0
   A11-RC:
     provider: kimi
     model: kimi_pro
-    max_tokens: 32000
+    max_tokens: 16000
+    effort: high
     temperature: 0.3
   A12-EDI:
     provider: anthropic
     model: claude_default
-    max_tokens: 64000
+    max_tokens: 16000
     effort: medium
     temperature: 0.2
 themes:
@@ -156,13 +201,13 @@ scientific_verification:
   max_occurrences_per_packet: 12
   max_global_entries_per_page: 128
   output_limits:
-    LOCAL: 10000
-    GLOBAL: 8000
+    LOCAL: 16000
+    GLOBAL: 16000
   retrieval_limit: 12
   max_retrieval_rounds: 2
 synthesis:
   theme_merge_max: 40
-  max_tokens_per_turn: 12000
+  max_tokens_per_turn: 16000
   max_findings_per_group: 24
   max_items_per_group: 8
   max_items_per_source_group: 16
@@ -172,9 +217,9 @@ synthesis:
   retrieval_limit: 12
   output_limits:
     PLAN: 32000
-    GROUP: 12000
-    RECONCILE: 6000
-    FINAL: 6000
+    GROUP: 16000
+    RECONCILE: 16000
+    FINAL: 16000
   context_ceiling_tokens: 900000
   cache_ttl: 1h
   plan_request:

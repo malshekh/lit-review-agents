@@ -255,7 +255,7 @@ request, the exact serialized request is bounded in UTF-8 bytes (never below its
 the routed model's window (`admission.context_windows`) with its output reserve (`max_tokens`, plus
 `reasoning_reserve_tokens` for providers where reasoning is not established to count within it). A request
 that cannot be bounded, or whose model has no recorded window, is refused. The windows were read from the
-providers' model-metadata endpoints on 2026-10-30 (`tests/model_window_probe.py`): Claude 1,000,000 input tokens,
+providers' model-metadata endpoints on 2026-10-30 (`scripts/live/model_window_probe.py`): Claude 1,000,000 input tokens,
 Kimi K3.1 Pro 1,048,576; OpenAI's endpoint reports none, so GPT-6.1's 1,050,000 is researcher-supplied. A request that does not fit is
 subdivided by a fixed rule or the stage stops. A09 writes one section per request, and a section too large
 for one request stops the stage: the plan must split it. A12 edits the whole manuscript, or one unit at a

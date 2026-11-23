@@ -108,12 +108,12 @@ def test_completed_validations_remain_skipped(ready,monkeypatch):
 
 
 @pytest.mark.projection_guard
-def test_real_agent_batches_64k_and_records_only_failed_batch_retry(ready,monkeypatch):
+def test_real_agent_batches_at_configured_cap_and_retries_truncation_with_larger_cap(ready,monkeypatch):
     from litreview import pilot_authorization as pa
     from litreview.agents import base
     from litreview.llm.base import LLMResponse
     from test_pilot_authorization import authorize
-    r,p=ready;r.cfg['agents']['A06-SV']['max_tokens']=64000
+    r,p=ready;cap=r.route('A06-SV').max_tokens
     r.save('selected_corpus.json',[{'record_id':'R0001','pmid':'34638842','pmcid':'PMC8508702','abstract':'Synthetic study'},
                                  {'record_id':'R0002','pmid':'27006494','abstract':'Synthetic'},
                                  {'record_id':'R0003','pmid':'30771200','abstract':'Synthetic'}])
@@ -124,8 +124,9 @@ def test_real_agent_batches_64k_and_records_only_failed_batch_retry(ready,monkey
     calls=[]
     def complete(*args,**kwargs):
         data=json.loads(kwargs['user'][0]['text']);calls.append(data['a06_validation_batch']['finding_ids'])
-        assert kwargs['max_tokens']==64000
-        if len(calls)==2:return LLMResponse('', 'openai',r.route('A06-SV').model,10,64000,'length')
+        # the one retry of the truncated batch (third call) asks for 1.5x the cap, never the cap that truncated
+        assert kwargs['max_tokens']==(int(cap*1.5) if len(calls)==3 else cap)
+        if len(calls)==2:return LLMResponse('', 'openai',r.route('A06-SV').model,10,cap,'length')
         return LLMResponse(json.dumps(response(data)),'openai',r.route('A06-SV').model,10,100,'stop')
     monkeypatch.setattr(base,'complete',complete)
     merged=r.agent('A06-SV',p,'A06-SV_R0001_recovery',exclude_providers=frozenset({'anthropic'}))

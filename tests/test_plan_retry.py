@@ -61,7 +61,9 @@ def test_raw_saved_and_charge_recorded_before_truncation_rejection(tmp_path,monk
     prov=SimpleNamespace(agent_call=lambda *a,**k:None)
     model=dataclasses.replace(config.agent_model("A07-SYN"),max_tokens=32000)
     with pytest.raises(base.AgentError,match="truncated"):
-        base.run_agent("A07-SYN",{"mode":"PLAN"},tmp_path,"synthetic_PLAN",b,prov,model=model,repair_limit=0)
+        base.run_agent("A07-SYN",{"mode":"PLAN"},tmp_path,"synthetic_PLAN",b,prov,model=model,repair_limit=0,
+                       truncation_retries=0)   # the controlled PLAN retry is authorized for exactly one attempt
+    assert json.loads((tmp_path/"outputs/synthetic_PLAN.truncated0.json").read_text())["partial_output"]=="synthetic_PLAN.raw0.txt"
     saved=json.loads((tmp_path/"outputs/synthetic_PLAN.provider.receipt0.json").read_text())
     assert saved["private_raw_response_path"]==str(full) and json.loads(full.read_text())==raw and len(charges)==1
     assert not (tmp_path/"outputs/synthetic_PLAN.provider.raw0.json").exists()
@@ -145,20 +147,18 @@ def test_financial_projection_removes_candidate_before_margin(tmp_path):
     assert candidate["projected_total_usd"]==pytest.approx(7.6957206+2.111228)
 
 
-def test_limits_other_than_plan_unchanged():
-    import yaml
-    from pathlib import Path
-    root=Path(r"C:\Users\maykh\LitReviewStage1")
-    old=yaml.safe_load((root/"execution-20261104-v9-r0001-writing/config/pipeline.yaml").read_text(encoding="utf-8"))
+def test_plan_limits_and_post_pilot_caps():
+    """The controlled PLAN keeps its approved request (32k, adaptive thinking, medium effort). Every other cap
+    was resized after the pilot (2026-11-23): no call leaves less than 12k for thinking plus output, and no agent
+    default is above 48k (the old 64k-128k defaults priced every worst case at an output nobody produced)."""
     new=config.load("pipeline")
-    import copy
-    changed=copy.deepcopy(new);changed["synthesis"]["output_limits"]["PLAN"]=4000
-    changed["synthesis"].pop("plan_request")
-    changed["providers"]["anthropic"].pop("plan_response_audit_dir")
-    # The only other intended difference: the notify trigger key is quoted, so it loads as "on", not True.
-    changed["notify"][True]=changed["notify"].pop("on")
-    assert changed==old
-    assert new["synthesis"]["output_limits"]["PLAN"]==32000
+    assert new["synthesis"]["output_limits"]=={"PLAN":32000,"GROUP":16000,"RECONCILE":16000,"FINAL":16000}
+    assert new["synthesis"]["plan_request"]=={"thinking":{"type":"adaptive"},"effort":"medium"}
+    assert new["scientific_verification"]["output_limits"]=={"LOCAL":16000,"GLOBAL":16000}
+    caps={a:v["max_tokens"] for a,v in new["agents"].items()}
+    assert max(caps.values())<=48000 and min(caps.values())>=12000
+    assert all(new["agents"][a].get("effort")=="medium" for a in ("A07-SYN","A09-WRI","A10-RV"))
+    assert "on" in new["notify"] and True not in new["notify"]
 
 
 def test_token_split_is_not_inferred_from_block_characters(tmp_path,monkeypatch):
