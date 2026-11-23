@@ -54,6 +54,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("copy-run"); c.add_argument("--source", required=True)
+    c.add_argument("--from-archive-reason", help="required when the source is inside an archived pilot")
     i = sub.add_parser("init"); i.add_argument("--run-id", required=True); i.add_argument("--max-groups", type=int, required=True)
     i.add_argument("--created-by", required=True); i.add_argument("--live", action="store_true")
     i.add_argument("--max-sections", type=int, required=True, choices=[1, 2])
@@ -83,7 +84,17 @@ def main(argv=None) -> int:
             print(f"REFUSED: {dst} exists"); return 1
         if sm.frozen_runtime():
             print("REFUSED: copy-run is for development trees, not a live runtime"); return 1
+        from litreview import preflight
+        archived = preflight.archived_root(src)
+        if archived is not None and not (args.from_archive_reason or "").strip():
+            print(f"REFUSED: {src} is inside the archived pilot {archived}. Archived material is never reused "
+                  "automatically; to rehearse on a copy, repeat the command with --from-archive-reason \"why\" "
+                  "(the reason is recorded in the copy)."); return 1
         shutil.copytree(src, dst)
+        if archived is not None:
+            (dst / "input" / "copied_from_archive.json").write_text(json.dumps(
+                {"source": str(src), "archive": str(archived), "reason": args.from_archive_reason.strip()}, indent=2),
+                encoding="utf-8")
         print(f"copied to {dst}"); return 0
     if args.cmd != "dry-run":
         sm.guard_live(getattr(args, "live", False))

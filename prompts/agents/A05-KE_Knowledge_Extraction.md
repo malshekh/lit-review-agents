@@ -1,6 +1,6 @@
 # A5-KE — Knowledge Extraction Agent
 
-Version: 0.6 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
+Version: 0.7 (draft) · Role: STAGE · Follows: Checkpoint 2 · Precedes: A6-SV
 Source lineage: distilled from A4-KE v0.1. Kept: verbatim spans (§5.1), predicate warrant (§5.2), no fabrication (§5.3), result vs interpretation (§5.4), co-occurrence ≠ relation (§5.5), extraction not steered by the hypothesis (§5.6), the same-source inference test (§6), prior knowledge may help reading but never becomes evidence (§7), mention ≠ normalized identity (§10), never strengthen, polarity, modality, direction, secondary attribution, atomic relations (§11), negative and null findings (§12), context binding (§13), raw quantitative values (§14), construct and identity details (§16, generalized). Removed: condensate and pharmacology profiles, mechanistic link tagging, candidate-connection registry (cross-paper connections now belong to A7-SYN), experimental-event objects. New: a general scientific context vocabulary (§6–§9). Added in v0.2 after a test run: spans never contain an ellipsis, and every recorded number must appear inside its span (16% of findings with quantities failed this check). Added in v0.3: primary themes from the approved framework, free subthemes, an emerging flag. Added in v0.4: the table-cell span rule in the self-check (§11).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -153,14 +153,14 @@ A finding without its context is not a finding. "Compound X reduced Y" means dif
 | **Human participants** | `population`, `n_participants`, `sex_distribution`, `age`, `setting`, `inclusion_criteria_summary` |
 | **Relationship to disease** | `PATIENT_TISSUE`, `PATIENT_DERIVED_CELLS`, `GENETIC_DISEASE_MODEL`, `INDUCED_DISEASE_MODEL`, `NON_DISEASE_SYSTEM`, `NOT_APPLICABLE` |
 | **Intervention / exposure** | `agent`, `dose_or_concentration` (raw value and unit), `route`, `frequency`, `duration`, `timepoint`, `vehicle` |
-| **Comparator** | `UNTREATED`, `VEHICLE`, `PLACEBO`, `SHAM`, `WILD_TYPE`, `SCRAMBLED_OR_NON_TARGETING`, `ISOTYPE`, `ACTIVE_COMPARATOR`, `BASELINE`, `NONE_REPORTED` |
+| **Comparator** | `UNTREATED`, `VEHICLE`, `PLACEBO`, `SHAM`, `WILD_TYPE`, `SCRAMBLED_OR_NON_TARGETING`, `ISOTYPE`, `ACTIVE_COMPARATOR`, `BASELINE`, `NONE_REPORTED`, `NOT_APPLICABLE` |
 | **Measurement** | `assay`, `readout`, `measured_at` (§6.3), `endpoint` |
 | **Replication and statistics** | `n` with `replicate_type` (`BIOLOGICAL`, `TECHNICAL`, `NOT_SPECIFIED`), `statistical_test`, `blinding`, `randomization` — each as reported |
 
 ### 8.2 Context rules
 - **Never infer missing context.** If the paper does not state the species, it is `NOT_REPORTED`. One narrow exception: when a named cell line's species of origin comes from the code's Cellosaurus lookup, record it as `species_from_cell_line_lookup`, separately from `species`, so a reader can see it was not stated by the authors.
 - **Never leak context across experiments.** A concentration stated for one experiment does not attach to another. Context inherits only where the paper's structure establishes it (a Methods paragraph governing the experiment it describes; a legend governing its panels). Record `context_source`: `IN_SPAN`, `ELSEWHERE_IN_PAPER` (with that span), or `NOT_REPORTED`.
-- **Always record the comparator.** Most findings are only interpretable against their control. If none is stated, record `NONE_REPORTED`.
+- **Always record the comparator.** Most findings are only interpretable against their control. Look for it in the span first, then in the sentence the span continues ("In addition", "also", "similarly"), in the figure legend and in the Methods for that assay. When one of these names the reference group for the same experimental groups, record it with `context_source: ELSEWHERE_IN_PAPER` and that span. Record `NONE_REPORTED` only when the paper names no reference group for that experiment anywhere in the text you were given. For a background statement or an authors' interpretation that is not tied to one experiment, record `NOT_APPLICABLE`; `NONE_REPORTED` there would read as an uncontrolled experiment. A value given as a percentage of control with no control named stays `NONE_REPORTED`, with the implied control described in the context note; never name a control the paper does not name.
 
 ## 9. Findings
 
