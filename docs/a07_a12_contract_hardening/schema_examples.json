@@ -1,0 +1,252 @@
+{
+  "A07-SYN.bounded-final.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "mode": "FINAL",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "thesis_options": [],
+    "proposed_interpretations": [],
+    "beyond_prose_bindings": []
+  },
+  "A07-SYN.bounded-group.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "mode": "GROUP",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "propositions": [],
+    "knowledge_gaps": [],
+    "findings_not_used": [],
+    "retrieval_requests": []
+  },
+  "A07-SYN.bounded-plan.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "mode": "PLAN",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "theme_change_proposals": [],
+    "scope_drift": [],
+    "fivew1h": []
+  },
+  "A07-SYN.bounded-reconcile.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "mode": "RECONCILE",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "reviews": [],
+    "issues": [],
+    "retrieval_requests": []
+  },
+  "A07-SYN.final.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "x",
+    "knowledge_gaps": [],
+    "proposed_interpretations": [],
+    "thesis_options": [],
+    "beyond_prose_bindings": []
+  },
+  "A07-SYN.group.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "x",
+    "propositions": [],
+    "context_contrasts": [],
+    "findings_context": [],
+    "findings_not_used": []
+  },
+  "A07-SYN.plan.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "x",
+    "fivew1h": [],
+    "groups": [],
+    "findings_not_used": []
+  },
+  "A07-SYN.schema.json": {
+    "agent_id": "A07-SYN",
+    "prompt_version": "1.0",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "package_version": "x",
+    "fivew1h": [],
+    "propositions": [],
+    "groups": [],
+    "knowledge_gaps": [],
+    "proposed_interpretations": [],
+    "thesis_options": [],
+    "coverage_realization": [],
+    "researcher_decision": {}
+  },
+  "A08-OL.schema.json": {
+    "agent_id": "A08-OL",
+    "prompt_version": "0.5",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "plan_version": "x",
+    "title": {
+      "text": "x",
+      "proposition_ids": []
+    },
+    "abstract_plan": {
+      "target_words": 0,
+      "ordered_proposition_ids": [],
+      "contribution_statement": "x"
+    },
+    "keywords": [],
+    "writing_order": [
+      "x"
+    ],
+    "sections": [
+      {
+        "section_id": "x",
+        "level": 1,
+        "heading": "x",
+        "heading_kind": "DESCRIPTIVE",
+        "heading_proposition_ids": [],
+        "purpose": "x",
+        "word_budget": 0,
+        "theme_ids": [],
+        "ordered_items": [],
+        "display_item_ids": [],
+        "transition_in": "x",
+        "transition_out": "x",
+        "wording_restrictions": []
+      }
+    ],
+    "allocation_ledger": [],
+    "display_items": [],
+    "budget_summary": {},
+    "readability": {
+      "background_concepts": [],
+      "abbreviations": [],
+      "nomenclature": []
+    }
+  },
+  "A09-WRI.front.schema.json": {
+    "agent_id": "A09-WRI",
+    "prompt_version": "0.3",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "FRONT_MATTER",
+    "title": "x",
+    "abstract": "x",
+    "keywords": [],
+    "table_captions": []
+  },
+  "A09-WRI.schema.json": {
+    "agent_id": "A09-WRI",
+    "prompt_version": "0.3",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "draft_version": "x",
+    "title": "x",
+    "abstract": "x",
+    "keywords": [],
+    "sections": [],
+    "figure_legends": [],
+    "main_text_word_count": 0,
+    "plan_gaps": []
+  },
+  "A09-WRI.section.schema.json": {
+    "agent_id": "A09-WRI",
+    "prompt_version": "0.3",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "SECTION",
+    "section": {
+      "section_id": "x",
+      "heading": "x",
+      "text_markdown": "x",
+      "word_count": 0
+    },
+    "retrieval_requests": [],
+    "plan_gaps": [],
+    "ceiling_unclear": []
+  },
+  "A10-RV.bounded.schema.json": {
+    "agent_id": "A10-RV",
+    "prompt_version": "2.0",
+    "mode": "LOCAL",
+    "status": "COMPLETE",
+    "verdicts": [],
+    "issues": [],
+    "retrieval_requests": [],
+    "inventory_fingerprint": "x",
+    "reviewed_index_ids": []
+  },
+  "A10-RV.schema.json": {
+    "agent_id": "A10-RV",
+    "prompt_version": "2.0",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "pass": "DRAFT",
+    "coverage": {},
+    "findings": [],
+    "verification_execution": "x",
+    "finding_severity": "x"
+  },
+  "A11-RC.schema.json": {
+    "agent_id": "A11-RC",
+    "prompt_version": "0.2",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "manuscript_version": "x",
+    "reader_passes": {},
+    "strengths": [],
+    "concerns": [],
+    "decision": "ACCEPT",
+    "decision_rationale": "x"
+  },
+  "A12-EDI.schema.json": {
+    "agent_id": "A12-EDI",
+    "prompt_version": "0.2",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "REVISION",
+    "output_manuscript_version": "x",
+    "title": "x",
+    "abstract": "x",
+    "sections": [],
+    "change_log": [],
+    "queries": [],
+    "escalations": []
+  },
+  "A12-EDI.unit.schema.json": {
+    "agent_id": "A12-EDI",
+    "prompt_version": "0.2",
+    "status": "COMPLETE",
+    "warnings": [],
+    "limitations": [],
+    "mode": "REVISION",
+    "unit": "x",
+    "output_manuscript_version": "x",
+    "change_log": [],
+    "queries": [],
+    "escalations": []
+  }
+}

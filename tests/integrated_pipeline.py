@@ -199,7 +199,10 @@ def simulate(n: int, root: Path, fail: dict | None = None) -> dict:
     orch.RUNS_DIR = root
     run = orch.Run(f"sim-{n}")
     corpus, findings, held = workload(n)
-    run.cfg = {**run.cfg, "batch": {**run.cfg["batch"], "gate_usd": 1e6}}   # nothing is spent; controls stay live
+    # This scripted integration scenario requires revision then ACCEPT and an injected redraft.
+    # Do not inherit the separate single-paper pilot's one-cycle configuration.
+    run.cfg = {**run.cfg, "batch": {**run.cfg["batch"], "gate_usd": 1e6},
+               "loops": {**run.cfg["loops"], "max_critique_cycles": 2, "max_redrafts": 1}}
     run.budget.cap = 1e6
     run.save("selected_corpus.json", corpus["selected_corpus"])
     run.save("validated_findings.json", findings)

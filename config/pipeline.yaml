@@ -1,272 +1,336 @@
-# Pipeline configuration: which model runs each agent, budgets, loop limits, notifications.
-# Change models here, never in code.
-#
-# Design rule: an auditor never runs on the same vendor as the agent whose work it checks.
-#   Claude (Anthropic) produces:  screening (Haiku), extraction and editing (Sonnet), synthesis and writing (Opus 5)
-#   OpenAI GPT-6.1 plans and audits: scope, search, outline; A06-SV checks A05 extraction, A10-RV checks A09/A12 prose
-#   Kimi (Moonshot) critiques:    A11-RC — a third vendor for an independent reader's view
-# Qualified on a drug-repurposing oncology topic (run 20261025-100039): Opus 5.5 refused twice ("bio"
-# classifier), so A07/A09 use Opus 5. Refusals are recorded per model and topic family (see routing).
-
 run:
-  spend_cap_usd: 35.00          # hard stop for one run; the orchestrator halts before exceeding it
-  spend_review_usd: 25.00       # pilot review point: before the call that would take spent + reserved + that call's
-                                #   worst case past it, the run stops and asks (CP_SPEND); the cap does not move
-  warn_at_fraction: 0.8         # warning email/log when 80% of the cap is spent
-  allow_unpriced_models: false  # refuse to run a model with no price in prices.yaml
-
+  spend_cap_usd: 35.0
+  spend_review_usd: 25.0
+  warn_at_fraction: 0.8
+  allow_unpriced_models: false
 loops:
-  max_json_repair_attempts: 1   # re-ask once if an agent returns invalid JSON
-  max_search_repairs: 2         # A03 REPAIR rounds per query family
-  max_reextractions: 0          # A06 defect -> A05 re-extraction rounds per paper
-  max_critique_cycles: 2        # A11 critique -> A12 revision cycles
-  cq_batch_size: 20             # records per A04 call
-  max_redrafts: 1               # A10 blocking findings on the first draft -> A09 redraft
-  verification: draft_and_final # legacy preference; version-bound A10 rechecks changed text via its cache
-
+  max_json_repair_attempts: 1
+  max_search_repairs: 2
+  max_reextractions: 0
+  max_critique_cycles: 1
+  cq_batch_size: 20
+  max_redrafts: 0
+  verification: draft_and_final
 retrieval:
-  max_records_total: 300        # across all query families and sources (A03-LM budget)
+  max_records_total: 300
   max_records_per_family: 300
   citation_expansion:
     enabled: true
-    depth: 1                    # 1 or 2. Use 2 only for sparse topics (A03-LM §4.5): it seeds from
-                                #   depth-1 records A04-CQ qualified, and costs extra A04 screening
-    max_per_seed: 30            # newest-first cap on citing + cited papers per seed
-    max_per_seed_depth2: 15     # tighter cap per seed at depth 2
-    max_total: 100              # cap on new records from expansion
-    directions: [references, citations]   # backward and forward
-
-# Where each provider is reached. API keys are read from .env (never stored here).
+    depth: 1
+    max_per_seed: 30
+    max_per_seed_depth2: 15
+    max_total: 100
+    directions:
+    - references
+    - citations
 providers:
   anthropic:
     key_env: ANTHROPIC_API_KEY
-    send_temperature: false     # Opus 5.5 / Sonnet 5.5 removed sampling params; anthropic SDK 1.x dropped the argument
+    send_temperature: false
+    plan_response_audit_dir: C:\Users\maykh\LitReviewStage1\PrivateProviderAudit-A07-PLAN-v10
   openai:
     key_env: OPENAI_API_KEY
-    base_url: null              # default OpenAI endpoint
-    send_temperature: false     # GPT-5/GPT-6 reasoning models reject non-default temperature
+    base_url: null
+    send_temperature: false
     json_mode: true
   kimi:
     key_env: MOONSHOT_API_KEY
-    base_url: https://api.moonshot.ai/v1   # international platform (keys from platform.kimi.ai)
+    base_url: https://api.moonshot.ai/v1
     send_temperature: false
     json_mode: true
-
 models:
-  # Claude:  https://platform.claude.com/docs/en/about-claude/pricing
-  claude_strong:  claude-opus-5-5     # $4 / $20 per M tokens
-  claude_default: claude-sonnet-5-5   # $2 / $10
-  claude_fast:    claude-haiku-5-5    # $0.10 / $0.50 (prompts <=100k tokens)
-  claude_opus5:   claude-opus-5       # $5 / $25 — used where Opus 5.5 refuses the topic
-  # OpenAI:  https://developers.openai.com/api/docs/pricing
-  openai_strong:  gpt-6.1-sol         # $2 / $10   — auditors
-  openai_fast:    gpt-5-mini          # $0.25 / $2. Snapshot shuts down Dec 11, 2026
-  openai_luna:    gpt-6-luna          # $0.10 / $0.50 — A04 alternate if Haiku refuses a topic
-  # Kimi:    https://platform.kimi.ai (international, USD)
-  kimi_strong:    kimi-k3             # $3 / $15
-  kimi_pro:       kimi-k3.1-pro       # $2 / $10
-  kimi_default:   kimi-k2.6           # $0.95 / $4
-
+  claude_strong: claude-opus-5-5
+  claude_default: claude-sonnet-5-5
+  claude_fast: claude-haiku-5-5
+  claude_opus5: claude-opus-5
+  openai_strong: gpt-6.1-sol
+  openai_fast: gpt-5-mini
+  openai_luna: gpt-6-luna
+  kimi_strong: kimi-k3
+  kimi_pro: kimi-k3.1-pro
+  kimi_default: kimi-k2.6
 agents:
-  # Claude agents: thinking is always on and counts toward max_tokens (requests are streamed, so
-  # large caps are safe; you pay only for tokens used). `effort` sets how much thinking is spent.
-  # OpenAI and Kimi agents ignore `effort`.
-  A02-SP:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.4 }
-  A03-LM:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.2 }
-  A04-CQ:  { provider: anthropic, model: claude_fast,    max_tokens: 32000,  temperature: 0.0 }
-  A05-KE:  { provider: anthropic, model: claude_default, max_tokens: 64000,  effort: medium, temperature: 0.0,
-             cache_system: true }   # system prompt (~10.6k tokens) is identical for every paper
-             # cache_payload: [review_spec, record] caches the paper for a re-extraction. Off: extraction
-             # and re-extraction are separate stages, often an hour apart, beyond the 5-minute cache,
-             # so every paper would pay the 25% write premium without a read.
-  A06-SV:  { provider: openai,    model: openai_strong,  max_tokens: 64000,  temperature: 0.0 }  # audits A05 (Claude)
-  A07-SYN: { provider: anthropic, model: claude_opus5,   max_tokens: 128000, effort: high,   temperature: 0.3 }
-  A08-OL:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.2 }
-  A09-WRI: { provider: anthropic, model: claude_opus5,   max_tokens: 64000,  effort: high,   temperature: 0.5 }
-  A10-RV:  { provider: openai,    model: openai_strong,  max_tokens: 32000,  temperature: 0.0 }  # audits A09/A12 (Claude)
-  A11-RC:  { provider: kimi,      model: kimi_pro,       max_tokens: 32000,  temperature: 0.3 }  # third vendor
-  A12-EDI: { provider: anthropic, model: claude_default, max_tokens: 64000,  effort: medium, temperature: 0.2 }
-
-# Theme framework: A02 proposes primary themes (approved at CP1). The range is guidance: A02 justifies
-# its number against how heterogeneous the evidence is. Subthemes are free; only you change primary themes.
+  A02-SP:
+    provider: openai
+    model: openai_strong
+    max_tokens: 32000
+    temperature: 0.4
+  A03-LM:
+    provider: openai
+    model: openai_strong
+    max_tokens: 32000
+    temperature: 0.2
+  A04-CQ:
+    provider: anthropic
+    model: claude_fast
+    max_tokens: 32000
+    temperature: 0.0
+  A05-KE:
+    provider: anthropic
+    model: claude_default
+    max_tokens: 64000
+    effort: medium
+    temperature: 0.0
+    cache_system: true
+  A06-SV:
+    provider: openai
+    model: openai_strong
+    max_tokens: 64000
+    temperature: 0.0
+  A07-SYN:
+    provider: anthropic
+    model: claude_opus5
+    max_tokens: 128000
+    effort: high
+    temperature: 0.3
+  A08-OL:
+    provider: openai
+    model: openai_strong
+    max_tokens: 32000
+    temperature: 0.2
+  A09-WRI:
+    provider: anthropic
+    model: claude_opus5
+    max_tokens: 64000
+    effort: high
+    temperature: 0.5
+  A10-RV:
+    provider: openai
+    model: openai_strong
+    max_tokens: 32000
+    temperature: 0.0
+  A11-RC:
+    provider: kimi
+    model: kimi_pro
+    max_tokens: 32000
+    temperature: 0.3
+  A12-EDI:
+    provider: anthropic
+    model: claude_default
+    max_tokens: 64000
+    effort: medium
+    temperature: 0.2
 themes:
   primary_min: 5
   primary_max: 8
-
-# Passed to A08-OL as the researcher's preference for the review's display item(s).
 outline:
-  display_preference: >-
-    One display item: a single comparative table (T1, TABLE_COMPARISON) of biochemical, preclinical and
-    clinical evidence, built by code from eligible findings (system, intervention, key observation, role,
-    limitation, citation). Contrary evidence is always included; it fits one page. No other display items.
-
-# Evidence-to-manuscript bridge (bridge.py): the A08 allocation ledger, section packets, sequential A09
-# writing with a deterministic gate after every section, and the comparative table.
+  display_preference: 'One display item: a single comparative table (T1, TABLE_COMPARISON)
+    of biochemical, preclinical and clinical evidence, built by code from eligible
+    findings (system, intervention, key observation, role, limitation, citation).
+    Contrary evidence is always included; it fits one page. No other display items.'
 bridge:
-  ledger_approval: true         # stop after A08 until the researcher approves the allocation ledger (CP_LEDGER):
-                                #   what gets individual discussion is evidence selection, the authors' decision
-  max_group_size: 16            # most elements one GROUPED_WITH passage may carry
-  table_max_rows: 25            # one typeset page (journal table_max_pages: 1)
-  max_retrieval_rounds: 2       # A09 evidence requests per section
-  retrieval_limit: 12           # items per request round
-  output_limits:                # max_tokens per downstream request kind, thinking included (sized to the unit
-                                #   written, not the whole manuscript; agents' max_tokens apply otherwise)
-    A09_SECTION: 16000          # one section of about 300-1,000 words plus thinking
-    A09_FRONT_MATTER: 8000      # title, abstract (200 words), keywords, one caption
-    A12_UNIT: 16000             # one section or the front matter, edited, with its change log
-
-# Admission for A08, A09, A11 and A12 (admission.py): every request is bounded (UTF-8 bytes of the exact
-# serialized request, never below its token count) and must fit the model's window with its output reserve.
-# A model with no window here is refused (fail closed): add a documented value before using it.
+  ledger_approval: true
+  max_group_size: 16
+  table_max_rows: 25
+  max_retrieval_rounds: 2
+  retrieval_limit: 12
+  output_limits:
+    A09_SECTION: 16000
+    A09_FRONT_MATTER: 8000
+    A12_UNIT: 16000
 admission:
   context_windows:
-    # Provider metadata endpoints, 2026-10-30 (tests/model_window_probe.py, docs/integration_validation/model_windows.json)
-    claude-opus-5: 1000000      # A09; A12 alternate. Anthropic max_input_tokens 1,000,000
-    claude-sonnet-5-5: 1000000  # A12; A09 alternate. Anthropic max_input_tokens 1,000,000
-    kimi-k3.1-pro: 1048576      # A11; A08 alternate. Moonshot context_length 1,048,576 (input + output)
-    gpt-6.1-sol: 1050000        # A08; A11 alternate. Researcher-supplied 2026-10-29: OpenAI's endpoint reports none
-  reasoning_reserve_tokens:     # added to max_tokens where reasoning is not established to count within it
-    anthropic: 0                # thinking counts within max_tokens
-    openai: 0                   # reasoning counts within max_completion_tokens
-    kimi: 32000                 # reasoning is always on (Moonshot: type only); not established to count
-                                #   within max_tokens, so reserved again in full
+    claude-opus-5: 1000000
+    claude-sonnet-5-5: 1000000
+    kimi-k3.1-pro: 1048576
+    gpt-6.1-sol: 1050000
+  reasoning_reserve_tokens:
+    anthropic: 0
+    openai: 0
+    kimi: 32000
   safety_margin_tokens: 0
-
-# Context utilisation, every call (interactive and batch): (input + reserved output) / the model's window above.
-# Logged with both the byte bound of the exact request and the provider's own count where available (Anthropic's
-# free messages.count_tokens: provider_count), plus the actual figure from usage after the call. The count decides
-# the level when present, else the byte bound (conservative). warn: logged and notified; review: the run stops
-# for the researcher's approval of that exact request (CP_CONTEXT, recorded in provenance). OPERATIONAL DEFAULTS,
-# NOT RELIABILITY GUARANTEES. The hard admission ceilings (admission above; A07/A10 job ceilings) are unchanged.
-# A model with no window above is logged WINDOW_UNKNOWN (no ratio).
 context_utilisation:
-  default: { warn: 0.80, review: 0.90 }
-  models: {}                    # per-model overrides, e.g. kimi-k3.1-pro: { warn: 0.80, review: 0.85 }
-  provider_count: { anthropic: true }
-
-# A06 instability test: after per-paper validation, every paper with a blocked finding is validated once
-# more with the identical input (whole paper against whole paper, same prompt, text, identities and model
-# settings). Agreement goes to data/instability_test.json; a finding whose two readings give it different
-# roles is quarantined for human review. Priced in the CP2 projection.
+  default:
+    warn: 0.8
+    review: 0.9
+  models: {}
+  provider_count:
+    anthropic: true
 validation:
-  shared_prefix: true          # development only; requires separate frozen-runtime promotion
+  shared_prefix: true
   findings_per_call: 15
   truncation_retries: 1
   instability_test: true
-
-# A10: conservative serialized-byte admission stays below the 272k pricing threshold.
 scientific_verification:
   context_ceiling_tokens: 240000
   max_occurrences_per_packet: 12
   max_global_entries_per_page: 128
-  output_limits: { LOCAL: 10000, GLOBAL: 8000 }
+  output_limits:
+    LOCAL: 10000
+    GLOBAL: 8000
   retrieval_limit: 12
   max_retrieval_rounds: 2
-
-# A07-SYN runs as one logical synthesis job; packet boundaries are not manuscript sections.
-# Registry-backed PLAN, bounded GROUP/retrieval, global RECONCILE, compact FINAL.
 synthesis:
-  theme_merge_max: 40            # legacy helper only; registry synthesis never merges approved themes
-  max_tokens_per_turn: 12000     # compatibility default; mode limits below include thinking
-  max_findings_per_group: 24     # deterministic packets within approved primary themes
+  theme_merge_max: 40
+  max_tokens_per_turn: 12000
+  max_findings_per_group: 24
   max_items_per_group: 8
-  max_items_per_source_group: 16 # source-only analysis; no findings removed, same 12k output cap
+  max_items_per_source_group: 16
   max_propositions_per_group: 12
   reconcile_page_size: 32
   max_retrieval_rounds: 2
   retrieval_limit: 12
-  output_limits: { PLAN: 4000, GROUP: 12000, RECONCILE: 6000, FINAL: 6000 }
-  context_ceiling_tokens: 900000 # stop cleanly if projected input + max output would exceed this (window 1M)
-  cache_ttl: 1h                  # cache the small shared system prompt, not the raw corpus
-
-# Calibrated planning forecast (src/litreview/tools/forecast.py). Projections after CP2 and the runtime gate use
-# the BASELINE scenario plus uncertainty_margin; every call is still admitted and reserved at its own strict bound,
-# and run.spend_cap_usd stays absolute. Measured: A05/A06 per-paper and per-theme costs, batch factor and repeat
-# share (records/cost_rates.json), A07 provider-counted input (docs/a07_efficiency), A10 request bounds
-# (docs/integrated_validation/a10), A08-A12 request bounds and byte/token counts (docs/bridge_validation).
-# Everything below is an ASSUMPTION, stated so it can be changed: no live output, retrieval or retry rates exist.
+  output_limits:
+    PLAN: 32000
+    GROUP: 12000
+    RECONCILE: 6000
+    FINAL: 6000
+  context_ceiling_tokens: 900000
+  cache_ttl: 1h
+  plan_request:
+    thinking:
+      type: adaptive
+    effort: medium
 forecast:
-  uncertainty_margin: 0.30
+  uncertainty_margin: 0.3
   scenarios:
-    # output: share of each output cap used (thinking included); bytes_per_token: A08-A12 and A10 request bytes per
-    # token (measured 1.925-2.381 on Claude; GPT/Kimi not counted); retrieval: share of A09 sections / A07 and A10
-    # turns using one retrieval round (adverse: every turn, every round); redraft: share of sections redrafted;
-    # cycles/revisions: A11 critique cycles and A12 revisions; paper: per-paper cost statistic; repeat: share of
-    # papers repeated by the A06 instability test (measured 0.643); batch: A05/A06 at batch rates after one
-    # interactive probe; retries: paid calls that fail and are redone, as a share of model-stage cost; pre_cp2: A02-A04.
-    baseline: {output: 0.50, bytes_per_token: 2.1, retrieval: 0.25, a07_retrieval: 0.10, a10_retrieval: 0.10,
-               redraft: 0.20, cycles: 2, revisions: 1, paper: mean_usd, repeat: measured, theme: mean_usd,
-               batch: true, retries: 0.05, pre_cp2: 4.00, a10_local_rerun: [1.0, 0.3, 0.6, 0.1]}
-    low:      {output: 0.25, bytes_per_token: 2.4, retrieval: 0.0, a07_retrieval: 0.0, a10_retrieval: 0.0,
-               redraft: 0.0, cycles: 1, revisions: 0, paper: mean_usd, repeat: measured, theme: mean_usd,
-               batch: true, retries: 0.0, pre_cp2: 2.07, a10_local_rerun: [1.0, 0.6, 0.1]}
-    high:     {output: 0.75, bytes_per_token: 2.0, retrieval: 0.50, a07_retrieval: 0.25, a10_retrieval: 0.25,
-               redraft: 0.50, cycles: 2, revisions: 1, paper: p90_usd, repeat: measured, theme: p90_usd,
-               batch: true, retries: 0.10, pre_cp2: 6.00, a10_local_rerun: [1.0, 0.5, 0.5, 1.0, 0.2]}
-    adverse:  {output: 1.00, bytes_per_token: 1.8, retrieval: 1.0, a07_retrieval: 1.0, a10_retrieval: 1.0,
-               redraft: 1.0, cycles: 2, revisions: 2, paper: p90_usd, repeat: 1.0, theme: p90_usd,
-               batch: false, retries: 0.15, pre_cp2: 8.00, a10_local_rerun: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]}
-
-# Vendor batch APIs (50% off) for stages of independent calls: A05 and A06 per paper (A06 only while
-# loops.max_reextractions is 0). Before a batch: one real item runs interactively (a refusal stops the stage
-# for one paper's cost), and the batch's worst-case cost (every item at max_tokens) is reserved under the
-# cap, or the batch is NOT submitted. A06 routes per paper away from the vendor of that paper's extraction.
-# `litreview run` reattaches to a running batch, adopting one only when its identity is proven. The vendors
-# allow 24 hours; throughput at full scale is unmeasured (records/batch_tests.jsonl: compatibility only).
+    baseline:
+      output: 0.5
+      bytes_per_token: 2.1
+      retrieval: 0.25
+      a07_retrieval: 0.1
+      a10_retrieval: 0.1
+      redraft: 0.2
+      cycles: 2
+      revisions: 1
+      paper: mean_usd
+      repeat: measured
+      theme: mean_usd
+      batch: true
+      retries: 0.05
+      pre_cp2: 4.0
+      a10_local_rerun:
+      - 1.0
+      - 0.3
+      - 0.6
+      - 0.1
+    low:
+      output: 0.25
+      bytes_per_token: 2.4
+      retrieval: 0.0
+      a07_retrieval: 0.0
+      a10_retrieval: 0.0
+      redraft: 0.0
+      cycles: 1
+      revisions: 0
+      paper: mean_usd
+      repeat: measured
+      theme: mean_usd
+      batch: true
+      retries: 0.0
+      pre_cp2: 2.07
+      a10_local_rerun:
+      - 1.0
+      - 0.6
+      - 0.1
+    high:
+      output: 0.75
+      bytes_per_token: 2.0
+      retrieval: 0.5
+      a07_retrieval: 0.25
+      a10_retrieval: 0.25
+      redraft: 0.5
+      cycles: 2
+      revisions: 1
+      paper: p90_usd
+      repeat: measured
+      theme: p90_usd
+      batch: true
+      retries: 0.1
+      pre_cp2: 6.0
+      a10_local_rerun:
+      - 1.0
+      - 0.5
+      - 0.5
+      - 1.0
+      - 0.2
+    adverse:
+      output: 1.0
+      bytes_per_token: 1.8
+      retrieval: 1.0
+      a07_retrieval: 1.0
+      a10_retrieval: 1.0
+      redraft: 1.0
+      cycles: 2
+      revisions: 2
+      paper: p90_usd
+      repeat: 1.0
+      theme: p90_usd
+      batch: false
+      retries: 0.15
+      pre_cp2: 8.0
+      a10_local_rerun:
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
+      - 1.0
 batch:
   enabled: true
-  gate_usd: 150.00             # runtime gate before ANY batch: spent + committed (unsettled batches) + projected
-                               #   (rest of the run) + this batch's worst case must not exceed it, or the stage
-                               #   stops. Separate from run.spend_cap_usd, which stays absolute.
-  agents: [A05-KE, A06-SV]
-  min_items: 3                 # fewer items left after the probe: run them interactively
-  chunk_size: 20               # items per batch; each chunk reserves its worst case (A05: 20 x 64k output
-                               #   at $5/M + input, about $7) and releases it when it settles
-  max_chunks_in_flight: 1      # chunks outstanding at once. Above 1 the cap stays strict (each chunk holds its
-                               #   own reservation) but the back-pressure goes: one chunk's actual cost no
-                               #   longer frees room before the next is reserved. Keep 1 until chunk
-                               #   turnaround is measured on a real run; raise it then for throughput.
+  gate_usd: 150.0
+  agents:
+  - A05-KE
+  - A06-SV
+  min_items: 3
+  chunk_size: 20
+  max_chunks_in_flight: 1
   poll_seconds: 60
-  max_wait_hours: 24.5         # past this the run pauses; rerunning reattaches (results kept 29-30 days)
-  cache_ttl: 1h                # Anthropic: batch items run concurrently, often beyond 5 minutes
-
-# Refusal routing. Every agent call is recorded in records/model_record.jsonl (tracked in git, shared by
-# all runs and machines) as COMPLETED or REFUSED, with model, agent and the run's topic family
-# (`litreview new --family`). A model that has refused in a topic family is not used again for that
-# family: the agent moves to its next alternate, or the stage fails before any call if none is left.
-# A refusal is never retried. Every agent has an alternate; each keeps the vendor rule above (an
-# auditor's alternate is still a different vendor from the agent it checks).
+  max_wait_hours: 24.5
+  cache_ttl: 1h
 routing:
-  # Routing to an alternate that would cost more than this multiple of the primary (priced from the
-  # run's own calls) stops the run before any call and asks: `litreview approve-alternate RUN AGENT`.
-  # A05 and A12 on Opus 5 (about 2.5x, more with cache reads) always ask.
   max_cost_multiple: 1.5
   alternates:
-    A02-SP:  [{ provider: kimi,      model: kimi_pro }]          # same price; planners have no vendor constraint
-    A03-LM:  [{ provider: kimi,      model: kimi_pro }]
-    # Haiku shares the 5.5 safety-classifier family that refused this topic at Opus 5.5; screening
-    # processes hundreds of records, so A04 has a non-Anthropic alternate at the same price.
-    A04-CQ:  [{ provider: openai,    model: openai_luna }]
-    A05-KE:  [{ provider: anthropic, model: claude_opus5 }]      # audited by OpenAI (A06): stays off OpenAI; 2.5x price
-    A06-SV:  [{ provider: kimi,      model: kimi_pro }]          # audits Claude: stays off Anthropic
-    # Synthesis and writing: Sonnet 5.5 completed every A05 call on this topic family (1M input, 128k output).
-    A07-SYN: [{ provider: anthropic, model: claude_default }]
-    A08-OL:  [{ provider: kimi,      model: kimi_pro }]
-    A09-WRI: [{ provider: anthropic, model: claude_default }]
-    A10-RV:  [{ provider: kimi,      model: kimi_pro }]          # audits Claude: stays off Anthropic
-    A11-RC:  [{ provider: openai,    model: openai_strong }]     # critiques Claude: stays off Anthropic
-    A12-EDI: [{ provider: anthropic, model: claude_opus5 }]      # audited by OpenAI (A10): stays off OpenAI; 2.5x price
-
+    A02-SP:
+    - provider: kimi
+      model: kimi_pro
+    A03-LM:
+    - provider: kimi
+      model: kimi_pro
+    A04-CQ:
+    - provider: openai
+      model: openai_luna
+    A05-KE:
+    - provider: anthropic
+      model: claude_opus5
+    A06-SV:
+    - provider: kimi
+      model: kimi_pro
+    A07-SYN:
+    - provider: anthropic
+      model: claude_default
+    A08-OL:
+    - provider: kimi
+      model: kimi_pro
+    A09-WRI:
+    - provider: anthropic
+      model: claude_default
+    A10-RV:
+    - provider: kimi
+      model: kimi_pro
+    A11-RC:
+    - provider: openai
+      model: openai_strong
+    A12-EDI:
+    - provider: anthropic
+      model: claude_opus5
 checkpoints:
-  CP1: { after: A02-SP,  purpose: "Approve scope, perspective and selection criteria" }
-  CP2: { after: A04-CQ,  purpose: "Select papers (every record shown, all tiers)" }
-  CP3: { after: A07-SYN, purpose: "Approve thesis, adopt or reject interpretations" }
-
+  CP1:
+    after: A02-SP
+    purpose: Approve scope, perspective and selection criteria
+  CP2:
+    after: A04-CQ
+    purpose: Select papers (every record shown, all tiers)
+  CP3:
+    after: A07-SYN
+    purpose: Approve thesis, adopt or reject interpretations
 notify:
-  on: [checkpoint, complete, budget_warning, failure, a10_detail]   # a10_detail: after a run's first A10 pass
-  email_to_env: NOTIFY_EMAIL_TO   # address read from .env
-
+  true:
+  - checkpoint
+  - complete
+  - budget_warning
+  - failure
+  - a10_detail
+  email_to_env: NOTIFY_EMAIL_TO
 tracing:
-  # LangSmith tracing is switched on by LANGSMITH_TRACING=true in .env.
-  # Traces include prompts and paper text: keep the LangSmith project private.
   project_env: LANGSMITH_PROJECT

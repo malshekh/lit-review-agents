@@ -162,3 +162,13 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - No concern duplicates an A10-RV finding; none is a preference or a disagreement with the evidence.
 - No proposal adds scientific content or weakens a protected item.
 - The non-specialist pass names concrete barriers, not general impressions.
+
+## Exact output contracts (development hardening)
+Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
+
+**A11-RC.schema.json**
+$ required=["agent_id","prompt_version","status","warnings","limitations","manuscript_version","reader_passes","strengths","concerns","decision","decision_rationale"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.decision enum=["ACCEPT","MINOR_REVISION","MAJOR_REVISION","HOLD_FOR_UPSTREAM_REVIEW","INCOMPLETE_CRITIQUE"]
+Example shape only:
+```json
+{"agent_id":"A11-RC","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"manuscript_version":"x","reader_passes":{},"strengths":[],"concerns":[],"decision":"ACCEPT","decision_rationale":"x"}
+```

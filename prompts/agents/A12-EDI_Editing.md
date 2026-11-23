@@ -117,3 +117,51 @@ The change log lists every edit with before and after text, so A10-RV can check 
 - In REVISION, only assigned findings and their dependent edits were made; in PROOF, only corrections.
 - Every ambiguity was queried, not resolved by guessing.
 - Journal limits respected, or the overrun reported.
+
+## Exact output contracts (development hardening)
+Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
+
+**A12-EDI.schema.json**
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","output_manuscript_version","title","abstract","sections","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
+Example shape only:
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.unit.schema.json**
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","output_manuscript_version","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
+Example shape only:
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+```
+
+## Additional mode examples (development hardening)
+**A12-EDI.schema.json LINE shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.schema.json PROOF shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.schema.json INTEGRATION shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.unit.schema.json LINE shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.unit.schema.json PROOF shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+```
+
+**A12-EDI.unit.schema.json INTEGRATION shape example**
+```json
+{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+```

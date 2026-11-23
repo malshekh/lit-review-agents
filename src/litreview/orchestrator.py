@@ -8,6 +8,7 @@ Stage order
   -> outline -> draft -> review_loop -> finish_edit -> finalize -> done
 """
 from __future__ import annotations
+from decimal import Decimal
 
 import dataclasses
 import hashlib
@@ -318,6 +319,9 @@ class Run:
         return g
 
     def _reserve(self,key,usd,agent_id,note="",steps=()):
+        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+            # Hold the future-work margin, not merely check it. Actual charges settle this hold.
+            usd = float(Decimal(str(usd)) * Decimal("1.30"))
         if pilot.enabled(self):
             try:
                 pilot.require(self,agent_id)
@@ -436,13 +440,18 @@ class Run:
                     try: pilot.require(self,agent_id,financial=False)
                     except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
                     if reservation_key:
+                        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+                            from .writing_admission import quote_call, require_hold
+                            required = quote_call(system, message, model, self.cfg['admission'], self.budget)
+                            require_hold(self.budget, reservation_key, required)
                         meta=self.load('pilot_reservations.json',{}).get(reservation_key,{})
                         if meta.get('scope')!=pilot.stage_for(self,agent_id) or meta.get('authorization')!=(self.load('pilot_'+meta.get('scope','')+'.json') or {}).get('fingerprint'):
                             raise Pause('Reservation lacks current stage authorization')
                         return reservation_key
                     from .synthesis_registry import offline_tokens
                     tokens=offline_tokens(system)+offline_tokens(message)
-                    amount=self.budget.cost(model.model,0,model.max_tokens,0,0,tokens)
+                    from .admission import output_reserve
+                    amount=self.budget.cost(model.model,0,output_reserve(model,self.cfg['admission']),0,0,tokens)
                     key='pilot-'+request_id[:24]+'-'+str(attempt)
                     if key in self.budget.reservations():raise Pause('Unsettled pilot request; reconcile before retry')
                     self._spend_review(agent_id,step,amount)
@@ -2219,6 +2228,8 @@ class Run:
             m = dataclasses.replace(m, **overrides)
         a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
         usd = self.budget.cost(m.model, a["input_bound"], a["output_reserve"])
+        if m.provider == "anthropic":
+            usd = self.budget.cost(m.model, 0, a["output_reserve"], 0, 0, a["input_bound"])
         if usd is None:
             raise UnpricedModel(m.model)
         self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})
