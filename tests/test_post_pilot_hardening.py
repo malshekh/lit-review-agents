@@ -456,11 +456,16 @@ def test_the_forecast_no_longer_moves_with_the_output_caps_and_prices_the_real_t
     assert forecast.expected_output("NOT-RECORDED", 10000, s) == 10000 * s["output"]
     b = BudgetTracker(tmp_path)
     route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]             # noqa: E731
-    usd, calls, warnings = forecast.a06_themes(1581, 120, config.load("pipeline"), b, route, s)
+    import copy
+    unpaged = copy.deepcopy(config.load("pipeline"))
+    unpaged["validation"]["theme_paging"]["enabled"] = False
+    usd, calls, warnings = forecast.a06_themes(1581, 120, unpaged, b, route, s)
     assert calls == config.load("pipeline")["themes"]["primary_max"] + 1 == 9   # not 279 (papers x themes per paper)
     assert any("would truncate" in w for w in warnings) and any("long-context" in w for w in warnings)
-    small, _, quiet = forecast.a06_themes(300, 28, config.load("pipeline"), b, route, s)
-    assert quiet == [] and small < usd
+    paged_usd, paged_calls, paged_warnings = forecast.a06_themes(1581, 120, config.load("pipeline"), b, route, s)
+    assert paged_warnings == [] and paged_calls > 9 and paged_usd < usd       # packets plus one reconciliation per theme
+    small, small_calls, quiet = forecast.a06_themes(300, 28, config.load("pipeline"), b, route, s)
+    assert quiet == [] and small < paged_usd and small_calls == 9             # a theme that fits is one call
 
 
 def test_billing_reconciliation_flags_a_gap_over_five_percent(tmp_path, capsys):

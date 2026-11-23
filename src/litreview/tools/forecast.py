@@ -54,17 +54,32 @@ def a06_themes(F: int, n_papers: int, cfg: dict, budget, route, s: dict) -> tupl
     papers x 2.3 themes (279 calls at 120 papers) when the code makes at most primary_max + 1."""
     t = output_shares().get("a06_theme") or {}
     m = route("A06-SV")
-    calls = int((cfg.get("themes") or {}).get("primary_max", 8)) + 1
-    page = (cfg.get("validation") or {}).get("theme_findings_per_call")
+    themes = int((cfg.get("themes") or {}).get("primary_max", 8)) + 1
+    calls = themes
     per_call_findings = F / calls
-    if page:
-        calls = max(calls, math.ceil(F / int(page)))
-        per_call_findings = F / calls
     overhead = float(t.get("assumed_overhead_tokens_per_call", 8400)) + 50 * n_papers
-    tokens_in = overhead + per_call_findings * float(t.get("input_tokens_per_finding", 1665))
-    tokens_out = per_call_findings * float(t.get("output_tokens_per_finding", 165)) * float(s.get("output_factor", 1.0))
+    per_in, per_out = float(t.get("input_tokens_per_finding", 1665)), float(t.get("output_tokens_per_finding", 165))
+    paging = ((cfg.get("validation") or {}).get("theme_paging") or {})
+    reconcile_usd = 0.0
+    if paging.get("enabled"):
+        index = F / themes * 120            # the global index: about 120 tokens per finding of the theme
+        room_in = max(1.0, float(paging["max_input_tokens"]) - overhead - index)
+        room_out = m.max_tokens * float(paging.get("output_share_of_cap", 0.6))
+        per_packet = max(1.0, min(room_in / per_in, room_out / per_out))
+        if F / themes > per_packet:         # the theme does not fit one request: packets plus one reconciliation
+            calls = themes * math.ceil(F / themes / per_packet)
+            per_call_findings = F / calls
+            overhead += index
+            # reconciliation: packet results, the index, and the originals of an assumed quarter of the findings
+            rec_in = overhead + (F / themes) * (0.25 * per_in + 60)
+            rec_out = min(m.max_tokens, 4000 + 0.25 * (F / themes) * per_out)
+            reconcile_usd = themes * (budget.cost(m.model, int(rec_in), int(rec_out)) or 0.0)
+    tokens_in = overhead + per_call_findings * per_in
+    tokens_out = per_call_findings * per_out * float(s.get("output_factor", 1.0))
     batched = bool(s.get("batch")) and "A06-SV" in ((cfg.get("batch") or {}).get("theme_agents") or [])
-    usd = calls * (budget.cost(m.model, int(tokens_in), int(tokens_out), batch=batched) or 0.0)
+    usd = calls * (budget.cost(m.model, int(tokens_in), int(tokens_out), batch=batched) or 0.0) + reconcile_usd
+    if reconcile_usd:
+        calls += themes
     warnings = []
     threshold = (budget.prices.get(m.model) or {}).get("long_context_threshold")
     if threshold and tokens_in > threshold:

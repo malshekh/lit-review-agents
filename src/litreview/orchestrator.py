@@ -1665,13 +1665,32 @@ class Run:
         for th, fs in by_theme.items():
             definition = next((t for t in (self.load("theme_framework.json") or {}).get("primary_themes", [])
                                if t["theme_id"] == th), None)
-            theme_records[th] = self.agent("A06-SV", {"mode": "PER_THEME", "theme": th, "theme_definition": definition,
-                                                      "validated_findings": fs,
-                                                      "same_study_flags": same_study,
-                                                      "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")}
-                                                                  for r in corpus]},
-                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}",
-                                           exclude_providers=theme_exclude)
+            base = {"mode": "PER_THEME", "theme": th, "theme_definition": definition,
+                    "same_study_flags": same_study,
+                    "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")} for r in corpus]}
+            step = f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}"
+            from . import theme_paging
+            from .synthesis_registry import offline_tokens
+            paging = theme_paging.settings(self.cfg)
+            cap = self.route("A06-SV", theme_exclude).max_tokens
+            overhead = 0
+            if paging:
+                bpt = float(paging.get("bytes_per_token", 2.1))
+                overhead = int(offline_tokens(build_system_prompt("A06-SV")) / bpt) + theme_paging.est_tokens(base, bpt)
+            try:
+                paged = bool(paging) and theme_paging.needs_paging(fs, paging, cap, overhead)
+                if paged:   # bounded packets, then one reconciliation over the whole theme (theme_paging.py)
+                    theme_records[th] = theme_paging.run(
+                        th, fs, base, paging, cap, overhead,
+                        lambda suffix, payload: self.agent("A06-SV", payload, step=f"{step}_{suffix}",
+                                                           exclude_providers=theme_exclude),
+                        save=lambda proof: self.save(f"theme_paging/{theme_paging.slug(th)}{label}.json", proof))
+                    self.prov.tool_run("theme_paging", step, theme_records[th]["theme_paging"])
+            except theme_paging.PagingError as exc:
+                raise Pause(f"A06 theme pass for {th}: {exc}") from exc
+            if not paged:
+                theme_records[th] = self.agent("A06-SV", {**base, "validated_findings": fs}, step=step,
+                                               exclude_providers=theme_exclude)
             from .scientific_validation import require_theme
             try:require_theme(theme_records[th], th, fs)
             except ValueError as exc:raise Pause(str(exc)) from exc

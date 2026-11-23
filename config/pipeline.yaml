@@ -200,7 +200,16 @@ validation:
   # The instability retest (a second, independent A06 reading of every paper with a blocked finding) runs for
   # these tiers only. A blocked finding of another tier simply stays blocked, the cautious outcome. null: all.
   instability_tiers: [CORE]
-  theme_findings_per_call: null   # null: one PER_THEME call per theme, however many findings it has
+  # The A06 theme pass in bounded packets plus one reconciliation per theme (theme_paging.py). A theme that
+  # fits one request is still audited in one call. Sizes are estimated tokens, never a count of papers.
+  theme_paging:
+    enabled: true
+    max_input_tokens: 120000          # per packet, everything included; well under the 272k long-context price tier
+    output_tokens_per_finding: 165    # measured on the reference run's theme calls (records/output_shares.json)
+    output_share_of_cap: 0.6          # a packet is closed when its expected output reaches this share of the cap
+    bytes_per_token: 2.1
+    max_retrieval_rounds: 2           # how often the reconciliation may ask for more original findings
+    reconcile_max_input_tokens: 240000   # packet results, the index and the originals named; over this the run stops
   shared_prefix: true
   findings_per_call: 15
   truncation_retries: 1

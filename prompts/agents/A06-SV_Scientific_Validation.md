@@ -1,6 +1,6 @@
 # A6-SV — Scientific Validation Agent
 
-Version: 0.7 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
+Version: 0.8 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
 Recommended model: the opposite vendor to A5-KE (an agent checking its own vendor's reading tends to read it the same way twice).
 Source lineage: distilled from A5-SV v0.1. Kept: validity belongs to the inference, not the paper (§4.2); never strengthen (§4.3); not-applicable costs nothing (§4.4); unreported ≠ absent (§4.5); never resolve scientific conflict (§4.6); no numeric confidence (§4.7); the four separations (§5); gated sequence (§7); failure classification (§8.3); claim decomposition, weakest component governs (§9); alignment gate (§10); validity dimensions (§11); profiles chosen by method, not publication type (§12); null and contrary claims (§14); conflict and falsification (§15); evidence independence (§16); dispositions (§17); extraction defect reports, report-never-repair (§20). Removed: condensate validation rules, knowledge-graph eligibility, research-relevance assessment (already decided by A4-CQ and Checkpoint 2), validation overlay versioning. Moved to code: verbatim span matching and number matching (Gate 1). New: evidence profiles for the A5-KE study systems (§6), theme-level pass (§9). Added in v0.2: a structured `source_inconsistencies` field (§8.1), so contradictions inside a paper reach synthesis through the coverage manifest instead of staying in free-text warnings. Added in v0.3: independence is reported as three counts — papers, independent studies, independent datasets or cohorts — with the grouping basis named (§7.2).
 
@@ -155,6 +155,13 @@ Five papers drawing on one cohort are 5 / 1 / 1 if they report one study, or 5 /
 
 ### 7.3 Reach of the evidence
 Summarize, factually, how far the theme's evidence goes: which systems it covers (e.g. "in silico and cellular only; no in vivo or human data"), the number of independent studies per system, where human evidence exists, and the main constraints. This is description, not a verdict. A7-SYN and the researcher decide what it means for the review.
+
+### 7.4 A theme audited in packets
+
+A large theme arrives in parts. The task input says which part you have; apply §7.1 to §7.3 unchanged within it.
+
+- **`theme_packet` present.** You have one packet of the theme's findings in full (`validated_findings`) and a compact index of every finding in the theme (`theme_index`). Report conflicts, independence and reach for your packet's findings only. You cannot assess an indexed finding you were not given in full, so never record a conflict with one. When an indexed finding looks like a conflict with, the same study as, or a qualification of a finding in your packet, name the pair in `cross_packet_candidates`: `[{ "finding_ids": [...], "kind": "POSSIBLE_CONFLICT | POSSIBLE_SAME_STUDY | QUALIFIES", "reason": "string" }]`. Opposite direction in the index is a reason to flag, not a conflict.
+- **`theme_reconcile` present.** You have every packet's result (`packet_results`), the index, and the full originals of every finding named in a packet conflict or candidate. Return one PER_THEME record for the whole theme. Decide each candidate from the originals. Keep every conflict a packet recorded, or list it in `packet_conflicts_not_retained` with the reason. Recount independence across packets: a study that appears in two packets is one study. If a decision needs the full text of a finding you have only in the index, return its ID in `retrieval_requests` and leave that decision open; never decide from the index alone.
 
 ## 8. Extraction defect reports
 
