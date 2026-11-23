@@ -19,7 +19,62 @@ frequency, critique outcomes, failed-call rates, and GPT/Kimi bytes per token.
 """
 from __future__ import annotations
 
+import json
 import math
+
+from ..paths import RECORDS_DIR
+
+
+def output_shares() -> dict:
+    """records/output_shares.json: expected output tokens per call and the measured A06 theme token model."""
+    path = RECORDS_DIR / "output_shares.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def expected_output(key: str, cap: int, s: dict | None) -> float:
+    """Output tokens the forecast prices for one call. s None (strict): the cap. Otherwise the recorded expected
+    tokens for `key` scaled by the scenario's output_factor and never above the cap; with no record, the
+    scenario's share of the cap (the old rule, which made every forecast rise and fall with the caps)."""
+    if s is None:
+        return float(cap)
+    rec = (output_shares().get("expected_output_tokens") or {}).get(key)
+    if rec is None or s.get("output_factor") is None:
+        return cap * float(s["output"])
+    return min(float(cap), float(rec["tokens"]) * float(s["output_factor"]))
+
+
+def output_share(key: str, cap: int, s: dict) -> float:
+    return expected_output(key, cap, s) / float(cap)
+
+
+def a06_themes(F: int, n_papers: int, cfg: dict, budget, route, s: dict) -> tuple[float, int, list[str]]:
+    """(usd, calls, warnings) for the A06 PER_THEME pass, priced from what the code does: one call per primary
+    theme (plus one for unthemed findings), each carrying every finding of its theme. Token sizes are the
+    reference run's (records/output_shares.json -> a06_theme). The earlier row multiplied a per-call mean by
+    papers x 2.3 themes (279 calls at 120 papers) when the code makes at most primary_max + 1."""
+    t = output_shares().get("a06_theme") or {}
+    m = route("A06-SV")
+    calls = int((cfg.get("themes") or {}).get("primary_max", 8)) + 1
+    page = (cfg.get("validation") or {}).get("theme_findings_per_call")
+    per_call_findings = F / calls
+    if page:
+        calls = max(calls, math.ceil(F / int(page)))
+        per_call_findings = F / calls
+    overhead = float(t.get("assumed_overhead_tokens_per_call", 8400)) + 50 * n_papers
+    tokens_in = overhead + per_call_findings * float(t.get("input_tokens_per_finding", 1665))
+    tokens_out = per_call_findings * float(t.get("output_tokens_per_finding", 165)) * float(s.get("output_factor", 1.0))
+    batched = bool(s.get("batch")) and "A06-SV" in ((cfg.get("batch") or {}).get("theme_agents") or [])
+    usd = calls * (budget.cost(m.model, int(tokens_in), int(tokens_out), batch=batched) or 0.0)
+    warnings = []
+    threshold = (budget.prices.get(m.model) or {}).get("long_context_threshold")
+    if threshold and tokens_in > threshold:
+        warnings.append(f"each theme call is about {int(tokens_in):,} input tokens, over the {threshold:,}-token "
+                        "long-context threshold: priced at the long rates")
+    if tokens_out > m.max_tokens:
+        warnings.append(f"each theme call needs about {int(tokens_out):,} output tokens, over the A06 cap of "
+                        f"{m.max_tokens:,}: it would truncate. Page the theme pass (validation.theme_findings_per_call) "
+                        "before a run of this size")
+    return usd, calls, warnings
 
 # --- A07: provider input tokens per finding count F (fits on the measured workloads, rounded up) -------------
 A07_INPUT = {"PLAN": lambda F: 230 * F,                 # measured 146,814 / 287,743 / 416,714
@@ -72,7 +127,7 @@ def a07(F: int, cfg: dict, budget, route, s: dict | None) -> tuple[float, int]:
             calls += n * (1 + (rounds if s is None else extra_rounds if r else 0))
         else:
             calls += n
-        usd += total * rates["input"] / 1e6 + n * weight * caps[mode] * out_share * rates["output"] / 1e6
+        usd += total * rates["input"] / 1e6 + n * weight * expected_output(f"A07-SYN.{mode}", caps[mode], s) * rates["output"] / 1e6
         if s is None:   # the system prompt as a 1-hour cache write on every request, not plain input
             usd += n * weight * A07_SYSTEM_TOKENS * (rates["cache_write_1h"] - rates["input"]) / 1e6
     return usd, calls
@@ -90,11 +145,12 @@ def a10(F: int, cfg: dict, budget, route, s: dict, bytes_per_token: float | None
     extra = rounds if r >= 1.0 else 1
     usd, calls = 0.0, 0
     for share in s["a10_local_rerun"]:
-        for n, size, cap in ((A10_LOCAL_CALLS * share, A10_LOCAL_BYTES, vc["output_limits"]["LOCAL"]),
-                             (pages, A10_PAGE_BYTES, vc["output_limits"]["GLOBAL"])):
+        for n, size, cap, mode in ((A10_LOCAL_CALLS * share, A10_LOCAL_BYTES, vc["output_limits"]["LOCAL"], "LOCAL"),
+                                   (pages, A10_PAGE_BYTES, vc["output_limits"]["GLOBAL"], "GLOBAL")):
             mult = 1 + r * sum(1 + k * A10_RETRIEVAL_SHARE for k in range(1, extra + 1))
             rates = budget._rates(m.model, int(size / bpt))
-            usd += n * mult * (size / bpt * rates["input"] + cap * float(s["output"]) * rates["output"]) / 1e6
+            out = cap if bytes_per_token else expected_output(f"A10-RV.{mode}", cap, s)   # strict adverse: the cap
+            usd += n * mult * (size / bpt * rates["input"] + out * rates["output"]) / 1e6
             calls += math.ceil(n) * (1 + (extra if r else 0))
     return usd, calls
 
@@ -130,7 +186,13 @@ def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, ra
     from .downstream_projection import requests as bridge_requests, _price, _weight
     fc = cfg["forecast"]
     pp = rates["per_paper"]
-    n_ft = round(n_papers * full_text_share)
+    # Tier policy (pipeline.yaml -> extraction.full_text_tiers, validation.instability_tiers): with CORE only,
+    # full text and the instability retest apply to the assumed CORE share of the corpus (forecast.core_share).
+    core_share = float(fc.get("core_share", 1.0))
+    ft_core_only = (cfg.get("extraction") or {}).get("full_text_tiers") == ["CORE"]
+    retest_core_only = (cfg.get("validation") or {}).get("instability_tiers") == ["CORE"]
+    n_core = round(n_papers * core_share)
+    n_ft = round((n_core if ft_core_only else n_papers) * full_text_share)
     n_ab = n_papers - n_ft
     F = round(n_ft * pp["FULL_TEXT"]["findings_mean"] + n_ab * pp["ABSTRACT"]["findings_mean"])
     batch_f = max((rates.get("batch_factor") or {"x": 1.0}).values())
@@ -143,24 +205,34 @@ def full_run(n_papers: int, full_text_share: float, cfg: dict, budget, route, ra
             unit = pp[level][stat]
             papers_usd += (unit + (n - 1) * unit * batch_f) if (s["batch"] and n) else n * unit
         share = rates.get("repeat_share", 1.0) if s["repeat"] == "measured" else float(s["repeat"])
-        repeats = sum(round(n * share) * pp[lv]["a06_p90_usd"] for lv, n in (("FULL_TEXT", n_ft), ("ABSTRACT", n_ab)))
+        retested = ((("FULL_TEXT", min(n_ft, n_core)), ("ABSTRACT", max(0, n_core - n_ft))) if retest_core_only
+                    else (("FULL_TEXT", n_ft), ("ABSTRACT", n_ab)))
+        repeats = sum(round(n * share) * pp[lv]["a06_p90_usd"] for lv, n in retested)
         repeats *= batch_f if s["batch"] else 1.0
-        themes = math.ceil(n_papers * rates["themes_per_paper"]) * rates["per_theme"][s["theme"]]
+        themes, theme_calls, theme_warnings = a06_themes(F, n_papers, cfg, budget, route, s)
         a07_usd = a07(F, cfg, budget, route, s)[0]
         a10_usd = a10(F, cfg, budget, route, s)[0]
+        def scen(a, k):   # the scenario with this request's output share taken from the expected-token table
+            cap = int((cfg.get("bridge") or {}).get("output_limits", {}).get(k) or route(a).max_tokens)
+            return {**s, "output": output_share(f"{a}.{k}" if k else a, cap, s)}
         bridge = {a: sum(_weight(t, s) * _price(a, b, k, budget, route, cfg.get("admission") or {},
-                                               cfg.get("bridge") or {}, s)[0] for b, k, t in req[a][0])
+                                               cfg.get("bridge") or {}, scen(a, k))[0] for b, k, t in req[a][0])
                   for a in ("A08-OL", "A09-WRI", "A11-RC", "A12-EDI")}
         models = a07_usd + a10_usd + sum(bridge.values())
         stages = {"A02-A04 (pre-CP2)": float(s["pre_cp2"]), "A05+A06 per paper": papers_usd,
-                  "A06 instability repeats": repeats, "A06 per theme": themes, "A07 synthesis": a07_usd,
+                  "A06 instability repeats": repeats, "A06 theme pass": themes, "A07 synthesis": a07_usd,
                   "A08 outline": bridge["A08-OL"], "A09 writing": bridge["A09-WRI"], "A10 verification": a10_usd,
                   "A11 critique": bridge["A11-RC"], "A12 editing": bridge["A12-EDI"],
                   "failed and redone calls (A07-A12)": models * float(s["retries"])}
         out[name] = {k: round(v, 2) for k, v in stages.items()} | {"total": round(sum(stages.values()), 2)}
+        if name == "baseline":
+            notes = {"a06_theme_calls": theme_calls, "a06_theme_warnings": theme_warnings}
     base = out["baseline"]["total"]
     margin = float(fc["uncertainty_margin"])
+    assumed = sorted(k for k, v in (output_shares().get("expected_output_tokens") or {}).items()
+                     if v.get("basis") != "MEASURED")
     return {"papers": n_papers, "validation": validation(n_papers, F), "full_text": n_ft, "abstract": n_ab,
-            "findings": F, "scenarios": out,
+            "core_papers_assumed": n_core, "findings": F, "scenarios": out, **notes,
+            "assumed_output_cells": assumed,
             "baseline_with_margin": round(base * (1 + margin), 2), "uncertainty_margin": margin,
             "bridge_basis": req["basis"]}

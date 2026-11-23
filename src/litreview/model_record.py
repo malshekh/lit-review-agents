@@ -59,13 +59,37 @@ def add(model: str, agent: str, family: str, outcome: str, run_id: str, step: st
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def refused(family: str, path: Path | None = None) -> dict[str, str]:
-    """{model: first refusal category} for models that have refused in this topic family."""
+def _cleared_at(family: str, path: Path | None = None) -> dict[str, str]:
+    """{model: time of its latest CLEARED entry in this family}."""
     out: dict[str, str] = {}
     for e in entries(path):
-        if e["family"] == family and e["outcome"] == "REFUSED":
+        if e["family"] == family and e["outcome"] == "CLEARED":
+            out[e["model"]] = max(out.get(e["model"], ""), e.get("time", ""))
+    return out
+
+
+def _standing(e: dict, cleared: dict[str, str]) -> bool:
+    return e["outcome"] == "REFUSED" and (e["model"] not in cleared or e.get("time", "") > cleared[e["model"]])
+
+
+def refused(family: str, path: Path | None = None) -> dict[str, str]:
+    """{model: first refusal category} for models with a standing refusal in this topic family. A refusal stands
+    until a later CLEARED entry for that model and family (`litreview clear-refusal`): one refusal used to
+    disqualify a model for the family for good, with no way to record that a retest had passed."""
+    out: dict[str, str] = {}
+    cleared = _cleared_at(family, path)
+    for e in entries(path):
+        if e["family"] == family and _standing(e, cleared):
             out.setdefault(e["model"], e.get("category") or "unspecified")
     return out
+
+
+def clear(model: str, family: str, by: str, reason: str, path: Path | None = None) -> None:
+    """Record a person's decision that this model's refusals so far in this family no longer disqualify it. The
+    refusals stay in the record; a refusal after this entry disqualifies the model again."""
+    if not (by or "").strip() or not (reason or "").strip():
+        raise ValueError("clearing a refusal needs who decided it and why")
+    add(model, "(all)", family, "CLEARED", "-", "-", note=f"cleared by {by.strip()}: {reason.strip()}", path=path)
 
 
 def refusals(family: str, path: Path | None = None) -> dict[str, list[dict]]:
@@ -73,8 +97,9 @@ def refusals(family: str, path: Path | None = None) -> dict[str, list[dict]]:
     happened at. Routing disqualifies a model for the whole family; the agent is kept so the rule can be
     narrowed to per-agent later if the evidence shows the classifier fires per task, not per topic."""
     out: dict[str, list[dict]] = {}
+    cleared = _cleared_at(family, path)
     for e in entries(path):
-        if e["family"] == family and e["outcome"] == "REFUSED":
+        if e["family"] == family and _standing(e, cleared):
             out.setdefault(e["model"], []).append({k: e.get(k) for k in ("agent", "category", "run_id", "step")})
     return out
 
@@ -94,7 +119,7 @@ def summary(path: Path | None = None) -> dict[str, dict[str, dict[str, int]]]:
     (NO_QUALIFIED_MODEL) are reported by `blocked`, not counted here."""
     out: dict = {}
     for e in entries(path):
-        if e["outcome"] == "NO_QUALIFIED_MODEL":
+        if e["outcome"] in ("NO_QUALIFIED_MODEL", "CLEARED"):
             continue
         m = out.setdefault(e["family"], {}).setdefault(e["model"], {"COMPLETED": 0, "REFUSED": 0})
         m[e["outcome"]] = m.get(e["outcome"], 0) + 1

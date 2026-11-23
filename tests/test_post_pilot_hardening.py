@@ -395,3 +395,111 @@ def test_a_truncated_batch_item_keeps_its_reply_and_is_redone_at_a_larger_cap(tm
     assert redo[tb.STEPS[2]][:2] == (72000 if False else min(int(48000 * 1.5), 64000), 0)   # one larger-cap retry
     assert redo[tb.STEPS[3]][2] is not None and redo[tb.STEPS[3]][2][0] == "{not json"       # repaired from its reply
     assert (r.dir / "outputs" / f"{tb.STEPS[2]}.batch.raw.txt").exists()                     # the paid reply is kept
+
+
+# ------------------------------------------------- records, measurement and billing (items 30, 31, 33, 36, 46)
+def test_a_refusal_stands_until_a_person_clears_it_and_a_new_one_stands_again(tmp_path, monkeypatch):
+    rec = tmp_path / "model_record.jsonl"
+    clock = iter(["2026-11-01T10:00:00", "2026-11-23T10:00:00", "2026-11-24T10:00:00"])
+    monkeypatch.setattr(model_record.time, "strftime", lambda fmt: next(clock))
+    model_record.add("claude-opus-5-5", "A07-SYN", "onc", "REFUSED", "r1", "s1", None, path=rec)
+    assert model_record.refused("onc", rec) == {"claude-opus-5-5": "unspecified"}
+    with pytest.raises(ValueError, match="who decided"):
+        model_record.clear("claude-opus-5-5", "onc", "", "retest passed", path=rec)
+    model_record.clear("claude-opus-5-5", "onc", "May Khalid", "one-mode retest of GROUP completed", path=rec)
+    assert model_record.refused("onc", rec) == {} and model_record.refusals("onc", rec) == {}
+    assert model_record.summary(rec)["onc"]["claude-opus-5-5"]["REFUSED"] == 1      # the history is kept
+    model_record.add("claude-opus-5-5", "A09-WRI", "onc", "REFUSED", "r2", "s2", "bio", path=rec)
+    assert model_record.refused("onc", rec) == {"claude-opus-5-5": "bio"}
+
+
+def _cost_run(tmp_path, sample):
+    d = tmp_path / ("sample" if sample else "full")
+    (d / "outputs").mkdir(parents=True)
+    (d / "input").mkdir()
+    if sample:
+        (d / "input" / "a07_a09_sample.json").write_text("{}", encoding="utf-8")
+    rows = [("A07-SYN", "A07-SYN_jobx_GROUP_G0001", 5000), ("A07-SYN", "A07-SYN_jobx_GROUP_G0002", 7000),
+            ("A07-SYN", "A07-SYN_jobx_GROUP_G0003", 6000), ("A07-SYN", "A07-SYN_jobx_GROUP_G0004", 16000),
+            ("A09-WRI", "A09-WRI_S1", 9000), ("A05-KE", "A05-KE_R0001", 20000)]
+    (d / "costs.jsonl").write_text("\n".join(json.dumps({"agent": a, "step": s, "output_tokens": o, "cost_usd": 0.1})
+                                             for a, s, o in rows), encoding="utf-8")
+    for _, s, _ in rows:
+        (d / "outputs" / f"{s}.json").write_text("{}", encoding="utf-8")
+    (d / "outputs" / "A07-SYN_jobx_GROUP_G0004.truncated0.json").write_text("{}", encoding="utf-8")
+    return d
+
+
+def test_output_shares_are_measured_from_completed_calls_and_never_from_a_sample(tmp_path):
+    from litreview.tools import output_shares
+    with pytest.raises(output_shares.NotRepresentative, match="NON-REPRESENTATIVE"):
+        output_shares.measure(_cost_run(tmp_path, True))
+    measured = output_shares.measure(_cost_run(tmp_path, False))
+    assert measured["cells"]["A07-SYN.GROUP"] == {"calls": 3, "mean": 6000, "p90": 7000, "max": 7000}   # truncated call left out
+    assert "A05-KE" not in str(measured["cells"])
+    table = tmp_path / "output_shares.json"
+    table.write_text(json.dumps({"expected_output_tokens": {"A07-SYN.GROUP": {"tokens": 1, "basis": "ASSUMED"},
+                                                           "A09-WRI.A09_SECTION": {"tokens": 8000, "basis": "ASSUMED"}}}))
+    assert output_shares.write(measured, table) == ["A07-SYN.GROUP"]            # one A09 call is not a measurement
+    after = json.loads(table.read_text())["expected_output_tokens"]
+    assert after["A07-SYN.GROUP"]["tokens"] == 7000 and after["A07-SYN.GROUP"]["basis"] == "MEASURED"
+    assert after["A09-WRI.A09_SECTION"]["basis"] == "ASSUMED"
+
+
+def test_the_forecast_no_longer_moves_with_the_output_caps_and_prices_the_real_theme_calls(tmp_path):
+    from litreview.tools import forecast
+    s = config.load("pipeline")["forecast"]["scenarios"]["baseline"]
+    assert forecast.expected_output("A07-SYN.GROUP", 12000, s) == forecast.expected_output("A07-SYN.GROUP", 16000, s) == 6000
+    assert forecast.expected_output("A07-SYN.GROUP", 16000, None) == 16000       # the strict worst case is the cap
+    assert forecast.expected_output("NOT-RECORDED", 10000, s) == 10000 * s["output"]
+    b = BudgetTracker(tmp_path)
+    route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]             # noqa: E731
+    usd, calls, warnings = forecast.a06_themes(1581, 120, config.load("pipeline"), b, route, s)
+    assert calls == config.load("pipeline")["themes"]["primary_max"] + 1 == 9   # not 279 (papers x themes per paper)
+    assert any("would truncate" in w for w in warnings) and any("long-context" in w for w in warnings)
+    small, _, quiet = forecast.a06_themes(300, 28, config.load("pipeline"), b, route, s)
+    assert quiet == [] and small < usd
+
+
+def test_billing_reconciliation_flags_a_gap_over_five_percent(tmp_path, capsys):
+    import importlib.util
+    from litreview.paths import REPO_ROOT
+    spec = importlib.util.spec_from_file_location("reconcile_billing", REPO_ROOT / "scripts" / "reconcile_billing.py")
+    rb = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rb)
+    rows = [{"provider": "anthropic", "model": "claude-opus-5", "cost_usd": 10.0, "started_at": 1795000000.0},
+            {"provider": "openai", "model": "gpt-6.1-sol", "cost_usd": 4.0, "started_at": 1795003600.0},
+            {"provider": "openai", "model": "gpt-6.1-sol", "cost_usd": None}]
+    (tmp_path / "costs.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    (tmp_path / "reservations.json").write_text(json.dumps({"call-abc": {"usd": 0.4}}), encoding="utf-8")
+    assert rb.main([str(tmp_path), "--billed", "anthropic=10.30", "openai=4.10"]) == 0          # 2.9% and 2.4%
+    assert rb.main([str(tmp_path), "--billed", "anthropic=11.00", "openai=4.00"]) == 1          # 9.1% more billed
+    out = capsys.readouterr().out
+    assert "BILLED_MORE_THAN_LOGGED" in out and "reservation(s) still held" in out and "no price" in out
+    report = json.loads((tmp_path / "billing_reconciliation.json").read_text())
+    assert report["providers"][0]["gap_usd"] == 1.0 and report["held_reservations"] == {"call-abc": 0.4}
+    assert rb.main([str(tmp_path)]) == 2                                                         # nothing to compare
+    csv_file = tmp_path / "export.csv"
+    csv_file.write_text("date,model,Cost (USD)\n2026-11-24,claude-opus-5,$6.00\n2026-11-24,claude-opus-5,3.90\n")
+    assert rb.main([str(tmp_path), "--csv", f"anthropic={csv_file}", "--billed", "openai=4.0"]) == 0
+
+
+def test_tests_directory_holds_no_script_that_can_reach_a_provider():
+    """Scripts that count tokens or call a provider live in scripts/live/, never beside the tests CI collects."""
+    from litreview.paths import REPO_ROOT
+    risky = ("load_dotenv", ".count_tokens(")   # loading real keys, or calling a provider endpoint
+    offenders = sorted(f.name for f in (REPO_ROOT / "tests").glob("*.py")
+                       if f.name != "test_post_pilot_hardening.py" and any(r in f.read_text(encoding="utf-8") for r in risky))
+    assert offenders == []
+    assert {f.name for f in (REPO_ROOT / "scripts" / "live").glob("*.py")} >= {
+        "a07_efficiency_report.py", "a07_validation_audit.py", "bridge_capacity_audit.py", "model_window_probe.py"}
+    workflow = (REPO_ROOT / ".github" / "workflows" / "tests.yml").read_text(encoding="utf-8")
+    for key in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "MOONSHOT_API_KEY"):
+        assert f'{key}: ""' in workflow
+
+
+def test_tier_policy_limits_full_text_and_the_instability_retest_to_core(run):
+    assert run.cfg["extraction"]["full_text_tiers"] == ["CORE"] and run.cfg["validation"]["instability_tiers"] == ["CORE"]
+    assert run._tier_allows("extraction", "full_text_tiers", {"tier": "CORE"})
+    assert not run._tier_allows("extraction", "full_text_tiers", {"tier": "SUPPORTING"})
+    assert run._tier_allows("extraction", "missing_key", {"tier": "CONTEXT"})    # no policy: every paper

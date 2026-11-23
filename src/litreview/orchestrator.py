@@ -1222,6 +1222,8 @@ class Run:
                     ready[rid] = {"required": required, "status": "BLOCKED", "reason": str(exc)}
                     self.save("source_readiness.json", ready)
                     raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+            elif not self._tier_allows("extraction", "full_text_tiers", rec):
+                sections = {"Abstract": rec.get("abstract") or ""}   # not a full-text tier: abstract only, labelled so
             else:
                 sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
                     or {"Abstract": rec.get("abstract") or ""}
@@ -1233,6 +1235,11 @@ class Run:
         self.run_many("A05-KE", items, lambda step, out: self.save(
             f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out)))
         return "validate"
+
+    def _tier_allows(self, section: str, key: str, rec: dict) -> bool:
+        """pipeline.yaml -> <section>.<key>: the tiers a costly step applies to. None or missing: every paper."""
+        tiers = (self.cfg.get(section) or {}).get(key)
+        return tiers is None or rec.get("tier") in tiers
 
     def _normalize(self, rid: str, ext: dict) -> dict:
         """Normalize a paper's entities against its own text (abbreviation expansions) and the run's conflict
@@ -1533,6 +1540,9 @@ class Run:
             rid = rec["record_id"]
             val = self.load(f"validations/{rid}.json") or {}
             if not any(str(v.get("disposition") or "").startswith("BLOCKED") for v in val.get("validations", [])):
+                continue
+            if not pilot.enabled(self) and not self._tier_allows("validation", "instability_tiers", rec):
+                skipped[rid] = f"tier {rec.get('tier')}: the retest runs for {self.cfg['validation']['instability_tiers']} only; its blocked findings stay blocked"
                 continue
             saved = self.load(f"a06_inputs/{rid}.json")
             if saved is None:

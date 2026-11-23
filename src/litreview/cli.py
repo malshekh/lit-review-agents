@@ -86,6 +86,32 @@ def cmd_repair_import(args) -> int:
     return 0
 
 
+def cmd_output_shares(args) -> int:
+    from .tools import output_shares
+    try:
+        measured = output_shares.measure(RUNS_DIR / args.run_id)
+    except output_shares.NotRepresentative as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(json.dumps(measured, indent=2))
+    if args.write:
+        written = output_shares.write(measured)
+        print(f"records/output_shares.json: {len(written)} cell(s) now MEASURED: {', '.join(written) or 'none'} "
+              f"(a cell needs at least {output_shares.MIN_CALLS} completed calls)")
+    return 0
+
+
+def cmd_clear_refusal(args) -> int:
+    from . import model_record
+    if args.model not in model_record.refused(args.family):
+        print(f"{args.model} has no standing refusal in topic family '{args.family}'")
+        return 1
+    model_record.clear(args.model, args.family, args.by, args.reason)
+    print(f"Recorded: refusals of {args.model} in '{args.family}' before now no longer disqualify it. "
+          "A new refusal disqualifies it again.")
+    return 0
+
+
 def cmd_submission_check(args) -> int:
     try:
         ready = Run(args.run_id).submission_check()
@@ -243,7 +269,10 @@ def cmd_review_validation(args) -> int:
 
 
 def cmd_cost_rates(args) -> int:
-    from .tools import cost_projection
+    from .tools import cost_projection, output_shares
+    if output_shares.is_sample(RUNS_DIR / args.run_id):
+        print(f"REFUSED: {args.run_id} is a NON-REPRESENTATIVE sample run; its costs never enter the rates or the forecast")
+        return 1
     rates = cost_projection.measured_rates(RUNS_DIR / args.run_id)
     cost_projection.rates_path().write_text(json.dumps(rates, indent=1) + "\n", encoding="utf-8")
     print(json.dumps(rates, indent=1))
@@ -393,6 +422,16 @@ def main(argv: list[str] | None = None) -> int:
     ri.add_argument("--by", required=True, help="your name")
     ri.add_argument("--reason", required=True, help="what was wrong and what you changed")
     ri.set_defaults(fn=cmd_repair_import)
+    os_ = sub.add_parser("output-shares", help="measured output tokens per call from a run (never a sample run)")
+    os_.add_argument("run_id")
+    os_.add_argument("--write", action="store_true", help="replace the measured cells of records/output_shares.json")
+    os_.set_defaults(fn=cmd_output_shares)
+    cl = sub.add_parser("clear-refusal", help="record that a model's earlier refusals in a topic family no longer disqualify it")
+    cl.add_argument("model")
+    cl.add_argument("--family", required=True)
+    cl.add_argument("--by", required=True, help="your name")
+    cl.add_argument("--reason", required=True, help="why, e.g. the result of a one-mode retest")
+    cl.set_defaults(fn=cmd_clear_refusal)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

@@ -191,7 +191,16 @@ context_utilisation:
   models: {}
   provider_count:
     anthropic: true
+extraction:
+  # Full text is read for these tiers only; other papers are extracted from their abstract and labelled
+  # ABSTRACT, which every later stage sees. null: full text for every paper that has it (the old behaviour).
+  # The staged pilot ignores this: its corpus authority fixes each paper's level.
+  full_text_tiers: [CORE]
 validation:
+  # The instability retest (a second, independent A06 reading of every paper with a blocked finding) runs for
+  # these tiers only. A blocked finding of another tier simply stays blocked, the cautious outcome. null: all.
+  instability_tiers: [CORE]
+  theme_findings_per_call: null   # null: one PER_THEME call per theme, however many findings it has
   shared_prefix: true
   findings_per_call: 15
   truncation_retries: 1
@@ -228,9 +237,11 @@ synthesis:
     effort: medium
 forecast:
   uncertainty_margin: 0.3
+  core_share: 0.4          # ASSUMED share of the selected corpus tiered CORE at CP2 (reference run: 17 of 28)
   scenarios:
     baseline:
       output: 0.5
+      output_factor: 1.0   # x the expected output tokens in records/output_shares.json (never above the cap)
       bytes_per_token: 2.1
       retrieval: 0.25
       a07_retrieval: 0.1
@@ -251,6 +262,7 @@ forecast:
       - 0.1
     low:
       output: 0.25
+      output_factor: 0.75   # x the expected output tokens in records/output_shares.json (never above the cap)
       bytes_per_token: 2.4
       retrieval: 0.0
       a07_retrieval: 0.0
@@ -270,6 +282,7 @@ forecast:
       - 0.1
     high:
       output: 0.75
+      output_factor: 1.5   # x the expected output tokens in records/output_shares.json (never above the cap)
       bytes_per_token: 2.0
       retrieval: 0.5
       a07_retrieval: 0.25
@@ -291,6 +304,7 @@ forecast:
       - 0.2
     adverse:
       output: 1.0
+      output_factor: 2.0   # x the expected output tokens in records/output_shares.json (never above the cap)
       bytes_per_token: 1.8
       retrieval: 1.0
       a07_retrieval: 1.0

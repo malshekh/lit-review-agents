@@ -51,17 +51,29 @@ def measured_rates(run_dir: Path) -> dict:
         findings[p.stem] = len(ext.get("findings", []))
     per = {"A05-KE": {}, "A06-SV": {}}
     themes = []
+    # Rates describe the procedure the code runs NOW. With loops.max_reextractions at 0 a paper is extracted once
+    # and audited once, so a reference run's re-extractions and the second audits that followed them are left out
+    # (the 2026-10-30 rates counted 19 re-extractions that no current run makes).
+    from .. import config
+    reextract = int(config.load("pipeline")["loops"].get("max_reextractions", 0)) > 0
+    a05 = r"A05-KE_(R\d+)(_reextract)?" if reextract else r"A05-KE_(R\d+)"
+    a06 = r"A06-SV_(R\d+)_v\d+" if reextract else r"A06-SV_(R\d+)_v1"
+    excluded = 0.0
     for e in entries:
         s = e["step"]
-        m = re.fullmatch(r"A05-KE_(R\d+)(_reextract)?", s)
+        if not reextract and (re.fullmatch(r"A05-KE_R\d+_reextract", s) or re.fullmatch(r"A06-SV_R\d+_v([2-9]|\d\d+)", s)):
+            excluded += e["cost_usd"] or 0
+        m = re.fullmatch(a05, s)
         if m:
             per["A05-KE"][m.group(1)] = per["A05-KE"].get(m.group(1), 0) + (e["cost_usd"] or 0)
-        m = re.fullmatch(r"A06-SV_(R\d+)_v\d+", s)
+        m = re.fullmatch(a06, s)
         if m:
             per["A06-SV"][m.group(1)] = per["A06-SV"].get(m.group(1), 0) + (e["cost_usd"] or 0)
         if s.startswith("A06-SV_theme_") and "_reval" not in s:
             themes.append(e["cost_usd"] or 0)
-    out = {"reference_run": run_dir.name, "measured_at": time.strftime("%Y-%m-%d"), "per_paper": {}, "per_theme": {}}
+    out = {"reference_run": run_dir.name, "measured_at": time.strftime("%Y-%m-%d"),
+           "procedure": {"reextractions_counted": reextract, "excluded_obsolete_usd": round(excluded, 4)},
+           "per_paper": {}, "per_theme": {}}
     for level in ("ABSTRACT", "FULL_TEXT"):
         rids = [r for r, lv in levels.items() if lv == level]
         cost = [per["A05-KE"].get(r, 0) + per["A06-SV"].get(r, 0) for r in rids]

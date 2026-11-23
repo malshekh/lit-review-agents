@@ -82,7 +82,10 @@ def test_measured_rates_come_from_the_cost_log(tmp_path):
     (tmp_path / "costs.jsonl").write_text("\n".join(json.dumps({"step": s, "cost_usd": c}) for s, c in log))
     r = cp.measured_rates(tmp_path)
     assert r["per_paper"]["ABSTRACT"]["mean_usd"] == pytest.approx(0.3)
-    assert r["per_paper"]["FULL_TEXT"]["mean_usd"] == pytest.approx(1.8)       # revalidation left out
+    # revalidation left out; and with loops.max_reextractions at 0 the re-extraction is left out as well: rates
+    # describe the procedure the code runs now, not what an older run happened to pay for
+    assert r["per_paper"]["FULL_TEXT"]["mean_usd"] == pytest.approx(1.3)
+    assert r["procedure"] == {"reextractions_counted": False, "excluded_obsolete_usd": 0.5}
     assert r["per_theme"]["mean_usd"] == pytest.approx(0.05) and r["themes_per_paper"] == 0.5
 
 
