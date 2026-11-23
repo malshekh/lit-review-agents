@@ -25,7 +25,7 @@ def test_v10_violation_types_fail_production_validator(kind):
     import jsonschema
     name='A07-SYN.bounded-plan.schema.json';p=copy.deepcopy(EXAMPLES[name])
     if kind=='missing_mode':p.pop('mode')
-    elif kind=='array_unresolved':p['fivew1h']=[{'theme_id':'T1','unresolved':['Preserve this uncertainty']}]
+    elif kind=='array_unresolved':p['unresolved_questions']=[{'theme_id':'T1','questions':'["a list written inside a string"]'}]
     else:
         q={'proposal':'Formatting fixture','rationale':'Formatting fixture','finding_ids':['R0001:F1']}
         if kind=='long_rationale':q['rationale']='x'*481

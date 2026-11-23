@@ -72,13 +72,12 @@ gpt-6-luna-batch:  { <<: *openai, input: 0.05, output: 0.25, cached_input: 0.005
                      long_cached_input: 0.01, long_cache_write: 0.125 }
 
 # --- Kimi (Moonshot, international) ------------------------------------
-# NOT re-verified: on 2026-11-23 the pricing page's tables did not render for an automated read, so the
-# standard rates below still carry their 2026-10-16 date and the 30-day gate refuses Kimi until a person
-# re-reads the page and updates `checked`. Read on 2026-11-23 from that page's text: batch inference on
-# kimi-k3.1-pro and kimi-k3 is billed at 60% of standard. There is deliberately NO kimi -batch row: the
-# pipeline has no Kimi batch transport (llm/batch.py: Anthropic and OpenAI only), and a -batch row would
-# price Kimi work at a discount it cannot get. Add the row together with the transport. K3 cache writes are billed separately by TTL (5 min or 1 h) at rates not recorded here, so a
-# Kimi cache write is billed at `input` and may be understated; the K2 models retire end of December 2026.
-_kimi: &kimi { source: "https://platform.kimi.ai/docs/pricing/chat-k3", checked: "2026-10-16" }
-kimi-k3.1-pro:       { <<: *kimi, input: 2.00, output: 10.00, cached_input: 0.20 }
-kimi-k3:             { <<: *kimi, input: 3.00, output: 15.00 }
+# kimi-k3.1-pro: verified by the researcher against Moonshot's official price list on 2026-11-23 (the page's
+# tables do not render for an automated read): $2 input, $10 output, $0.20 cached input, $2 five-minute cache
+# write, $4 one-hour cache write. kimi-k3 was NOT re-verified and keeps its 2026-10-16 date, so the 30-day gate
+# refuses it; no agent or alternate uses it. Batch inference on K3 models is billed at 60% of standard (page
+# text, 2026-11-23). There is deliberately NO kimi -batch row: the pipeline has no Kimi batch transport
+# (llm/batch.py: Anthropic and OpenAI only), and a -batch row would price Kimi work at a discount it cannot get.
+kimi-k3.1-pro:       { source: "https://platform.kimi.ai/docs/pricing/chat-k3", checked: "2026-11-23", verified_by: researcher,
+                       input: 2.00, output: 10.00, cached_input: 0.20, cache_write: 2.00, cache_write_1h: 4.00 }
+kimi-k3:             { source: "https://platform.kimi.ai/docs/pricing/chat-k3", checked: "2026-10-16", input: 3.00, output: 15.00 }

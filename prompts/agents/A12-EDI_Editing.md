@@ -122,14 +122,14 @@ The change log lists every edit with before and after text, so A10-RV can check 
 Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
 
 **A12-EDI.schema.json**
-$ required=["agent_id","prompt_version","status","warnings","limitations","mode","output_manuscript_version","title","abstract","sections","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","output_manuscript_version","title","abstract","sections","change_log","queries","escalations"]; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.output_manuscript_version type=string; $.title type=string; $.abstract type=string
 Example shape only:
 ```json
 {"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
 ```
 
 **A12-EDI.unit.schema.json**
-$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","output_manuscript_version","change_log","queries","escalations"]; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","output_manuscript_version","change_log","queries","escalations"]; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.output_manuscript_version type=string; $.title type=string; $.abstract type=string; $.unit type=string
 Example shape only:
 ```json
 {"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}

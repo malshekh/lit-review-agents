@@ -100,14 +100,16 @@ def test_no_price_is_hard_coded_in_the_package():
 def test_a_price_older_than_30_days_refuses_the_model(tmp_path, monkeypatch):
     b = BudgetTracker(tmp_path)
     b.check_priced("claude-opus-5")                                   # checked 2026-11-23: within 30 days
-    with pytest.raises(StalePrice, match=r"kimi-k3.1-pro.*last checked 2026-10-16 \(38 days ago; limit 30\)"):
-        b.check_priced("kimi-k3.1-pro")                               # not re-verified: refused before any call
+    b.check_priced("kimi-k3.1-pro")                                   # verified by the researcher 2026-11-23
+    with pytest.raises(StalePrice, match=r"kimi-k3'.*last checked 2026-10-16 \(38 days ago; limit 30\)"):
+        b.check_priced("kimi-k3")                                     # not re-verified: refused before any call
+    assert preflight.price_problems() == []                          # every model an agent can route to is current
     monkeypatch.setenv("LITREVIEW_TEST_TODAY", "2026-12-24")
     with pytest.raises(StalePrice, match="31 days ago"):
         b.check_priced("claude-opus-5")
     assert budget_mod.price_problem({"m": {"input": 1, "output": 2}}, "m", 30) == \
         "'m' in config/prices.yaml has no source or checked date"
-    assert any("kimi-k3.1-pro" in p for p in preflight.price_problems())
+    assert b.cost("kimi-k3.1-pro", 0, 0, 0, 1_000_000, 1_000_000) == pytest.approx(2.00 + 4.00)   # 5-minute and 1-hour writes
 
 
 # -------------------------------------------------------------------------- profiles (item 34)

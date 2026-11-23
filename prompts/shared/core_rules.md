@@ -48,3 +48,7 @@ plus the task-specific fields. Use `null` for unknown values rather than omittin
 ## Writing style for anything the researcher reads
 
 Use precise scientific language. Avoid vague phrases ("promising", "growing evidence", "plays a key role") in favour of what was observed, in what system, by how many studies. State uncertainty once, specifically.
+
+## Researcher decisions
+
+When the task input contains `researcher_decisions`, each entry is an instruction the researcher has applied to the findings, records, sections or themes it names (`applies_to`), or to the whole request. Follow it exactly for those items: use the wording it prescribes, respect the constraint or exclusion it sets, and do not extend it to items it does not name. A decision changes how evidence is described or used; it never changes what a source says. If following a decision would require stating something the supplied evidence does not support, do not comply silently and do not ignore it: say so in `warnings`, naming the `decision_id`, and stop with the status your contract provides for human review.

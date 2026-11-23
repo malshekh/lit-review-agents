@@ -25,7 +25,7 @@ SETTINGS = {"max_findings_per_group": 2}
 
 def repaired_plan():
     return {**header("PLAN"), "theme_change_proposals": [], "scope_drift": ["fixture"],
-            "fivew1h": [{"theme_id": "T1", "unresolved": "fixture"}]}
+            "unresolved_questions": [{"theme_id": "T1", "questions": ["fixture"]}]}
 
 
 class FakeRun:

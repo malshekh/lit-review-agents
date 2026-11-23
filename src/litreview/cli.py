@@ -112,6 +112,35 @@ def cmd_clear_refusal(args) -> int:
     return 0
 
 
+def cmd_decide(args) -> int:
+    from .decisions import DecisionError
+    targets = {"finding_ids": args.findings, "record_ids": args.records, "section_ids": args.sections,
+               "theme_ids": args.themes, "agents": args.agents, "all": args.all}
+    targets = {k: ([x.strip() for x in v.split(",")] if isinstance(v, str) else v) for k, v in targets.items() if v}
+    try:
+        entry = Run(args.run_id).decide(args.kind, args.instruction or "", targets, args.by, args.checkpoint or "",
+                                        args.reason or "", args.id, args.withdraw)
+    except DecisionError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(json.dumps(entry, indent=2, ensure_ascii=False))
+    print("Applied. Every request that contains an item this decision names now carries it, and outputs made "
+          "without it are no longer reused.")
+    return 0
+
+
+def cmd_revise_framework(args) -> int:
+    try:
+        themes = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        themes = themes.get("primary_themes", themes) if isinstance(themes, dict) else themes
+        new = Run(args.run_id).revise_framework(themes, args.by, args.reason)
+    except (ValueError, OSError) as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Theme framework is now version {new['version']}. Theme records are marked stale and will be rebuilt.")
+    return 0
+
+
 def cmd_submission_check(args) -> int:
     try:
         ready = Run(args.run_id).submission_check()
@@ -432,6 +461,24 @@ def main(argv: list[str] | None = None) -> int:
     cl.add_argument("--by", required=True, help="your name")
     cl.add_argument("--reason", required=True, help="why, e.g. the result of a one-mode retest")
     cl.set_defaults(fn=cmd_clear_refusal)
+    dc = sub.add_parser("decide", help="apply a researcher decision to named findings, records, sections or themes")
+    dc.add_argument("run_id")
+    dc.add_argument("--kind", required=True, choices=["WORDING", "CONSTRAINT", "EXCLUSION", "INTERPRETATION_LIMIT"])
+    dc.add_argument("--instruction", help="the exact instruction the agents must follow")
+    dc.add_argument("--findings"); dc.add_argument("--records"); dc.add_argument("--sections"); dc.add_argument("--themes")
+    dc.add_argument("--agents", help="limit to these agents, e.g. A07-SYN,A09-WRI")
+    dc.add_argument("--all", action="store_true", help="every request of the listed agents")
+    dc.add_argument("--by", required=True, help="your name")
+    dc.add_argument("--checkpoint"); dc.add_argument("--reason")
+    dc.add_argument("--id", help="an existing decision to replace with a new version")
+    dc.add_argument("--withdraw", action="store_true")
+    dc.set_defaults(fn=cmd_decide)
+    rf = sub.add_parser("revise-framework", help="change the approved theme framework (the only way to relabel a theme)")
+    rf.add_argument("run_id")
+    rf.add_argument("--file", required=True, help="JSON: the full list of primary themes after the change")
+    rf.add_argument("--by", required=True)
+    rf.add_argument("--reason", required=True)
+    rf.set_defaults(fn=cmd_revise_framework)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

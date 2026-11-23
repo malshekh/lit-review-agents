@@ -363,7 +363,8 @@ class Run:
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
               reservation_key: str | None = None, repair_limit: int | None = None,
               truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
-        from . import a06_batches
+        from . import a06_batches, decisions
+        payload = decisions.attach(self.dir, agent_id, payload)   # applied decisions travel in the request identity
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
             except ValueError as exc:raise Pause("A06 batch validation rejected: " + str(exc)) from exc
@@ -783,6 +784,46 @@ class Run:
                                      "theme framework approved at CP1")
         self.save("spec_approved.json", spec)
         return "search"
+
+    def _decision_identity(self, agent_id: str) -> dict:
+        """{} when no applied decision can reach this agent (identities of runs without decisions are unchanged);
+        otherwise the decisions' fingerprint, so a job whose turns depend on each other is rebuilt when one changes."""
+        from . import decisions
+        if not [d for d in decisions.active(self.dir)
+                if not d["applies_to"].get("agents") or agent_id in d["applies_to"]["agents"]]:
+            return {}
+        return {"applied_decisions": decisions.fingerprint(self.dir, agent_id)}
+
+    def decide(self, kind: str, instruction: str, applies_to: dict, author: str, checkpoint: str = "",
+               reason: str = "", decision_id: str | None = None, withdraw: bool = False) -> dict:
+        """Record an applied researcher decision (decisions.py) and log it as a human decision."""
+        from . import decisions
+        entry = decisions.add(self.dir, kind, instruction, applies_to, author, checkpoint, reason, decision_id, withdraw)
+        self.prov.human_decision("APPLIED_DECISION", {k: entry[k] for k in ("decision_id", "version", "status", "kind",
+                                                                           "instruction", "applies_to", "author")},
+                                 reason)
+        return entry
+
+    def revise_framework(self, primary_themes: list[dict], author: str, note: str) -> dict:
+        """The one way a theme is relabelled, redefined, added or removed after CP1: a new framework version.
+        Everything built on the framework carries it in its input, so the affected identities regenerate; theme
+        records are marked stale so the theme pass is rebuilt before synthesis."""
+        if not (author or "").strip() or not (note or "").strip():
+            raise ValueError("a framework revision needs its author and the reason for the change")
+        fw = self.load("theme_framework.json")
+        if not fw:
+            raise ValueError("this run has no approved theme framework yet (it is created at CP1)")
+        ids = [t.get("theme_id") for t in primary_themes]
+        if not ids or any(not i for i in ids) or len(ids) != len(set(ids)):
+            raise ValueError("every primary theme needs a unique theme_id")
+        new = theme_framework.revise(fw, primary_themes, "RESEARCHER_REVISION", f"{author.strip()}: {note.strip()}")
+        self.save("theme_framework.json", new)
+        if self.data("theme_records.json").exists():
+            self.save("theme_records_stale.json", sorted(set(self.load("theme_records.json", {}))
+                                                         | set(self.load("theme_records_stale.json", []))))
+        self.prov.human_decision("THEME_FRAMEWORK", {"version": new["version"], "author": author.strip(),
+                                                     **{k: new["history"][-1][k] for k in ("added", "removed")}}, note)
+        return new
 
     def _framework_update(self, decision: dict, checkpoint: str) -> None:
         """A framework change approved at CP2 or CP3: a new version, logged as the researcher's decision."""
@@ -1925,7 +1966,8 @@ class Run:
         scfg = self._synthesis_settings()
         identity = {"prompt": build_system_prompt("A07-SYN"),
                     "schemas": {p.name: p.read_text(encoding="utf-8") for p in sorted(SCHEMAS_DIR.glob("A07-SYN*.json"))},
-                    "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices}
+                    "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices,
+                    **self._decision_identity("A07-SYN")}
         tag = fingerprint({"corpus": registry.digest, "execution": identity, "settings": scfg})[:16]
         system = build_system_prompt("A07-SYN")
 
@@ -2212,7 +2254,8 @@ class Run:
         system = build_system_prompt('A10-RV')
         count = lambda p: offline_tokens(system)+offline_tokens(user_parts(p))
         execution = {'model':dataclasses.asdict(self.route('A10-RV',prose)), 'prices':self.budget.prices,
-                     'prompt':system,'schema':(SCHEMAS_DIR/'A10-RV.bounded.schema.json').read_text()}
+                     'prompt':system,'schema':(SCHEMAS_DIR/'A10-RV.bounded.schema.json').read_text(),
+                     **self._decision_identity('A10-RV')}
         def call(mode, payload, name):
             cap = cfg['output_limits'][mode]
             model = self.route('A10-RV',prose)

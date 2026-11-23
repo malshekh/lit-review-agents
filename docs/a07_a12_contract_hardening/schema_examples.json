@@ -31,7 +31,7 @@
     "limitations": [],
     "theme_change_proposals": [],
     "scope_drift": [],
-    "fivew1h": []
+    "unresolved_questions": []
   },
   "A07-SYN.bounded-reconcile.schema.json": {
     "agent_id": "A07-SYN",
