@@ -92,6 +92,16 @@ def level_cap(agent_id: str, payload: dict | None, default: int) -> int:
     return int(by_level.get(level, default))
 
 
+def _effort_for(provider: str, effort: str | None) -> str | None:
+    """An alternate on another vendor inherits the agent's effort only if that vendor accepts the value;
+    otherwise it takes the vendor's configured default (Kimi has no `medium`)."""
+    setting = ((load("pipeline").get("providers") or {}).get(provider) or {}).get("reasoning_effort") or {}
+    allowed = setting.get("allowed")
+    if not allowed or effort in allowed:
+        return effort
+    return setting.get("default") or allowed[0]
+
+
 def agent_candidates(agent_id: str) -> list[AgentModel]:
     """The agent's configured model, then its alternates (pipeline.yaml -> routing.alternates), in order.
     An alternate gives provider and model; other settings come from the agent unless it overrides them."""
@@ -102,7 +112,8 @@ def agent_candidates(agent_id: str) -> list[AgentModel]:
         out.append(AgentModel(agent_id=agent_id, provider=alt["provider"],
                               model=cfg["models"].get(alt["model"], alt["model"]),
                               max_tokens=int(alt.get("max_tokens", primary.max_tokens)),
-                              temperature=primary.temperature, effort=alt.get("effort", primary.effort),
+                              temperature=primary.temperature,
+                              effort=alt.get("effort") or _effort_for(alt["provider"], primary.effort),
                               cache_system=primary.cache_system, cache_payload=primary.cache_payload,
                               cache_ttl=primary.cache_ttl))
     return out

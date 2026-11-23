@@ -68,7 +68,7 @@ providers:
     structured_output: json_object
     # K3.1 Pro always reasons and defaults to max when the field is omitted (guides, read 2026-11-23;
     # Moonshot's own page did not render). `medium` is not an accepted value: an agent on Kimi sets low or high.
-    reasoning_effort: {send: true, allowed: [low, high, max]}
+    reasoning_effort: {send: true, allowed: [low, high, max], default: high}   # default: for an alternate whose agent says medium
 models:
   claude_strong: claude-opus-5-5
   claude_default: claude-sonnet-5-5

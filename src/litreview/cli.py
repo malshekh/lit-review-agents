@@ -7,6 +7,9 @@
   litreview approve <run_id> CP1|CP2|CP3|CP_LEDGER|CP_CONTRARY|CP_CONTEXT|CP_SPEND   record a decision
   litreview revise <run_id> CP1|CP3 --feedback feedback.md   send the stage back with your corrections
   litreview costs <run_id>                 per-agent cost breakdown
+  litreview repair-import <run_id> <step> --agent A0X --file fixed.json --by NAME --reason TEXT
+                                           use your repair of an output that failed its schema (no second payment)
+  litreview submission-check <run_id>      recompute the submission checklist after editing final/declarations
   litreview verify <run_id> <record_id> --statement TEXT [--matches TEXT]
                                            record that you verified an inconsistency inside a paper
 """
@@ -67,6 +70,19 @@ def cmd_new(args) -> int:
 def cmd_run(args) -> int:
     status = Run(args.run_id).run(until=args.until)
     print(status)
+    return 0
+
+
+def cmd_repair_import(args) -> int:
+    from .repair_import import ImportRefused, import_output
+    try:
+        audit = import_output(Run(args.run_id), args.step, args.agent, Path(args.file), args.by, args.reason, args.schema)
+    except ImportRefused as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Imported outputs/{args.step}.json ({len(audit['changed_paths'])} JSON path(s) differ from the saved reply; "
+          f"audit in outputs/{args.step}.repair.audit.json). The next `litreview run {args.run_id}` uses it without "
+          "paying for the call again.")
     return 0
 
 
@@ -368,6 +384,15 @@ def main(argv: list[str] | None = None) -> int:
     au=sub.add_parser('authorize-stage',help='explicit human financial approval of the exact pending stage projection')
     au.add_argument('run_id');au.add_argument('stage',choices=['1','2'])
     au.add_argument('--fingerprint',required=True);au.add_argument('--reviewer',required=True);au.set_defaults(fn=cmd_authorize_stage)
+    ri = sub.add_parser("repair-import", help="import your repair of a complete output that failed its schema (free)")
+    ri.add_argument("run_id")
+    ri.add_argument("step", help="the step name, as in outputs/<step>.raw0.txt")
+    ri.add_argument("--agent", required=True, help="e.g. A07-SYN")
+    ri.add_argument("--file", required=True, help="the repaired JSON file")
+    ri.add_argument("--schema", help="schema file name when the step used a mode schema, e.g. A07-SYN.bounded-group.schema.json")
+    ri.add_argument("--by", required=True, help="your name")
+    ri.add_argument("--reason", required=True, help="what was wrong and what you changed")
+    ri.set_defaults(fn=cmd_repair_import)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

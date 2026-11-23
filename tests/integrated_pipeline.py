@@ -196,6 +196,17 @@ def _resume(run, stage, agents):
 
 
 def simulate(n: int, root: Path, fail: dict | None = None) -> dict:
+    """Run the scripted pipeline. The export functions it replaces are restored afterwards: left in place they
+    made every later test in the same process export an empty manuscript."""
+    from litreview.tools import manuscript_export, references
+    saved = (references.crossref_lookup, manuscript_export.render_markdown, manuscript_export.render_docx)
+    try:
+        return _simulate(n, root, fail)
+    finally:
+        references.crossref_lookup, manuscript_export.render_markdown, manuscript_export.render_docx = saved
+
+
+def _simulate(n: int, root: Path, fail: dict | None = None) -> dict:
     orch.RUNS_DIR = root
     run = orch.Run(f"sim-{n}")
     corpus, findings, held = workload(n)
