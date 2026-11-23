@@ -468,7 +468,7 @@ def main(argv: list[str] | None = None) -> int:
     a = sub.add_parser("approve")
     a.add_argument("run_id")
     a.add_argument("checkpoint", choices=["CP1", "CP2", "CP_SYN", "CP3", "CP_LEDGER", "CP_CONTRARY",
-                                         "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW"])
+                                         "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW", "CP_EARLY"])
     a.set_defaults(fn=cmd_approve)
     aa = sub.add_parser("approve-alternate", help="accept a costlier alternate model after a refusal (this run only)")
     aa.add_argument("run_id")

@@ -303,3 +303,47 @@ def test_explicit_counts_ignore_the_assumed_core_share(tmp_path):
     cfg["forecast"]["core_share"] = 0.05
     r2 = forecast.full_run(15, 0.01, cfg, b, route, rates, explicit={"full_text": 5, "abstract": 10})
     assert (r["full_text"], r["abstract"]) == (5, 10) == (r2["full_text"], r2["abstract"]) and r["findings"] == r2["findings"]
+
+
+# ----------------------------------------------------------------------- early check after the first papers
+def test_extraction_stops_after_one_full_text_and_two_abstracts_until_the_researcher_has_looked(tmp_path, monkeypatch):
+    monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
+    monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
+    monkeypatch.setattr(orch.notify, "send", lambda *a, **k: False)
+    run_id = orch.new_run("topic", outline=outline(), corpus_manifest=manifest(), corpus_mode="OPEN_CORPUS", profile="corpus15")
+    run = orch.Run(run_id)
+    corpus = [{"record_id": f"R{i:04d}", "pmid": p["pmid"], "pmcid": f"PMC{i}", "abstract": "An abstract.",
+               "manifest_paper_id": p["paper_id"], "intended_reading_level": p["intended_reading_level"],
+               "tier": p["scientific_importance"]} for i, p in enumerate(manifest()["papers"], 1)]
+    run.save("selected_corpus.json", corpus)
+    run.save("spec_approved.json", {"central_question": "q"})
+    for r in corpus[:5]:
+        run.save(f"fulltext/{r['record_id']}.json", {"Abstract": "a", "Results": "b"})
+    run.save_state({**run.state(), "stage": "extract"})
+    monkeypatch.setattr(orch, "verify_cached_source", lambda *a, **k: None)
+    calls = []
+
+    def run_many(agent, items, on_output, exclude=None):
+        for step, payload in items:
+            calls.append(step)
+            on_output(step, {"content_level": payload["content_level"], "findings": [{"finding_id": "F1", "context_id": "C1"}],
+                             "contexts": [{"context_id": "C1", "comparator": "NONE_REPORTED"}]})
+    monkeypatch.setattr(run, "run_many", run_many)
+    monkeypatch.setattr(run, "_normalize", lambda rid, ext: ext)
+    with pytest.raises(orch.Pause, match="waiting for CP_EARLY"):
+        run.stage_extract(run.state())
+    assert calls == ["A05-KE_R0001", "A05-KE_R0006", "A05-KE_R0007"]     # one full text, two abstracts, manifest order
+    report = run.load("early_check.json")
+    assert [p["level"] for p in report["papers"]] == ["FULL_TEXT", "ABSTRACT", "ABSTRACT"]
+    assert report["papers"][0]["comparator_not_reported"] == 1 and "extrapolated_extraction_usd" in report
+    access = run.load("source_access.json")
+    assert access["R0006"]["level"] == "ABSTRACT" and access["R0001"]["figures_inspected"] is True
+    cp = orch.checkpoints.cp_dir(run.dir)
+    with pytest.raises(orch.checkpoints.DecisionIncomplete, match="record what you inspected"):
+        orch.checkpoints.approve(run.dir, "CP_EARLY", run.prov)
+    decision = json.loads((cp / "CP_EARLY_decision.json").read_text())
+    decision.update(approve_continue=True, notes="Checked spans and comparators for P01, P06 and P07 against the PDFs.")
+    (cp / "CP_EARLY_decision.json").write_text(json.dumps(decision))
+    orch.checkpoints.approve(run.dir, "CP_EARLY", run.prov)
+    assert run.stage_extract(run.state()) == "validate"
+    assert len(calls) == 15 and len(set(calls)) == 15                     # the first three are not read again

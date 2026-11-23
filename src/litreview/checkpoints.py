@@ -316,7 +316,7 @@ def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: 
 # CP_CONTRARY (release: contrary evidence neither in the table nor addressed in prose), CP_CONTEXT (a request near
 # its model's window), CP_SPEND (the run's spend review point). Each approval is bound to the fingerprint it was
 # written for, logged to provenance by `approve`, and kept in <cp>_approvals.json, so a later pause never erases it.
-REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW")
+REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW", "CP_EARLY")
 
 
 def _write_review(run_dir: Path, cp: str, digest: str, lines: list[str], template: dict, state: dict) -> None:
@@ -382,6 +382,29 @@ def write_spend_review(run_dir: Path, digest: str, detail: dict) -> None:
     _write_review(run_dir, "CP_SPEND", digest, lines, {"approve_continue": False}, {"detail": detail})
 
 
+def write_early_review(run_dir: Path, digest: str, report: dict) -> None:
+    """The first papers are extracted: the run stops so the researcher can inspect quality and cost before the
+    rest of the corpus is read. Nothing already done is repeated after approval."""
+    lines = ["# Early check: the first papers are extracted", "",
+             "Read these extractions before the rest of the corpus is processed. Open each file under "
+             "`data/extractions/` and compare a few findings with the paper: spans, comparators, doses, values and "
+             "whether a result or an interpretation was recorded.", "",
+             "| Paper | Record | Read as | Findings | Comparator not reported | Cost | Projected per paper |",
+             "|---|---|---|---:|---:|---:|---:|"]
+    for p in report["papers"]:
+        lines.append(f"| {p.get('paper_id') or ''} | {p['record_id']} | {p['level']} | {p['findings']} | "
+                     f"{p['comparator_not_reported']} | ${p['cost_usd']:.2f} | "
+                     + (f"${p['projected_usd']:.2f}" if p.get("projected_usd") is not None else "n/a") + " |")
+    lines += ["", f"Spent on these papers: ${report['spent_usd']:.2f}. If every remaining paper costs what its level "
+              f"cost here, extraction of the corpus totals about ${report['extrapolated_extraction_usd']:.2f} "
+              f"(projection: ${report['projected_extraction_usd']:.2f}). One full text and two abstracts are an early "
+              "signal, not an average.", "",
+              "To continue, set `approve_continue` to true and write what you checked in `notes` (at least a "
+              "sentence), then run `litreview approve <run_id> CP_EARLY`. To change course instead, record an applied "
+              "decision (`litreview decide`) or stop the run; nothing paid for is lost either way."]
+    _write_review(run_dir, "CP_EARLY", digest, lines, {"approve_continue": False}, {"report": report})
+
+
 def review_approved(run_dir: Path, cp: str, digest: str) -> dict | None:
     """The approval recorded for exactly this fingerprint, if any."""
     p = cp_dir(run_dir) / f"{cp}_approvals.json"
@@ -439,6 +462,8 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
             raise DecisionIncomplete("CP_AGENT_REVIEW: explicit continuation and resolution notes required")
         if cp == "CP_CONTEXT" and decision.get("approve_request") is not True:
             raise DecisionIncomplete("CP_CONTEXT: set approve_request to true, or split the work and run again")
+        if cp == "CP_EARLY" and (decision.get("approve_continue") is not True or len(decision.get("notes", "").strip()) < 20):
+            raise DecisionIncomplete("CP_EARLY: set approve_continue to true and record what you inspected in notes")
         if cp == "CP_SPEND" and decision.get("approve_continue") is not True:
             raise DecisionIncomplete("CP_SPEND: set approve_continue to true to continue to the cap")
         if cp == "CP_CONTRARY":

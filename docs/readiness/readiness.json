@@ -1,0 +1,84 @@
+{
+  "checked_at": "2026-11-23T17:34:25",
+  "git_commit": "00a441a3591aae39420df658520f2ac6f72b845d",
+  "faults": {
+    "passed": true,
+    "summary": "65 passed in 6.91s",
+    "failures": []
+  },
+  "resume": {
+    "passed": true,
+    "summary": "18 passed in 45.13s",
+    "failures": []
+  },
+  "accounting": {
+    "passed": true,
+    "summary": "68 passed in 64.62s (0:01:04)",
+    "failures": []
+  },
+  "budget": {
+    "passed": true,
+    "summary": "15 passed in 1.16s",
+    "failures": []
+  },
+  "specification": {
+    "passed": true,
+    "summary": "40 passed in 1.44s",
+    "failures": []
+  },
+  "smoke_test": {
+    "passed": null,
+    "status": "NOT RUN: needs your approval (it makes live calls)",
+    "combinations_to_confirm": 15,
+    "worst_case_usd": 0.4391,
+    "command": "litreview smoke-test --approve-usd 1.0 --by \"<your name>\""
+  },
+  "rehearsal": {
+    "papers": 15,
+    "findings": 211,
+    "calls": {
+      "A08-OL": 1,
+      "A09-WRI": 13,
+      "A10-RV": 24,
+      "A11-RC": 2,
+      "A12-EDI": 4
+    },
+    "a07": {
+      "status": "COMPLETE",
+      "propositions": 40,
+      "gaps": 119,
+      "reconciliation_issues": 1,
+      "findings_unaccounted": 0,
+      "coverage_incomplete": 0
+    },
+    "a10_release": "APPROVED",
+    "a10_coverage": {
+      "occurrences_total": 193,
+      "occurrences_reviewed": 193,
+      "global_index_entries_reviewed": 371,
+      "inventory_fingerprint": "09cdccae9a4db945704c3702c5e704a561631b4a5d746fb764987c68ff8db739"
+    },
+    "ledger": {
+      "DISCUSSED": 22,
+      "GROUPED_WITH": 137,
+      "TABLE_ONLY": 0,
+      "NOT_INDIVIDUALLY_DISCUSSED": 0,
+      "elements": 159
+    },
+    "checks": {
+      "reached_export": true,
+      "every_finding_accounted": true,
+      "no_ineligible_evidence_used": true,
+      "every_written_element_rendered": true,
+      "mandatory_items_written": true,
+      "every_claim_verified": true,
+      "release_on_current_verification": true,
+      "injected_failures_resumed": true
+    },
+    "passed": true,
+    "submission_blockers_in_rehearsal": 24,
+    "table_finding": "Table: Table 1: estimated at 5.12 pages (15 rows); the journal allows 1. Shorten cells or remove rows at CP_LEDGER",
+    "note": "Scripted models: this proves the machinery, not the science. Stages before A07 (search, CP2, extraction, validation) are covered by their own tests in 'specification', 'faults' and 'resume'."
+  },
+  "ready_for_smoke_test": true
+}

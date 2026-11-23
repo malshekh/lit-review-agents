@@ -209,6 +209,7 @@ run_spec:
   # paper's reading level; the tier policy below applies only to runs without one.
   max_papers: 15
   max_full_text: 5
+  first_tranche: {full_text: 1, abstract: 2}   # read first; the run stops (CP_EARLY) for inspection, then continues
 extraction:
   # Full text is read for these tiers only; other papers are extracted from their abstract and labelled
   # ABSTRACT, which every later stage sees. null: full text for every paper that has it (the old behaviour).

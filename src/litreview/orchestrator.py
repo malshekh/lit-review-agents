@@ -1365,9 +1365,78 @@ class Run:
                 payload["outline_questions"] = [{"section_id": s["section_id"], "heading": s["heading"],
                                                  "questions": s["questions"]} for s in outline["sections"]]
             items.append((f"A05-KE_{rid}", payload))
-        self.run_many("A05-KE", items, lambda step, out: self.save(
-            f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out)))
+        save = lambda step, out: self.save(f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out))  # noqa: E731
+        first = self._first_tranche()
+        if first:
+            self.run_many("A05-KE", [it for it in items if rid_of[it[0]] in first], save)
+            self._early_check(first)
+            items = [it for it in items if rid_of[it[0]] not in first]
+        self.run_many("A05-KE", items, save)
         return "validate"
+
+    def _first_tranche(self) -> list[str]:
+        """run_spec.first_tranche: the record IDs read first, before the early check (manifest runs only). Chosen by
+        the manifest's order within each reading level, so the researcher decides which papers come first."""
+        from . import run_spec
+        want = (self.cfg.get("run_spec") or {}).get("first_tranche") or {}
+        _, manifest = run_spec.load(self.dir)
+        if not manifest or not want:
+            return []
+        order = {p["paper_id"]: i for i, p in enumerate(manifest["papers"])}
+        corpus = sorted((r for r in self.load("selected_corpus.json", []) if r.get("manifest_paper_id")),
+                        key=lambda r: order.get(r["manifest_paper_id"], 999))
+        out = []
+        for level, n in (("FULL_TEXT", int(want.get("full_text", 0))), ("ABSTRACT", int(want.get("abstract", 0)))):
+            out += [r["record_id"] for r in corpus if r.get("intended_reading_level") == level][:n]
+        return out
+
+    def _early_check(self, first: list[str]) -> None:
+        """Stop after the first papers until the researcher has looked at them (CP_EARLY). Approved once per tranche."""
+        from .synthesis_registry import fingerprint
+        digest = fingerprint({"run": self.id, "first_tranche": sorted(first)})
+        if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
+            return
+        from . import run_spec
+        _, manifest = run_spec.load(self.dir)
+        corpus = {r["record_id"]: r for r in self.load("selected_corpus.json", [])}
+        proj = self.load("cost_projection.json") or {}
+        per_level = {}
+        for line in proj.get("lines", []):
+            for level in ("FULL_TEXT", "ABSTRACT"):
+                if line.get("level") == level and line.get("papers"):
+                    per_level[level] = float(line["usd"]) / int(line["papers"])
+        rates = {}
+        try:
+            rates = cost_projection.load_rates().get("per_paper", {})
+        except FileNotFoundError:
+            pass
+        papers, spent, by_level = [], 0.0, {}
+        entries = self.budget.entries()
+        for rid in first:
+            ext = self.load(f"extractions/{rid}.json") or {}
+            level = ext.get("content_level") or corpus.get(rid, {}).get("intended_reading_level") or "ABSTRACT"
+            cost = sum(e["cost_usd"] or 0 for e in entries if e["agent"] == "A05-KE" and re.match(rf"A05-KE_{rid}(_|$)", e["step"]))
+            contexts = {c.get("context_id"): c for c in ext.get("contexts") or []}
+            missing = sum(1 for f in ext.get("findings") or []
+                          if (contexts.get(f.get("context_id")) or f.get("context") or {}).get("comparator") in (None, "", "NONE_REPORTED"))
+            projected = per_level.get(level) or (rates.get(level) or {}).get("mean_usd")
+            papers.append({"record_id": rid, "paper_id": corpus.get(rid, {}).get("manifest_paper_id"), "level": level,
+                           "findings": len(ext.get("findings") or []), "comparator_not_reported": missing,
+                           "cost_usd": round(cost, 4), "projected_usd": projected})
+            spent += cost
+            by_level.setdefault(level, []).append(cost)
+        counts = {"FULL_TEXT": 0, "ABSTRACT": 0}
+        for p in (manifest or {}).get("papers", []):
+            counts[p["intended_reading_level"]] += 1
+        extrapolated = sum(counts[lv] * (sum(c) / len(c)) for lv, c in by_level.items() if c)
+        extrapolated += sum(counts[lv] * float((rates.get(lv) or {}).get("mean_usd") or 0) for lv in counts if lv not in by_level)
+        projected = sum(counts[lv] * float((rates.get(lv) or {}).get("mean_usd") or 0) for lv in counts)
+        report = {"papers": papers, "spent_usd": round(spent, 4), "extrapolated_extraction_usd": round(extrapolated, 2),
+                  "projected_extraction_usd": round(projected, 2), "note": "extraction (A05) only; validation follows"}
+        self.save("early_check.json", report)
+        self.prov.tool_run("early_check", "extract", report)
+        checkpoints.write_early_review(self.dir, digest, report)
+        self.pause_for_checkpoint("CP_EARLY")
 
     def _tier_allows(self, section: str, key: str, rec: dict) -> bool:
         """pipeline.yaml -> <section>.<key>: the tiers a costly step applies to. None or missing: every paper."""

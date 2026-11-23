@@ -31,7 +31,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FROM_GIT = ["src", "config", "prompts", "schemas", "records", "a07_a09_sample.py", "scripts/reconcile_billing.py",
-            "pyproject.toml", "requirements.txt", "LICENSE.md"]
+            "scripts/plan_budget.py", "scripts/offline_guard.py", "docs/run_spec", "pyproject.toml", "requirements.txt",
+            "LICENSE.md"]
 FROM_RUNTIME = ["vendor", "bootstrap.py", "cli_entry.py", "candidate/model_record_baseline.jsonl",
                 "records/model_record.jsonl"]
 TELEMETRY = "records/model_record.jsonl"
@@ -51,7 +52,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--dest", required=True)
     ap.add_argument("--from-runtime", required=True, help="the previous runtime: vendor, launcher, telemetry and run come from it")
-    ap.add_argument("--run-id", required=True, help="the run folder to carry over (copied, never moved)")
+    ap.add_argument("--run-id", help="a run folder to carry over (copied, never moved). Omit it for a fresh runtime: "
+                                     "a new scientific run starts empty, with no earlier PLAN, approval, finding or "
+                                     "financial authorization")
     ap.add_argument("--version", required=True)
     ap.add_argument("--purpose", required=True)
     args = ap.parse_args(argv)
@@ -64,8 +67,8 @@ def main(argv: list[str] | None = None) -> int:
         print("REFUSED: the worktree has uncommitted changes; commit first:\n" + dirty[:1000])
         return 1
     commit = git("rev-parse", "HEAD")
-    run_src = prev / "runs" / args.run_id
-    if not run_src.is_dir():
+    run_src = prev / "runs" / args.run_id if args.run_id else None
+    if run_src is not None and not run_src.is_dir():
         print(f"REFUSED: {run_src} not found")
         return 1
     dest.mkdir(parents=True)
@@ -85,14 +88,17 @@ def main(argv: list[str] | None = None) -> int:
             shutil.copytree(src, dst)
         else:
             shutil.copy2(src, dst)
-    shutil.copytree(run_src, dest / "runs" / args.run_id)
+    (dest / "runs").mkdir(exist_ok=True)
+    if run_src is not None:
+        shutil.copytree(run_src, dest / "runs" / args.run_id)
     # 4. manifest
     files = {p.relative_to(dest).as_posix(): sha(p) for p in sorted(dest.rglob("*"))
              if p.is_file() and p.relative_to(dest).parts[0] != "runs" and p.relative_to(dest).as_posix() != TELEMETRY}
     manifest = {"runtime_version": args.version, "purpose": args.purpose, "git_commit": commit,
                 "git_branch": git("rev-parse", "--abbrev-ref", "HEAD"), "built_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 "source_paths_from_git": FROM_GIT,
-                "copied_from_runtime": {"runtime": str(prev), "paths": FROM_RUNTIME, "run": args.run_id},
+                "copied_from_runtime": {"runtime": str(prev), "paths": FROM_RUNTIME, "run": args.run_id,
+                                        "note": "engineering only: vendored packages, launcher, model-record telemetry"},
                 "files": files, "mutable_telemetry": {"baseline": "candidate/model_record_baseline.jsonl"}}
     (dest / MANIFEST).write_text(json.dumps(manifest, indent=1), encoding="utf-8")
     # 5. verify with the runtime's own verifier
