@@ -13,3 +13,9 @@ No rehearsal outputs or approvals enter the live run. Full-text extraction remai
 The operational overlay disables automatic truncation retries, because the researcher prohibited automatically increasing limits after a failure. Financial limits, prices and model selections remain unchanged.
 
 Email notifications are disabled in the operational overlay; checkpoint results are presented locally.
+
+## Live adapter failure and correction
+
+V17's first corrected A02 smoke returned `{}` with stop reason `stop`, and was correctly rejected by exact-schema validation. Its recorded cost is $0.001826; total recorded spending became $0.0611663, plus the original $0.019586 hold. No other corrected smoke was dispatched in v17.
+
+Inspection identified `strict: false` in the OpenAI Chat Completions adapter. It now explicitly sends `strict: true`; the request-body regression requires that flag. The official Structured Outputs guide establishes this requirement: https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat . Models, output caps and scientific schema fields are unchanged. V18 migrates every v17 receipt, cost entry and authorization, preserving the rejected response and the historical unresolved hold. All five old OpenAI successes were already invalid, so no OpenAI acceptance is reused across this transport correction; the six Anthropic A07/A09 acceptances remain unchanged.

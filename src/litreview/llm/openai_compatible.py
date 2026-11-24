@@ -85,7 +85,7 @@ def chat_params(system: str, user, model: str, max_tokens: int, temperature: flo
         kwargs["reasoning_effort"] = sent_effort
     if response_schema:   # structured output for a combination the smoke test confirmed (structured.py)
         kwargs["response_format"] = {"type": "json_schema", "json_schema": {
-            "name": response_schema["name"], "schema": response_schema["schema"], "strict": False}}
+            "name": response_schema["name"], "schema": response_schema["schema"], "strict": True}}
     elif p.get("json_mode", True):
         kwargs["response_format"] = {"type": "json_object"}
     return kwargs

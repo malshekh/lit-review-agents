@@ -244,6 +244,7 @@ def test_the_request_carries_the_schema_and_the_full_validator_still_runs():
     assert "format" not in anthropic_client.message_params("s", "u", "claude-opus-5", 100, 0.0, "medium").get("output_config", {})
     chat = oc.chat_params("s", "u", "gpt-6.1-sol", 100, 0.0, effort="medium", response_schema=shape)
     assert chat["response_format"]["type"] == "json_schema" and chat["response_format"]["json_schema"]["schema"] == shape["schema"]
+    assert chat["response_format"]["json_schema"]["strict"] is True
     assert oc.chat_params("s", "u", "gpt-6.1-sol", 100, 0.0)["response_format"] == {"type": "json_object"}
 
 
