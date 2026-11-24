@@ -154,6 +154,7 @@ def smoke_estimate(budget) -> tuple[float, list[dict]]:
 
 def recover_smoke_receipts(budget) -> None:
     """Settle received calls exactly once; an uncertain dispatch retains its reservation and stops."""
+    accepted_receipts = set()
     for p in sorted((budget.log_path.parent / "smoke_receipts").glob("*.json")):
         receipt = json.loads(p.read_text(encoding="utf-8"))
         key = receipt["reservation"]
@@ -176,8 +177,14 @@ def recover_smoke_receipts(budget) -> None:
             except (ValueError, OSError) as exc:
                 validation["accepted"] = False
                 validation["problems"].append("current provider contract incompatible; no approval retained")
-        record(receipt["provider"], receipt["model"], receipt["schema_sha256"], validation["accepted"],
-               "reassessed persisted receipt", validation=validation)
+        identity = _key(receipt["provider"], receipt["model"], receipt["schema_sha256"])
+        # UUID filename order is not chronology. An invalid receipt cannot erase a separately
+        # validated success for the identical current provider/model/schema.
+        if validation["accepted"] or identity not in accepted_receipts:
+            record(receipt["provider"], receipt["model"], receipt["schema_sha256"], validation["accepted"],
+                   "reassessed persisted receipt", validation=validation)
+        if validation["accepted"]:
+            accepted_receipts.add(identity)
         budget.release(key)
 
 

@@ -48,3 +48,19 @@ def test_retained_authorization_fails_closed(retained,change):
 def test_same_rejected_schema_cannot_repeat(retained,monkeypatch):
     b,a,p=retained;monkeypatch.setattr(structured,"slim",lambda *args: ({},"old"))
     with pytest.raises(ValueError,match="unchanged"):blocking_holds(b,a)
+
+
+def test_second_hold_needs_its_own_explicit_authorization(retained):
+    b,a,p=retained
+    b.reserve("smoke-new",0.001107,"smoke-test","uncertain")
+    new_receipt={"state":"ERROR_RESPONSE","reservation":"smoke-new","target":"A05-KE.schema.json"}
+    new_path=p.with_name("smoke-new.json");new_path.write_text(json.dumps(new_receipt))
+    log=p.parent.parent/"smoke_tests.jsonl"
+    row=json.loads(log.read_text().splitlines()[0]);row["time"]=b.reservations()["smoke-new"]["reserved_at"];row["error"]="Error code: 400 request_new"
+    log.write_text(log.read_text()+json.dumps(row)+"\n")
+    assert blocking_holds(b,a)==["smoke-new"]
+    auth=json.loads(a.read_text())
+    extra={**auth,"reservation":"smoke-new","held_usd":0.001107,"receipt_sha256":hashlib.sha256(new_path.read_bytes()).hexdigest(),"provider_request_id":"request_new"}
+    auth["additional_authorized_holds"]=[extra];a.write_text(json.dumps(auth))
+    assert blocking_holds(b,a)==[]
+    assert b.reserved()==pytest.approx(0.020693) and not b.entries()

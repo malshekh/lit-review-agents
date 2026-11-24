@@ -49,3 +49,26 @@ def test_migration_preserves_the_spend_unknown_hold_and_receipts(tmp_path):
     assert migrate(source,dest,'test',source_pin,dest_pin)['destination_commit']=='new'
     with pytest.raises(ValueError,match='pinned manifest'):
         migrate(source,dest,'test','wrong',dest_pin)
+
+
+@pytest.mark.parametrize("good_name,bad_name",[("a","z"),("z","a")])
+def test_recovery_preserves_valid_success_regardless_of_receipt_filename_order(tmp_path,monkeypatch,good_name,bad_name):
+    from litreview.budget import BudgetTracker
+    shape={"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":False}
+    digest=smoke_validation.schema_hash(shape)
+    monkeypatch.setattr(structured,"slim",lambda *args:(shape,digest))
+    monkeypatch.setattr(structured,"RECORD",tmp_path/"structured_output.json")
+    folder=tmp_path/"smoke_receipts";folder.mkdir()
+    costs=[]
+    for name,body in [(good_name,'{"ok":true}'),(bad_name,'{}')]:
+        key="smoke-"+name
+        (folder/(name+".json")).write_text(json.dumps({"state":"RECEIVED","reservation":key,"provider":"openai","model":"gpt-6.1-sol",
+            "schema_file":"fixture.json","schema_sha256":digest,"submitted_schema":shape,"stop_reason":"stop","text":body,"input_tokens":1,"output_tokens":1}))
+        costs.append({"step":key,"agent":"smoke-test","cost_usd":0.01})
+    (tmp_path/"costs.jsonl").write_text("\n".join(map(json.dumps,costs))+"\n")
+    before={p:p.read_bytes() for p in folder.iterdir()}
+    b=BudgetTracker(tmp_path)
+    structured.recover_smoke_receipts(b)
+    assert structured.verified()[structured._key("openai","gpt-6.1-sol",digest)]["accepted"]
+    assert b.spent()==0.02 and len(b.entries())==2
+    assert all(p.read_bytes()==raw for p,raw in before.items())
