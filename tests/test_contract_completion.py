@@ -136,3 +136,15 @@ def test_a_received_reply_or_a_mismatched_request_id_is_not_settled_by_attestati
     with pytest.raises(ValueError, match="RECEIVED"):
         structured.settle_smoke_hold(budget, key, 0, "console", "May")
     assert key in budget.reservations()
+
+
+def test_anthropic_nullable_enum_uses_equivalent_typed_branches():
+    from litreview.tools.structured_contract import problems
+    local={"type":"object","properties":{"role":{"type":["string","null"],"enum":["PRIMARY","CONTEXT",None]}},
+           "required":["role"],"additionalProperties":False}
+    assert any("list-valued type" in x for x in problems(local,"anthropic"))
+    wire,_=contract.for_structured_output(local,"anthropic")
+    assert wire["properties"]["role"]=={"anyOf":[{"type":"string","enum":["PRIMARY","CONTEXT"]},{"type":"null"}]}
+    for value in ["PRIMARY","CONTEXT",None,"OTHER",0,False,[],{}]:
+        assert jsonschema.Draft202012Validator(local).is_valid({"role":value})==jsonschema.Draft202012Validator(wire).is_valid({"role":value})
+    assert contract.for_structured_output(local,"openai")[0]==local

@@ -60,6 +60,8 @@ def problems(schema: dict, provider: str) -> list[str]:
         known=declared|set(props)
         missing=set(node.get('required',[]))-known
         if missing:errors.append(path+': undeclared required fields '+','.join(sorted(missing)))
+        if provider=='anthropic' and isinstance(node.get('type'),list) and 'enum' in node:
+            errors.append(path+': anthropic enum with list-valued type requires explicit typed branches')
         types=node.get('type',[]); types=[types] if isinstance(types,str) else types
         if 'object' in types or 'properties' in node:
             if not props:errors.append(path+': unspecified/empty object; define useful fields explicitly')
