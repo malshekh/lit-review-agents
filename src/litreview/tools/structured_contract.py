@@ -14,6 +14,26 @@ def problems(schema: dict, provider: str) -> list[str]:
     if provider not in ('anthropic','openai'):
         return [f'unsupported structured-output provider: {provider}']
     errors=[]
+    optional=unions=properties=0
+    def count(node):
+        nonlocal optional,unions,properties
+        if not isinstance(node,dict):return
+        props=node.get('properties',{})
+        optional+=len(set(props)-set(node.get('required',[])))
+        properties+=len(props)
+        types=node.get('type')
+        unions+=int((isinstance(types,list) and len(types)>1) or 'anyOf' in node or 'oneOf' in node)
+        for child in props.values():count(child)
+        if isinstance(node.get('items'),dict):count(node['items'])
+        for key in ('$defs','definitions'):
+            for child in node.get(key,{}).values():count(child)
+        for key in ('anyOf','oneOf','allOf'):
+            for child in node.get(key,[]):count(child)
+    count(schema)
+    if provider=='anthropic':
+        if optional>24:errors.append(f'$: anthropic optional parameter limit exceeded ({optional}>24)')
+        if unions>16:errors.append(f'$: anthropic union parameter limit exceeded ({unions}>16)')
+    if provider=='openai' and properties>5000:errors.append('$: openai property count exceeds 5000')
     try:jsonschema.Draft202012Validator.check_schema(schema)
     except jsonschema.SchemaError as exc:errors.append('invalid JSON Schema: '+exc.message)
     def walk(node,path='$',refs=(),declared=frozenset()):

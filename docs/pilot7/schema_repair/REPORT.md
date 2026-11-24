@@ -89,3 +89,23 @@ Stable full offline suite: **1,050 passed in 193.42 seconds**, with sockets and 
 
 A read-only Anthropic cost-report request for 2026-11-24 02:58-03:15 UTC (the November 23 local smoke window) returned HTTP 401 authentication_error with the current-account key. No inference request was sent. Redacted evidence is retained privately as runs/schema-repair-billing-evidence.json and will travel into the continued run. The response does not establish the failed request's billed amount; the hold remains unchanged.
 
+## Authored Anthropic A05 wire contract and final checks
+
+The official Anthropic limits also cap optional parameters at 24 and union-typed parameters at 16.
+`A05-KE.anthropic.schema.json` is an explicit A05-only provider contract, not a generic rewrite of arbitrary
+schemas. It retains every scientific property path in the complete local schema, with zero optional wire
+parameters and 16 unions. Unreported context dimensions and the few non-nullable metadata locations use
+the documented `NOT_REPORTED`/`NOT_APPLICABLE` representations; no missing experiment details are inferred.
+Nullable object identifiers, quantitative uncertainty, attribution and bridging remain available. All local
+constraints and scientific semantic checks still run. The provider prompt describes these representations.
+
+The recursive compatibility checker enforces the documented resource limits before dispatch. Definition
+and scientific property names such as `if` or `then` are preserved as names, rather than stripped as schema
+keywords. A dedicated regression validates a referenced definition with those names.
+
+The full suite with the complexity guards passed **1,052 tests in 192.02 seconds**. After the final
+definition-name preservation edge case, **41 focused contract/migration/receipt tests passed**. No live
+schema-compilation success is claimed; corrected paid smoke checks remain blocked by reconciliation and
+the other incomplete provider contracts. Source receipts still permit exactly six unchanged checks to be
+reused after offline validation, and nine checks need eventual correction/retesting. No paid call was added.
+

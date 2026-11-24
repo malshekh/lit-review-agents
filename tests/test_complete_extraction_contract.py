@@ -7,9 +7,27 @@ from litreview import structured,smoke_validation
 from litreview.tools import contract,span_check,structured_contract
 ROOT=Path(__file__).resolve().parents[1]
 
+def _wire_fill(schema, value):
+    # Synthetic fixture completion records missingness only; existing scientific values are never changed.
+    if '$ref' in schema:raise AssertionError('fixture has no references')
+    if 'anyOf' in schema:
+        if value is None and any(x.get('type')=='null' for x in schema['anyOf']):return None
+        return _wire_fill(next(x for x in schema['anyOf'] if x.get('type')!='null'),value)
+    kind=schema.get('type')
+    if kind=='object':
+        value=value or {}
+        return {k:_wire_fill(v,value.get(k)) for k,v in schema['properties'].items()}
+    if kind=='array':return [_wire_fill(schema['items'],v) for v in value or []]
+    if value is not None:return value
+    if kind=='null' or isinstance(kind,list) and 'null' in kind:return None
+    if 'const' in schema:return schema['const']
+    if kind=='boolean':return False
+    return 'NOT_REPORTED'
+
+
 def extraction():
     span='Doxorubicin was measured at 5 nM in spiked plasma compared with vehicle (n=3).'
-    return {'agent_id':'A05-KE','prompt_version':'1.0','status':'COMPLETE','warnings':[],
+    value={'agent_id':'A05-KE','prompt_version':'1.0','status':'COMPLETE','warnings':[],
       'limitations':['Spiked plasma; no samples collected after administration.'],'record_id':'R0001',
       'content_level':'FULL_TEXT','sections_inspected':['Results','Figure legend Figure 1'],
       'study_profile':{'study_type':'PRIMARY_RESEARCH','evidence_systems':['IN_VITRO_CELL_FREE'],'funding_and_conflicts':'NOT_REPORTED'},
@@ -24,6 +42,7 @@ def extraction():
                      'n':'3','variance_or_ci':None,'p_value':None,'converted':None}]}],
       'author_stated_limitations':[{'text':'No patient samples were tested.','location':'Discussion'}],
       'source_access':{'level':'FULL_TEXT','figure_legends_read':True,'figure_images_inspected':False,'supplements_inspected':False}}
+    return _wire_fill(json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text()),value)
 
 def test_complete_nonempty_extraction_reaches_real_independent_validation_input(tmp_path,monkeypatch):
     from litreview import orchestrator as orch,model_record
@@ -145,3 +164,37 @@ def test_atomic_smoke_record_preserves_previous_file_on_interruption(tmp_path,mo
     monkeypatch.setattr(structured.os,'replace',lambda *a: (_ for _ in ()).throw(OSError('interrupted')))
     with pytest.raises(OSError):structured._write_json(p,{'new':True})
     assert json.loads(p.read_text())=={'old':True}
+
+
+def test_authored_wire_contract_keeps_every_local_scientific_property():
+    local=json.loads((ROOT/'schemas/A05-KE.schema.json').read_text())
+    wire=json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text())
+    def paths(node,at='$'):
+        result=set()
+        if isinstance(node,dict):
+            for key,child in node.get('properties',{}).items():
+                result.add(at+'.'+key);result|=paths(child,at+'.'+key)
+            if 'items' in node:result|=paths(node['items'],at+'[]')
+            for key in ('anyOf','allOf'):
+                for child in node.get(key,[]):result|=paths(child,at)
+        return result
+    assert paths(local)==paths(wire)
+    shape,_=structured.slim('A05-KE.schema.json','anthropic')
+    assert not structured_contract.problems(shape,'anthropic')
+
+
+def test_documented_anthropic_complexity_limits_are_checked_offline():
+    optional={'type':'object','properties':{str(i):{'type':'string'} for i in range(25)},'additionalProperties':False}
+    with pytest.raises(structured_contract.SchemaCompatibilityError,match='optional parameter limit'):
+        contract.for_structured_output(optional,'anthropic')
+    unions={'type':'object','properties':{str(i):{'type':['string','null']} for i in range(17)},'required':[str(i) for i in range(17)],'additionalProperties':False}
+    with pytest.raises(structured_contract.SchemaCompatibilityError,match='union parameter limit'):
+        contract.for_structured_output(unions,'anthropic')
+
+
+def test_definition_and_property_names_are_not_mistaken_for_keywords():
+    schema={'type':'object','properties':{'result':{'$ref':'#/$defs/if'}},'required':['result'],'additionalProperties':False,
+            '$defs':{'if':{'type':'object','properties':{'then':{'type':'string'}},'required':['then'],'additionalProperties':False}}}
+    shape,_=contract.for_structured_output(schema,'anthropic')
+    jsonschema.validate({'result':{'then':'scientific value'}},shape)
+    assert 'if' in shape['$defs'] and 'then' in shape['$defs']['if']['properties']

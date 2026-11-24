@@ -85,7 +85,7 @@ def for_structured_output(schema: dict, provider: str = "anthropic") -> tuple[di
                 continue
             if k in ("$schema", "title", "$id"):
                 continue
-            if k == "properties":
+            if k in ("properties", "$defs", "definitions"):
                 out[k] = {name: strip(child, f"{path}.{name}") for name, child in v.items()}
             elif k == "allOf":
                 kept = [strip(x, f"{path}.allOf[{i}]") for i, x in enumerate(v)]

@@ -321,7 +321,7 @@
       "provider": "anthropic",
       "model": "claude-sonnet-5-5",
       "schema_file": "A05-KE.schema.json",
-      "schema_sha256": "3487310c979ace6f14976432de76b053ae63a02b85df4ab487eaa4db555f9594",
+      "schema_sha256": "53e8885ee7020e64719fa73bea380d560d4a0fa562cf40cf86add2ff88419e56",
       "problems": []
     },
     {
@@ -431,6 +431,12 @@
     "status": "BLOCKED",
     "request_id": "req_011ChM1MMKaDrZauPitV2pKC",
     "evidence": "HTTP 400 invalid_request_error is preserved; no usage receipt, billing export or current-account admin billing credential is available.",
-    "inference": "A rejected schema is known, but that alone is not independent billing evidence. Hold remains; no retry permitted."
+    "inference": "A rejected schema is known, but that alone is not independent billing evidence. Hold remains; no retry permitted.",
+    "current_account_billing_query": {
+      "http_status": 401,
+      "operation": "read-only official cost report for smoke window",
+      "result": "Admin API requires an Admin API key or organization-scoped API key; no billed amount established",
+      "hold_released": false
+    }
   }
 }

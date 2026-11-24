@@ -40,7 +40,8 @@ def schema_files(agent_id: str) -> list[str]:
 
 def slim(schema_file: str, provider: str = "anthropic") -> tuple[dict, str]:
     """(the schema in structured-output form, its SHA-256)."""
-    schema = json.loads((SCHEMAS_DIR / schema_file).read_text(encoding="utf-8"))
+    submitted_file = "A05-KE.anthropic.schema.json" if schema_file == "A05-KE.schema.json" and provider == "anthropic" else schema_file
+    schema = json.loads((SCHEMAS_DIR / submitted_file).read_text(encoding="utf-8"))
     out, _ = contract.for_structured_output(schema, provider)
     return out, hashlib.sha256(json.dumps(out, sort_keys=True).encode("utf-8")).hexdigest()
 
