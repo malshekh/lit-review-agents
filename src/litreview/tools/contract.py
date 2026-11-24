@@ -107,6 +107,9 @@ def for_structured_output(schema: dict, provider: str = "anthropic") -> tuple[di
             if strings:branches.append({"type":"string","enum":strings})
             if None in values:branches.append({"type":"null"})
             out={**{k:v for k,v in out.items() if k not in ("type","enum")},"anyOf":branches}
+        if provider == "anthropic" and out.get("type") in (["string", "null"], ["null", "string"]):
+            rest={k:v for k,v in out.items() if k!="type"}
+            out={"anyOf":[{"type":"string",**rest},{"type":"null"}]}
         return out
     result = strip(copy.deepcopy(schema), "$")
     from .structured_contract import problems

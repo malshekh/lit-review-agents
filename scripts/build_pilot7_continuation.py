@@ -1,11 +1,11 @@
-"""Build the explicitly authorized v21 continuation; no network or paid calls."""
+"""Build the explicitly authorized v22 continuation; no network or paid calls."""
 from pathlib import Path
 import datetime, hashlib, io, json, shutil, subprocess, sys, tarfile
 import build_runtime
 REPO=Path(__file__).resolve().parents[1]
-OLD=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v20-pilot7-retained-hold-50usd")
-DEST=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v21-pilot7-retained-hold-50usd")
-SOURCE_PIN="8f4b50b2853dd569027d6caa5113da94e837355da63ace9d08df966adc8db4c3"
+OLD=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v21-pilot7-retained-hold-50usd")
+DEST=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v22-pilot7-retained-hold-50usd")
+SOURCE_PIN="a625e4dd338e35528d4f4df3913bfacb347358040f3e67874b9b8ba23f098ec2"
 RUN="20261123-214928"
 def git(*args):return subprocess.check_output(["git",*args],cwd=REPO)
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
@@ -56,8 +56,14 @@ def main():
         "model":"claude-haiku-5-5","provider_request_id":"req_011ChMwemm1jBP7wi9kaej8c",
         "rejected_schema_sha256":"c50908fb9e5bfa4dc2b2fa8bf7695babf07455b8e02b6b78cc6018972fc7d9bc",
         "user_instruction":"Retain both holds and continue corrected checks (explicit researcher reply, 2026-11-24)."}]
+    third_key="smoke-cf915e7cd207476399c034b44c539d2a"
+    auth["additional_authorized_holds"].append({**{k:v for k,v in auth.items() if k!="additional_authorized_holds"},
+        "reservation":third_key,"receipt_sha256":sha(source/"smoke_receipts"/(third_key+".json")),"held_usd":0.037048,
+        "provider_request_id":"req_011ChMxNR9guXmuWRanNjcoB",
+        "rejected_schema_sha256":"53e8885ee7020e64719fa73bea380d560d4a0fa562cf40cf86add2ff88419e56",
+        "user_instruction":"Retain all three holds and continue corrected checks after offline repair; explicit researcher reply 2026-11-24."})
     write(DEST/"pilot_retained_hold_authorization.json",auth)
-    manifest={"runtime_version":"stage1-v21-pilot7-retained-hold-50usd","git_commit":commit,
+    manifest={"runtime_version":"stage1-v22-pilot7-retained-hold-50usd","git_commit":commit,
               "built_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "source_runtime":str(OLD),"source_manifest_sha256":SOURCE_PIN,
               "operational_overrides":"v16 financial limits retained; automatic truncation retries disabled per user instruction; unknown hold remains reserved",
@@ -70,18 +76,18 @@ def main():
     for name in ["structured_output.json","input/runtime_pin.json","LIVE_LAUNCH_STATUS.json","LIVE_LAUNCH_STATUS.md","smoke_result.json"]:
         src=target/name
         if src.exists():
-            dst=target/"migration/v21_previous"/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
+            dst=target/"migration/v22_previous"/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
     # Resume with the verified, hash-bound receipt enrichment already produced by v16.
     write(target/"structured_output.json",{})
     report={"run_id":RUN,"source_runtime":str(OLD),"source_manifest_sha256":SOURCE_PIN,"destination_runtime":str(DEST),
             "manifest_sha256":pin,"commit":commit,"original_run_files_sha256":before,"new_paid_calls":0,
             "authorization":auth,"billing_status":"UNRESOLVED_HOLD_RETAINED","scientific_approvals_added":0}
-    write(target/"migration/v21_continuation.json",report)
+    write(target/"migration/v22_continuation.json",report)
     write(target/"input/runtime_pin.json",{"run_id":RUN,"runtime":str(DEST),"manifest_sha256":pin,"reviewed_commit":commit})
     assert inventory(source)==before
     for name,digest in before.items():
         if name not in ("structured_output.json","input/runtime_pin.json"):assert sha(target/name)==digest,name
     result={"runtime":str(DEST),"commit":commit,"manifest_sha256":pin,"run_id":RUN,**verify(DEST,manifest)}
-    write(REPO/"runs/v21_runtime_pin.json",result)
+    write(REPO/"runs/v22_runtime_pin.json",result)
     print(json.dumps(result,indent=2))
 if __name__=="__main__":main()

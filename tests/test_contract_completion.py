@@ -148,3 +148,11 @@ def test_anthropic_nullable_enum_uses_equivalent_typed_branches():
     for value in ["PRIMARY","CONTEXT",None,"OTHER",0,False,[],{}]:
         assert jsonschema.Draft202012Validator(local).is_valid({"role":value})==jsonschema.Draft202012Validator(wire).is_valid({"role":value})
     assert contract.for_structured_output(local,"openai")[0]==local
+
+
+def test_anthropic_plain_nullable_strings_preserve_values_with_explicit_alternatives():
+    local={"type":"object","properties":{"x":{"type":["string","null"]}},"required":["x"],"additionalProperties":False}
+    wire,_=contract.for_structured_output(local,"anthropic")
+    assert wire['properties']['x']=={'anyOf':[{'type':'string'},{'type':'null'}]}
+    for value in [None,'','null','arbitrary',0,False,[],{}]:
+        assert jsonschema.Draft202012Validator(local).is_valid({'x':value})==jsonschema.Draft202012Validator(wire).is_valid({'x':value})

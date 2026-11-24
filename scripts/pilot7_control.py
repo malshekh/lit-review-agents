@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     from litreview import structured, model_record, config, orchestrator, preflight
     from litreview.runtime_integrity import verify, sha
-    ap=argparse.ArgumentParser(); ap.add_argument('action',choices=['availability','audit','smoke','scope']); ap.add_argument('run_id')
+    ap=argparse.ArgumentParser(); ap.add_argument('action',choices=['availability','audit','schema-preflight','smoke','scope']); ap.add_argument('run_id')
     args=ap.parse_args()
     manifest=json.loads((ROOT/'frozen_runtime_manifest.json').read_text(encoding='utf-8'))
     verify(ROOT,manifest)
@@ -37,6 +37,37 @@ def main():
         print(json.dumps({'inventory':structured.schema_inventory(),'remaining_checks':len(todo),'worst_case_usd':amount,
              'spent_usd':run.budget.spent(),'held_usd':run.budget.reserved()},indent=2))
         return 0
+    if args.action=='schema-preflight':
+        import requests, hashlib
+        folder=run.dir/'input/schema_preflight';folder.mkdir(exist_ok=True)
+        pcfg=config.load('pipeline')['providers']['anthropic']
+        assert pcfg['base_url'].rstrip('/')=='https://api.anthropic.com'
+        headers={'x-api-key':os.environ[pcfg['key_env']],'anthropic-version':'2023-06-01'}
+        def probe(label,model,shape):
+            body={'model':model,'system':structured.SMOKE_SYSTEM,'messages':[{'role':'user','content':'Return the object now.'}],
+                  'output_config':{'format':{'type':'json_schema','schema':shape}}}
+            path=folder/(label+'.json')
+            if path.exists():return json.loads(path.read_text())
+            result={'label':label,'endpoint':'/v1/messages/count_tokens','model':model,
+                    'schema_sha256':hashlib.sha256(json.dumps(shape,sort_keys=True).encode()).hexdigest(),
+                    'inference_sent':False,'billed_usd':0,'billing_basis':'Official token-counting endpoint is free; no message generated.'}
+            response=requests.post('https://api.anthropic.com/v1/messages/count_tokens',headers=headers,json=body,timeout=210)
+            result.update(http_status=response.status_code,response=response.json(),request_id=response.headers.get('request-id'))
+            path.write_text(json.dumps(result,indent=2)+'\n')
+            print(json.dumps(result),flush=True)
+            return result
+        failed=json.loads((run.dir/'smoke_receipts/smoke-cf915e7cd207476399c034b44c539d2a.json').read_text())
+        control=probe('known_rejected_a05',failed['model'],failed['submitted_schema'])
+        reproduced=control['http_status']==400 and 'grammar' in json.dumps(control['response']).lower()
+        results=[]
+        for target in structured.targets():
+            if target['provider']=='anthropic':results.append(probe(target['schema_file'],target['model'],target['schema']))
+        report={'known_rejection_reproduced':reproduced,'compiler_validation_established':reproduced,
+                'limitation':'A token-count success is not live smoke acceptance; if the negative control passes, compiler validation is not established.',
+                'results':results}
+        (folder/'summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps({'known_rejection_reproduced':reproduced,'statuses':[r['http_status'] for r in results]}))
+        return 0 if all(r['http_status']==200 for r in results) else 2
     if args.action=='availability':
         import requests
         models={}
