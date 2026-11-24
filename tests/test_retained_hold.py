@@ -75,3 +75,15 @@ def test_unrelated_authorization_does_not_allow_repeating_rejected_schema(retain
     for operation in [None,'smoke','scope']:
         with pytest.raises(ValueError,match='unchanged'):blocking_holds(b,a,operation=operation)
     assert b.reserved()>0
+
+
+def test_http400_request_id_can_be_joined_from_hash_bound_error_receipt(retained):
+    b,a,p=retained
+    receipt=json.loads(p.read_text());receipt.update(state='ERROR_RESPONSE',http_status=400,provider_request_id='request_old')
+    p.write_text(json.dumps(receipt))
+    auth=json.loads(a.read_text());auth['receipt_sha256']=hashlib.sha256(p.read_bytes()).hexdigest();a.write_text(json.dumps(auth))
+    log=p.parent.parent/'smoke_tests.jsonl';row=json.loads(log.read_text());row['error']='Error code: 400 Invalid schema';log.write_text(json.dumps(row)+'\n')
+    assert blocking_holds(b,a)==[]
+    assert b.reserved()==0.019586 and not b.entries()
+    receipt['provider_request_id']='different';p.write_text(json.dumps(receipt));auth['receipt_sha256']=hashlib.sha256(p.read_bytes()).hexdigest();a.write_text(json.dumps(auth))
+    with pytest.raises(ValueError,match='confirmed HTTP 400'):blocking_holds(b,a)

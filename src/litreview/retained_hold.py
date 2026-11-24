@@ -36,7 +36,9 @@ def _authorized_key(budget, auth, operation=None):
                and r.get("provider") == auth["provider"] and r.get("model") == auth["model"]
                and r.get("schema_sha256") == auth["rejected_schema_sha256"]
                and r.get("accepted") is False and "Error code: 400" in r.get("error", "")
-               and auth["provider_request_id"] in r.get("error", "")]
+               and (auth["provider_request_id"] in r.get("error", "") or
+                    (receipt.get("state")=="ERROR_RESPONSE" and receipt.get("http_status")==400
+                     and receipt.get("provider_request_id")==auth["provider_request_id"]))]
     if len(matches) != 1:
         raise ValueError("no unique confirmed HTTP 400 evidence; uncertain dispatch cannot be repeated")
     from .structured import slim
