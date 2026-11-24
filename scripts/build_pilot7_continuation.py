@@ -34,7 +34,7 @@ def main():
     pipeline_path=DEST/"config/pipeline.yaml"
     pipeline=yaml.safe_load(pipeline_path.read_text(encoding="utf-8"))
     pipeline["notify"]["on"]=[]  # No external messages were authorized.
-    pipeline["extraction"]["generation_mode"]="ordinary_json_local_v1"  # Explicit new A05 contract; functional approval remains pending.
+    pipeline["extraction"]["generation_mode"]="ordinary_json_local_v1"  # Explicit researcher-approved A05 mode; scientific checkpoint decisions remain pending.
     pipeline["loops"]["max_truncation_retries"]=0  # User prohibits automatic token-limit increases after failure.
     pipeline_path.write_text(yaml.safe_dump(pipeline,sort_keys=False),encoding="utf-8")
     assert pipeline["profiles"]["pilot7"]["spend_cap_usd"]==50
@@ -63,11 +63,29 @@ def main():
         "provider_request_id":"req_011ChMxNR9guXmuWRanNjcoB",
         "rejected_schema_sha256":"53e8885ee7020e64719fa73bea380d560d4a0fa562cf40cf86add2ff88419e56",
         "user_instruction":"Retain all three holds and continue corrected checks after offline repair; explicit researcher reply 2026-11-24."})
+    fourth_key="smoke-06b75cd9b38647d29a3e16fc3e902aa7"
+    auth["additional_authorized_holds"].append({**{k:v for k,v in auth.items() if k!="additional_authorized_holds"},
+        "reservation":fourth_key,"receipt_sha256":sha(source/"smoke_receipts"/(fourth_key+".json")),"held_usd":0.041668,
+        "provider_request_id":"req_011ChNMGzga3FkrjawEPcPZA",
+        "rejected_schema_sha256":"cb602653047b74fd9865a64e630c214c4c3931b1df2949acc037cee6dd98f9dc",
+        "user_instruction":"Researcher explicitly authorizes all four existing holds retained; no settlement or release; 2026-11-24."})
+    prepared=json.loads((DEST/"docs/pilot7/a05_functional/prepared_plan.json").read_text(encoding="utf-8"))
+    assert prepared["combined_remaining_worst_case_usd"]==0.712374
+    assert prepared["functional_worst_case_usd"]==0.594 and prepared["prior_success_count"]==9
+    check_auth={"run_id":RUN,"approved_by":"May Khalid: explicit chat authorization, 2026-11-24",
+        "implementation_commit":"7d98042f2356b5e022ac5de56c6dc8ce46c23b12",
+        "fingerprint":prepared["fingerprint"],"additional_cap_usd":0.712374,"functional_cap_usd":0.594,
+        "strict_cap_usd":0.118374,"baseline_spend_usd":0.0690631,"baseline_hold_usd":0.099409,
+        "smoke_cap_usd":1,"pilot_cap_usd":50,"review_points_usd":[25,48],
+        "scope_limit":"CP1; no scientific approval","strict_first":"A06-SV.schema.json",
+        "stop_on":["new unresolved hold","required check fails after permitted repair","reviewed cost bound changes"],
+        "user_instruction":"Authorize up to $0.712374 additional spending for five strict checks and the prepared ordinary A05 plus independent A06 functional task, including priced bounded repairs; retain all 23 original receipts and all four unresolved holds."}
+    write(DEST/"pilot_check_authorization.json",check_auth)
     write(DEST/"pilot_retained_hold_authorization.json",auth)
     manifest={"runtime_version":"stage1-v23-pilot7-retained-hold-50usd","git_commit":commit,
               "built_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "source_runtime":str(OLD),"source_manifest_sha256":SOURCE_PIN,
-              "operational_overrides":"v16 financial limits retained; automatic truncation retries disabled per user instruction; all four holds preserved; newest hold and functional check remain blocked",
+              "operational_overrides":"v16 financial limits retained; automatic truncation retries disabled per user instruction; all four holds preserved; checks explicitly authorized up to $0.712374 additional; scope stops at CP1",
               "files":{p.relative_to(DEST).as_posix():sha(p) for p in sorted(DEST.rglob("*")) if p.is_file() and p.relative_to(DEST).as_posix()!="records/model_record.jsonl"},
               "mutable_telemetry":{"baseline":"candidate/model_record_baseline.jsonl"}}
     write(DEST/"frozen_runtime_manifest.json",manifest);pin=sha(DEST/"frozen_runtime_manifest.json")

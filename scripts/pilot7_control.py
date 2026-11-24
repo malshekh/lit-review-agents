@@ -9,7 +9,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     from litreview import structured, model_record, config, orchestrator, preflight
     from litreview.runtime_integrity import verify, sha
-    ap=argparse.ArgumentParser(); ap.add_argument('action',choices=['availability','audit','schema-preflight','smoke','scope']); ap.add_argument('run_id')
+    ap=argparse.ArgumentParser(); ap.add_argument('action',choices=['availability','audit','schema-preflight','smoke','functional','scope']); ap.add_argument('run_id')
     args=ap.parse_args()
     manifest=json.loads((ROOT/'frozen_runtime_manifest.json').read_text(encoding='utf-8'))
     verify(ROOT,manifest)
@@ -93,15 +93,25 @@ def main():
     availability=json.loads((run.dir/'input/model_availability.json').read_text(encoding='utf-8'))
     if not all(r.get('http_status')==200 and not r.get('missing') for r in availability):
         raise SystemExit('BLOCKED: configured model availability has not passed')
+    if args.action in ('smoke','functional'):
+        from litreview.check_authorization import require as require_check_authorization
+        check_auth=require_check_authorization(run,ROOT)
+    if args.action=='functional':
+        from litreview import a05_functional
+        result=a05_functional.execute(run,check_auth['functional_cap_usd'],check_auth['approved_by'],check_auth)
+        print(json.dumps(result,indent=2))
+        return 0
     if args.action=='smoke':
         structured.recover_smoke_receipts(run.budget)
         from litreview.a05_functional import smoke_spent as combined_smoke_spent
         smoke_spent=combined_smoke_spent(run.budget)
         remaining=1-smoke_spent
         assert remaining>=0
-        run.budget.operational_ceiling=min(50,run.budget.spent()+remaining)
+        # Exact additional authorization ceiling was installed above; do not widen it to unused smoke room.
         estimate,todo=structured.smoke_estimate(run.budget)
         assert len(todo)<=auth['approved_checks'] and estimate+run.budget.reserved()<=remaining
+        if not any(t['schema_file']=='A06-SV.schema.json' and t['already_verified'] for t in structured.targets()):
+            assert todo and todo[0]['schema_file']=='A06-SV.schema.json', 'A06 strict check must precede functional extraction'
         result=structured.smoke_test(run.budget,remaining,auth['authorized_by'],retained_hold_authorization=authorization)
         result['total_run_spend_usd']=run.budget.spent(); result['unsettled_usd']=run.budget.reserved()
         (run.dir/'smoke_result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
