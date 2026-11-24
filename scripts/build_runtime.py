@@ -31,7 +31,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FROM_GIT = ["src", "config", "prompts", "schemas", "records", "a07_a09_sample.py", "scripts/reconcile_billing.py",
-            "scripts/plan_budget.py", "scripts/offline_guard.py", "docs/run_spec", "pyproject.toml", "requirements.txt",
+            "scripts/plan_budget.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
+            "pyproject.toml", "requirements.txt",
             "LICENSE.md"]
 FROM_RUNTIME = ["vendor", "bootstrap.py", "cli_entry.py", "candidate/model_record_baseline.jsonl",
                 "records/model_record.jsonl"]
