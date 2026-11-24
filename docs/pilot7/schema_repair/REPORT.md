@@ -108,4 +108,3 @@ definition-name preservation edge case, **41 focused contract/migration/receipt 
 schema-compilation success is claimed; corrected paid smoke checks remain blocked by reconciliation and
 the other incomplete provider contracts. Source receipts still permit exactly six unchanged checks to be
 reused after offline validation, and nine checks need eventual correction/retesting. No paid call was added.
-
