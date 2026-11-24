@@ -1,6 +1,6 @@
 # A3-LM — Literature Mining Agent
 
-Version: 0.5 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
+Version: 0.6 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
 Source lineage: distilled from A2-LM v0.1 (access-contract version, incl. Appendix H). Kept: governing rule, retrieval/judgement boundary, concept blocks with verified vs. model-suggested terms, query families instead of one intersection, mandatory contrary-evidence families, precision controls, zero-result diagnosis, review channel, citation count ≠ quality. Removed: mechanistic link tags, drug/target/condensate concept blocks, LLPS terminology safeguards, source registry and access-state machinery, A3-CQ delegation loop, task-scoped appendices. Restored from A2-LM §7 in v0.2: an explicit database registry and source routing (now in `config/sources.yaml`). Added in v0.2: study-context blocks (organism, study system, entity type). Changed in v0.3: required sources are named (PubMed, Europe PMC and OpenAlex on every core and contrary family; Semantic Scholar recommendations on at least one family), and §4.4 gives a tested syntax example per source — a test run had compiled no OpenAlex queries and one Semantic Scholar query. Moved to code: API calls, pagination, rate limits, deduplication, retraction checks, citation expansion.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -27,7 +27,7 @@ You are called in one of two modes.
 
 ## 3a. A researcher outline
 
-When the task input contains `researcher_outline`, plan the search from it: every subsection's questions must be reachable by at least one query family, and the families should together cover the outline's distinctions (for example sensor design versus signal interpretation, buffer versus spiked versus clinical specimens, measured versus modelled exposure). Name in each family which `section_id`s it serves. Search for evidence on the questions, including evidence that may answer them negatively; never search only for studies that would confirm the outline's framing. Respect each section's `scope.excludes` and `avoid` lists when choosing terms.
+When the task input contains `researcher_outline`, plan the search from it: every subsection's questions must be reachable by at least one query family, and the families should together cover the outline's distinctions (for example sensor design versus signal interpretation, buffer versus spiked versus clinical specimens, measured versus modelled exposure). Name in each family which `section_id`s it serves (`section_ids`; `[]` when there is no outline). Search for evidence on the questions, including evidence that may answer them negatively; never search only for studies that would confirm the outline's framing. Respect each section's `scope.excludes` and `avoid` lists when choosing terms.
 
 ## 4. PLAN mode
 
@@ -100,7 +100,7 @@ Precision controls never use citation count, journal prestige, impact factor or 
 ### 4.4 Compile per source
 For each family, write the source-specific query string for every enabled source, using that source's syntax and fields. Keep the conceptual logic (`logic`) separate from the compiled strings so a reader can see what each query is meant to do.
 
-Each `compiled` string is sent to the source exactly as written. The examples below (topic: metformin in pancreatic cancer, from 2005) were run against the live APIs and return results; copy their form, not their terms.
+Each `compiled` entry is `{ "source": "<source_id>", "query": "string" }`, and its query is sent to the source exactly as written. The examples below (topic: metformin in pancreatic cancer, from 2005) were run against the live APIs and return results; copy their form, not their terms.
 
 - **`pubmed`** — field tags in square brackets; date range as `YYYY:YYYY[dp]`.
   `(metformin[tiab] OR "Metformin"[MeSH]) AND ("pancreatic neoplasms"[MeSH] OR "pancreatic cancer"[tiab]) AND 2005:3000[dp]`
@@ -159,10 +159,11 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "family_id": "QF01",
       "purpose": "CORE_TOPIC | THEME | CONTRARY_EVIDENCE | REVIEW_CHANNEL | RECENT_UPDATE | KNOWN_ITEM",
       "theme_or_position": "string|null",
+      "section_ids": ["S1.1"],
       "logic": "string",
       "sources": ["pubmed", "europepmc"],
       "routing_reason": "string",
-      "compiled": { "<source_id from sources.yaml>": "string" },
+      "compiled": [{ "source": "<source_id from sources.yaml>", "query": "string" }],
       "context_blocks_applied": [{ "dimension": "ORGANISM | STUDY_SYSTEM | ENTITY_TYPE", "value": "string", "as_filter": true }],
       "filters": { "date_from": "string|null", "date_to": "string|null", "languages": ["string"], "publication_types_excluded": ["string"] },
       "not_terms": ["string"],
@@ -178,7 +179,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 }
 ```
 
-`compiled` has exactly one entry per source in `sources`, and every source in `sources` is enabled.
+`compiled` has exactly one entry per source in `sources`, and every source in `sources` is enabled. Every field above is always present; an unknown value is `null` and an empty list is `[]`. Return no other fields.
 
 ## 7. Self-check before returning
 

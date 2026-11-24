@@ -181,13 +181,91 @@ def recover_smoke_receipts(budget) -> None:
         budget.release(key)
 
 
+SETTLEABLE = ("DISPATCHED", "ERROR_RESPONSE")
+
+
+def unsettled_smoke_holds(budget) -> list[dict]:
+    """Smoke reservations still held, each with its receipt (state, provider, request ID) when one exists."""
+    out = []
+    for key, res in sorted(budget.reservations().items()):
+        if not key.startswith("smoke-"):
+            continue
+        path = budget.log_path.parent / "smoke_receipts" / f"{key}.json"
+        receipt = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        out.append({"reservation": key, "held_usd": res.get("usd"), "reserved_at": res.get("reserved_at"),
+                    "state": receipt.get("state", "NO_RECEIPT"),
+                    **{k: receipt.get(k) for k in ("provider", "model", "target", "schema_file", "http_status",
+                                                   "provider_request_id", "error") if receipt.get(k) is not None}})
+    return out
+
+
+def settle_smoke_hold(budget, reservation: str, billed_usd: float, evidence: str, by: str,
+                      provider_request_id: str | None = None, provider: str | None = None,
+                      model: str | None = None) -> dict:
+    """Settle one uncertain smoke dispatch (no reply, or an HTTP error) on the researcher's attestation of what the
+    provider actually billed. Nothing is assumed free: the billed amount and the evidence it rests on (for example
+    the provider console's usage for that request's time window) are required and kept. The amount is logged as a
+    cost entry (zero included, so the resolution is visible in the cost log), the receipt records the settlement,
+    and only then is the reservation released."""
+    if not (by or "").strip():
+        raise ValueError("settling a hold needs the name of the person attesting the billed amount")
+    if not (evidence or "").strip():
+        raise ValueError("settling a hold needs the billing evidence (what shows the billed amount); nothing is assumed")
+    try:
+        billed = float(billed_usd)
+    except (TypeError, ValueError):
+        raise ValueError("the billed amount must be a number of US dollars") from None
+    if billed < 0 or billed != billed:
+        raise ValueError("the billed amount cannot be negative")
+    held = budget.reservations().get(reservation)
+    if not reservation.startswith("smoke-") or held is None:
+        raise ValueError(f"{reservation} is not a held smoke reservation of this run")
+    path = budget.log_path.parent / "smoke_receipts" / f"{reservation}.json"
+    if not path.exists():
+        raise ValueError(f"no receipt for {reservation}: reconcile it by hand before settling")
+    receipt = json.loads(path.read_text(encoding="utf-8"))
+    if receipt.get("state") not in SETTLEABLE:
+        raise ValueError(f"receipt {reservation} is {receipt.get('state')}; only an uncertain dispatch "
+                         f"({' or '.join(SETTLEABLE)}) is settled by attestation")
+    known_id = receipt.get("provider_request_id")
+    if provider_request_id and known_id and provider_request_id != known_id:
+        raise ValueError(f"request ID {provider_request_id} differs from the receipt's {known_id}")
+    if any(e.get("step") == reservation for e in budget.entries()):
+        raise ValueError(f"{reservation} already has a cost entry; inspect costs.jsonl before settling")
+    for name, given in (("provider", provider), ("model", model)):
+        if given and receipt.get(name) and given != receipt[name]:
+            raise ValueError(f"{name} {given} differs from the receipt's {receipt[name]}")
+    provider, model = receipt.get("provider") or provider, receipt.get("model") or model
+    if not provider or not model:
+        raise ValueError("the receipt does not name the provider and model; give them (--provider, --model) "
+                         "from the smoke log of that dispatch")
+    at = time.strftime("%Y-%m-%dT%H:%M:%S")
+    settlement = {"billed_usd": round(billed, 6), "held_usd": held.get("usd"), "evidence": evidence.strip(),
+                  "attested_by": by.strip(), "settled_at": at, "provider": provider, "model": model,
+                  "provider_request_id": provider_request_id or known_id, "previous_state": receipt.get("state")}
+    entry = {"time": at, "agent": "smoke-test", "step": reservation, "started_at": None, "provider": provider,
+             "model": model, "input_tokens": 0, "cached_input_tokens": 0, "cache_write_tokens": 0,
+             "cache_write_1h_tokens": 0, "output_tokens": 0, "cost_usd": round(billed, 6),
+             "cost_parts_usd": {"attested": round(billed, 6)}, "reservation_key": reservation,
+             "attested_settlement": {k: settlement[k] for k in ("evidence", "attested_by", "provider_request_id")}}
+    with open(budget.log_path, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry) + "\n")
+    _write_json(path, {**receipt, "state": "SETTLED_BY_ATTESTATION", "billing_status": "SETTLED_BY_ATTESTATION",
+                       "settlement": settlement})
+    with open(budget.log_path.parent / "smoke_settlements.jsonl", "a", encoding="utf-8") as fh:
+        fh.write(json.dumps({"reservation": reservation, **settlement}) + "\n")
+    budget.release(reservation)
+    return {"reservation": reservation, **settlement}
+
+
 def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None) -> dict:
     """One tiny live request per unverified combination. Refused unless its worst case fits the approved amount.
     Records what each provider accepted; a rejected schema is recorded too, so it is never tried in a paid stage."""
     from .llm import complete
     recover_smoke_receipts(budget)
     if any(k.startswith("smoke-") for k in budget.reservations()):
-        raise ValueError("unsettled smoke receipt: reconcile smoke_receipts and reservations before retrying; no call sent")
+        raise ValueError("unsettled smoke receipt: settle it on billing evidence first (litreview settle-smoke-hold "
+                         "<run_id>); no call sent")
     usd, todo = smoke_estimate(budget)
     if not (by or "").strip():
         raise ValueError("a live smoke test needs the name of the person who approved it")

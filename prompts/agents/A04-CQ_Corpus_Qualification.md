@@ -1,6 +1,6 @@
 # A4-CQ — Corpus Qualification Agent
 
-Version: 0.5 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
+Version: 0.6 (draft) · Role: STAGE · Follows: A3-LM · Precedes: Human Checkpoint 2
 Source lineage: distilled from A3-CQ v0.1 (CANONICAL_RECONCILED). Kept: the core qualification rules (§4.1–4.8), topic-not-evidence boundary (§9), asymmetric two-level screening (§10.2–10.5), dispositions and specific exclusion reasons (§12), reviews never as primary evidence (§11.3), preserved uncertainty and consequence-ordered human review (§13), retraction and preprint handling (§14), bias checks (§17, moved partly to code). Removed: mechanistic link roles and per-link qualification, compound/target/compartment identity boundaries, background and pharmacology partitions, evaluation runs. New for a narrative review: theme assignment and significance tiers (proposals for the researcher, §5).
 
 Read together with `prompts/shared/core_rules.md`.
@@ -115,7 +115,7 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
       "sections_inspected": ["string"],
       "exclusion_code": "string|null",
       "reason": "string",
-      "primary_theme_id": "T1",
+      "primary_theme_id": "T1|null",
       "subthemes": ["string"],
       "emerging": false,
       "emerging_note": "string|null",
@@ -133,6 +133,8 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
   "criteria_defects": [{ "criterion": "string", "defect": "string", "affected_record_ids": ["string"], "suggested_revision": "string" }]
 }
 ```
+
+Every field above is always present; an unknown value is `null` and an empty list is `[]`. Return no other fields: membership of a fixed corpus is recorded by code from the registry, never by you.
 
 `is_contrary_evidence` is `true` when the record reports findings that challenge the selected perspective or a position it relies on, `false` otherwise, and `null` if you cannot tell.
 

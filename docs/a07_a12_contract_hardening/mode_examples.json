@@ -45,7 +45,11 @@
       "sections": [],
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "main_text_word_count": 0
     }
   },
   {
@@ -64,7 +68,11 @@
       "sections": [],
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "main_text_word_count": 0
     }
   },
   {
@@ -83,7 +91,11 @@
       "sections": [],
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "main_text_word_count": 0
     }
   },
   {
@@ -102,7 +114,11 @@
       "sections": [],
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "main_text_word_count": 0
     }
   },
   {
@@ -119,7 +135,13 @@
       "output_manuscript_version": "x",
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "title": null,
+      "abstract": null,
+      "sections": []
     }
   },
   {
@@ -136,7 +158,13 @@
       "output_manuscript_version": "x",
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "title": null,
+      "abstract": null,
+      "sections": []
     }
   },
   {
@@ -153,7 +181,13 @@
       "output_manuscript_version": "x",
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "title": null,
+      "abstract": null,
+      "sections": []
     }
   },
   {
@@ -170,7 +204,13 @@
       "output_manuscript_version": "x",
       "change_log": [],
       "queries": [],
-      "escalations": []
+      "escalations": [],
+      "input_manuscript_version": "x",
+      "kept_unchanged_sections": [],
+      "consistency_register": [],
+      "title": null,
+      "abstract": null,
+      "sections": []
     }
   }
 ]

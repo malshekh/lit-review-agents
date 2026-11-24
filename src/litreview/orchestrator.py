@@ -120,6 +120,22 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     return run_id
 
 
+def compiled_queries(family: dict) -> dict[str, str]:
+    """A query family's compiled queries as {source: query}. The A03 contract returns them as a list of
+    {source, query} (strict structured output has no free-form maps); a plan saved before that change is a map.
+    A source compiled twice is ambiguous and refused rather than silently taking one of the two."""
+    raw = family.get("compiled") or {}
+    if isinstance(raw, dict):
+        return {str(k): v for k, v in raw.items()}
+    out: dict[str, str] = {}
+    for entry in raw:
+        source = entry.get("source")
+        if source in out:
+            raise ValueError(f"query family {family.get('family_id')}: source {source} is compiled twice")
+        out[source] = entry.get("query") or ""
+    return out
+
+
 def code_version() -> dict:
     """The commit a run starts from and whether the working tree was clean: a run that tests a frozen
     system can show it ran on exactly that code."""
@@ -949,17 +965,19 @@ class Run:
     def _execute_plan(self, plan: dict, sources: dict) -> list[dict]:
         out = []
         # Preflight every query before dispatching even the first source request.
+        families = plan.get("query_families", [])
         try:
-            for family in plan.get("query_families", []):
+            compiled = [compiled_queries(family) for family in families]
+            for family, queries in zip(families, compiled):
                 for source in family.get("sources", []):
-                    corpus_policy.require_query(self, source, family, family.get("compiled", {}).get(source, ""))
+                    corpus_policy.require_query(self, source, family, queries.get(source, ""))
         except ValueError as exc:
             raise Pause(str(exc)) from exc
-        for fam in plan.get("query_families", []):
+        for fam, queries in zip(families, compiled):
             for src in fam.get("sources", []):
-                if src not in sources or src not in fam.get("compiled", {}):
+                if src not in sources or src not in queries:
                     continue
-                res = search(src, fam["compiled"][src], fam["family_id"],
+                res = search(src, queries[src], fam["family_id"],
                              min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"]))
                 try:
                     corpus_policy.require_records(self, [r.to_dict() for r in res.records])

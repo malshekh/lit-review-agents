@@ -33,7 +33,7 @@ from litreview.evidence import role_allowed, status_of                          
 from litreview.synthesis_bounded import RegistrySynthesisJob                         # noqa: E402
 from litreview.synthesis_input import build_corpus, build_manifest                   # noqa: E402
 from litreview.synthesis_registry import EvidenceRegistry, fingerprint, offline_tokens  # noqa: E402
-from bridge_fixtures import fixture_plan, profile, tagged_text                       # noqa: E402
+from bridge_fixtures import editor_reply, fixture_plan, profile, tagged_text                       # noqa: E402
 from test_synthesis_bounded import FixtureModel, header                              # noqa: E402
 from test_verification_job import ScriptedVerifier                                   # noqa: E402
 
@@ -162,11 +162,7 @@ class Agents:
             for s in m.get("sections") or []:
                 s["text_markdown"] = s["text_markdown"].replace("This section is organized by evidence system.",
                                                                 "This section compares evidence across systems.", 1)
-        out = {**head, "mode": payload["mode"], "output_manuscript_version": "edited", "change_log": [], "queries": [],
-               "escalations": [], **{k: m[k] for k in ("title", "abstract", "sections") if k in m}}
-        if "unit" in payload:
-            out["unit"] = payload["unit"]
-        return out
+        return editor_reply(head, payload, m)
 
 
 def _approve(run, cp, **fields):

@@ -1,6 +1,6 @@
 # A6-SV — Scientific Validation Agent
 
-Version: 0.8 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
+Version: 0.9 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
 Recommended model: the opposite vendor to A5-KE (an agent checking its own vendor's reading tends to read it the same way twice).
 Source lineage: distilled from A5-SV v0.1. Kept: validity belongs to the inference, not the paper (§4.2); never strengthen (§4.3); not-applicable costs nothing (§4.4); unreported ≠ absent (§4.5); never resolve scientific conflict (§4.6); no numeric confidence (§4.7); the four separations (§5); gated sequence (§7); failure classification (§8.3); claim decomposition, weakest component governs (§9); alignment gate (§10); validity dimensions (§11); profiles chosen by method, not publication type (§12); null and contrary claims (§14); conflict and falsification (§15); evidence independence (§16); dispositions (§17); extraction defect reports, report-never-repair (§20). Removed: condensate validation rules, knowledge-graph eligibility, research-relevance assessment (already decided by A4-CQ and Checkpoint 2), validation overlay versioning. Moved to code: verbatim span matching and number matching (Gate 1). New: evidence profiles for the A5-KE study systems (§6), theme-level pass (§9). Added in v0.2: a structured `source_inconsistencies` field (§8.1), so contradictions inside a paper reach synthesis through the coverage manifest instead of staying in free-text warnings. Added in v0.3: independence is reported as three counts — papers, independent studies, independent datasets or cohorts — with the grouping basis named (§7.2).
 
@@ -182,12 +182,12 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
   "validations": [
     {
       "finding_id": "string",
-      "structure": "ATOMIC | COMPOSITE",
+      "structure": "ATOMIC | COMPOSITE | null",
       "components": [{ "component": "string", "disposition": "string", "reason": "string" }],
       "gate1": "PASSED | FAILED | UNRESOLVED_SOURCE_ACCESS",
-      "gate2": "string",
+      "gate2": "string|null",
       "profiles": ["string"],
-      "dimensions": {
+      "dimensions": null or {
         "construct": { "finding": "string", "reason": "string" },
         "internal": { "finding": "string", "reason": "string" },
         "statistical": { "finding": "string", "reason": "string" },
@@ -223,16 +223,21 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
     { "finding_ids": ["string"], "type": "DIRECT_CONTRADICTION | CONTEXT_DEPENDENT | METHODOLOGICAL | SCOPE", "description": "string", "would_resolve": "string" }
   ],
   "independence": [
-    { "claim_summary": "string", "supporting_findings": 0, "papers": 0, "independent_studies": 0, "independent_datasets_or_cohorts": 0, "grouping_basis": "string|null", "shared_origin_notes": "string|null" }
+    { "claim_summary": "string", "supporting_findings": 0, "papers": 0, "independent_studies": 0, "independent_datasets_or_cohorts": "0|null", "grouping_basis": "string|null", "shared_origin_notes": "string|null" }
   ],
   "evidence_reach": {
     "systems_covered": [{ "system": "string", "independent_studies": 0 }],
     "systems_missing": ["string"],
     "main_constraints": ["string"],
     "summary": "string"
-  }
+  },
+  "cross_packet_candidates": [{ "finding_ids": ["string", "string"], "kind": "POSSIBLE_CONFLICT | POSSIBLE_SAME_STUDY | QUALIFIES", "reason": "string" }],
+  "packet_conflicts_not_retained": [{ "finding_ids": ["string"], "reason": "string" }],
+  "retrieval_requests": ["finding_id"]
 }
 ```
+
+**Both modes return every field of both shapes**, so one contract covers them. In PER_PAPER, `theme` and `evidence_reach` are `null` and `conflicts`, `independence`, `cross_packet_candidates`, `packet_conflicts_not_retained` and `retrieval_requests` are `[]`. In PER_THEME, `record_id` is `null`, `validations`, `defect_reports`, `normalization_conflicts` and `source_inconsistencies` are `[]`, and `defect_count` is `0`. The last three PER_THEME lists are used only when the task names a packet or a reconciliation; otherwise they are `[]`. `dimensions` is `null` only when Gate 1 failed and the dimensions were not assessed. Return no other fields.
 
 ## 10. Self-check before returning
 

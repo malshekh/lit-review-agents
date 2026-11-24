@@ -108,3 +108,38 @@ definition-name preservation edge case, **41 focused contract/migration/receipt 
 schema-compilation success is claimed; corrected paid smoke checks remain blocked by reconciliation and
 the other incomplete provider contracts. Source receipts still permit exactly six unchanged checks to be
 reused after offline validation, and nine checks need eventual correction/retesting. No paid call was added.
+
+## Remaining provider contracts completed (2026-11-24)
+
+The eight blockers above are now complete, closed contracts. `structured.schema_inventory()` reports no
+problem for any of the 15 configured provider/schema pairs, and each repaired schema also passes the check
+for the other provider.
+
+| Schema | Provider | What changed |
+|---|---|---|
+| A02-SP | OpenAI | Readiness, scope, perspective options, selection criteria, themes and search seeds fully typed; every field required, unknowns `null`. `synonyms` is a list of `{concept, synonyms}` (strict output has no free-form maps). `researcher_decision` left the model's output: code records it at CP1. |
+| A03-LM | OpenAI | Concept blocks, query families (with the outline's `section_ids`), filters, repairs and seed recall typed. `compiled` is a list of `{source, query}`; `orchestrator.compiled_queries` reads it and still reads plans saved as a map, and refuses a source compiled twice. |
+| A04-CQ | Anthropic | Qualifications, review queue, theme suggestions and criteria defects typed and closed; 7 nullable fields (limit 16), no optional fields. |
+| A06-SV | OpenAI | One shape for both modes: every PER_PAPER and PER_THEME field is always present, the other mode's lists empty and identifiers `null`; the local schema enforces that separation per mode. Validation rows, dimensions, defects, normalization conflicts, source inconsistencies, conflicts, independence, evidence reach and the paging fields are typed. Batch merges produce the same complete shape. |
+| A08-OL | OpenAI | `budget_summary` typed, `title.word_count` and `reserved_human_items` required, root closed. |
+| A10-RV bounded | OpenAI | Each retrieval request carries all four fields (unused lists `[]`, unused query `null`). |
+| A12-EDI, A12-EDI.unit | Anthropic | Sections, change log, queries, escalations, consistency register typed and closed. Keywords, table captions and figure legends are no longer editable by A12. In the unit contract `title`/`abstract` are `null` for a section unit, and a `null` never overwrites the front matter. |
+
+The prompts (A02 0.4, A03 0.6, A04 0.6, A06 0.9, A08 0.7, A12 0.3) document the same contracts and say that
+every field is always present; generated contract lines were regenerated.
+
+**Smoke hold.** `litreview settle-smoke-hold <run_id>` lists held smoke reservations with their receipts.
+With `--reservation`, `--billed-usd`, `--evidence` and `--by` it settles one uncertain dispatch on the
+researcher's attestation of what the provider billed: the amount is logged as a cost entry (zero included),
+the receipt records the settlement and evidence, provenance records the human decision, and only then is the
+reservation released. Nothing is assumed free; a received reply, a mismatched request ID or a second
+settlement is refused. The $0.019586 hold for `req_011ChM1MMKaDrZauPitV2pKC` is **not** settled: that needs
+the billed amount from the Anthropic console (or an admin-key cost report) for 2026-11-24 02:58-03:15 UTC.
+
+**Smoke retests.** The six reusable Opus checks (four A07, two A09) are unchanged. Nine checks need a paid
+retest under the new contracts (A02, A03, A04, A05, A06, A08, A10, A12, A12 unit), worst case about $0.21.
+None was run.
+
+**Verification.** Full suite 1,077 passed (python-docx and matplotlib, both in `requirements.txt`, installed). The discovery rehearsal passes all nine route checks;
+October replay outputs are now projected onto today's A05 contract and every projection is counted in its
+output. `scripts/readiness.py` passes every offline check.

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A04-CQ output (top-level contract; see the prompt's output schema for full detail)",
+  "title": "A04-CQ output: one screening batch (prompt v0.6). Every field is always present; unknown values are null.",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -30,23 +30,237 @@
         "type": "string"
       }
     },
+    "spec_version": {
+      "type": "string"
+    },
     "batch_id": {
       "type": "string"
     },
     "received_record_ids": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "qualifications": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string"
+          },
+          "disposition": {
+            "enum": [
+              "QUALIFIED",
+              "EXCLUDED",
+              "UNRESOLVED_FULL_TEXT_REQUIRED",
+              "UNRESOLVED_TEXT_UNAVAILABLE",
+              "UNRESOLVED_HUMAN_REVIEW"
+            ]
+          },
+          "role": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PRIMARY",
+              "CONTEXT",
+              null
+            ]
+          },
+          "content_inspected": {
+            "enum": [
+              "METADATA_ONLY",
+              "ABSTRACT",
+              "FULL_TEXT"
+            ]
+          },
+          "sections_inspected": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "exclusion_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "primary_theme_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subthemes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "emerging": {
+            "type": "boolean"
+          },
+          "emerging_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proposed_tier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "CORE",
+              "SUPPORTING",
+              "CONTEXT",
+              "PERIPHERAL",
+              null
+            ]
+          },
+          "tier_signal": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_contrary_evidence": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "PREPRINT",
+                "CORRECTED",
+                "RETRACTED",
+                "POSSIBLE_SAME_STUDY",
+                "EMBEDDED_INSTRUCTION"
+              ]
+            }
+          },
+          "related_record_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "record_id",
+          "disposition",
+          "role",
+          "content_inspected",
+          "sections_inspected",
+          "exclusion_code",
+          "reason",
+          "primary_theme_id",
+          "subthemes",
+          "emerging",
+          "emerging_note",
+          "proposed_tier",
+          "tier_signal",
+          "is_contrary_evidence",
+          "flags",
+          "related_record_ids"
+        ],
+        "additionalProperties": false
+      }
     },
     "human_review_queue": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "record_id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "why_consequential": {
+            "type": "string"
+          },
+          "content_inspected": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "record_id",
+          "question",
+          "why_consequential",
+          "content_inspected"
+        ],
+        "additionalProperties": false
+      }
     },
     "theme_suggestions": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "string"
+          },
+          "record_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "theme",
+          "record_ids",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
     },
     "criteria_defects": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "criterion": {
+            "type": "string"
+          },
+          "defect": {
+            "type": "string"
+          },
+          "affected_record_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "suggested_revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "defect",
+          "affected_record_ids",
+          "suggested_revision"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -55,6 +269,7 @@
     "status",
     "warnings",
     "limitations",
+    "spec_version",
     "batch_id",
     "received_record_ids",
     "qualifications",
@@ -62,5 +277,5 @@
     "theme_suggestions",
     "criteria_defects"
   ],
-  "additionalProperties": true
+  "additionalProperties": false
 }

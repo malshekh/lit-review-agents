@@ -218,6 +218,39 @@ def cmd_smoke_test(args) -> int:
     return 0 if result["tested"] == result["accepted"] else 1
 
 
+def cmd_settle_smoke_hold(args) -> int:
+    """List a run's uncertain smoke holds; with --reservation, --billed-usd, --evidence and --by, settle one."""
+    from . import structured
+    run = Run(args.run_id)
+    holds = structured.unsettled_smoke_holds(run.budget)
+    if not args.reservation:
+        if not holds:
+            print("No smoke reservation is held in this run.")
+            return 0
+        print(f"{len(holds)} smoke reservation(s) held (nothing is assumed free; each needs billing evidence):")
+        for h in holds:
+            print(f"  {h['reservation']}  ${h['held_usd']:.6f}  {h['state']}  {h.get('provider', '?')} {h.get('model', '?')}"
+                  f"  request {h.get('provider_request_id') or 'not recorded'}  {h.get('error', '')[:160]}")
+        print("To settle one: litreview settle-smoke-hold <run_id> --reservation <key> --billed-usd <amount> "
+              "--evidence \"<what shows the billed amount>\" --by \"<your name>\" [--request-id <ID>] [--provider <p> --model <m>]")
+        return 0
+    missing = [n for n, v in (("--billed-usd", args.billed_usd), ("--evidence", args.evidence), ("--by", args.by))
+               if v is None or (isinstance(v, str) and not v.strip())]
+    if missing:
+        print(f"REFUSED: settling a hold needs {', '.join(missing)}; nothing was changed")
+        return 1
+    try:
+        done = structured.settle_smoke_hold(run.budget, args.reservation, args.billed_usd, args.evidence, args.by,
+                                            provider_request_id=args.request_id, provider=args.provider, model=args.model)
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    run.prov.human_decision("SMOKE_HOLD_SETTLEMENT", done, "uncertain smoke dispatch settled on attested billing evidence")
+    print(f"Settled {done['reservation']}: billed ${done['billed_usd']:.6f} (held ${done['held_usd']:.6f}), "
+          f"attested by {done['attested_by']}. The reservation is released; the amount is in costs.jsonl.")
+    return 0
+
+
 def cmd_submission_check(args) -> int:
     try:
         ready = Run(args.run_id).submission_check()
@@ -573,6 +606,16 @@ def main(argv: list[str] | None = None) -> int:
     sm.add_argument("--by", help="your name")
     sm.add_argument("--run-id", help="run whose combined spending allowance pays for the smoke test")
     sm.set_defaults(fn=cmd_smoke_test)
+    sh = sub.add_parser("settle-smoke-hold", help="list, or settle on attested billing evidence, an uncertain smoke hold")
+    sh.add_argument("run_id")
+    sh.add_argument("--reservation", help="the held smoke reservation key (smoke-...)")
+    sh.add_argument("--billed-usd", type=float, help="what the provider actually billed for that request")
+    sh.add_argument("--evidence", help="what shows the billed amount (e.g. console usage for the request's window)")
+    sh.add_argument("--by", help="your name")
+    sh.add_argument("--request-id", help="the provider request ID, when the receipt does not record it")
+    sh.add_argument("--provider", help="the provider, when the receipt does not record it")
+    sh.add_argument("--model", help="the model, when the receipt does not record it")
+    sh.set_defaults(fn=cmd_settle_smoke_hold)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")
     sc.set_defaults(fn=cmd_submission_check)

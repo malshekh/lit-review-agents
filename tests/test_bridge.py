@@ -8,7 +8,7 @@ import re
 import jsonschema
 import pytest
 
-from bridge_fixtures import compact_package, fixture_plan, oversized_package, tagged_text
+from bridge_fixtures import compact_package, editor_reply, fixture_plan, oversized_package, tagged_text
 from litreview import bridge, checkpoints, config, verification_job
 from litreview import orchestrator as orch
 from litreview.admission import AdmissionRefused
@@ -73,11 +73,7 @@ class Agents:
             return {**head, "manuscript_version": "draft", "reader_passes": {}, "strengths": [], "concerns": [],
                     "decision": "ACCEPT", "decision_rationale": "Scripted evaluation critique"}
         m = payload["manuscript"]
-        out = {**head, "mode": payload["mode"], "output_manuscript_version": "edited", "change_log": [],
-               "queries": [], "escalations": [], **{k: m[k] for k in ("title", "abstract", "sections") if k in m}}
-        if "unit" in payload:
-            out["unit"] = payload["unit"]
-        return out
+        return editor_reply(head, payload, m)
 
 
 def make_run(tmp_path, monkeypatch, fx, stage="outline"):
@@ -558,8 +554,8 @@ def test_an_editor_request_too_large_for_one_call_is_edited_unit_by_unit_without
     # a manuscript of ten 120 kB sections: over Sonnet 5.5's window as one request, each unit well within it
     filler = " ".join(["Evaluation sentence for an oversized manuscript. ⟦ORG⟧"] * 2300)
     m = {"title": "t", "abstract": "a ⟦ORG⟧", "keywords": [],
-         "sections": [{"section_id": s["section_id"], "heading": s["heading"], "text_markdown": filler}
-                      for s in fx["plan"]["sections"]]}
+         "sections": [{"section_id": s["section_id"], "heading": s["heading"], "text_markdown": filler,
+                       "word_count": len(filler.split())} for s in fx["plan"]["sections"]]}
     agents = Agents(run, fx)
     monkeypatch.setattr(run, "agent", agents)
     edited = run._edit("LINE", m, ps, "A12-EDI_line")

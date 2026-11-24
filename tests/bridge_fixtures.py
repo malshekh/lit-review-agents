@@ -351,7 +351,8 @@ def fixture_plan(pkg: dict, corpus: list[dict], table: dict, group_size: int = 1
             "sections": sections,
             "display_items": [{"display_id": "T1", "type": "TABLE_COMPARISON", "placement_section_id": "S2",
                                "purpose": "Compare evidence across systems"}] if table.get("status") == "BUILT" else [],
-            "budget_summary": {"main_text_words_planned": 4750, "main_text_limit": 5000},
+            "budget_summary": {"main_text_words_planned": 4750, "main_text_limit": 5000, "references_planned": len(corpus),
+                               "references_target": None, "selected_papers_count": len(corpus)},
             "readability": {"background_concepts": [], "abbreviations": [{"abbr": "DSF", "expansion": "disulfiram"},
                                                                            {"abbr": "GBM", "expansion": "glioblastoma"}],
                             "nomenclature": [{"entity": "copper diethyldithiocarbamate", "form_to_use": "CuET",
@@ -404,3 +405,21 @@ def bridge_stubs(run, monkeypatch, ps: dict | None = None):
     monkeypatch.setattr(run, "_require_current", lambda *a, **k: None)
     monkeypatch.setattr(run, "_bridge_fingerprint", lambda *a, **k: "fp")
     return ps
+
+
+def editor_reply(head: dict, payload: dict, m: dict) -> dict:
+    """A scripted A12 reply in the complete contract: the whole manuscript, or one unit (FRONT carries title and
+    abstract and no sections; a section unit carries its section and null front matter)."""
+    def section(s):
+        text = s.get("text_markdown") or ""
+        return {"section_id": s.get("section_id"), "heading": s.get("heading") or "", "text_markdown": text,
+                "word_count": s.get("word_count") if isinstance(s.get("word_count"), int) else len(text.split())}
+    out = {**head, "mode": payload["mode"], "input_manuscript_version": str(m.get("draft_version") or "draft"),
+           "output_manuscript_version": "edited", "sections": [section(s) for s in m.get("sections") or []],
+           "change_log": [], "kept_unchanged_sections": [], "queries": [], "escalations": [], "consistency_register": []}
+    if "unit" in payload:
+        out.update(unit=payload["unit"], title=m.get("title"), abstract=m.get("abstract"))
+    else:
+        out.update(title=m.get("title") or "", abstract=m.get("abstract") or "",
+                   main_text_word_count=sum(s["word_count"] for s in out["sections"]))
+    return out

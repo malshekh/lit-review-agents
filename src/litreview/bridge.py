@@ -1256,7 +1256,7 @@ def merge_units(m: dict, outputs: dict[str, dict]) -> dict:
     out = copy.deepcopy(m)
     if "FRONT" in outputs:
         for k in ("title", "abstract", "keywords", "table_captions", "figure_legends"):
-            if k in outputs["FRONT"]:
+            if outputs["FRONT"].get(k) is not None:   # null: the unit contract's "not edited here"
                 out[k] = copy.deepcopy(outputs["FRONT"][k])
     by_id = {s.get("section_id"): s for o in outputs.values() for s in o.get("sections") or []}
     out["sections"] = [copy.deepcopy(by_id.get(s.get("section_id"), s)) for s in m.get("sections") or []]

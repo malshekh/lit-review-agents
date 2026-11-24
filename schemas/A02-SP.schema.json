@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A02-SP output (top-level contract; see the prompt's output schema for full detail)",
+  "title": "A02-SP output: the review specification (prompt v0.4). Every field is always present; unknown values are null.",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -30,6 +30,9 @@
         "type": "string"
       }
     },
+    "spec_version": {
+      "type": "string"
+    },
     "spec_state": {
       "enum": [
         "READY_FOR_CHECKPOINT",
@@ -44,54 +47,329 @@
     "normalized_topic": {
       "type": "string"
     },
+    "central_question": {
+      "type": "string"
+    },
+    "audience": {
+      "type": "string"
+    },
     "readiness": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "topic_boundaries": {
+          "enum": [
+            "CONFIRMED",
+            "PARTIAL",
+            "UNRESOLVED"
+          ]
+        },
+        "central_question": {
+          "enum": [
+            "CONFIRMED",
+            "PARTIAL",
+            "UNRESOLVED"
+          ]
+        },
+        "audience": {
+          "enum": [
+            "CONFIRMED",
+            "PARTIAL",
+            "UNRESOLVED"
+          ]
+        },
+        "competing_positions": {
+          "enum": [
+            "CONFIRMED",
+            "PARTIAL",
+            "UNRESOLVED"
+          ]
+        }
+      },
+      "required": [
+        "topic_boundaries",
+        "central_question",
+        "audience",
+        "competing_positions"
+      ],
+      "additionalProperties": false
     },
     "scope": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "in_scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "out_of_scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "in_scope",
+        "out_of_scope"
+      ],
+      "additionalProperties": false
     },
     "perspective_options": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "option_id": {
+            "type": "string"
+          },
+          "angle": {
+            "type": "string"
+          },
+          "organizing_principle": {
+            "type": "string"
+          },
+          "why_timely": {
+            "type": "string"
+          },
+          "contribution": {
+            "type": "string"
+          },
+          "competing_positions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "title_candidates": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "option_id",
+          "angle",
+          "organizing_principle",
+          "why_timely",
+          "contribution",
+          "competing_positions",
+          "risks",
+          "title_candidates"
+        ],
+        "additionalProperties": false
+      }
     },
     "selection_criteria": {
-      "type": "object"
-    },
-    "search_seeds": {
-      "type": "object"
-    },
-    "assumptions": {
-      "type": "array"
-    },
-    "questions_for_researcher": {
-      "type": "array"
-    },
-    "researcher_decision": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "inclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterion",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "exclusion": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "criterion",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "time_window": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preprint_policy": {
+          "type": "string"
+        },
+        "significance_signals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exclusion_reason_vocabulary": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "inclusion",
+        "exclusion",
+        "time_window",
+        "languages",
+        "source_types",
+        "preprint_policy",
+        "significance_signals",
+        "exclusion_reason_vocabulary"
+      ],
+      "additionalProperties": false
     },
     "theme_framework": {
       "type": "object",
-      "required": [
-        "primary_themes",
-        "count_justification"
-      ],
       "properties": {
         "primary_themes": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "type": "object",
+            "properties": {
+              "theme_id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "includes": {
+                "type": "string"
+              },
+              "excludes": {
+                "type": "string"
+              }
+            },
             "required": [
               "theme_id",
               "name",
               "scope",
               "includes",
               "excludes"
-            ]
-          }
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
         },
         "count_justification": {
           "type": "string"
         }
+      },
+      "required": [
+        "primary_themes",
+        "count_justification"
+      ],
+      "additionalProperties": false
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contribution_statement_draft": {
+      "type": "string"
+    },
+    "search_seeds": {
+      "type": "object",
+      "properties": {
+        "core_concepts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "synonyms": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "concept": {
+                "type": "string"
+              },
+              "synonyms": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "concept",
+              "synonyms"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "adjacent_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "seed_papers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "core_concepts",
+        "synonyms",
+        "adjacent_fields",
+        "seed_papers"
+      ],
+      "additionalProperties": false
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "questions_for_researcher": {
+      "type": "array",
+      "items": {
+        "type": "string"
       }
     }
   },
@@ -101,18 +379,22 @@
     "status",
     "warnings",
     "limitations",
+    "spec_version",
     "spec_state",
     "original_topic",
     "normalized_topic",
+    "central_question",
+    "audience",
     "readiness",
     "scope",
     "perspective_options",
     "selection_criteria",
     "theme_framework",
+    "keywords",
+    "contribution_statement_draft",
     "search_seeds",
     "assumptions",
-    "questions_for_researcher",
-    "researcher_decision"
+    "questions_for_researcher"
   ],
-  "additionalProperties": true
+  "additionalProperties": false
 }

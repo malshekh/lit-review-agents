@@ -104,7 +104,8 @@
     "plan_version": "x",
     "title": {
       "text": "x",
-      "proposition_ids": []
+      "proposition_ids": [],
+      "word_count": 1
     },
     "abstract_plan": {
       "target_words": 0,
@@ -134,12 +135,19 @@
     ],
     "allocation_ledger": [],
     "display_items": [],
-    "budget_summary": {},
+    "budget_summary": {
+      "main_text_words_planned": 0,
+      "main_text_limit": null,
+      "references_planned": 0,
+      "references_target": null,
+      "selected_papers_count": 0
+    },
     "readability": {
       "background_concepts": [],
       "abbreviations": [],
       "nomenclature": []
-    }
+    },
+    "reserved_human_items": []
   },
   "A09-WRI.front.schema.json": {
     "agent_id": "A09-WRI",
@@ -234,7 +242,11 @@
     "sections": [],
     "change_log": [],
     "queries": [],
-    "escalations": []
+    "escalations": [],
+    "input_manuscript_version": "x",
+    "kept_unchanged_sections": [],
+    "consistency_register": [],
+    "main_text_word_count": 0
   },
   "A12-EDI.unit.schema.json": {
     "agent_id": "A12-EDI",
@@ -247,6 +259,12 @@
     "output_manuscript_version": "x",
     "change_log": [],
     "queries": [],
-    "escalations": []
+    "escalations": [],
+    "input_manuscript_version": "x",
+    "kept_unchanged_sections": [],
+    "consistency_register": [],
+    "title": null,
+    "abstract": null,
+    "sections": []
   }
 }

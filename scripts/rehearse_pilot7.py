@@ -38,6 +38,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
+from contract_fixtures import a06_paper, a06_theme   # noqa: E402  (scripted replies in the complete A06 contract)
 OCT = ROOT / "runs" / "20261025-100039"
 DROPPED: dict[str, int] = {}
 CHECKPOINT_NOTES = "Rehearsal: read the review files and approved as a researcher would; scripted, no science judged."
@@ -91,6 +92,69 @@ class October:
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
+PROJECTED: dict[str, int] = {}
+
+
+def project(schema: dict, value, path: str = "$"):
+    """Replay only: fit an October output to today's contract. Undeclared fields (code-added ones such as `themes`)
+    are dropped, code-owned fields are nulled, missing fields get the contract's neutral value, and an enumerated
+    value written with a note ("VEHICLE (DMSO)") keeps its leading code. Every change is counted in PROJECTED;
+    anything still invalid is left for the per-finding schema check, which drops and counts it."""
+    def note(kind):
+        key = f"{kind} {re.sub(r'\[\d+\]', '[]', path)}"
+        PROJECTED[key] = PROJECTED.get(key, 0) + 1
+    if "anyOf" in schema:
+        if value is None and any(o.get("type") == "null" for o in schema["anyOf"]):
+            return None
+        return project(next(o for o in schema["anyOf"] if o.get("type") != "null"), value, path)
+    kind = schema.get("type")
+    kinds = kind if isinstance(kind, list) else [kind]
+    if "object" in kinds and (isinstance(value, dict) or (value is None and "null" not in kinds)):
+        value = value or {}
+        out = {}
+        for k in value:
+            if k not in schema.get("properties", {}):
+                note("dropped")
+        for k, sub in schema.get("properties", {}).items():
+            sub_kinds = sub.get("type") if isinstance(sub.get("type"), list) else [sub.get("type")]
+            nullable = "null" in sub_kinds or any(o.get("type") == "null" for o in sub.get("anyOf", []))
+            if k in value and value[k] is None and not nullable and k not in schema.get("required", []):
+                note("null optional dropped")   # an optional field written as null is simply absent
+            elif k in value:
+                out[k] = project(sub, value[k], f"{path}.{k}")
+            elif k in schema.get("required", []):
+                out[k] = project(sub, None, f"{path}.{k}")
+                note("filled")
+        return out
+    if "array" in kinds:
+        items = schema.get("items", {})
+        if not isinstance(value, list):
+            if value is not None:
+                note("emptied")
+            return []
+        kept = [x for x in value if not (x is None and items.get("type") == "object")]
+        if len(kept) != len(value):
+            note("null items dropped")
+        return [project(items, x, f"{path}[]") for x in kept]
+    if kinds == ["null"]:
+        if value is not None:
+            note("code-owned nulled")
+        return None
+    allowed = schema.get("enum")
+    if allowed is not None and value not in allowed:
+        first = value[0] if isinstance(value, list) and value else value
+        lead = next((a for a in allowed if isinstance(a, str) and isinstance(first, str) and first.startswith(a)), None)
+        fallback = None if None in allowed else ("NOT_REPORTED" if "NOT_REPORTED" in allowed else lead)
+        note("enum coerced")
+        return lead if lead is not None else fallback
+    if value is None and "null" not in kinds:
+        note("filled")
+        if "const" in schema:
+            return schema["const"]
+        return {"boolean": False, "integer": 0, "number": 0}.get(kind, "NOT_REPORTED")
+    return value
+
+
 def remap(obj, old, new):
     return json.loads(re.sub(rf'"{old}(?=[":])', f'"{new}', json.dumps(obj, ensure_ascii=False)))
 
@@ -115,20 +179,39 @@ class Models:
         if agent == "A02-SP":
             fw = {"primary_themes": [{"theme_id": "T1", "name": "A02's own idea", "scope": "s", "includes": "i", "excludes": "e"}],
                   "count_justification": "rehearsal"}
-            return {**head(agent), "spec_state": "READY_FOR_CHECKPOINT", "original_topic": payload["topic_statement"][:200],
-                    "normalized_topic": "AI-enabled nanobiosensing for cancer therapy", "readiness": {},
-                    "scope": {"central_question": payload.get("researcher_outline", {}).get("review_question")},
-                    "perspective_options": [{"option_id": "P1", "angle": "outline as given", "risks": [], "title_candidates": []}],
-                    "selection_criteria": {"include": ["reports evidence on an outline question"], "exclude": ["later chapters"]},
-                    "theme_framework": fw, "keywords": ["nanobiosensing"],
-                    "search_seeds": {"core_concepts": ["nanobiosensor", "machine learning"], "synonyms": {}, "adjacent_fields": [],
-                                     "seed_papers": []},
-                    "assumptions": [], "questions_for_researcher": [], "researcher_decision": {}}
+            outline = payload.get("researcher_outline", {})
+            crit = lambda c, r: {"criterion": c, "reason": r}   # noqa: E731
+            return {**head(agent), "spec_version": "1", "spec_state": "READY_FOR_CHECKPOINT",
+                    "original_topic": payload["topic_statement"][:200],
+                    "normalized_topic": "AI-enabled nanobiosensing for cancer therapy",
+                    "central_question": outline.get("review_question") or "", "audience": "researchers",
+                    "readiness": {k: "CONFIRMED" for k in ("topic_boundaries", "central_question", "audience",
+                                                          "competing_positions")},
+                    "scope": {"in_scope": ["outline sections"], "out_of_scope": ["later chapters"]},
+                    "perspective_options": [{"option_id": "P1", "angle": "outline as given", "organizing_principle": "outline",
+                                             "why_timely": "rehearsal", "contribution": "rehearsal",
+                                             "competing_positions": ["AI adds nothing"], "risks": [], "title_candidates": []}],
+                    "selection_criteria": {"inclusion": [crit("reports evidence on an outline question", "scope")],
+                                           "exclusion": [crit("later chapters", "outline")], "time_window": None,
+                                           "languages": ["en"], "source_types": ["primary research"],
+                                           "preprint_policy": "flag", "significance_signals": [],
+                                           "exclusion_reason_vocabulary": ["OUT_OF_SCOPE"]},
+                    "theme_framework": fw, "keywords": ["nanobiosensing"], "contribution_statement_draft": "rehearsal",
+                    "search_seeds": {"core_concepts": ["nanobiosensor", "machine learning"],
+                                     "synonyms": [{"concept": "nanobiosensor", "synonyms": ["nanosensor"]}],
+                                     "adjacent_fields": [], "seed_papers": []},
+                    "assumptions": [], "questions_for_researcher": []}
         if agent == "A03-LM":
             sections = [s["section_id"] for s in payload["researcher_outline"]["sections"]]
-            return {**head(agent), "mode": mode, "plan_version": "1", "concept_blocks": [],
-                    "query_families": [{"family_id": f"F{i}", "purpose": "DISCOVERY", "sources": ["pubmed"], "max_records": 60,
-                                        "section_ids": sections[i::2], "compiled": {"pubmed": f"(nanobiosens*) AND family {i}"}}
+            return {**head(agent), "mode": mode, "spec_version": "1", "plan_version": "1", "concept_blocks": [],
+                    "query_families": [{"family_id": f"F{i}", "purpose": "THEME", "theme_or_position": None,
+                                        "section_ids": sections[i::2], "logic": "rehearsal", "sources": ["pubmed"],
+                                        "routing_reason": "rehearsal",
+                                        "compiled": [{"source": "pubmed", "query": f"(nanobiosens*) AND family {i}"}],
+                                        "context_blocks_applied": [],
+                                        "filters": {"date_from": None, "date_to": None, "languages": [],
+                                                    "publication_types_excluded": []},
+                                        "not_terms": [], "max_records": 60, "expected_failure_modes": []}
                                        for i in range(2)],
                     "citation_expansion_seed_families": ["F0"], "repairs": [], "seeds_not_recalled": []}
         if agent == "A04-CQ":
@@ -151,20 +234,23 @@ class Models:
                                   "primary_theme_id": None, "subthemes": [], "emerging": False, "emerging_note": None,
                                   "proposed_tier": None, "tier_signal": None, "is_contrary_evidence": False, "flags": [],
                                   "related_record_ids": []})
-            return {**head(agent), "batch_id": payload["batch_id"], "received_record_ids": [r["record_id"] for r in payload["records"]],
+            return {**head(agent), "spec_version": "1", "batch_id": payload["batch_id"],
+                    "received_record_ids": [r["record_id"] for r in payload["records"]],
                     "qualifications": quals, "human_review_queue": [], "theme_suggestions": [], "criteria_defects": []}
         if agent == "A05-KE":
             rec = payload["record"]
             old = self.old_id(rec)
             ext = copy.deepcopy(self.oct.extraction(old))
             ext = remap(ext, old, rec["record_id"])
-            ext.update(record_id=rec["record_id"], content_level=payload["content_level"], prompt_version="rehearsal")
+            ext.update(record_id=rec["record_id"], content_level=payload["content_level"], prompt_version="rehearsal",
+                       agent_id="A05-KE")
             for f in ext.get("findings", []):   # October outputs predate fields the current schema requires
                 if f.get("predicate") == "OTHER_SPECIFIED" and not f.get("predicate_detail"):
                     f["predicate_detail"] = "relation stated in the span (rehearsal fill for a pre-schema October output)"
             import jsonschema
             from litreview.paths import SCHEMAS_DIR
             schema = json.loads((SCHEMAS_DIR / "A05-KE.schema.json").read_text(encoding="utf-8"))
+            ext = project(schema, ext)
             bad = {e.absolute_path[1] for e in jsonschema.Draft202012Validator(schema).iter_errors(ext)
                    if len(e.absolute_path) > 1 and e.absolute_path[0] == "findings"}
             if bad:   # replay only: findings that fail today's schema are left out and counted
@@ -179,13 +265,11 @@ class Models:
             present = {f["finding_id"] for f in (self.run.load(f"extractions/{rid}.json") or payload["extraction"])["findings"]}
             rows = {v["finding_id"]: v for v in val["validations"] if v["finding_id"] in present}
             keep = lambda xs: [x for x in xs if set(x.get("finding_ids", [])) <= set(rows)]   # noqa: E731
-            return {**head(agent, "COMPLETE_WITH_WARNINGS"), "mode": "PER_PAPER", "record_id": rid,
-                    "validations": [rows[f] for f in wanted], "defect_reports": [],
-                    "source_inconsistencies": keep(val.get("source_inconsistencies", [])) if not payload.get("a06_validation_batch") else [],
-                    "normalization_conflicts": []}
+            return a06_paper(**head(agent, "COMPLETE_WITH_WARNINGS"), record_id=rid,
+                             validations=[rows[f] for f in wanted],
+                             source_inconsistencies=keep(val.get("source_inconsistencies", [])) if not payload.get("a06_validation_batch") else [])
         if agent == "A06-SV":
-            return {**head(agent), "mode": "PER_THEME", "theme": payload["theme"], "conflicts": [], "independence": [],
-                    "evidence_reach": {"summary": "rehearsal"}, "cross_packet_candidates": [], "retrieval_requests": []}
+            return a06_theme(**head(agent), theme=payload["theme"], evidence_reach={"summary": "rehearsal"})
         raise AssertionError(f"no scripted reply for {agent} {mode}")
 
 
@@ -381,6 +465,7 @@ def main(argv=None) -> int:
                          for p in manifest.get("papers", [])],
               "calls_by_agent": {a: sum(1 for e in run.budget.entries() if e["agent"] == a) for a in sorted({e["agent"] for e in run.budget.entries()})},
               "replay_findings_dropped_for_schema": DROPPED,
+              "replay_fields_projected_to_current_contract": dict(sorted(PROJECTED.items())),
               "checks": checks, "passed": all(checks.values())}
     print(json.dumps(result, indent=2))
     if args.keep:

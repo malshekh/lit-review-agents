@@ -1,36 +1,36 @@
 {
-  "checked_at": "2026-11-23T19:13:48",
-  "git_commit": "c440d461599e354a77c0bc968d80ac9bfc9a5a7d",
+  "checked_at": "2026-11-24T00:00:14",
+  "git_commit": "f0b74789c06c0ce7b9c58c8bc5be48dd234113ba",
   "faults": {
     "passed": true,
-    "summary": "66 passed in 7.43s",
+    "summary": "66 passed in 7.55s",
     "failures": []
   },
   "resume": {
     "passed": true,
-    "summary": "18 passed in 44.11s",
+    "summary": "18 passed in 45.41s",
     "failures": []
   },
   "accounting": {
     "passed": true,
-    "summary": "68 passed in 67.86s (0:01:07)",
+    "summary": "68 passed in 64.78s (0:01:04)",
     "failures": []
   },
   "budget": {
     "passed": true,
-    "summary": "15 passed in 1.32s",
+    "summary": "15 passed in 0.94s",
     "failures": []
   },
   "specification": {
     "passed": true,
-    "summary": "40 passed in 1.46s",
+    "summary": "40 passed in 1.31s",
     "failures": []
   },
   "smoke_test": {
     "passed": null,
     "status": "NOT RUN: needs your approval (it makes live calls)",
     "combinations_to_confirm": 15,
-    "worst_case_usd": 0.4391,
+    "worst_case_usd": 0.4888,
     "command": "litreview smoke-test --approve-usd 1.0 --by \"<your name>\""
   },
   "discovery_rehearsal": {

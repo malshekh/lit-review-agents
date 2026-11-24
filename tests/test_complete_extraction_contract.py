@@ -95,7 +95,19 @@ def test_provider_requirements_do_not_universally_rewrite_optional_fields():
     with pytest.raises(structured_contract.SchemaCompatibilityError):contract.for_structured_output(schema,'openai')
     assert 'required' not in schema
 
-def test_every_configured_schema_is_audited_and_legacy_gaps_are_blockers():
+@pytest.fixture
+def legacy_a02(tmp_path,monkeypatch):
+    """The configured schemas with A02 reverted to an open, undefined contract (the shape the audit found)."""
+    import shutil
+    from litreview.paths import SCHEMAS_DIR
+    d=tmp_path/'schemas';shutil.copytree(SCHEMAS_DIR,d)
+    s=json.loads((d/'A02-SP.schema.json').read_text(encoding='utf-8'))
+    s['properties']['readiness']={'type':'object'};s['properties']['assumptions']={'type':'array'};s['additionalProperties']=True
+    (d/'A02-SP.schema.json').write_text(json.dumps(s),encoding='utf-8')
+    monkeypatch.setattr(structured,'SCHEMAS_DIR',d)
+    return d
+
+def test_every_configured_schema_is_audited_and_legacy_gaps_are_blockers(legacy_a02):
     rows=structured.schema_inventory()
     assert len(rows)==15
     assert not next(r for r in rows if r['schema_file']=='A05-KE.schema.json')['problems']
@@ -116,7 +128,7 @@ def test_submitted_hash_is_checked_not_only_the_record_key():
 
 
 @pytest.mark.provider_contract_guard
-def test_actual_run_preflight_blocks_legacy_contract_before_paid_dispatch(tmp_path,monkeypatch):
+def test_actual_run_preflight_blocks_legacy_contract_before_paid_dispatch(tmp_path,monkeypatch,legacy_a02):
     from litreview import orchestrator as orch
     monkeypatch.setattr(orch,'RUNS_DIR',tmp_path)
     run=orch.Run('contract');run.save_state({'stage':'scope','profile':'pilot7','counters':{}})
@@ -127,7 +139,7 @@ def test_actual_run_preflight_blocks_legacy_contract_before_paid_dispatch(tmp_pa
 
 
 @pytest.mark.provider_contract_guard
-def test_direct_agent_schema_failure_occurs_before_a_provider_is_called(tmp_path,monkeypatch):
+def test_direct_agent_schema_failure_occurs_before_a_provider_is_called(tmp_path,monkeypatch,legacy_a02):
     from litreview.agents import base
     from litreview.budget import BudgetTracker
     from litreview.provenance import ProvenanceLog

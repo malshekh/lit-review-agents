@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A08-OL output: the manuscript plan and its allocation ledger (prompt v0.5)",
+  "title": "A08-OL output: the manuscript plan and its allocation ledger (prompt v0.7)",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -51,6 +51,7 @@
       },
       "required": [
         "text",
+        "word_count",
         "proposition_ids"
       ],
       "additionalProperties": false
@@ -284,7 +285,38 @@
       "maxItems": 1
     },
     "budget_summary": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "main_text_words_planned": {
+          "type": "integer"
+        },
+        "main_text_limit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "references_planned": {
+          "type": "integer"
+        },
+        "references_target": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "selected_papers_count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "main_text_words_planned",
+        "main_text_limit",
+        "references_planned",
+        "references_target",
+        "selected_papers_count"
+      ],
+      "additionalProperties": false
     },
     "readability": {
       "type": "object",
@@ -370,7 +402,8 @@
     "allocation_ledger",
     "display_items",
     "budget_summary",
-    "readability"
+    "readability",
+    "reserved_human_items"
   ],
-  "additionalProperties": true
+  "additionalProperties": false
 }

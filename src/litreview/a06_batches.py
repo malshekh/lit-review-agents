@@ -80,7 +80,10 @@ def merge(payload,parts,outputs):
     if len(outputs)!=len(parts):raise ValueError('Incomplete A06 batch coverage')
     result={'agent_id':'A6-SV','prompt_version':outputs[0]['prompt_version'] if outputs else 'unknown',
             'status':'COMPLETE_WITH_WARNINGS','mode':'PER_PAPER','record_id':payload['extraction']['record_id'],
-            'validations':[],'warnings':[],'limitations':[],'defect_reports':[],'source_inconsistencies':[],'normalization_conflicts':[]}
+            'validations':[],'warnings':[],'limitations':[],'defect_reports':[],'source_inconsistencies':[],'normalization_conflicts':[],
+            # the PER_THEME half of the one A06 contract: present, empty
+            'theme':None,'conflicts':[],'independence':[],'evidence_reach':None,'cross_packet_candidates':[],
+            'packet_conflicts_not_retained':[],'retrieval_requests':[]}
     rows={};metadata=[]
     for part,out in zip(parts,outputs):
         validate_batch(out,part,payload)
@@ -92,8 +95,9 @@ def merge(payload,parts,outputs):
                 if item not in result[field]:result[field].append(copy.deepcopy(item))
         metadata.append({k:copy.deepcopy(v) for k,v in out.items() if k not in result and k!='defect_count' and not k.startswith('_')})
     result['validations']=[rows[f['finding_id']] for f in payload['extraction']['findings']]
-    result['defect_count']=len(result['defect_reports']);result['batch_metadata']=metadata
+    result['defect_count']=len(result['defect_reports'])
     require_complete(result,payload['extraction'],result['record_id']);validate('A06-SV',result)
+    result['batch_metadata']=metadata   # code-added provenance, outside the model's contract
     return result
 
 

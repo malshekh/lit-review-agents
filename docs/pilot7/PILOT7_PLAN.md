@@ -53,7 +53,8 @@ The pipeline itself:
 | Full test suite | Current continuation results: see `HARDENING_RESULTS.md`; 996 passed was historical. |
 | Live literature services (`litreview check --apis`, free, 2026-11-23) | PubMed, Europe PMC, PubTator, OpenAlex, Semantic Scholar, ClinicalTrials.gov, HGNC and OLS answered; ChEMBL timed out once (a lookup failure is recorded and does not stop the run) |
 | Live full-text fetch (free) | A real open-access paper returned 40 verified sections |
-| Live model smoke test | **Not run: needs your approval** (worst case $0.44) |
+| Provider output contracts | **All 15 complete** (`structured.schema_inventory()` reports no problem; see `schema_repair/REPORT.md`) |
+| Live model smoke test | **Not run: needs your approval.** In the existing run, 9 checks need a retest (worst case about $0.21); 6 are reusable |
 
 The discovery rehearsal runs the real run loop from scope to export under the `pilot7` profile and your
 outline:
@@ -98,12 +99,17 @@ run stops at CP2, before any extraction is paid for.
 1. **Check `docs/pilot7/outline.json`** against your outline. I kept your wording, and split each section's
    instructions into `questions`, `guidance` and `avoid`.
 2. **Approve the spending limits** above, or give your own; I change one line of `config/pipeline.yaml`.
-3. **Merge PR #5.** I then seal a fresh runtime (v13) from the merged commit.
-4. Create the run first with the command below. **Approve the live smoke test separately**, using the current
+3. **Merge PR #5.** I then seal a fresh runtime from the merged commit (v16 predates these contracts).
+4. **Settle the held smoke charge first.** One earlier smoke request (HTTP 400, `req_011ChM1MMKaDrZauPitV2pKC`)
+   still holds $0.019586. Read what Anthropic billed for it in the console (Usage / Cost, 2026-11-24
+   02:58-03:15 UTC), then run `litreview settle-smoke-hold <id> --reservation <key> --billed-usd <amount>
+   --evidence "<what you saw>" --by "<name>" --request-id req_011ChM1MMKaDrZauPitV2pKC --provider anthropic
+   --model claude-sonnet-5-5` (the old receipt does not record the last three). Without it, no smoke test can be sent.
+   Create the run first with the command below. **Approve the live smoke test separately**, using the current
    estimate, then run `litreview smoke-test --run-id <id> --approve-usd <explicitly approved amount> --by "<name>"`.
    Uncertain dispatches retain their reservations and block retries until reconciled. Received receipts recover
    without duplicate charges. No smoke test or paid call was executed in this continuation.
-5. **Start the pilot** in v13:
+5. **Start the pilot** in that fresh runtime:
    `litreview new --topic docs/pilot7/topic.md --outline docs/pilot7/outline.json --corpus-mode OPEN_CORPUS --profile pilot7`,
    then `litreview run <id>`. Approve each checkpoint as it comes.
 

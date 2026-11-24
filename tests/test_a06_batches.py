@@ -5,6 +5,7 @@ from litreview import a06_batches as b,orchestrator as orch
 from litreview.agents.base import AgentError
 from litreview.synthesis_registry import fingerprint
 from test_pilot_authorization import run
+from contract_fixtures import a06_paper
 
 @pytest.fixture
 def ready(run):
@@ -20,10 +21,9 @@ def ready(run):
 
 
 def response(payload):
-    return {'agent_id':'A6-SV','prompt_version':'0.3','status':'COMPLETE','warnings':[],'limitations':[],
-            'mode':'PER_PAPER','record_id':'R0001','validations':[{'finding_id':f['finding_id'],'disposition':'SUPPORTED_WITH_CONSTRAINTS',
-            'gate1':'PASSED','constraints':['Synthetic limit'],'plain_language_limit':'Synthetic bound'} for f in payload['extraction']['findings']],
-            'defect_reports':[],'source_inconsistencies':[],'normalization_conflicts':[]}
+    return a06_paper(agent_id='A6-SV',prompt_version='0.3',record_id='R0001',
+            validations=[{'finding_id':f['finding_id'],'disposition':'SUPPORTED_WITH_CONSTRAINTS',
+            'gate1':'PASSED','constraints':['Synthetic limit'],'plain_language_limit':'Synthetic bound'} for f in payload['extraction']['findings']])
 
 
 def fake_agent(r,monkeypatch,fail=None):
@@ -72,13 +72,14 @@ def test_invalid_batch_never_accepted(ready,change):
     elif change=='unknown':out['validations'][0]['finding_id']='F999'
     elif change=='wrong_record':out['record_id']='R0002'
     elif change=='failed':out['status']='FAILED'
-    else:out['source_inconsistencies']=[{'finding_ids':['F999']}]
+    else:out['source_inconsistencies']=[{'finding_ids':['F999'],'description':'x','locations':[],'affects_interpretation':'x'}]
     with pytest.raises(ValueError):b.validate_batch(out,part,p)
 
 
 def test_cross_batch_annotations_and_constraints_survive_merge(ready):
     _,p=ready;parts=b.batches(p);outs=[response(x) for x in parts]
-    issue={'finding_ids':['F1','F37'],'description':'Synthetic shared-study cross-batch inconsistency','locations':['Results','Table 1']}
+    issue={'finding_ids':['F1','F37'],'description':'Synthetic shared-study cross-batch inconsistency','locations':['Results','Table 1'],
+           'affects_interpretation':'Synthetic: the two batches report one study'}
     outs[0]['source_inconsistencies']=[issue];outs[-1]['source_inconsistencies']=[issue]
     merged=b.merge(p,parts,outs)
     assert merged['source_inconsistencies']==[issue] and len(merged['validations'])==37

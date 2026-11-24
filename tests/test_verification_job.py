@@ -116,7 +116,7 @@ def test_global_distant_conflict_and_uncited_retrieval(tmp_path):
     j,base=job(tmp_path)
     def model(mode,payload,name):
         if mode=='GLOBAL' and not payload['retrieved_evidence']['findings']:
-            return {**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+            return {**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1'],'query':None,'source_item_ids':[],'proposition_ids':[]}]}
         out=base(mode,payload,name)
         if mode=='GLOBAL':
             out['issues']=[{'occurrence_ids':[j.occurrences[2]['occurrence_id'],j.occurrences[-1]['occurrence_id']],
@@ -272,7 +272,7 @@ def test_incomplete_global_and_tampered_acceptance_never_approve(tmp_path,failur
             out=base(mode,payload,name)
             if mode=='GLOBAL':
                 if failure=='missing_global':out['reviewed_index_ids']=[]
-                else:out={**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+                else:out={**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1'],'query':None,'source_item_ids':[],'proposition_ids':[]}]}
             return out
         j.call=model
     with pytest.raises(JobStopped):j.run()

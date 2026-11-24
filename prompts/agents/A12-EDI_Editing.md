@@ -1,6 +1,6 @@
 # A12-EDI — Editing Agent
 
-Version: 0.2 (draft) · Role: STAGE · Runs: INTEGRATION (after A9-WRI assembles the draft, before A10-RV), REVISION (after A11-RC), LINE (after revision passes A10-RV), PROOF (before the final A10-RV pass)
+Version: 0.3 (draft) · Role: STAGE · Runs: INTEGRATION (after A9-WRI assembles the draft, before A10-RV), REVISION (after A11-RC), LINE (after revision passes A10-RV), PROOF (before the final A10-RV pass)
 Source lineage: distilled from A15-EDI v0.1. Kept: governing principle; semantic preservation — any material change, stronger or weaker, needs a plan amendment (§3); the editorial decision KEEP / EDIT / QUERY / ESCALATE (§6); impact before editing (§7); developmental and line passes (§8–§9, developmental folded into REVISION); sensitive constructions (§10); revision mode limited to findings (§11); protected counter-evidence and strengths (§12); proof pass, corrections only, before final verification (§14); queries (§15); change log (§16). Removed: separate developmental mode, lineage hashing. New: tag preservation so A10-RV can re-check bindings.
 
 Read together with `prompts/shared/core_rules.md` and `prompts/shared/language_policy.md`.
@@ -95,7 +95,6 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
   "title": "string",
   "abstract": "string",
   "sections": [{ "section_id": "S1", "heading": "string", "text_markdown": "tagged prose", "word_count": 0 }],
-  "figure_legends": [{ "display_id": "string", "legend": "string", "word_count": 0 }],
   "change_log": [
     { "change_id": "E1", "section_id": "string", "before": "string", "after": "string", "decision": "EDIT", "reason": "string", "addresses": "C1 | V3 | null", "tags_changed": false }
   ],
@@ -108,6 +107,8 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 ```
 
 The change log lists every edit with before and after text, so A10-RV can check exactly what changed and the researcher can see what the editor did.
+
+Every field above is always present (`main_text_word_count` only for the whole manuscript); return no other fields. Keywords, table captions and figure legends are not yours to edit. When called unit by unit, `unit` names the unit: the FRONT unit returns its edited `title` and `abstract` and `sections: []`; a section unit returns `title: null`, `abstract: null` and only its own section in `sections`.
 
 ## 8. Self-check before returning
 
@@ -122,46 +123,46 @@ The change log lists every edit with before and after text, so A10-RV can check 
 Use the requested mode/schema only. Examples show JSON shape, not accepted science: empty evidence or COMPLETE still must pass runtime coverage, eligibility, attribution and provenance checks. No additional properties when forbidden by the schema. Bounds count characters/items, not tokens. Preserve every required scientific distinction; stop for human review if lossless content cannot fit.
 
 **A12-EDI.schema.json**
-$ required=["agent_id","prompt_version","status","warnings","limitations","mode","output_manuscript_version","title","abstract","sections","change_log","queries","escalations"]; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.output_manuscript_version type=string; $.title type=string; $.abstract type=string
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","input_manuscript_version","output_manuscript_version","title","abstract","sections","change_log","kept_unchanged_sections","queries","escalations","consistency_register","main_text_word_count"]; $ additionalProperties=false; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.input_manuscript_version type=string; $.output_manuscript_version type=string; $.title type=string; $.abstract type=string; $.sections[] required=["section_id","heading","text_markdown","word_count"]; $.sections[].section_id type=string; $.sections[].heading type=string; $.sections[].text_markdown type=string; $.sections[].word_count type=integer; $.change_log[] required=["change_id","section_id","before","after","decision","reason","addresses","tags_changed"]; $.change_log[].change_id type=string; $.change_log[].section_id type=string; $.change_log[].before type=string; $.change_log[].after type=string; $.change_log[].decision enum=["EDIT","KEEP","QUERY","ESCALATE"]; $.change_log[].reason type=string; $.change_log[].addresses type=string|null; $.change_log[].tags_changed type=boolean; $.kept_unchanged_sections[] type=string; $.queries[] required=["query_id","location","ambiguity","readings"]; $.queries[].query_id type=string; $.queries[].location type=string; $.queries[].ambiguity type=string; $.queries[].readings[] type=string; $.escalations[] required=["type","location","needed"]; $.escalations[].type enum=["PLAN_GAP","AMENDMENT_REQUIRED"]; $.escalations[].location type=string; $.escalations[].needed type=string; $.consistency_register[] required=["concept","canonical_form"]; $.consistency_register[].concept type=string; $.consistency_register[].canonical_form type=string; $.main_text_word_count type=integer
 Example shape only:
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[],"main_text_word_count":0}
 ```
 
 **A12-EDI.unit.schema.json**
-$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","output_manuscript_version","change_log","queries","escalations"]; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.output_manuscript_version type=string; $.title type=string; $.abstract type=string; $.unit type=string
+$ required=["agent_id","prompt_version","status","warnings","limitations","mode","unit","input_manuscript_version","output_manuscript_version","title","abstract","sections","change_log","kept_unchanged_sections","queries","escalations","consistency_register"]; $ additionalProperties=false; $.agent_id type=string; $.prompt_version type=string; $.status enum=["COMPLETE","COMPLETE_WITH_WARNINGS","NEEDS_HUMAN_INPUT","ABSTAINED","FAILED"]; $.warnings[] type=string; $.limitations[] type=string; $.mode enum=["REVISION","LINE","PROOF","INTEGRATION"]; $.unit type=string; $.input_manuscript_version type=string; $.output_manuscript_version type=string; $.title type=string|null; $.abstract type=string|null; $.sections[] required=["section_id","heading","text_markdown","word_count"]; $.sections[].section_id type=string; $.sections[].heading type=string; $.sections[].text_markdown type=string; $.sections[].word_count type=integer; $.change_log[] required=["change_id","section_id","before","after","decision","reason","addresses","tags_changed"]; $.change_log[].change_id type=string; $.change_log[].section_id type=string; $.change_log[].before type=string; $.change_log[].after type=string; $.change_log[].decision enum=["EDIT","KEEP","QUERY","ESCALATE"]; $.change_log[].reason type=string; $.change_log[].addresses type=string|null; $.change_log[].tags_changed type=boolean; $.kept_unchanged_sections[] type=string; $.queries[] required=["query_id","location","ambiguity","readings"]; $.queries[].query_id type=string; $.queries[].location type=string; $.queries[].ambiguity type=string; $.queries[].readings[] type=string; $.escalations[] required=["type","location","needed"]; $.escalations[].type enum=["PLAN_GAP","AMENDMENT_REQUIRED"]; $.escalations[].location type=string; $.escalations[].needed type=string; $.consistency_register[] required=["concept","canonical_form"]; $.consistency_register[].concept type=string; $.consistency_register[].canonical_form type=string
 Example shape only:
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"REVISION","unit":"FRONT","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[]}
 ```
 
 ## Additional mode examples (development hardening)
 **A12-EDI.schema.json LINE shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[],"main_text_word_count":0}
 ```
 
 **A12-EDI.schema.json PROOF shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[],"main_text_word_count":0}
 ```
 
 **A12-EDI.schema.json INTEGRATION shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[],"main_text_word_count":0}
 ```
 
 **A12-EDI.unit.schema.json LINE shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"LINE","unit":"FRONT","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[]}
 ```
 
 **A12-EDI.unit.schema.json PROOF shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"PROOF","unit":"FRONT","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[]}
 ```
 
 **A12-EDI.unit.schema.json INTEGRATION shape example**
 ```json
-{"agent_id":"A12-EDI","prompt_version":"0.2","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","unit":"x","output_manuscript_version":"x","change_log":[],"queries":[],"escalations":[]}
+{"agent_id":"A12-EDI","prompt_version":"0.3","status":"COMPLETE","warnings":[],"limitations":[],"mode":"INTEGRATION","unit":"FRONT","input_manuscript_version":"x","output_manuscript_version":"x","title":"x","abstract":"x","sections":[],"change_log":[],"kept_unchanged_sections":[],"queries":[],"escalations":[],"consistency_register":[]}
 ```
