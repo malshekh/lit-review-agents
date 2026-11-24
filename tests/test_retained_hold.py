@@ -65,3 +65,13 @@ def test_second_hold_needs_its_own_explicit_authorization(retained):
     auth["additional_authorized_holds"]=[extra];a.write_text(json.dumps(auth))
     assert blocking_holds(b,a)==[]
     assert b.reserved()==pytest.approx(0.020693) and not b.entries()
+
+
+def test_unrelated_authorization_does_not_allow_repeating_rejected_schema(retained,monkeypatch):
+    b,a,p=retained;monkeypatch.setattr(structured,'slim',lambda *args:({},'old'))
+    monkeypatch.setattr('litreview.extraction_mode.active',lambda *args:False)
+    v=json.loads(a.read_text());v['continue_without_retry']=['functional'];a.write_text(json.dumps(v))
+    assert blocking_holds(b,a,operation='functional')==[]
+    for operation in [None,'smoke','scope']:
+        with pytest.raises(ValueError,match='unchanged'):blocking_holds(b,a,operation=operation)
+    assert b.reserved()>0

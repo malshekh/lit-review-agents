@@ -30,7 +30,7 @@ def main():
     authorization=ROOT/'pilot_retained_hold_authorization.json'
     auth=json.loads(authorization.read_text(encoding='utf-8'))
     assert auth['run_id']==run.id and auth['total_cap_usd']==50 and auth['smoke_allowance_usd']==1
-    if blocking_holds(run.budget,authorization):raise SystemExit('BLOCKED: an additional unresolved dispatch exists')
+    if blocking_holds(run.budget,authorization,operation=args.action):raise SystemExit('BLOCKED: an additional unresolved dispatch exists')
     if args.action=='audit':
         structured.recover_smoke_receipts(run.budget)
         amount,todo=structured.smoke_estimate(run.budget)
@@ -95,7 +95,7 @@ def main():
         raise SystemExit('BLOCKED: configured model availability has not passed')
     if args.action in ('smoke','functional'):
         from litreview.check_authorization import require as require_check_authorization
-        check_auth=require_check_authorization(run,ROOT)
+        check_auth=require_check_authorization(run,ROOT,action=args.action)
     if args.action=='functional':
         from litreview import a05_functional
         result=a05_functional.execute(run,check_auth['functional_cap_usd'],check_auth['approved_by'],check_auth)
@@ -117,6 +117,8 @@ def main():
         (run.dir/'smoke_result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
         print(json.dumps(result,indent=2))
         return 0 if result['tested']==result['accepted'] and all(t['already_verified'] for t in structured.targets()) and not blocking_holds(run.budget,authorization) else 2
+    check_scope_auth=json.loads((ROOT/'pilot_check_authorization.json').read_text(encoding='utf-8'))
+    if check_scope_auth.get('functional_only'):raise SystemExit('BLOCKED: scope and further strict checks remain paused by researcher instruction')
     from litreview import extraction_mode,a05_functional
     if extraction_mode.active() and not a05_functional.verified(run.dir):raise SystemExit('BLOCKED: A05 ordinary JSON nonempty functional check has not passed')
     smoke=json.loads((run.dir/'smoke_result.json').read_text(encoding='utf-8'))

@@ -4,16 +4,16 @@ import hashlib
 import json
 
 
-def blocking_holds(budget, authorization: Path | None = None) -> list[str]:
+def blocking_holds(budget, authorization: Path | None = None, operation: str | None = None) -> list[str]:
     held = budget.reservations()
     if not held or authorization is None:
         return list(held)
     auth = json.loads(Path(authorization).read_text(encoding="utf-8"))
-    allowed = {_authorized_key(budget, a) for a in [auth, *auth.get("additional_authorized_holds", [])]}
+    allowed = {_authorized_key(budget, a, operation) for a in [auth, *auth.get("additional_authorized_holds", [])]}
     return [key for key in held if key not in allowed]
 
 
-def _authorized_key(budget, auth):
+def _authorized_key(budget, auth, operation=None):
     held = budget.reservations()
     if (auth.get("run_id") != budget.log_path.parent.name or not auth.get("authorized_by")
             or auth.get("decision") != "CONTINUE_WITH_UNRESOLVED_HOLD"
@@ -42,6 +42,7 @@ def _authorized_key(budget, auth):
     from .structured import slim
     from .extraction_mode import active
     changed_to_ordinary=receipt["target"]=="A05-KE.schema.json" and active()
-    if not changed_to_ordinary and slim(receipt["target"], auth["provider"])[1] == auth["rejected_schema_sha256"]:
+    unrelated_authorized_operation=operation in auth.get("continue_without_retry",[]) if operation is not None else False
+    if not changed_to_ordinary and not unrelated_authorized_operation and slim(receipt["target"], auth["provider"])[1] == auth["rejected_schema_sha256"]:
         raise ValueError("rejected schema is unchanged")
     return key

@@ -1,11 +1,11 @@
-"""Build the explicitly authorized v23 continuation; no network or paid calls."""
+"""Build the explicitly authorized v24 continuation; no network or paid calls."""
 from pathlib import Path
 import datetime, hashlib, io, json, shutil, subprocess, sys, tarfile
 import build_runtime
 REPO=Path(__file__).resolve().parents[1]
-OLD=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v22-pilot7-retained-hold-50usd")
-DEST=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v23-pilot7-ordinary-a05-50usd")
-SOURCE_PIN="39261a0c749c830318fb3f025fe34adbd3c0f924b885992a6533064950121705"
+OLD=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v23-pilot7-ordinary-a05-50usd")
+DEST=Path(r"C:\Users\maykh\LitReviewStage1\execution-20261124-v24-pilot7-functional-only-50usd")
+SOURCE_PIN="f25ca4b7e9de4e31139de3e82c2640550e77045f42fee2d89b6790e58e78f84c"
 RUN="20261123-214928"
 def git(*args):return subprocess.check_output(["git",*args],cwd=REPO)
 def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
@@ -69,23 +69,32 @@ def main():
         "provider_request_id":"req_011ChNMGzga3FkrjawEPcPZA",
         "rejected_schema_sha256":"cb602653047b74fd9865a64e630c214c4c3931b1df2949acc037cee6dd98f9dc",
         "user_instruction":"Researcher explicitly authorizes all four existing holds retained; no settlement or release; 2026-11-24."})
+    fifth_key="smoke-c9789daf1c7c452d8b52fdeefef0f939"
+    auth["additional_authorized_holds"].append({**{k:v for k,v in auth.items() if k!="additional_authorized_holds"},
+        "reservation":fifth_key,"receipt_sha256":sha(source/"smoke_receipts"/(fifth_key+".json")),"held_usd":0.025262,
+        "provider":"openai","model":"gpt-6.1-sol","provider_request_id":"req_5377fd18723845e4b008236100ef5184",
+        "rejected_schema_sha256":"6cf8656f20883e59a2f50fedf8410e90fac117d934728039c783c511a34c39c4",
+        "continue_without_retry":["audit","availability","functional"],
+        "user_instruction":"Retain the fifth unresolved hold; authorize A05-A06 functional check only, no further strict checks or scope."})
     prepared=json.loads((DEST/"docs/pilot7/a05_functional/prepared_plan.json").read_text(encoding="utf-8"))
     assert prepared["combined_remaining_worst_case_usd"]==0.712374
     assert prepared["functional_worst_case_usd"]==0.594 and prepared["prior_success_count"]==9
     check_auth={"run_id":RUN,"approved_by":"May Khalid: explicit chat authorization, 2026-11-24",
         "implementation_commit":"7d98042f2356b5e022ac5de56c6dc8ce46c23b12",
-        "fingerprint":prepared["fingerprint"],"additional_cap_usd":0.712374,"functional_cap_usd":0.594,
-        "strict_cap_usd":0.118374,"baseline_spend_usd":0.0690631,"baseline_hold_usd":0.099409,
+        "fingerprint":prepared["fingerprint"],"additional_cap_usd":0.594,"functional_cap_usd":0.594,
+        "strict_cap_usd":0,"baseline_spend_usd":0.0707391,"baseline_hold_usd":0.124671,
         "smoke_cap_usd":1,"pilot_cap_usd":50,"review_points_usd":[25,48],
-        "scope_limit":"CP1; no scientific approval","strict_first":"A06-SV.schema.json",
+        "scope_limit":"PAUSED; no scope or scientific approval","strict_first":"A06-SV.schema.json",
+        "allowed_actions":["functional"],"functional_only":True,
+        "a06_receipt_identity":{"provider":"openai","model":"gpt-6.1-sol","schema_sha256":"157cbeb66719080072638fdd497a2d4f42ee6c1897a1f10c00271e84ca1389b6"},
         "stop_on":["new unresolved hold","required check fails after permitted repair","reviewed cost bound changes"],
-        "user_instruction":"Authorize up to $0.712374 additional spending for five strict checks and the prepared ordinary A05 plus independent A06 functional task, including priced bounded repairs; retain all 23 original receipts and all four unresolved holds."}
+        "user_instruction":"Authorize only the already prepared A05-A06 functional check up to $0.594 including bounded repairs; retain all five unresolved holds and receipts. Further strict checks and scope are paused."}
     write(DEST/"pilot_check_authorization.json",check_auth)
     write(DEST/"pilot_retained_hold_authorization.json",auth)
-    manifest={"runtime_version":"stage1-v23-pilot7-retained-hold-50usd","git_commit":commit,
+    manifest={"runtime_version":"stage1-v24-pilot7-retained-hold-50usd","git_commit":commit,
               "built_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "source_runtime":str(OLD),"source_manifest_sha256":SOURCE_PIN,
-              "operational_overrides":"v16 financial limits retained; automatic truncation retries disabled per user instruction; all four holds preserved; checks explicitly authorized up to $0.712374 additional; scope stops at CP1",
+              "operational_overrides":"v16 financial limits retained; automatic truncation retries disabled per user instruction; all five holds preserved; functional check only up to $0.594 additional; strict checks and scope paused",
               "files":{p.relative_to(DEST).as_posix():sha(p) for p in sorted(DEST.rglob("*")) if p.is_file() and p.relative_to(DEST).as_posix()!="records/model_record.jsonl"},
               "mutable_telemetry":{"baseline":"candidate/model_record_baseline.jsonl"}}
     write(DEST/"frozen_runtime_manifest.json",manifest);pin=sha(DEST/"frozen_runtime_manifest.json")
@@ -95,18 +104,18 @@ def main():
     for name in ["structured_output.json","input/runtime_pin.json","LIVE_LAUNCH_STATUS.json","LIVE_LAUNCH_STATUS.md","smoke_result.json"]:
         src=target/name
         if src.exists():
-            dst=target/"migration/v23_previous"/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
+            dst=target/"migration/v24_previous"/name;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
     # Resume with the verified, hash-bound receipt enrichment already produced by v16.
     write(target/"structured_output.json",{})
     report={"run_id":RUN,"source_runtime":str(OLD),"source_manifest_sha256":SOURCE_PIN,"destination_runtime":str(DEST),
             "manifest_sha256":pin,"commit":commit,"original_run_files_sha256":before,"new_paid_calls":0,
             "authorization":auth,"billing_status":"UNRESOLVED_HOLD_RETAINED","scientific_approvals_added":0}
-    write(target/"migration/v23_continuation.json",report)
+    write(target/"migration/v24_continuation.json",report)
     write(target/"input/runtime_pin.json",{"run_id":RUN,"runtime":str(DEST),"manifest_sha256":pin,"reviewed_commit":commit})
     assert inventory(source)==before
     for name,digest in before.items():
         if name not in ("structured_output.json","input/runtime_pin.json"):assert sha(target/name)==digest,name
     result={"runtime":str(DEST),"commit":commit,"manifest_sha256":pin,"run_id":RUN,**verify(DEST,manifest)}
-    write(REPO/"runs/v23_runtime_pin.json",result)
+    write(REPO/"runs/v24_runtime_pin.json",result)
     print(json.dumps(result,indent=2))
 if __name__=="__main__":main()

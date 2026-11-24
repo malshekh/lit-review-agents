@@ -171,7 +171,7 @@ def execute(parent_run,approve_usd,by,decision):
     seal=json.loads((REPO_ROOT/'frozen_runtime_manifest.json').read_text(encoding='utf-8'));verify(REPO_ROOT,seal)
     if not by or decision.get('fingerprint')!=fingerprint() or decision.get('approved_by')!=by:
         raise ValueError('New functional mode needs explicit fingerprint-bound researcher approval')
-    if blocking_holds(parent_run.budget,REPO_ROOT/'pilot_retained_hold_authorization.json'):
+    if blocking_holds(parent_run.budget,REPO_ROOT/'pilot_retained_hold_authorization.json',operation='functional'):
         raise ValueError('Unapproved billing hold remains; no functional dispatch')
     from . import structured
     validator=config.agent_model('A06-SV')

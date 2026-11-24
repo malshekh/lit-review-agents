@@ -38,3 +38,10 @@ def test_new_hold_cost_change_or_lost_approval_stops_before_dispatch(authorized,
     elif change=='spent':values['spent']+=0.712375
     else:targets[0]['already_verified']=False
     with pytest.raises(ValueError):require(run,root)
+
+
+def test_functional_only_authorization_refuses_strict_and_scope(authorized):
+    run,root,values,targets=authorized
+    p=root/'pilot_check_authorization.json';a=json.loads(p.read_text());a['allowed_actions']=['functional'];p.write_text(json.dumps(a))
+    for action in ['smoke','scope',None]:
+        with pytest.raises(ValueError,match='paused'):require(run,root,action=action)
