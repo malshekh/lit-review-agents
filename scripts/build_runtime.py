@@ -7,8 +7,8 @@ What it does, in order (it never calls a provider and never writes outside --des
   1. refuses a dirty worktree: a runtime is a commit, not a commit plus whatever was lying around;
   2. exports that commit's src/, config/, prompts/, schemas/, records/, the sample launcher, the billing
      reconciliation script, pyproject.toml and requirements.txt with `git archive`;
-  3. copies from the previous runtime only what is not source: its vendored third-party packages, its launcher
-     (bootstrap.py, cli_entry.py), the model-record telemetry and its baseline, and the named run folder;
+  3. copies from the previous runtime only what is not source: its vendored third-party packages, its CLI entry point
+     (cli_entry.py); bootstrap.py is built from the reviewed scripts/runtime_bootstrap.py, the model-record telemetry and its baseline, and the named run folder;
   4. writes frozen_runtime_manifest.json (SHA-256 of every file outside runs/ except the telemetry file and the
      manifest itself, the git commit, and where each copied part came from);
   5. verifies the result with litreview.runtime_integrity.verify and prints the manifest's own SHA-256, which is
@@ -31,10 +31,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FROM_GIT = ["src", "config", "prompts", "schemas", "records", "a07_a09_sample.py", "scripts/reconcile_billing.py",
-            "scripts/plan_budget.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
+            "scripts/plan_budget.py", "scripts/runtime_bootstrap.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
             "pyproject.toml", "requirements.txt",
             "LICENSE.md"]
-FROM_RUNTIME = ["vendor", "bootstrap.py", "cli_entry.py", "candidate/model_record_baseline.jsonl",
+FROM_RUNTIME = ["vendor", "cli_entry.py", "candidate/model_record_baseline.jsonl",
                 "records/model_record.jsonl"]
 TELEMETRY = "records/model_record.jsonl"
 MANIFEST = "frozen_runtime_manifest.json"
@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     (dest / "runs").mkdir(exist_ok=True)
     if run_src is not None:
         shutil.copytree(run_src, dest / "runs" / args.run_id)
+    shutil.copy2(dest / "scripts/runtime_bootstrap.py", dest / "bootstrap.py")
     # 4. manifest
     files = {p.relative_to(dest).as_posix(): sha(p) for p in sorted(dest.rglob("*"))
              if p.is_file() and p.relative_to(dest).parts[0] != "runs" and p.relative_to(dest).as_posix() != TELEMETRY}
