@@ -56,6 +56,24 @@ def _digest(sections):
     return hashlib.sha256(json.dumps(sections, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def identity_problems(record, ids) -> str | None:
+    """Why the XML's article identifiers do not identify this record, or None. The PMCID must match, every PMID and
+    DOI the record has must match the XML, and at least one of them must be present: a PMCID alone is not checked
+    against anything the record says about itself."""
+    pmid, doi, pmcid = str(record.get("pmid") or "").strip(), str(record.get("doi") or "").strip(), record.get("pmcid") or ""
+    if not pmcid:
+        return "PMCID missing"
+    if not pmid and not doi:
+        return "neither PMID nor DOI on the record: identity cannot be confirmed"
+    if _pmc_identity(ids) != pmcid.removeprefix("PMC"):
+        return "PMCID mismatch"
+    if pmid and ids.get("pmid") != pmid:
+        return "PMID mismatch"
+    if doi and ids.get("doi", "").lower() != doi.lower():
+        return "DOI mismatch"
+    return None
+
+
 def verify_cached_source(record, sections, source):
     import hashlib, base64
     if not isinstance(source, dict) or not isinstance(sections, dict):
@@ -65,7 +83,7 @@ def verify_cached_source(record, sections, source):
     except (ValueError, TypeError) as exc:
         raise FullTextUnavailable("Cached source encoding invalid") from exc
     if (not isinstance(source, dict) or source.get("verified") is not True
-            or source.get("pmid") != str(record.get("pmid"))
+            or source.get("pmid") != (str(record["pmid"]) if record.get("pmid") else None)
             or source.get("pmcid") != record.get("pmcid")
             or source.get("url") != URL.format(pmcid=record.get("pmcid"))
             or source.get("sections_sha256") != _digest(sections)
@@ -79,9 +97,7 @@ def verify_cached_source(record, sections, source):
     except (ValueError, ET.ParseError) as exc:
         raise FullTextUnavailable("Cached source XML invalid") from exc
     ids = {x.get("pub-id-type"): (x.text or "").strip() for x in tree.findall("./front/article-meta/article-id")}
-    if (ids.get("pmid") != str(record.get("pmid"))
-            or _pmc_identity(ids) != record.get("pmcid", "").removeprefix("PMC")
-            or (record.get("doi") and ids.get("doi", "").lower() != record["doi"].lower())):
+    if identity_problems(record, ids):
         raise FullTextUnavailable("Cached source XML identity mismatch")
     body = tree.find("./body")
     names = [(sec.findtext("title") or "Untitled").strip() for sec in body.findall("./sec")] if body is not None else []
@@ -97,6 +113,18 @@ EPMC_SEARCH = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 # with HTTP 403 on 2026-11-23, so it is only a fallback. Only `tool` is sent: no personal address leaves the machine.
 IDCONV = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/"
 HEADERS = {"User-Agent": "litreview/0.1", "Accept": "application/json"}
+
+
+ROUTES_NOT_ATTEMPTED = ["publisher website", "Unpaywall and other open-access aggregators",
+                        "institutional and subject repositories", "preprint servers", "author copies",
+                        "subscription access"]
+
+
+def lookup_status(pmcid: str | None, why: str) -> str:
+    """FOUND | NOT_LISTED (a service answered: no PMC copy) | UNAVAILABLE (no service could answer)."""
+    if pmcid:
+        return "FOUND"
+    return "NOT_LISTED" if ("lists no PMC copy" in why or "no PMC copy listed" in why or "has no record" in why) else "UNAVAILABLE"
 
 
 def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[str | None, str]:
@@ -144,8 +172,8 @@ def fetch_verified_sections(record, timeout=60):
     """
     import hashlib, datetime, base64
     pmid, pmcid = str(record.get("pmid") or ""), record.get("pmcid")
-    if not pmid or not pmcid:
-        raise FullTextUnavailable("Required PMID/PMCID missing")
+    if not pmcid or (not pmid and not record.get("doi")):
+        raise FullTextUnavailable("Required PMCID, and a PMID or DOI to confirm identity, missing")
     url = URL.format(pmcid=pmcid)
     try:
         response = requests.get(url, timeout=timeout)
@@ -157,9 +185,9 @@ def fetch_verified_sections(record, timeout=60):
         raise FullTextUnavailable("Full-text retrieval/XML parse failed") from exc
     ids = {x.get("pub-id-type"): (x.text or "").strip()
            for x in tree.findall("./front/article-meta/article-id")}
-    if (ids.get("pmid") != pmid or _pmc_identity(ids) != pmcid.removeprefix("PMC")
-            or (record.get("doi") and ids.get("doi", "").lower() != record["doi"].lower())):
-        raise FullTextUnavailable("Full-text XML PMID/PMCID/DOI identity mismatch")
+    why = identity_problems(record, ids)
+    if why:
+        raise FullTextUnavailable(f"Full-text XML identity mismatch: {why}")
     body = tree.find("./body")
     if body is None or not " ".join(body.itertext()).strip():
         raise FullTextUnavailable("Full-text body missing")
@@ -169,7 +197,8 @@ def fetch_verified_sections(record, timeout=60):
         raise FullTextUnavailable("Full-text body sections missing")
     # Keep the established section-count contract while identity/body verification is explicit.
     sections.setdefault("Abstract", "")
-    source = {"verified": True, "pmid": pmid, "pmcid": pmcid, "doi": ids.get("doi"), "url": url,
+    source = {"verified": True, "pmid": pmid or None, "pmcid": pmcid, "doi": ids.get("doi"), "url": url,
+              "identifiers_confirmed": [k for k in ("pmid", "doi") if record.get(k)],
               "retrieved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "xml_sha256": hashlib.sha256(raw).hexdigest(), "sections_sha256": _digest(sections),
               "body_sections": names, "xml_base64": base64.b64encode(raw).decode("ascii")}

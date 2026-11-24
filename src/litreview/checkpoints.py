@@ -412,20 +412,31 @@ def write_spend_review(run_dir: Path, digest: str, detail: dict) -> None:
 def write_early_review(run_dir: Path, digest: str, report: dict) -> None:
     """The first papers are extracted: the run stops so the researcher can inspect quality and cost before the
     rest of the corpus is read. Nothing already done is repeated after approval."""
-    lines = ["# Early check: the first papers are extracted", "",
-             "Read these extractions before the rest of the corpus is processed. Open each file under "
-             "`data/extractions/` and compare a few findings with the paper: spans, comparators, doses, values and "
-             "whether a result or an interpretation was recorded.", "",
-             "| Paper | Record | Read as | Findings | Comparator not reported | Cost | Projected per paper |",
-             "|---|---|---|---:|---:|---:|---:|"]
+    lines = ["# Early check: the first papers are extracted and independently validated", "",
+             "Read these papers' extractions (`data/extractions/`) and validations (`data/validations/`) before the rest "
+             "of the corpus is processed. Compare a few findings with the paper: spans, comparators, doses, values, and "
+             "whether a result or an interpretation was recorded; then check that each validation disposition is right.", "",
+             "| Paper | Read as | Access | Legends read | Findings | Supported | Not established | Rejected | Unresolved | "
+             "Comparator not reported | Comparator missing |", "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|"]
     for p in report["papers"]:
-        lines.append(f"| {p.get('paper_id') or ''} | {p['record_id']} | {p['level']} | {p['findings']} | "
-                     f"{p['comparator_not_reported']} | ${p['cost_usd']:.2f} | "
-                     + (f"${p['projected_usd']:.2f}" if p.get("projected_usd") is not None else "n/a") + " |")
-    lines += ["", f"Spent on these papers: ${report['spent_usd']:.2f}. If every remaining paper costs what its level "
-              f"cost here, extraction of the corpus totals about ${report['extrapolated_extraction_usd']:.2f} "
-              f"(projection: ${report['projected_extraction_usd']:.2f}). One full text and two abstracts are an early "
-              "signal, not an average.", "",
+        lines.append(f"| {p.get('paper_id') or p['record_id']} | {p['level']} | {p.get('access_category')} | "
+                     f"{'yes' if p.get('figure_legends_read') else 'no'} (images: no) | {p['findings']} | {p['supported']} | "
+                     f"{p['not_established']} | {p['rejected']} | {p['unresolved']} | {p['comparator_not_reported']} | "
+                     f"{p['comparator_missing']} |")
+    lines += ["", "| Paper | Extraction | Validation | Together | Projected at CP2 (same quantity) |", "|---|---:|---:|---:|---:|"]
+    for p in report["papers"]:
+        lines.append(f"| {p.get('paper_id') or p['record_id']} | ${p['extraction_usd']:.2f} | ${p['validation_usd']:.2f} | "
+                     f"${p['measured_per_paper_usd']:.2f} | "
+                     + (f"${p['projected_per_paper_usd']:.2f}" if p.get("projected_per_paper_usd") is not None else "n/a") + " |")
+    f = report["forecast"]
+    lines += ["", "Access limitations: " + "; ".join(f"{p.get('paper_id') or p['record_id']}: {p['access_limitations']}"
+                                                     for p in report["papers"]), "",
+              f"Re-forecast from these measurements: the remaining {f['remaining_papers']} papers about "
+              f"${f['remaining_extraction_and_validation_usd']:.2f} for extraction and validation; about "
+              f"{f['findings_expected_total']} findings in all; downstream stages ${f['downstream_usd_revised']:.2f} "
+              f"(${f['downstream_usd_at_cp2']:.2f} at CP2). {f['basis']}", "",
+              "Accounts: " + ", ".join(f"{k.replace('_', ' ')} ${v:.2f}" for k, v in report["accounts"].items()
+                                       if isinstance(v, (int, float))), "",
               "To continue, set `approve_continue` to true and write what you checked in `notes` (at least a "
               "sentence), then run `litreview approve <run_id> CP_EARLY`. To change course instead, record an applied "
               "decision (`litreview decide`) or stop the run; nothing paid for is lost either way."]

@@ -36,7 +36,7 @@ profiles:
     recovery_allowance: 0.25
     smoke_test_allowance_usd: 1.0
     overrides:                         # this profile's settings; other runs are unaffected (config.effective)
-      run_spec: {max_papers: 7, max_full_text: null, first_tranche: {full_text: 1, abstract: 2}, chapter_tolerance: 0.15}
+      run_spec: {max_papers: 7, max_full_text: null, first_tranche: {papers: 3}, chapter_tolerance: 0.15}   # 3 papers, every level obtained
       extraction: {full_text_tiers: null}     # full text for every selected paper that has an open-access copy
       validation: {instability_tiers: null}   # retest every paper with a blocked finding: 7 papers make this affordable
       loops: {max_critique_cycles: 2}         # one revision, then a second critique that can accept it

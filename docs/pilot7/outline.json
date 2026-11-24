@@ -134,6 +134,7 @@
       "intended_contribution": "Identifies which component or process each measurement represents, the specific contribution of AI to interpreting it, and whether sensing feeds back into assessing or refining a delivery system.",
       "word_budget": 180,
       "guidance": [
+        "A carrier-associated label does not by itself establish intact-carrier abundance, released drug concentration, or biologically available payload.",
         "Distinguish measurements of the nanocarrier or a carrier-associated signal, of the drug payload, of encapsulated and released drug, and of release-related changes or distribution.",
         "Explain the specific contribution of AI to interpreting these measurements.",
         "Evaluate whether sensing supplies feedback for assessing or refining a delivery system."

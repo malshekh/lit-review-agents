@@ -281,10 +281,10 @@ def propose_selection(quals: list[dict], records: list[dict], framework: dict | 
 
 
 def build_manifest(selected: list[dict], quals: dict, proposals: dict, framework: dict | None, outline: dict | None,
-                   cp2_fingerprint: str) -> dict:
-    """The corpus manifest generated from discovery and screening, frozen when CP2 is approved. The reading level
-    is what is expected (full text when an open-access copy is identified); what was actually read is recorded at
-    extraction (data/retrieval_log.json, data/source_access.json)."""
+                   cp2_fingerprint: str, access: dict | None = None) -> dict:
+    """The corpus manifest generated from discovery and screening, frozen when CP2 is approved. `access`: the free
+    access check of each paper (Run._access_check), so the reading level is what retrieval actually obtained; an
+    unresolved lookup is budgeted as full text. Without it the level is estimated from a known PMCID."""
     section_of = {t["theme_id"]: t.get("outline_section_id") for t in (framework or {}).get("primary_themes", [])}
     papers = []
     for n, r in enumerate(selected, 1):
@@ -295,9 +295,12 @@ def build_manifest(selected: list[dict], quals: dict, proposals: dict, framework
             "selection_reason": proposals.get(r["record_id"]) or ("selected by the researcher at CP2; screening reason: "
                                                                    + str(q.get("reason") or "not given")),
             "scientific_importance": q.get("proposed_tier") or "SUPPORTING",
-            "intended_reading_level": "FULL_TEXT" if r.get("pmcid") else "ABSTRACT",
+            "intended_reading_level": ((access or {}).get(r["record_id"]) or {}).get("level_for_budget")
+                                      or ("FULL_TEXT" if r.get("pmcid") else "ABSTRACT"),
             "informs_sections": sorted({section_of[t] for t in q.get("themes") or [] if section_of.get(t)}),
-            "actual_access": None})
+            "actual_access": ({k: access[r["record_id"]].get(k) for k in ("category", "level_read", "figure_legends_read",
+                                                                          "figure_images_inspected", "supplements_inspected")}
+                              if access and r["record_id"] in access else None)})
     return {"manifest_version": 1, "generated_from": "DISCOVERY_AND_SCREENING", "frozen_at_checkpoint": "CP2",
             "cp2_fingerprint": cp2_fingerprint, "papers": papers}
 
@@ -383,11 +386,16 @@ def selection_problems(manifest: dict, selected: list[dict]) -> list[str]:
     return out
 
 
-def source_access(paper: dict, level_read: str) -> dict:
-    """What an agent may say it had access to for this paper."""
+def source_access(paper: dict, level_read: str, sections: dict | None = None) -> dict:
+    """What an agent may say it had access to for this paper. The pipeline sends text only: figure legends may be in
+    the text, figure images never are, so `figure_images_inspected` is always false here. What the researcher
+    inspected by hand is kept separately and does not widen what an agent may claim."""
     a = paper["actual_access"]
-    return {"level": level_read, "figures_inspected": bool(a["figures_inspected"]) and level_read == "FULL_TEXT",
+    legends = level_read == "FULL_TEXT" and any(k.lower().startswith(("figure legend", "verbatim figure legend"))
+                                                for k in (sections or {}))
+    return {"level": level_read, "figure_legends_read": legends, "figure_images_inspected": False,
             "supplements_inspected": bool(a["supplements_inspected"]) and level_read == "FULL_TEXT",
+            "researcher_inspected_figures": bool(a.get("figures_inspected")),
             "scientific_importance": paper["scientific_importance"], "note": a.get("note", "")}
 
 

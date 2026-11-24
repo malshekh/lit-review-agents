@@ -40,7 +40,16 @@ def run(tmp_path, monkeypatch):
     monkeypatch.setattr(model_record, "RECORD", tmp_path / "model_record.jsonl")
     monkeypatch.setattr(orch.notify, "send", lambda *a, **k: False)
     run_id = orch.new_run("AI-enabled nanobiosensing", outline=OUTLINE, corpus_mode="OPEN_CORPUS", profile="pilot7")
-    return orch.Run(run_id)
+    run = orch.Run(run_id)
+    def access(rec, retry=False):
+        level = "FULL_TEXT" if rec.get("pmcid") else "ABSTRACT"
+        row = {"category": "FULL_TEXT_RETRIEVED" if rec.get("pmcid") else "NO_PMC_COPY_FOUND",
+               "level_read": level, "level_for_budget": level, "figure_legends_read": False,
+               "figure_images_inspected": False}
+        log = run.load("retrieval_log.json", {}); log[rec["record_id"]] = row; run.save("retrieval_log.json", log)
+        return row
+    monkeypatch.setattr(run, "_access_check", access)
+    return run
 
 
 def test_a_discovery_run_has_the_outline_no_corpus_and_its_profile(run):
@@ -117,12 +126,11 @@ def test_cp2_prefills_the_proposal_and_refuses_more_than_seven_or_two_versions(r
     marked = [r["record_id"] for r in rows if r["select"] == "Y"]
     assert len(marked) == 7 and all(r["proposed_reason"] for r in rows if r["select"] == "Y")
     assert "Proposed selection" in (cp / "CP2_review.md").read_text(encoding="utf-8")
-    decision = {"selected_record_ids": marked + ["R0010"], "tier_overrides": {}}
-    with pytest.raises(orch.Pause, match="selects 8 papers; this run allows at most 7"):
-        run._freeze_discovered_corpus(decision, {r["record_id"]: r for r in records}, {q["record_id"]: q for q in _quals(records)})
-    with pytest.raises(orch.Pause, match="versions of one publication"):
-        run._freeze_discovered_corpus({"selected_record_ids": ["R0001", "R0099"]}, {r["record_id"]: r for r in records},
-                                      {q["record_id"]: q for q in _quals(records)})
+    _, problems = run._provisional_discovered_corpus(marked + ["R0010"], {r["record_id"]: r for r in records}, {})
+    assert any("at most 7" in p for p in problems)
+    _, problems = run._provisional_discovered_corpus(["R0001", "R0099"], {r["record_id"]: r for r in records}, {})
+    assert any("versions of one publication" in p for p in problems)
+    assert not run.data("corpus_manifest.json").exists()
 
 
 def test_the_approved_selection_is_frozen_as_the_corpus_manifest(run):
@@ -131,30 +139,34 @@ def test_the_approved_selection_is_frozen_as_the_corpus_manifest(run):
     by_id = {r["record_id"]: r for r in records}
     quals = {q["record_id"]: q for q in _quals(records)}
     chosen = ["R0001", "R0002", "R0003", "R0007"]
-    m = run._freeze_discovered_corpus({"selected_record_ids": chosen, "review_fingerprint": "fp"}, by_id, quals)
+    provisional, problems = run._provisional_discovered_corpus(chosen, by_id, quals)
+    assert not problems
+    m = run._freeze_corpus(provisional)
     assert m["generated_from"] == "DISCOVERY_AND_SCREENING" and [p["record_id"] for p in m["papers"]] == chosen
     p1, p2 = m["papers"][0], m["papers"][1]
     assert (p1["intended_reading_level"], p2["intended_reading_level"]) == ("FULL_TEXT", "ABSTRACT")   # expected, from the PMCID
-    assert p1["informs_sections"] == ["S1.1"] and p1["actual_access"] is None and p1["selection_reason"]
+    assert p1["informs_sections"] == ["S1.1"] and p1["actual_access"]["level_read"] == "FULL_TEXT" and p1["selection_reason"]
     decision = [e for e in run.prov.events() if e.get("checkpoint") == "CORPUS_FROZEN"]
     assert decision and decision[0]["decision"]["papers"] == chosen
-    with pytest.raises(orch.Pause, match="frozen at an earlier CP2"):
-        run._freeze_discovered_corpus({"selected_record_ids": ["R0001", "R0004"]}, by_id, quals)
-    assert run._freeze_discovered_corpus({"selected_record_ids": chosen}, by_id, quals)["papers"] == m["papers"]
+    with pytest.raises(orch.Pause, match="already frozen"):
+        run._freeze_corpus(run._provisional_discovered_corpus(["R0001", "R0004"], by_id, quals)[0])
+    assert run._freeze_corpus(provisional)["papers"] == m["papers"]
 
 
 def test_retrieval_is_logged_and_a_failure_is_a_limitation_not_an_exclusion(run, monkeypatch):
     from litreview.tools import fulltext
+    monkeypatch.setattr(run, "_access_check", orch.Run._access_check.__get__(run))
+    monkeypatch.setattr(orch, "verify_cached_source", lambda *a: None)
     monkeypatch.setattr(fulltext, "find_pmcid", lambda pmid, doi: (None, "no PMC copy listed for this identifier"))
 
     def fetch(rec):
         if rec["pmcid"] == "PMC1":
-            return {"Abstract": "a", "Results": "b", "Figure legend Figure 1": "c"}, {"verified": True}
+            return {"Abstract": "a", "Results": "b", "Figure legend Figure 1": "c"}, {"verified": True, "xml_sha256": "fixture", "pmcid": "PMC1"}
         raise orch.FullTextUnavailable("Full-text body missing")
     monkeypatch.setattr(orch, "fetch_verified_sections", fetch)
     ok = {"record_id": "R0001", "pmid": "1", "pmcid": "PMC1", "abstract": "a", "manifest_paper_id": "P01", "tier": "CORE"}
     sections, access = run._retrieve_discovered(ok)
-    assert access["level"] == "FULL_TEXT" and access["figures_inspected"] and not access["supplements_inspected"]
+    assert access["level"] == "FULL_TEXT" and access["figure_legends_read"] and not access["figure_images_inspected"] and not access["supplements_inspected"]
     failed = {**ok, "record_id": "R0003", "pmcid": "PMC3", "abstract": "only the abstract"}
     sections, access = run._retrieve_discovered(failed)
     assert sections == {"Abstract": "only the abstract"} and access["level"] == "ABSTRACT"
@@ -162,9 +174,9 @@ def test_retrieval_is_logged_and_a_failure_is_a_limitation_not_an_exclusion(run,
     run._retrieve_discovered(none)
     log = run.load("retrieval_log.json")
     assert log["R0001"]["category"] == "FULL_TEXT_RETRIEVED"
-    assert log["R0003"]["category"] == "RETRIEVAL_LIMITATION_ABSTRACT_ONLY"
-    assert log["R0003"]["attempts"][-1] == {"source": "PMC open-access XML", "outcome": "FAILED", "detail": "Full-text body missing"}
-    assert log["R0002"]["attempts"][0]["outcome"] == "NOT_FOUND"
+    assert log["R0003"]["category"] == "PMC_COPY_NOT_VERIFIED"
+    assert log["R0003"]["attempts"][-1]["outcome"] == "FAILED"
+    assert log["R0002"]["attempts"][0]["outcome"] == "NOT_LISTED"
     with pytest.raises(orch.Pause, match="no full text and no abstract"):
         run._retrieve_discovered({**none, "record_id": "R0005", "abstract": ""})
     assert run.load("retrieval_log.json")["R0005"]["category"] == "NO_SOURCE_TEXT"

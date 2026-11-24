@@ -245,3 +245,6 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 - Every defect report quotes what the span actually says, and nothing was repaired.
 - Every contradiction inside the paper is in `source_inconsistencies` with both locations, and none was resolved.
 - Every independence entry gives papers, independent studies and independent datasets or cohorts separately, with the grouping basis.
+
+
+Access and scope constraints: `figure_legends_read` means text captions only. `figure_images_inspected` is false for this text-only route; captions never establish image inspection. Retain source-access limits on each claim. Distinguish limited corpus coverage, inaccessible sources, insufficient reporting, and demonstrated scientific limitations. A small selected corpus does not establish a field-wide evidence gap.

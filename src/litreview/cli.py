@@ -193,7 +193,11 @@ def cmd_spec_check(args) -> int:
 def cmd_smoke_test(args) -> int:
     import tempfile
     from . import structured
-    budget = BudgetTracker(Path(tempfile.mkdtemp()))
+    run_id = getattr(args, "run_id", None)
+    if args.approve_usd is not None and not run_id:
+        print("REFUSED: paid smoke tests require --run-id so receipts count against the combined run cap")
+        return 1
+    budget = Run(run_id).budget if run_id else BudgetTracker(Path(tempfile.mkdtemp()))
     usd, todo = structured.smoke_estimate(budget)
     print(f"{len(todo)} provider/model/schema combination(s) not yet confirmed; worst case ${usd:.2f}:")
     for t in todo:
@@ -207,7 +211,7 @@ def cmd_smoke_test(args) -> int:
         print(f"REFUSED: {e}")
         return 1
     print(f"Tested {result['tested']}, accepted {result['accepted']}, spent ${result['spent_usd']:.4f} "
-          "(records/smoke_tests.jsonl; records/structured_output.json).")
+          "(run smoke_tests.jsonl and smoke_receipts/; records/structured_output.json).")
     for r in result["results"]:
         if not r["accepted"]:
             print(f"  NOT accepted: {r['provider']} {r['model']} {r['schema_file']}: {r.get('error') or r.get('stop_reason')}")
@@ -567,6 +571,7 @@ def main(argv: list[str] | None = None) -> int:
     sm = sub.add_parser("smoke-test", help="list, or run with approval, one tiny live request per model/schema pair")
     sm.add_argument("--approve-usd", type=float, help="the amount you approve; without it nothing is sent")
     sm.add_argument("--by", help="your name")
+    sm.add_argument("--run-id", help="run whose combined spending allowance pays for the smoke test")
     sm.set_defaults(fn=cmd_smoke_test)
     sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
     sc.add_argument("run_id")

@@ -215,11 +215,13 @@ def _outline_words(run_dir) -> int | None:
     return run_spec.total_words(outline) if outline else None
 
 
-def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, route, cfg: dict) -> dict:
-    """Projection for a CP2 selection: measured per-paper and per-theme rates, worst-case downstream."""
+def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, route, cfg: dict,
+                  levels: dict | None = None) -> dict:
+    """Projection for a CP2 selection: measured per-paper and per-theme rates, worst-case downstream. `levels`:
+    {record_id: FULL_TEXT|ABSTRACT} from the access check, overriding the estimate from cached text or a PMCID."""
     lines, n_findings, by_level = [], 0, {"ABSTRACT": 0, "FULL_TEXT": 0}
     for rec in selection:
-        by_level[content_level(rec, run_dir)] += 1
+        by_level[(levels or {}).get(rec["record_id"]) or content_level(rec, run_dir)] += 1
     factor = _batch_factor(rates, cfg)
     for level, n in by_level.items():
         r = rates["per_paper"][level]

@@ -146,3 +146,6 @@ Example shape only:
 ```json
 {"agent_id":"A08-OL","prompt_version":"0.5","status":"COMPLETE","warnings":[],"limitations":[],"plan_version":"x","title":{"text":"x","proposition_ids":[]},"abstract_plan":{"target_words":0,"ordered_proposition_ids":[],"contribution_statement":"x"},"keywords":[],"writing_order":["x"],"sections":[{"section_id":"x","level":1,"heading":"x","heading_kind":"DESCRIPTIVE","heading_proposition_ids":[],"purpose":"x","word_budget":0,"theme_ids":[],"ordered_items":[],"display_item_ids":[],"transition_in":"x","transition_out":"x","wording_restrictions":[]}],"allocation_ledger":[],"display_items":[],"budget_summary":{},"readability":{"background_concepts":[],"abbreviations":[],"nomenclature":[]}}
 ```
+
+
+Access and scope constraints: `figure_legends_read` means text captions only. `figure_images_inspected` is false for this text-only route; captions never establish image inspection. Retain source-access limits on each claim. Distinguish limited corpus coverage, inaccessible sources, insufficient reporting, and demonstrated scientific limitations. A small selected corpus does not establish a field-wide evidence gap.

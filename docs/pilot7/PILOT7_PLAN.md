@@ -19,14 +19,18 @@ The pipeline itself:
 4. **CP2, your first selection decision.** The pipeline proposes seven papers from the screening results: the
    strongest tier first, covering as many subsections as possible, with one contrary-evidence paper if screening
    found any. Access is not a criterion. You confirm or change the marks. More than seven, or two versions of one
-   publication, is refused. Your approval freezes the corpus as `data/corpus_manifest.json`.
+   publication, is refused. Free access checks and a provisional budget run before freezing. Over-budget selections remain editable in
+   the same run, without repeating discovery or screening. Changed access or selection requires renewed review.
+   Your CP2 approval freezes only the reviewed, affordable selection as `data/corpus_manifest.json`.
 5. **Retrieval.** For each paper, an open-access full text is sought: Europe PMC by PMID or DOI, then PMC XML,
    with identity verification. Every attempt is logged (`data/retrieval_log.json`). A failure means the paper is
    read as its abstract, recorded as a retrieval limitation, never as an exclusion. A paper with no text at all
    stops the run. Figure legends are read as text; figure images and supplements are not retrieved, and this is
    recorded.
-6. **Early check (CP_EARLY).** After one full text and two abstracts are extracted, the run stops and shows you
-   their findings, comparator labelling and cost.
+6. **Early check (CP_EARLY).** After three papers are extracted AND independently validated, the run stops.
+   `{papers: 3}` accepts any retrieved mix and includes both reading levels when available. The review shows
+   actual reading levels, separate extraction/validation costs, dispositions, comparator problems and unresolved
+   issues. It compares extraction plus validation with the same CP2 quantity and re-forecasts remaining work.
 7. **Extraction and validation.** Extraction, then validation by a different vendor, in batches of 15 findings.
    Every paper with a blocked finding gets a second independent reading, and the theme check is paged where
    needed.
@@ -46,7 +50,7 @@ The pipeline itself:
 | Discovery rehearsal (`scripts/rehearse_pilot7.py`) | **Pass.** See below. |
 | Faults, resume, accounting, budget and specification tests | Pass (`scripts/readiness.py`) |
 | 15-paper rehearsal, synthesis to export | Pass |
-| Full test suite | 996 passed |
+| Full test suite | Current continuation results: see `HARDENING_RESULTS.md`; 996 passed was historical. |
 | Live literature services (`litreview check --apis`, free, 2026-11-23) | PubMed, Europe PMC, PubTator, OpenAlex, Semantic Scholar, ClinicalTrials.gov, HGNC and OLS answered; ChEMBL timed out once (a lookup failure is recorded and does not stop the run) |
 | Live full-text fetch (free) | A real open-access paper returned 40 verified sections |
 | Live model smoke test | **Not run: needs your approval** (worst case $0.44) |
@@ -78,10 +82,11 @@ Per-paper costs are taken at the 90th percentile; the margin is included.
 | Outline and writing | $8.67 | $10.84 |
 | Verification | $13.65 | $17.06 |
 | Critique and editing | $4.08 | $5.10 |
-| **Total** | **$47.79** | **$60.67** |
+| **Total** | **$47.79 (historical provisional)** | **$60.67** |
 
 Proposed `pilot7` limits, for your approval: **review pause at $25 and at $48, hard stop at $65**. The smoke
-test's $1 fits inside these limits. The pre-CP2 stages are cheap: screening runs on Haiku, and search planning
+test must use the pilot run ID; its receipts and uncertain reservations count inside the combined cap.
+These figures are NOT spending authorization. The pre-CP2 stages are cheap: screening runs on Haiku, and search planning
 takes one or two GPT-6.1 calls.
 
 **What these figures rest on.** They are projections from the October run's costs re-priced, plus assumed output
@@ -94,7 +99,10 @@ run stops at CP2, before any extraction is paid for.
    instructions into `questions`, `guidance` and `avoid`.
 2. **Approve the spending limits** above, or give your own; I change one line of `config/pipeline.yaml`.
 3. **Merge PR #5.** I then seal a fresh runtime (v13) from the merged commit.
-4. **Approve the live smoke test** (worst case $0.44).
+4. Create the run first with the command below. **Approve the live smoke test separately**, using the current
+   estimate, then run `litreview smoke-test --run-id <id> --approve-usd <explicitly approved amount> --by "<name>"`.
+   Uncertain dispatches retain their reservations and block retries until reconciled. Received receipts recover
+   without duplicate charges. No smoke test or paid call was executed in this continuation.
 5. **Start the pilot** in v13:
    `litreview new --topic docs/pilot7/topic.md --outline docs/pilot7/outline.json --corpus-mode OPEN_CORPUS --profile pilot7`,
    then `litreview run <id>`. Approve each checkpoint as it comes.
@@ -112,3 +120,10 @@ review point, scientific hold or retrieval failure it cannot resolve itself.
   A chapter far short of 800 words means the evidence ran out, and the report says so.
 - **The search queries are the model's.** You see the search plan's warnings at CP2, but the queries themselves
   are not shown for approval before they run.
+
+
+Continuation verification and limitations are recorded in `HARDENING_RESULTS.md`. A PMC lookup miss establishes
+only that no PMC copy was listed; publisher, other repositories, preprints and author copies remain unchecked.
+DOI plus PMCID can verify a paper without PMID; all supplied identifiers must match and cached XML re-verifies.
+Figure legends are text only. Image inspection is always false in this route and travels to independent
+validation and downstream verification. Subsection 2.2 includes the requested carrier-label caution.

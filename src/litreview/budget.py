@@ -214,6 +214,17 @@ class BudgetTracker:
         with open(self.log_path, encoding="utf-8") as fh:
             return [json.loads(line) for line in fh if line.strip()]
 
+    def prior_spend(self) -> float:
+        """Spend made before the run existed and counted against it (input/prior_spend.json: the smoke test)."""
+        p = self.log_path.parent / "input" / "prior_spend.json"
+        if not p.exists():
+            return 0.0
+        import math
+        value = float(json.loads(p.read_text(encoding="utf-8")).get("total_usd") or 0.0)
+        if not math.isfinite(value) or value < 0:
+            raise BudgetExceeded("Prior spend must be finite and non-negative")
+        return value
+
     def spent(self) -> float:
         from .evaluation_budget import prior
         entries = self.entries()
@@ -221,7 +232,7 @@ class BudgetTracker:
             carried = prior(self.log_path.parent, entries)
         except (ValueError, OSError, KeyError) as exc:
             raise BudgetExceeded("Cumulative evaluation budget invalid: " + str(exc)) from exc
-        return carried + sum(e["cost_usd"] or 0.0 for e in entries)
+        return carried + self.prior_spend() + sum(e["cost_usd"] or 0.0 for e in entries)
 
     def ensure_headroom(self, reservation_key: str | None = None) -> None:
         """Raise before a call if the cap is already reached, counting spend reserved by unsettled batches."""

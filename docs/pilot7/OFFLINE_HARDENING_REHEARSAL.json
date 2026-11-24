@@ -1,0 +1,265 @@
+{
+  "kind": "OFFLINE_SCRIPTED_REHEARSAL",
+  "date": "2026-11-23",
+  "paid_calls": 0,
+  "actual_provider_spend_usd": 0,
+  "final_stage": "done",
+  "seven_papers": 7,
+  "reading_levels": {
+    "R0001": "ABSTRACT",
+    "R0002": "FULL_TEXT",
+    "R0004": "FULL_TEXT",
+    "R0007": "ABSTRACT",
+    "R0008": "FULL_TEXT",
+    "R0003": "FULL_TEXT",
+    "R0005": "FULL_TEXT"
+  },
+  "early_check": {
+    "papers": [
+      {
+        "record_id": "R0002",
+        "paper_id": "P02",
+        "level": "FULL_TEXT",
+        "access_category": "FULL_TEXT_RETRIEVED",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "extraction_usd": 0.0681,
+        "validation_usd": 0.2468,
+        "findings": 20,
+        "supported": 8,
+        "not_established": 7,
+        "rejected": 5,
+        "unresolved": 0,
+        "comparator_not_reported": 0,
+        "comparator_missing": 20,
+        "access_limitations": "legends read as text; images and supplements not retrieved",
+        "projected_per_paper_usd": 1.0353999999999999,
+        "measured_per_paper_usd": 0.3149
+      },
+      {
+        "record_id": "R0001",
+        "paper_id": "P01",
+        "level": "ABSTRACT",
+        "access_category": "PMC_COPY_NOT_VERIFIED",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "extraction_usd": 0.0418,
+        "validation_usd": 0.0456,
+        "findings": 9,
+        "supported": 8,
+        "not_established": 1,
+        "rejected": 0,
+        "unresolved": 0,
+        "comparator_not_reported": 0,
+        "comparator_missing": 9,
+        "access_limitations": "a PMC copy is listed but could not be retrieved, or its identity or body did not verify",
+        "projected_per_paper_usd": 0.3642,
+        "measured_per_paper_usd": 0.0874
+      },
+      {
+        "record_id": "R0004",
+        "paper_id": "P03",
+        "level": "FULL_TEXT",
+        "access_category": "FULL_TEXT_RETRIEVED",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "extraction_usd": 0.0927,
+        "validation_usd": 0.5462,
+        "findings": 34,
+        "supported": 21,
+        "not_established": 1,
+        "rejected": 11,
+        "unresolved": 1,
+        "comparator_not_reported": 0,
+        "comparator_missing": 34,
+        "access_limitations": "legends read as text; images and supplements not retrieved",
+        "projected_per_paper_usd": 1.0353999999999999,
+        "measured_per_paper_usd": 0.6389
+      }
+    ],
+    "spent_usd": 1.0412,
+    "forecast": {
+      "remaining_papers": 4,
+      "remaining_extraction_and_validation_usd": 1.52,
+      "findings_expected_total": 153,
+      "downstream_usd_revised": 32.5,
+      "validation_retest_and_theme_reserve_usd": 3.19,
+      "downstream_usd_at_cp2": 37.07,
+      "basis": "remaining papers at the cost measured here for their reading level (the CP2 per-paper projection where a level was not measured); downstream stages re-projected at the findings count these papers imply. Three papers are an early signal, not an average."
+    },
+    "accounts": {
+      "discovery_and_screening_spent_usd": 0.0715,
+      "smoke_test_and_other_prior_spend_usd": 0.0,
+      "smoke_test_spent_in_run_usd": 0,
+      "unsettled_reservations_usd": 0,
+      "spent_so_far_total_usd": 1.1126,
+      "projected_remaining_usd_provisional": 37.2026,
+      "retry_and_repair_allowance_usd": 12.4922,
+      "combined_maximum_exposure_usd": 59.7711,
+      "hard_cap_usd": 65.0,
+      "projected_by_provider_usd": {
+        "anthropic": 19.3033,
+        "kimi": 1.5785,
+        "openai": 16.3209
+      },
+      "spent_by_provider_usd": {
+        "anthropic": 0.2131,
+        "openai": 0.8995
+      },
+      "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed output sizes; not a measured current-code cost. Provider allocation is estimated; the early combined extraction/validation forecast is split equally between their providers"
+    }
+  },
+  "chapter_lengths": [
+    {
+      "section_id": "S1",
+      "heading": "AI-enabled nanobiosensing: design, recognition and signal interpretation",
+      "target": 800,
+      "written": 71,
+      "within_tolerance": false,
+      "by_subsection": {
+        "S1.1": 13,
+        "S1.2": 13,
+        "S1.3": 26,
+        "S1.4": 13
+      }
+    },
+    {
+      "section_id": "S2",
+      "heading": "Sensing drug and nanomedicine exposure",
+      "target": 800,
+      "written": 91,
+      "within_tolerance": false,
+      "by_subsection": {
+        "S2.1": 16,
+        "S2.2": 6,
+        "S2.3": 13,
+        "S2.4": 43
+      }
+    }
+  ],
+  "length_explanations": [
+    {
+      "chapter": "S1",
+      "written": 71,
+      "target": 800,
+      "shortfall_words": 729,
+      "planned_words": 860,
+      "plan_warnings": [],
+      "subsection_counts": {
+        "S1.1": 13,
+        "S1.2": 13,
+        "S1.3": 26,
+        "S1.4": 13
+      },
+      "sections_without_evidence": [
+        "S1",
+        "S2.2"
+      ],
+      "held_findings_count": 23,
+      "retrieval_limitations_count": 2,
+      "interpretation": "Recorded outcomes; these counts alone do not identify a scientific cause of the shortfall."
+    },
+    {
+      "chapter": "S2",
+      "written": 91,
+      "target": 800,
+      "shortfall_words": 709,
+      "planned_words": 860,
+      "plan_warnings": [],
+      "subsection_counts": {
+        "S2.1": 16,
+        "S2.2": 6,
+        "S2.3": 13,
+        "S2.4": 43
+      },
+      "sections_without_evidence": [
+        "S1",
+        "S2.2"
+      ],
+      "held_findings_count": 23,
+      "retrieval_limitations_count": 2,
+      "interpretation": "Recorded outcomes; these counts alone do not identify a scientific cause of the shortfall."
+    }
+  ],
+  "simulated_spending": {
+    "total_usd": 9.6577,
+    "by_stage_usd": {
+      "A02-A04 scope, search, screening": 0.0715,
+      "A05-A06 extraction and validation": 4.6962,
+      "A07 synthesis": 2.1,
+      "A08-A09 outline and writing": 1.71,
+      "A10 verification": 0.72,
+      "A11-A12 critique and editing": 0.36
+    },
+    "by_agent": {
+      "A02-SP": {
+        "calls": 1,
+        "usd": 0.0238,
+        "input": 4402,
+        "output": 1500
+      },
+      "A03-LM": {
+        "calls": 1,
+        "usd": 0.0372,
+        "input": 11091,
+        "output": 1500
+      },
+      "A04-CQ": {
+        "calls": 3,
+        "usd": 0.0105,
+        "input": 82258,
+        "output": 4500
+      },
+      "A05-KE": {
+        "calls": 7,
+        "usd": 0.4874,
+        "input": 191208,
+        "output": 10500
+      },
+      "A06-SV": {
+        "calls": 32,
+        "usd": 4.2088,
+        "input": 1864408,
+        "output": 48000
+      },
+      "A07-SYN": {
+        "calls": 14,
+        "usd": 2.1,
+        "input": 280000,
+        "output": 28000
+      },
+      "A08-OL": {
+        "calls": 1,
+        "usd": 0.06,
+        "input": 20000,
+        "output": 2000
+      },
+      "A09-WRI": {
+        "calls": 11,
+        "usd": 1.65,
+        "input": 220000,
+        "output": 22000
+      },
+      "A10-RV": {
+        "calls": 12,
+        "usd": 0.72,
+        "input": 240000,
+        "output": 24000
+      },
+      "A11-RC": {
+        "calls": 2,
+        "usd": 0.12,
+        "input": 40000,
+        "output": 4000
+      },
+      "A12-EDI": {
+        "calls": 4,
+        "usd": 0.24,
+        "input": 80000,
+        "output": 8000
+      }
+    },
+    "steps_paid_more_than_once": {}
+  },
+  "limitations": "Replays October literature on another topic; scripted downstream prose and checkpoint approvals. These amounts are fake usage priced by real accounting, not provider spend or a launch quote. Short chapters are fixture output, not evidence of a scientific gap."
+}

@@ -109,7 +109,20 @@ def collect(run: Path) -> dict:
     human = [{"time": e["time"], "checkpoint": e.get("checkpoint"), "note": (e.get("note") or "")[:300]}
              for e in prov if e.get("type") == "human_decision"]
 
+    plan = _j(data / "manuscript_plan.json", {}) or {}
+    lengths = _j(final / "chapter_lengths.json", []) or []
+    length_explanations = [{"chapter": c["section_id"], "written": c["written"], "target": c["target"],
+        "shortfall_words": max(0, c["target"] - c["written"]),
+        "planned_words": sum(s.get("word_budget", 0) for s in plan.get("sections", [])
+                             if s.get("section_id") == c["section_id"] or s.get("section_id", "").startswith(c["section_id"] + ".")),
+        "plan_warnings": plan.get("warnings", []),
+        "subsection_counts": c.get("by_subsection", {}),
+        "sections_without_evidence": (unmapped or {}).get("outline_coverage", {}).get("sections_without_evidence", []),
+        "held_findings_count": len(held), "retrieval_limitations_count": sum(a.get("category") != "FULL_TEXT_RETRIEVED" for a in retrieval.values()),
+        "interpretation": "Recorded outcomes; these counts alone do not identify a scientific cause of the shortfall."}
+        for c in lengths if c["written"] < c["target"]]
     return {
+        "length_explanations": length_explanations,
         "run": run.name, "state": {k: state.get(k) for k in ("stage", "status", "profile")},
         "spending": {"total_usd": round(sum(by_stage.values()), 4),
                      "by_stage_usd": {k: round(v, 4) for k, v in sorted(by_stage.items())},
@@ -132,6 +145,15 @@ def collect(run: Path) -> dict:
                        "wording_flags": lint, "held_for_correction": held,
                        "verification_findings": [f for f in rv.get("findings", []) if f.get("severity") in ("MAJOR", "BLOCKING", "MINOR")]},
         "chapter_lengths": _j(final / "chapter_lengths.json"),
+        "length_evidence": {"outline_plan": _j(data / "manuscript_plan.json"),
+                            "unmapped_evidence": unmapped, "held_findings": held,
+                            "verification_findings": rv.get("findings", []),
+                            "pipeline_stage": state.get("stage"),
+                            "interpretation": "These records explain pipeline outcomes and corpus coverage only; "
+                            "missing text, insufficient reporting and demonstrated scientific limitations must be distinguished. "
+                            "A chapter shortfall does not establish a field-wide gap."},
+        "early_check": _j(data / "early_check.json"),
+        "accounts": _j(data / "early_check.json", {}).get("accounts") or _j(data / "cp2_selection_review.json", {}).get("accounts"),
         "human_interventions": human,
         "files": {"manuscript": str(final / "manuscript.md") if (final / "manuscript.md").exists() else None},
     }
@@ -150,6 +172,10 @@ def markdown(r: dict, run: Path) -> str:
         out += ["## 2. Chapter lengths", "", "| Chapter | Target | Written | Within 15% |", "|---|---:|---:|---|"]
         out += [f"| {c['section_id']} {c['heading']} | {c['target']} | {c['written']} | {'yes' if c['within_tolerance'] else 'no'} |"
                 for c in r["chapter_lengths"]] + [""]
+    out += ["Recorded chapter shortfalls: " + json.dumps(r.get("length_explanations", [])), ""]
+    out += ["Length evidence: `pilot_report.json:length_evidence` links the recorded outline plan, unmapped evidence, held findings, verification findings and current stage. A missing chapter before export is a pipeline outcome. A short chapter alone establishes no scientific limitation or field-wide gap.", "",
+            "Access: `retrieval_per_paper` distinguishes PMC lookup limits from paywall status and records legends separately from images. Legends are text; no figure images were inspected.", "",
+            "Accounts (provisional forecast from the most recent checkpoint): " + json.dumps(r.get("accounts")), ""]
     s = r["spending"]
     out += ["## 3. Expenditure", "", f"Total recorded: **${s['total_usd']:.2f}** (from `costs.jsonl`; reconcile with the "
             "provider consoles using `scripts/reconcile_billing.py`).", "", "| Stage | USD |", "|---|---:|"]

@@ -396,6 +396,8 @@ class Run:
               reservation_key: str | None = None, repair_limit: int | None = None,
               truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
         from . import a06_batches, decisions
+        if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+            payload = {**payload, "source_access": payload.get("source_access", self.load("source_access.json", {}))}
         payload = decisions.attach(self.dir, agent_id, payload)   # applied decisions travel in the request identity
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
@@ -1199,27 +1201,31 @@ class Run:
         from . import run_spec
         _, manifest = run_spec.load(self.dir)
         outline, _ = run_spec.load(self.dir)
-        if outline and not manifest:   # a discovery run: the selection becomes the frozen corpus manifest
-            manifest = self._freeze_discovered_corpus(decision, by_id, quals)
+        if outline and not manifest:   # a discovery run: check provisionally, show, and only then freeze
+            review = self._cp2_review_selection(decision["selected_record_ids"], by_id, quals)
+            self._write_cp2_selection_review(review, approved=True)
+            if review["problems"] or decision.get("selection_review_fingerprint") != review["fingerprint"]:
+                self.save("corpus_manifest.provisional.json", review["manifest"])
+                self.save("cost_projection.provisional.json", review["projection"])
+                why = ("; ".join(review["problems"]) + ". Change the marks in checkpoints/CP2_records.csv, then approve CP2 again "
+                       "(search and screening are kept; nothing is frozen)") if review["problems"] else \
+                    ("the selection's actual reading levels and its revised projection are now in checkpoints/CP2_review.md "
+                     "(Selection under review). Read them, then approve CP2 again to freeze this corpus")
+                raise Pause(f"CP2 selection not frozen: {why}.")
+            self.save("cost_projection.json", review["projection"])
+            self.prov.tool_run("cost_projection", "cp2", {k: review["projection"][k] for k in
+                                                          ("projected_total_usd", "cap_usd", "verdict", "papers")})
+            self._derive_stage_caps(review["projection"])
+            manifest = self._freeze_corpus(review["manifest"])
+            self.save("selected_corpus.json", self._corpus_records(decision["selected_record_ids"], by_id, quals, manifest))
+            return "extract"
         if manifest:
             mismatch = run_spec.selection_problems(manifest, [by_id[rid] for rid in decision["selected_record_ids"]])
             if mismatch:
                 raise Pause("CP2 selection differs from the corpus manifest (input/corpus_manifest.json): "
                             + "; ".join(mismatch) + ". The manifest is the corpus: fix the selection, or change the "
                             "manifest in a new run.")
-        discovered = bool(manifest and manifest.get("generated_from") == "DISCOVERY_AND_SCREENING")
-        for rid in decision["selected_record_ids"]:
-            q = quals.get(rid, {})
-            paper = run_spec.paper_for(manifest, by_id[rid]) if not discovered else next(
-                p for p in manifest["papers"] if p["record_id"] == rid)
-            corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
-                           "subthemes": q.get("subthemes", []),
-                           "tier": (paper["scientific_importance"] if paper else
-                                    decision["tier_overrides"].get(rid) or q.get("proposed_tier")),
-                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence"),
-                           **({"manifest_paper_id": paper["paper_id"],
-                               "intended_reading_level": paper["intended_reading_level"]} if paper else {}),
-                           **({"corpus_source": "DISCOVERY"} if discovered else {})})
+        corpus = self._corpus_records(decision["selected_record_ids"], by_id, quals, manifest, decision)
         # the projection decides here, where changing the selection is still cheap
         if pilot.enabled(self):
             try:proj=pilot.project(self,pilot.STAGE_1,records=corpus)
@@ -1229,7 +1235,8 @@ class Run:
                                                  self.cfg)
         self.save("cost_projection.json", proj)
         self.prov.tool_run("cost_projection", "cp2", {k: proj[k] for k in ("projected_total_usd", "cap_usd", "verdict", "papers")})
-        self._derive_stage_caps(proj)
+        if proj["verdict"] == "WITHIN_CAP":
+            self._derive_stage_caps(proj)
         if proj["verdict"] != "WITHIN_CAP":
             raise Pause(f"CP2 selection of {len(corpus)} papers is projected at ${proj['projected_total_usd']:.2f}, over "
                         f"the ${proj['cap_usd']:.2f} cap (data/cost_projection.json). Deselect papers or raise the cap, "
@@ -1237,33 +1244,94 @@ class Run:
         self.save("selected_corpus.json", corpus)
         return "extract"
 
-    def _derive_stage_caps(self, proj: dict) -> None:
-        """Profiles with `stage_caps_usd: derived`: sub-caps from this run's own projection, so a stage can never be
-        capped below what the projection says it costs. If the caps together exceed the run's cap, the run stops
-        here, where the selection can still change."""
+    def accounts(self, proj: dict | None = None, caps: dict | None = None) -> dict:
+        """The money in one view: actual discovery and screening spend, prior spend carried into the run (the smoke
+        test), spend so far, the projection of what is ahead (PROVISIONAL), the retry and repair allowance, the
+        combined maximum exposure, the hard cap, and the projected spend by provider."""
+        proj = proj if proj is not None else (self.load("cost_projection.json") or {})
+        caps = caps if caps is not None else self.load("stage_caps.json")
+        entries = self.budget.entries()
+        spent_by = lambda agents: sum(e["cost_usd"] or 0.0 for e in entries if e["agent"] in agents)   # noqa: E731
+        projected = float(proj.get("projected_remaining_usd", proj.get("projected_total_usd")) or 0.0)
+        caps_total = float((caps or {}).get("total_usd") or 0.0)
+        allowance = max(0.0, caps_total - sum(float(v) for v in ((caps or {}).get("projected_usd") or {}).values()))
+        by_provider: dict[str, float] = {}
+        for line in proj.get("lines", []):
+            agent = line["stage"] if line.get("stage") in self.cfg["agents"] else \
+                "A05-KE" if str(line.get("stage", "")).startswith(("A05", "A06")) else None
+            if agent and line.get("usd") is not None:
+                prov = config.agent_model(agent).provider
+                by_provider[prov] = by_provider.get(prov, 0.0) + float(line["usd"])
+        spent_now = self.budget.spent()
+        exposure = min(self.budget.cap, spent_now + max(projected, caps_total - spent_by(("A02-SP", "A03-LM", "A04-CQ"))))
+        return {"discovery_and_screening_spent_usd": round(spent_by(("A02-SP", "A03-LM", "A04-CQ")), 4),
+                "smoke_test_and_other_prior_spend_usd": round(self.budget.prior_spend(), 4),
+                "smoke_test_spent_in_run_usd": round(spent_by(("smoke-test",)), 4),
+                "unsettled_reservations_usd": round(self.budget.reserved(), 4),
+                "spent_so_far_total_usd": round(spent_now, 4),
+                "projected_remaining_usd_provisional": round(projected, 4),
+                "retry_and_repair_allowance_usd": round(allowance, 4),
+                "combined_maximum_exposure_usd": round(exposure, 4),
+                "hard_cap_usd": self.budget.cap,
+                "projected_by_provider_usd": {k: round(v, 4) for k, v in sorted(by_provider.items())},
+                "spent_by_provider_usd": {p: round(sum(e["cost_usd"] or 0.0 for e in entries if e["provider"] == p), 4)
+                                          for p in sorted({e["provider"] for e in entries})},
+                "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed "
+                         "output sizes; not a measured current-code cost. Provider allocation is estimated; the early "
+                         "combined extraction/validation forecast is split equally between their providers"}
+
+    def _corpus_records(self, selected_ids, by_id, quals, manifest=None, decision=None) -> list[dict]:
+        from . import run_spec
+        discovered = bool(manifest and manifest.get("generated_from") == "DISCOVERY_AND_SCREENING")
+        corpus = []
+        for rid in selected_ids:
+            q = quals.get(rid, {})
+            paper = (next(p for p in manifest["papers"] if p["record_id"] == rid) if discovered
+                     else run_spec.paper_for(manifest, by_id[rid]))
+            corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
+                           "subthemes": q.get("subthemes", []),
+                           "tier": (paper["scientific_importance"] if paper else
+                                    ((decision or {}).get("tier_overrides") or {}).get(rid) or q.get("proposed_tier")),
+                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence"),
+                           **({"manifest_paper_id": paper["paper_id"],
+                               "intended_reading_level": paper["intended_reading_level"]} if paper else {}),
+                           **({"corpus_source": "DISCOVERY", "source_access": paper.get("actual_access")} if discovered else {})})
+        return corpus
+
+    def _stage_caps_for(self, proj: dict) -> tuple[dict | None, str | None]:
+        """(the stage sub-caps this projection needs, or None for a profile without derived caps; why they do not fit,
+        or None). Profiles with `stage_caps_usd: derived` only. Saves nothing."""
         from .budget import derive_stage_caps
         settings = config.run_settings(self.state().get("profile"))
         if settings.get("stage_caps_usd") != "derived":
-            return
+            return None, None
         stage_usd: dict[str, float] = {}
         for x in proj.get("lines", []):   # per-paper lines are named by work, not agent: map them to their stage
-            agent = x.get("stage") if x.get("stage") in self.cfg["agents"] else                 "A05-KE" if str(x.get("stage", "")).startswith(("A05", "A06")) else None
+            agent = x.get("stage") if x.get("stage") in self.cfg["agents"] else \
+                "A05-KE" if str(x.get("stage", "")).startswith(("A05", "A06")) else None
             if agent and x.get("usd") is not None:
                 stage_usd[agent] = stage_usd.get(agent, 0.0) + float(x["usd"])
-        spent = {}
         for e in self.budget.entries():   # stages already paid for keep at least what they spent
-            spent[e["agent"]] = spent.get(e["agent"], 0.0) + (e["cost_usd"] or 0.0)
-        for agent, usd in spent.items():
-            stage_usd[agent] = stage_usd.get(agent, 0.0) + usd
+            stage_usd[e["agent"]] = stage_usd.get(e["agent"], 0.0) + (e["cost_usd"] or 0.0)
         derived = derive_stage_caps(stage_usd, float(settings.get("recovery_allowance", 0.15)))
-        self.save("stage_caps.json", {**derived, "from_projection_created": proj.get("created"),
-                                      "run_cap_usd": self.budget.cap})
+        derived["from_projection_created"] = proj.get("created")
+        room = self.budget.cap - self.budget.prior_spend() - sum(
+            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"]))
+        problem = (f"the stage limits this projection needs add up to ${derived['total_usd']:.2f}, over the "
+                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend; reduce the selection"
+                   if derived["total_usd"] > room else None)
+        return derived, problem
+
+    def _derive_stage_caps(self, proj: dict) -> None:
+        """Save the sub-caps for an accepted projection (the checks ran before: _stage_caps_for)."""
+        derived, problem = self._stage_caps_for(proj)
+        if derived is None:
+            return
+        if problem:
+            raise Pause(problem + " (data/stage_caps.json).")
+        self.save("stage_caps.json", {**derived, "run_cap_usd": self.budget.cap})
         self.budget = BudgetTracker(self.dir)
         self.prov.tool_run("stage_caps", "cp2", derived)
-        if derived["total_usd"] > self.budget.cap:
-            raise Pause(f"the stage sub-caps this projection needs add up to ${derived['total_usd']:.2f}, over the run's "
-                        f"${self.budget.cap:.2f} cap (data/stage_caps.json). Reduce the corpus or the word budgets, or "
-                        "choose a profile with a higher cap; raising one sub-cap would only move the shortfall.")
 
     def _outline_input(self) -> dict:
         """{"researcher_outline": ...} for the agents before A08, in an outlined run; {} otherwise."""
@@ -1286,87 +1354,200 @@ class Run:
                                                       "found any; access level not considered"})
         checkpoints.prefill_cp2(self.dir, {p["record_id"]: p["reason"] for p in proposal}, limit)
         self.prov.tool_run("selection_proposal", "cp2", {"proposed": [p["record_id"] for p in proposal], "max_papers": limit})
+        if proposal:   # access and costs of the proposal, checked for free, before the researcher decides
+            by_id = {r["record_id"]: r for r in self.load("records.json")}
+            review = self._cp2_review_selection([p["record_id"] for p in proposal], by_id, {q["record_id"]: q for q in quals})
+            self._write_cp2_selection_review(review, approved=False)
 
-    def _freeze_discovered_corpus(self, decision: dict, by_id: dict, quals: dict) -> dict:
-        """Check the CP2 selection of a discovery run (at most max_papers unique publications) and freeze it as the
-        corpus manifest (data/corpus_manifest.json). Frozen once: a later CP2 approval that changes it stops."""
+    def _write_cp2_selection_review(self, review: dict, approved: bool) -> None:
+        """Append the selection's access, projection, limits and accounts to CP2_review.md, and put its fingerprint in
+        CP2_decision.json: approving CP2 then accepts exactly what was shown."""
+        d = checkpoints.cp_dir(self.dir)
+        proj, caps, acc = review["projection"], review["stage_caps"] or {}, review["accounts"]
+        log = self.load("retrieval_log.json", {})
+        lines = ["", "## Selection under review" + (" (as approved)" if approved else " (the proposal)"), "",
+                 "Access was checked for free before any extraction is budgeted. Scientific relevance was decided by "
+                 "screening, independently of access.", "",
+                 "| Paper | Record | Importance | Access found | Read as | Legends read | Images inspected |",
+                 "|---|---|---|---|---|---|---|"]
+        for p in review["manifest"]["papers"]:
+            a = log.get(p["record_id"]) or {}
+            lines.append(f"| {p['paper_id']} | {p['record_id']} | {p['scientific_importance']} | {a.get('category')} | "
+                         f"{a.get('level_read')} | {'yes' if a.get('figure_legends_read') else 'no'} | no |")
+        lines += ["", "Routes not attempted for any paper: " + ", ".join(next(iter(log.values()), {}).get("routes_not_attempted", [])) + ".",
+                  "", f"**Projection (PROVISIONAL):** ${proj['projected_total_usd']:.2f} for the stages ahead, margin "
+                  "included. It rests on per-paper rates from the October 2026 run re-priced (an older procedure) and on "
+                  "assumed output sizes; it is not a measured current-code cost.", "",
+                  "| Account | USD |", "|---|---:|"]
+        lines += [f"| {k.replace('_', ' ')} | {v:.2f} |" for k, v in acc.items() if isinstance(v, (int, float))]
+        lines += ["", "Estimated by provider (projected, stages ahead): "
+                  + ", ".join(f"{k} ${v:.2f}" for k, v in acc["projected_by_provider_usd"].items()), ""]
+        if caps:
+            lines += ["Stage limits this selection needs: " + ", ".join(f"{k} ${v:.2f}" for k, v in caps["caps_usd"].items()), ""]
+        lines += (["**Problems (the corpus cannot be frozen until they are resolved):**", *[f"- {x}" for x in review["problems"]], ""]
+                  if review["problems"] else ["No problem found: approving CP2 freezes this selection.", ""])
+        text = (d / "CP2_review.md").read_text(encoding="utf-8")
+        cut = text.find("\n## Selection under review")
+        (d / "CP2_review.md").write_text((text if cut < 0 else text[:cut]) + "\n".join(lines) + "\n", encoding="utf-8")
+        decision_path = d / "CP2_decision.json"
+        decision = json.loads(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {}
+        decision["selection_review_fingerprint"] = review["fingerprint"]
+        decision_path.write_text(json.dumps(decision, indent=2), encoding="utf-8")
+        self.save("cp2_selection_review.json", {k: review[k] for k in ("problems", "fingerprint", "accounts")}
+                  | {"papers": [p["record_id"] for p in review["manifest"]["papers"]]})
+
+    def _provisional_discovered_corpus(self, selected_ids: list[str], by_id: dict, quals: dict) -> tuple[dict, list[str]]:
+        """A discovery run's selection as a PROVISIONAL manifest: the cap and duplicate checks, then the free access
+        check of every selected paper, so the extraction budget is set from what can actually be read. Nothing is
+        frozen here. Returns (manifest, problems that stop the selection)."""
         from . import run_spec
         from .synthesis_registry import fingerprint
         limit = int((self.cfg.get("run_spec") or {}).get("max_papers", 15))
-        selected = [by_id[rid] for rid in decision["selected_record_ids"]]
+        selected = [by_id[rid] for rid in selected_ids]
+        problems = []
         if len(selected) > limit:
-            raise Pause(f"CP2 selects {len(selected)} papers; this run allows at most {limit}. Unmark papers in "
-                        "checkpoints/CP2_records.csv and approve CP2 again.")
+            problems.append(f"{len(selected)} papers are selected; this run allows at most {limit}")
         seen: dict[str, str] = {}
         for r in selected:
             for key in ([f"doi:{r['doi'].lower()}"] if r.get("doi") else []) + ([f"pmid:{r['pmid']}"] if r.get("pmid") else []) \
                     + [f"title:{run_spec._norm_title(r.get('title'))}"]:
                 if key in seen and seen[key] != r["record_id"]:
-                    raise Pause(f"CP2 selects {seen[key]} and {r['record_id']}, which look like versions of one publication "
-                                f"(same {key.split(':')[0]}). Keep one and approve CP2 again.")
+                    problems.append(f"{seen[key]} and {r['record_id']} look like versions of one publication (same "
+                                    f"{key.split(':')[0]}); keep one")
                 seen[key] = r["record_id"]
+        access = {r["record_id"]: self._access_check(r) for r in selected[:max(limit, 0) or len(selected)]}
+        for rid, a in access.items():
+            if a["category"] == "NO_SOURCE_TEXT":
+                problems.append(f"{rid}: neither full text nor an abstract could be obtained, so it cannot be read")
         proposals = {p["record_id"]: p["reason"] for p in (self.load("selection_proposal.json", {}) or {}).get("proposed", [])}
         manifest = run_spec.build_manifest(selected, quals, proposals, self.load("theme_framework.json"),
-                                           run_spec.load(self.dir)[0], decision.get("review_fingerprint") or fingerprint(decision))
-        prior = run_spec.generated_manifest(self.dir)
-        if prior is not None and [p["record_id"] for p in prior["papers"]] != [p["record_id"] for p in manifest["papers"]]:
-            raise Pause("the corpus was frozen at an earlier CP2 approval (data/corpus_manifest.json) and this approval "
-                        "selects different papers. Start a new run to change the corpus.")
-        if prior is None:
-            self.save("corpus_manifest.json", manifest)
-            self.prov.human_decision("CORPUS_FROZEN", {"papers": [p["record_id"] for p in manifest["papers"]],
-                                                       "manifest_sha256": fingerprint(manifest)},
-                                     "corpus manifest generated from discovery and screening, frozen at CP2")
-        return prior or manifest
+                                           run_spec.load(self.dir)[0], fingerprint(selected_ids), access)
+        return manifest, problems
 
-    def _retrieve_discovered(self, rec: dict) -> tuple[dict, dict]:
-        """Full text for a discovered paper if an open-access copy can be found and verified, else its abstract.
-        Every attempt is logged (data/retrieval_log.json). A retrieval failure is a limitation of access, recorded
-        as such, never a scientific exclusion; a paper with neither full text nor an abstract stops the run."""
-        from .tools.fulltext import find_pmcid
+    def _cp2_review_selection(self, selected_ids: list[str], by_id: dict, quals: dict) -> dict:
+        """Everything CP2 must show for a selection before its corpus can be frozen: access per paper, the projection
+        from actual reading levels, the stage limits it needs, the accounts, and every problem. Writes nothing that
+        freezes; returns the review, with a fingerprint the CP2 approval must carry."""
+        from .synthesis_registry import fingerprint
+        manifest, problems = self._provisional_discovered_corpus(selected_ids, by_id, quals)
+        corpus = self._corpus_records(selected_ids, by_id, quals, manifest)
+        levels = {p["record_id"]: (self.load("retrieval_log.json", {}).get(p["record_id"]) or {}).get("level_for_budget", "ABSTRACT")
+                  for p in manifest["papers"]}
+        proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
+                                             self.cfg, levels=levels)
+        derived, cap_problem = self._stage_caps_for(proj)
+        if proj["verdict"] != "WITHIN_CAP":
+            problems.append(f"the projection is ${proj['projected_total_usd']:.2f}, over the ${proj['cap_usd']:.2f} cap")
+        if cap_problem:
+            problems.append(cap_problem)
+        digest = fingerprint({"selected": list(selected_ids), "levels": levels, "projected": round(proj["projected_total_usd"], 2),
+                              "caps": derived and derived["caps_usd"], "problems": problems})
+        return {"manifest": manifest, "corpus": corpus, "projection": proj, "stage_caps": derived, "problems": problems,
+                "fingerprint": digest, "accounts": self.accounts(proj, derived)}
+
+    def _freeze_corpus(self, manifest: dict) -> dict:
+        """Freeze the checked selection as the corpus manifest (once; a later different freeze is refused)."""
+        from . import run_spec
+        from .synthesis_registry import fingerprint
+        prior = run_spec.generated_manifest(self.dir)
+        if prior is not None:
+            if [p["record_id"] for p in prior["papers"]] != [p["record_id"] for p in manifest["papers"]]:
+                raise Pause("the corpus is already frozen (data/corpus_manifest.json) with different papers; start a new "
+                            "run to change it")
+            return prior
+        manifest = {**manifest, "frozen_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        self.save("corpus_manifest.json", manifest)
+        self.prov.human_decision("CORPUS_FROZEN", {"papers": [p["record_id"] for p in manifest["papers"]],
+                                                   "manifest_sha256": fingerprint(manifest)},
+                                 "corpus manifest generated from discovery and screening; frozen at CP2 after its access, "
+                                 "projection and stage limits were checked")
+        return manifest
+
+    ACCESS_CATEGORIES = {
+        "FULL_TEXT_RETRIEVED": "an open-access copy in PMC was found and its identity verified",
+        "NO_PMC_COPY_FOUND": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is "
+                             "paywalled or that no open-access full text exists elsewhere",
+        "PMC_COPY_NOT_VERIFIED": "a PMC copy is listed but could not be retrieved, or its identity or body did not verify",
+        "LOOKUP_UNAVAILABLE": "no lookup service could be reached; access is unresolved and is budgeted as full text",
+        "NO_SOURCE_TEXT": "neither full text nor an abstract could be obtained",
+    }
+
+    def _access_check(self, rec: dict, retry: bool = False) -> dict:
+        """The free retrieval and readiness check for one discovered paper, run at CP2 before its extraction budget is
+        set, and again before extraction only when access was unresolved. Caches what it obtains (data/fulltext,
+        data/fulltext_provenance) and logs every route tried and every route not tried (data/retrieval_log.json).
+        Never raises for a missing copy: access is recorded, scientific relevance is decided elsewhere."""
+        from .tools.fulltext import ROUTES_NOT_ATTEMPTED, find_pmcid, lookup_status
         rid = rec["record_id"]
         log = self.load("retrieval_log.json", {})
-        entry = log.get(rid) or {"record_id": rid, "paper_id": rec.get("manifest_paper_id"), "pmid": rec.get("pmid"),
-                                 "doi": rec.get("doi"), "attempts": []}
-        cached = self.load(f"fulltext/{rid}.json")
-        if cached and len(cached) > 1:
-            sections = cached
-        else:
-            sections = None
-            pmcid = rec.get("pmcid")
-            if not pmcid:
-                pmcid, why = find_pmcid(rec.get("pmid"), rec.get("doi"))
-                entry["attempts"].append({"source": "PMC identifier lookup", "outcome": "FOUND" if pmcid else "NOT_FOUND",
-                                          "detail": pmcid or why})
-            if pmcid:
-                try:
-                    sections, source = fetch_verified_sections({**rec, "pmcid": pmcid})
-                    self.save(f"fulltext_provenance/{rid}.json", source)
-                    entry["attempts"].append({"source": "PMC open-access XML", "outcome": "RETRIEVED", "detail": pmcid})
-                except FullTextUnavailable as exc:
-                    entry["attempts"].append({"source": "PMC open-access XML", "outcome": "FAILED", "detail": str(exc)})
-            if not sections:
-                if not (rec.get("abstract") or "").strip():
-                    entry["category"] = "NO_SOURCE_TEXT"
-                    log[rid] = entry
-                    self.save("retrieval_log.json", log)
-                    raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
-                                "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
-                                f"data/fulltext/{rid}.json, or start a new run without it.")
-                sections = {"Abstract": rec["abstract"]}
-        level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
-        names = " ".join(sections).lower()
-        entry.update(level_read=level, category="FULL_TEXT_RETRIEVED" if level == "FULL_TEXT"
-                     else "RETRIEVAL_LIMITATION_ABSTRACT_ONLY",
-                     figures_inspected=level == "FULL_TEXT" and "figure legend" in names,
-                     supplements_inspected=False,
-                     note="Figure legends are read as text; figure images and supplementary files are not retrieved.")
+        entry = log.get(rid)
+        if entry and not (retry and entry.get("category") == "LOOKUP_UNAVAILABLE"):
+            return entry
+        entry = {"record_id": rid, "pmid": rec.get("pmid"), "doi": rec.get("doi"), "attempts": (entry or {}).get("attempts", [])}
+        sections, category = None, None
+        pmcid = rec.get("pmcid")
+        if not pmcid:
+            pmcid, why = find_pmcid(rec.get("pmid"), rec.get("doi"))
+            status = lookup_status(pmcid, why)
+            entry["attempts"].append({"route": "PMC identifier lookup (Europe PMC, then NCBI)", "outcome": status,
+                                      "detail": pmcid or why, "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+            category = {"NOT_LISTED": "NO_PMC_COPY_FOUND", "UNAVAILABLE": "LOOKUP_UNAVAILABLE"}.get(status)
+        if pmcid:
+            try:
+                sections, source = fetch_verified_sections({**rec, "pmcid": pmcid})
+                self.save(f"fulltext/{rid}.json", sections)
+                self.save(f"fulltext_provenance/{rid}.json", source)
+                entry["attempts"].append({"route": "PMC open-access XML via Europe PMC", "outcome": "RETRIEVED_VERIFIED",
+                                          "detail": pmcid, "xml_sha256": source["xml_sha256"],
+                                          "identifiers_confirmed": source.get("identifiers_confirmed"),
+                                          "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                category = "FULL_TEXT_RETRIEVED"
+            except FullTextUnavailable as exc:
+                entry["attempts"].append({"route": "PMC open-access XML via Europe PMC", "outcome": "FAILED", "detail": str(exc),
+                                          "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                category = "PMC_COPY_NOT_VERIFIED"
+        if category != "FULL_TEXT_RETRIEVED" and category != "LOOKUP_UNAVAILABLE":
+            if (rec.get("abstract") or "").strip():
+                self.save(f"fulltext/{rid}.json", {"Abstract": rec["abstract"]})
+            else:
+                category = "NO_SOURCE_TEXT"
+        legends = bool(sections) and any(k.lower().startswith(("figure legend", "verbatim figure legend")) for k in sections)
+        entry.update(category=category, meaning=self.ACCESS_CATEGORIES[category],
+                     level_read={"FULL_TEXT_RETRIEVED": "FULL_TEXT", "LOOKUP_UNAVAILABLE": "UNRESOLVED",
+                                 "NO_SOURCE_TEXT": "NONE"}.get(category, "ABSTRACT"),
+                     level_for_budget="FULL_TEXT" if category in ("FULL_TEXT_RETRIEVED", "LOOKUP_UNAVAILABLE") else "ABSTRACT",
+                     figure_legends_read=legends, figure_images_inspected=False, supplements_inspected=False,
+                     routes_not_attempted=ROUTES_NOT_ATTEMPTED,
+                     note="Figure legends are read as text only; figure images and supplementary files are not retrieved. "
+                          "Routes not attempted are listed, so a missing copy here says nothing about the paper's access "
+                          "elsewhere.")
         log[rid] = entry
         self.save("retrieval_log.json", log)
-        return sections, {"level": level, "figures_inspected": entry["figures_inspected"],
-                          "supplements_inspected": False, "scientific_importance": rec.get("tier"),
-                          "note": entry["note"] + ("" if level == "FULL_TEXT" else
-                                                   " No open-access full text was found: abstract only.")}
+        return entry
+
+    def _retrieve_discovered(self, rec: dict) -> tuple[dict, dict]:
+        """Extraction input for a discovered paper, from its access check (re-run only if access was unresolved)."""
+        rid = rec["record_id"]
+        entry = self._access_check(rec, retry=True)
+        if entry["category"] in ("NO_SOURCE_TEXT",) or (entry["category"] == "LOOKUP_UNAVAILABLE" and not (rec.get("abstract") or "").strip()):
+            raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
+                        "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
+                        f"data/fulltext/{rid}.json, or start a new run without it.")
+        if entry["category"] == "LOOKUP_UNAVAILABLE":   # still unresolved at extraction: read the abstract, recorded so
+            self.save(f"fulltext/{rid}.json", {"Abstract": rec["abstract"]})
+            entry = {**entry, "level_read": "ABSTRACT"}
+            log = self.load("retrieval_log.json", {})
+            log[rid] = {**entry, "note": entry["note"] + " Access was still unresolved at extraction: read as abstract."}
+            self.save("retrieval_log.json", log)
+        sections = self.load(f"fulltext/{rid}.json")
+        if entry["category"] == "FULL_TEXT_RETRIEVED":
+            verify_cached_source({**rec, "pmcid": self.load(f"fulltext_provenance/{rid}.json")["pmcid"]}, sections,
+                                 self.load(f"fulltext_provenance/{rid}.json"))
+        level = "FULL_TEXT" if entry["category"] == "FULL_TEXT_RETRIEVED" else "ABSTRACT"
+        return sections, {"level": level, "figure_legends_read": entry["figure_legends_read"],
+                          "figure_images_inspected": False, "supplements_inspected": False,
+                          "scientific_importance": rec.get("tier"), "access_category": entry["category"],
+                          "note": entry["note"] + ("" if level == "FULL_TEXT" else f" {entry['meaning'][0].upper()}{entry['meaning'][1:]}.")}
 
     def _retraction_check(self, records: list[dict], label: str) -> dict:
         """Crossref retraction status of the given records (free; cached in data/crossref_cache). Written to
@@ -1502,7 +1683,7 @@ class Run:
                 access[rid] = {"paper_id": rec.get("manifest_paper_id"), **access_now}
                 self.save("source_access.json", access)
             elif paper:   # what was actually accessible, so nothing is described that was never read
-                payload["source_access"] = run_spec.source_access(paper, level)
+                payload["source_access"] = run_spec.source_access(paper, level, sections)
                 access = self.load("source_access.json", {})
                 access[rid] = {"paper_id": paper["paper_id"], **payload["source_access"]}
                 self.save("source_access.json", access)
@@ -1515,14 +1696,39 @@ class Run:
         first = self._first_tranche()
         if first:
             self.run_many("A05-KE", [it for it in items if rid_of[it[0]] in first], save)
+            self._validate_subset([r for r in self.load("selected_corpus.json") if r["record_id"] in first])   # the early check judges extraction and its independent validation together
             self._early_check(first)
             items = [it for it in items if rid_of[it[0]] not in first]
         self.run_many("A05-KE", items, save)
         return "validate"
 
+    def _validate_papers(self, rids: list[str]) -> None:
+        """Independent A06 validation of these papers (those not validated yet), on a vendor other than the one that
+        extracted each. Used by the validate stage and, before CP_EARLY, for the first papers."""
+        spec = self.load("spec_approved.json")
+        items, rid_of = [], {}
+        for rid in rids:
+            if self.data(f"validations/{rid}.json").exists():
+                continue
+            ext, sections = self._prepare_validation(rid)
+            # a paper re-extracted before re-extraction was turned off keeps its label (v2)
+            n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
+            rid_of[f"A06-SV_{rid}_v{n}"] = rid
+            payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
+                       "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections,
+                       "source_access": self.load("source_access.json", {}).get(rid, {})}
+            self._save_a06_input(rid, f"A06-SV_{rid}_v{n}", payload)
+            items.append((f"A06-SV_{rid}_v{n}", payload))
+        entries = self.budget.entries()
+        vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
+        self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
+                      exclude=vendor.__getitem__)
+
     def _first_tranche(self) -> list[str]:
-        """run_spec.first_tranche: the record IDs read first, before the early check (manifest runs only). Chosen by
-        the manifest's order within each reading level, so the researcher decides which papers come first."""
+        """run_spec.first_tranche: the papers read (and validated) first, before the early check. {papers: N} takes N
+        papers in manifest order, at least one of each reading level actually obtained when the corpus has both, so
+        the check works for whatever mix of full texts and abstracts discovery and retrieval produced. The older
+        {full_text: a, abstract: b} form is honoured as a preference and filled up to a + b."""
         from . import run_spec
         want = (self.cfg.get("run_spec") or {}).get("first_tranche") or {}
         manifest = run_spec.manifest_of(self.dir)
@@ -1531,58 +1737,105 @@ class Run:
         order = {p["paper_id"]: i for i, p in enumerate(manifest["papers"])}
         corpus = sorted((r for r in self.load("selected_corpus.json", []) if r.get("manifest_paper_id")),
                         key=lambda r: order.get(r["manifest_paper_id"], 999))
-        out = []
-        for level, n in (("FULL_TEXT", int(want.get("full_text", 0))), ("ABSTRACT", int(want.get("abstract", 0)))):
-            out += [r["record_id"] for r in corpus if r.get("intended_reading_level") == level][:n]
-        total = int(want.get("full_text", 0)) + int(want.get("abstract", 0))
+        actual_access = self.load("source_access.json", {})
+        level = lambda r: actual_access.get(r["record_id"], {}).get("level") or r.get("intended_reading_level")   # noqa: E731  (for discovered papers: what retrieval obtained)
+        out: list[str] = []
+        if "papers" in want:
+            total = int(want["papers"])
+            for lv in ("FULL_TEXT", "ABSTRACT"):
+                first = next((r["record_id"] for r in corpus if level(r) == lv), None)
+                if first and len(out) < total:
+                    out.append(first)
+        else:
+            total = int(want.get("full_text", 0)) + int(want.get("abstract", 0))
+            for lv, n in (("FULL_TEXT", int(want.get("full_text", 0))), ("ABSTRACT", int(want.get("abstract", 0)))):
+                out += [r["record_id"] for r in corpus if level(r) == lv][:n]
         out += [r["record_id"] for r in corpus if r["record_id"] not in out][:max(0, total - len(out))]
         return out if len(out) < len(corpus) else []   # a tranche that is the whole corpus is no early check
 
     def _early_check(self, first: list[str]) -> None:
-        """Stop after the first papers until the researcher has looked at them (CP_EARLY). Approved once per tranche."""
+        """Stop after the first papers are extracted AND independently validated, until the researcher has looked
+        (CP_EARLY, approved once per tranche). Reports extraction and validation separately, compares the one quantity
+        the projection forecast (extraction plus validation per paper, by reading level), and re-forecasts the rest of
+        the run from these measurements: the remaining papers at the measured cost per level, and the downstream
+        stages at the findings count the measured papers imply."""
         from .synthesis_registry import fingerprint
         digest = fingerprint({"run": self.id, "first_tranche": sorted(first)})
         if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
             return
         from . import run_spec
-        manifest = run_spec.manifest_of(self.dir)
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json", [])}
         proj = self.load("cost_projection.json") or {}
-        per_level = {}
+        projected_per_paper = {}
         for line in proj.get("lines", []):
-            for level in ("FULL_TEXT", "ABSTRACT"):
-                if line.get("level") == level and line.get("papers"):
-                    per_level[level] = float(line["usd"]) / int(line["papers"])
-        rates = {}
-        try:
-            rates = cost_projection.load_rates().get("per_paper", {})
-        except FileNotFoundError:
-            pass
-        papers, spent, by_level = [], 0.0, {}
+            for lv in ("FULL_TEXT", "ABSTRACT"):
+                if line.get("stage") == f"A05-KE + A06-SV per paper ({lv})" and line.get("calls"):
+                    projected_per_paper[lv] = float(line["usd"]) / int(line["calls"])
+        retrieval = self.load("retrieval_log.json", {}) or {}
         entries = self.budget.entries()
+        cost = lambda agent, rid: sum(e["cost_usd"] or 0.0 for e in entries if e["agent"] == agent   # noqa: E731
+                                      and re.match(rf"{agent}_{rid}(_|$)", e["step"]))
+        groups = {"supported": ("SUPPORTED", "SUPPORTED_WITH_CONSTRAINTS", "SUPPORTED_FOR_OBSERVATION", "PARTIALLY_SUPPORTED"),
+                  "not_established": ("DOES_NOT_ESTABLISH",), "rejected": ("BLOCKED_PROVENANCE", "BLOCKED_ALIGNMENT"),
+                  "unresolved": ("HUMAN_REVIEW_REQUIRED", "UNRESOLVED_SOURCE_ACCESS")}
+        papers, measured = [], {}
         for rid in first:
             ext = self.load(f"extractions/{rid}.json") or {}
-            level = ext.get("content_level") or corpus.get(rid, {}).get("intended_reading_level") or "ABSTRACT"
-            cost = sum(e["cost_usd"] or 0 for e in entries if e["agent"] == "A05-KE" and re.match(rf"A05-KE_{rid}(_|$)", e["step"]))
+            val = self.load(f"validations/{rid}.json") or {}
+            lv = ext.get("content_level") or corpus.get(rid, {}).get("intended_reading_level") or "ABSTRACT"
             contexts = {c.get("context_id"): c for c in ext.get("contexts") or []}
-            missing = sum(1 for f in ext.get("findings") or []
-                          if (contexts.get(f.get("context_id")) or f.get("context") or {}).get("comparator") in (None, "", "NONE_REPORTED"))
-            projected = per_level.get(level) or (rates.get(level) or {}).get("mean_usd")
-            papers.append({"record_id": rid, "paper_id": corpus.get(rid, {}).get("manifest_paper_id"), "level": level,
-                           "findings": len(ext.get("findings") or []), "comparator_not_reported": missing,
-                           "cost_usd": round(cost, 4), "projected_usd": projected})
-            spent += cost
-            by_level.setdefault(level, []).append(cost)
-        counts = {"FULL_TEXT": 0, "ABSTRACT": 0}
-        for p in (manifest or {}).get("papers", []):
-            counts[p["intended_reading_level"]] += 1
-        extrapolated = sum(counts[lv] * (sum(c) / len(c)) for lv, c in by_level.items() if c)
-        extrapolated += sum(counts[lv] * float((rates.get(lv) or {}).get("mean_usd") or 0) for lv in counts if lv not in by_level)
-        projected = sum(counts[lv] * float((rates.get(lv) or {}).get("mean_usd") or 0) for lv in counts)
-        report = {"papers": papers, "spent_usd": round(spent, 4), "extrapolated_extraction_usd": round(extrapolated, 2),
-                  "projected_extraction_usd": round(projected, 2), "note": "extraction (A05) only; validation follows"}
+            comparators = [(contexts.get(f.get("context_id")) or f.get("context") or {}).get("comparator") for f in ext.get("findings") or []]
+            disp = [v.get("disposition") for v in val.get("validations") or []]
+            a = retrieval.get(rid) or {}
+            row = {"record_id": rid, "paper_id": corpus.get(rid, {}).get("manifest_paper_id"), "level": lv,
+                   "access_category": a.get("category"), "figure_legends_read": a.get("figure_legends_read", False),
+                   "figure_images_inspected": False,
+                   "extraction_usd": round(cost("A05-KE", rid), 4), "validation_usd": round(cost("A06-SV", rid), 4),
+                   "findings": len(ext.get("findings") or []),
+                   **{k: sum(d in v for d in disp) for k, v in groups.items()},
+                   "comparator_not_reported": sum(c in ("NONE_REPORTED",) for c in comparators),
+                   "comparator_missing": sum(c in (None, "") for c in comparators),
+                   "access_limitations": a.get("meaning") if a.get("category") != "FULL_TEXT_RETRIEVED" else
+                   "legends read as text; images and supplements not retrieved",
+                   "projected_per_paper_usd": projected_per_paper.get(lv)}
+            row["measured_per_paper_usd"] = round(row["extraction_usd"] + row["validation_usd"], 4)
+            papers.append(row)
+            measured.setdefault(lv, []).append(row)
+        # re-forecast the rest from the measurements
+        remaining = [r for rid, r in corpus.items() if rid not in first]
+        rest_usd, rest_findings = 0.0, 0
+        rates = cost_projection.load_rates().get("per_paper", {})
+        for r in remaining:
+            lv = r.get("intended_reading_level") or "ABSTRACT"
+            got = measured.get(lv)
+            rest_usd += (sum(x["measured_per_paper_usd"] for x in got) / len(got)) if got else projected_per_paper.get(lv, 0.0)
+            rest_findings += (sum(x["findings"] for x in got) / len(got)) if got else float((rates.get(lv) or {}).get("findings_p90", 0))
+        findings_total = int(round(sum(p["findings"] for p in papers) + rest_findings))
+        outline, _ = run_spec.load(self.dir)
+        downstream = cost_projection.downstream(self.budget, self.route, self.cfg, findings_total,
+                                                words=run_spec.total_words(outline) if outline else None)
+        downstream_usd = sum(float(x["usd"]) for x in downstream)
+        auxiliary = sum(float(x["usd"]) for x in proj.get("lines", [])
+                        if x.get("stage") in ("A06-SV whole-paper repeat (instability test)", "A06-SV per theme"))
+        revised = {**proj, "projected_remaining_usd": rest_usd + downstream_usd + auxiliary,
+                   "projected_total_usd": self.budget.spent() + rest_usd + downstream_usd + auxiliary,
+                   "lines": [{"stage": "A05-KE", "usd": rest_usd / 2},
+                             {"stage": "A06-SV", "usd": rest_usd / 2 + auxiliary}, *downstream]}
+        old_downstream = sum(float(x["usd"]) for x in proj.get("lines", []) if x.get("stage") in self.cfg["agents"])
+        report = {"papers": papers, "spent_usd": round(sum(p["measured_per_paper_usd"] for p in papers), 4),
+                  "forecast": {"remaining_papers": len(remaining),
+                               "remaining_extraction_and_validation_usd": round(rest_usd, 2),
+                               "findings_expected_total": findings_total,
+                               "downstream_usd_revised": round(downstream_usd, 2),
+                               "validation_retest_and_theme_reserve_usd": round(auxiliary, 2),
+                               "downstream_usd_at_cp2": round(old_downstream, 2),
+                               "basis": "remaining papers at the cost measured here for their reading level (the CP2 "
+                                        "per-paper projection where a level was not measured); downstream stages re-projected "
+                                        "at the findings count these papers imply. Three papers are an early signal, not an "
+                                        "average."},
+                  "accounts": self.accounts(revised)}
         self.save("early_check.json", report)
-        self.prov.tool_run("early_check", "extract", report)
+        self.prov.tool_run("early_check", "extract", {k: report[k] for k in ("spent_usd", "forecast")})
         checkpoints.write_early_review(self.dir, digest, report)
         self.pause_for_checkpoint("CP_EARLY")
 
@@ -1775,29 +2028,12 @@ class Run:
                              f"for {step}), so vendor separation cannot be enforced; not validating it.")
         return calls[-1]["provider"]
 
-    def stage_validate(self, st: dict) -> str:
+    def _validate_subset(self, corpus: list[dict]) -> None:
+        """Validate selected papers, including configured repairs, without downstream theme work."""
         spec = self.load("spec_approved.json")
-        corpus = self.load("selected_corpus.json")
         max_re = int(self.cfg["loops"]["max_reextractions"])
         if max_re == 0:
-            # no extract-validate loop: every paper's validation is independent (and can be batched)
-            items, rid_of = [], {}
-            for rec in corpus:
-                rid = rec["record_id"]
-                if self.data(f"validations/{rid}.json").exists():
-                    continue
-                ext, sections = self._prepare_validation(rid)
-                # a paper re-extracted before re-extraction was turned off keeps its label (v2)
-                n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
-                rid_of[f"A06-SV_{rid}_v{n}"] = rid
-                payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                           "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections}
-                self._save_a06_input(rid, f"A06-SV_{rid}_v{n}", payload)
-                items.append((f"A06-SV_{rid}_v{n}", payload))
-            entries = self.budget.entries()
-            vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
-            self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
-                          exclude=vendor.__getitem__)
+            self._validate_papers([r["record_id"] for r in corpus])
         for rec in corpus:
             rid = rec["record_id"]
             if self.data(f"validations/{rid}.json").exists():
@@ -1810,7 +2046,7 @@ class Run:
                 ext, sections = self._prepare_validation(rid)
                 gate1 = span_check.check_findings(ext, sections)
                 payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext, "gate1_results": gate1,
-                           "paper_text": sections}
+                           "paper_text": sections, "source_access": self.load("source_access.json", {}).get(rid, {})}
                 step = f"A06-SV_{rid}_v{attempt + 1 + label_offset}"
                 self._save_a06_input(rid, step, payload)
                 val = self.agent("A06-SV", payload, step=step,
@@ -1835,6 +2071,10 @@ class Run:
                     break
                 self.save(f"extractions/{rid}.json", self._normalize(rid, ext))
             self._save_validation(rid, val)
+
+    def stage_validate(self, st: dict) -> str:
+        corpus = self.load("selected_corpus.json")
+        self._validate_subset(corpus)
         for rec in corpus:
             rid = rec['record_id']
             self._require_complete_validation(rid, self.load(f'validations/{rid}.json'),

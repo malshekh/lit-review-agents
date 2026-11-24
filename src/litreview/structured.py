@@ -112,18 +112,51 @@ def smoke_estimate(budget) -> tuple[float, list[dict]]:
     return usd, todo
 
 
+def recover_smoke_receipts(budget) -> None:
+    """Settle received calls exactly once; an uncertain dispatch retains its reservation and stops."""
+    for p in sorted((budget.log_path.parent / "smoke_receipts").glob("*.json")):
+        receipt = json.loads(p.read_text(encoding="utf-8"))
+        key = receipt["reservation"]
+        if receipt["state"] != "RECEIVED":
+            continue
+        if not any(e["step"] == key for e in budget.entries()):
+            budget.record("smoke-test", receipt["provider"], receipt["model"],
+                          receipt["input_tokens"], receipt["output_tokens"], step=key, reservation_key=key)
+        try:
+            accepted = isinstance(json.loads(receipt["text"]), dict)
+        except (ValueError, TypeError):
+            accepted = False
+        record(receipt["provider"], receipt["model"], receipt["schema_sha256"], accepted, "recovered persisted receipt")
+        budget.release(key)
+
+
 def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None) -> dict:
     """One tiny live request per unverified combination. Refused unless its worst case fits the approved amount.
     Records what each provider accepted; a rejected schema is recorded too, so it is never tried in a paid stage."""
     from .llm import complete
+    recover_smoke_receipts(budget)
+    if any(k.startswith("smoke-") for k in budget.reservations()):
+        raise ValueError("unsettled smoke receipt: reconcile smoke_receipts and reservations before retrying; no call sent")
     usd, todo = smoke_estimate(budget)
     if not (by or "").strip():
         raise ValueError("a live smoke test needs the name of the person who approved it")
     if usd > approve_usd:
         raise ValueError(f"the smoke test's worst case is ${usd:.2f}, over the approved ${approve_usd:.2f}")
     results = []
-    log = log_path or RECORDS_DIR / "smoke_tests.jsonl"
+    log = log_path or budget.log_path.parent / "smoke_tests.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
     for t in todo:
+        import uuid
+        budget.check_priced(t["model"])
+        worst_input = len(SMOKE_SYSTEM.encode()) + len(json.dumps(t["schema"]).encode()) + 200
+        worst = budget.cost(t["model"], worst_input, SMOKE_MAX_TOKENS)
+        key = "smoke-" + uuid.uuid4().hex
+        ok, room = budget.reserve(key, worst, "smoke-test", "live schema check; uncertain calls retain reservation")
+        if not ok:
+            raise ValueError(f"smoke test exceeds combined run allowance (${room:.4f} available)")
+        receipt = budget.log_path.parent / "smoke_receipts" / (key + ".json")
+        receipt.parent.mkdir(exist_ok=True)
+        receipt.write_text(json.dumps({"state": "DISPATCHED", "reservation": key, "target": t["schema_file"]}))
         row = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "approved_by": by.strip(),
                **{k: t[k] for k in ("agent", "provider", "model", "schema_file", "schema_sha256")}}
         try:
@@ -131,6 +164,13 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
                             max_tokens=SMOKE_MAX_TOKENS, temperature=0.0, effort=t["effort"],
                             response_schema={"name": "smoke", "schema": t["schema"]},
                             trace={"agent": "smoke-test", "step": t["schema_file"]})
+            receipt.write_text(json.dumps({"state": "RECEIVED", "reservation": key,
+                "input_tokens": resp.input_tokens, "output_tokens": resp.output_tokens,
+                "provider": t["provider"], "model": t["model"], "schema_sha256": t["schema_sha256"], "text": resp.text}))
+            budget.record("smoke-test", t["provider"], t["model"], resp.input_tokens, resp.output_tokens,
+                          step=key, reservation_key=key)
+            row.update(input_tokens=resp.input_tokens, output_tokens=resp.output_tokens,
+                       cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens))
             parsed = isinstance(json.loads(resp.text), dict)
             row.update(accepted=parsed, stop_reason=resp.stop_reason, input_tokens=resp.input_tokens,
                        output_tokens=resp.output_tokens,
@@ -139,6 +179,8 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
         except Exception as exc:   # noqa: BLE001 — the point of the test is to learn what each provider does with the schema
             row.update(accepted=False, error=f"{type(exc).__name__}: {str(exc)[:300]}")
             record(t["provider"], t["model"], t["schema_sha256"], False, row["error"])
+        if any(e["step"] == key for e in budget.entries()):
+            budget.release(key)
         results.append(row)
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")

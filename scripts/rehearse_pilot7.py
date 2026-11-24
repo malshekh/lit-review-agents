@@ -232,8 +232,9 @@ def main(argv=None) -> int:
     def fetch(rec, timeout=60):
         ft = octo.fulltext(old_of(rec))
         if ft and len(ft) > 1:
-            return ft, {"verified": True, "pmcid": rec.get("pmcid"), "rehearsal": True}
+            return ft, {"verified": True, "pmcid": rec.get("pmcid"), "xml_sha256": "offline-fixture", "rehearsal": True}
         raise orch.FullTextUnavailable("Full-text body missing (rehearsal: the October run had abstract only)")
+    orch.verify_cached_source = lambda *a, **k: None  # replay fixture, not a retrieval identity test
     orch.fetch_verified_sections = fetch
     fulltext.find_pmcid = lambda pmid, doi, timeout=30: (None, "no PMC copy listed for this identifier (rehearsal)")
 

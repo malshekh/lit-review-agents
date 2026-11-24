@@ -76,7 +76,8 @@ def test_importance_and_access_are_separate_facts():
     summary = run_spec.check(outline(), m, LIMITS)
     assert summary["core_read_as_abstract"] == ["P09"] and summary["full_text"] == 5
     access = run_spec.source_access(m["papers"][8], "ABSTRACT")
-    assert access == {"level": "ABSTRACT", "figures_inspected": False, "supplements_inspected": False,
+    assert access == {"level": "ABSTRACT", "figure_legends_read": False, "figure_images_inspected": False,
+                      "researcher_inspected_figures": False, "supplements_inspected": False,
                       "scientific_importance": "CORE", "note": ""}
 
 
@@ -154,7 +155,7 @@ FLAGGED = [
     ("COPPER_ABSENCE", "Disulfiram without copper reduced sphere formation [@R0001]."),
     ("COPPER_ABSENCE", "Under copper-free conditions the drug was inactive [@R0001]."),
     ("NULL_FROM_NONSIGNIFICANCE", "Disulfiram had no effect on tumour growth in vivo [@R0001]."),
-    ("NULL_FROM_NONSIGNIFICANCE", "Exogenous TGF-β1 did not affect motility of resistant cells [@R0001]."),
+    ("NULL_FROM_NONSIGNIFICANCE", "Exogenous TGF-Î²1 did not affect motility of resistant cells [@R0001]."),
     ("UNDEFINED_MEDIAN", "Median survival was not reached in the three treated arms [@R0001]."),
     ("UNDEFINED_MEDIAN", "The median survival of treated mice was not defined [@R0001]."),
     ("PERCENT_WITHOUT_COMPARATOR", "Three treatments left 85.5% viability in resistant cells [@R0001]."),
@@ -205,7 +206,7 @@ def test_every_rule_is_also_a_prompt_instruction():
 def test_flags_block_submission_until_a_person_reviews_them(tmp_path):
     from litreview.tools import submission
     flags = science_lint.check_manuscript({"title": "T", "abstract": "A.", "sections": [
-        {"section_id": "S2", "text_markdown": "Disulfiram had no effect on tumour growth [@R0001]. ⟦P1⟧"}]})
+        {"section_id": "S2", "text_markdown": "Disulfiram had no effect on tumour growth [@R0001]. âŸ¦P1âŸ§"}]})
     assert len(flags) == 1
     comp = {"checks": []}
     blocked = submission.status(tmp_path, {}, [], comp, None, flags)
@@ -330,14 +331,21 @@ def test_extraction_stops_after_one_full_text_and_two_abstracts_until_the_resear
                              "contexts": [{"context_id": "C1", "comparator": "NONE_REPORTED"}]})
     monkeypatch.setattr(run, "run_many", run_many)
     monkeypatch.setattr(run, "_normalize", lambda rid, ext: ext)
+    def validate(corpus):
+        for r in corpus:
+            rid = r["record_id"]
+            if not run.data(f"validations/{rid}.json").exists():
+                calls.append(f"A06-SV_{rid}_v1")
+                run.save(f"validations/{rid}.json", {"validations": [{"disposition": "SUPPORTED"}]})
+    monkeypatch.setattr(run, "_validate_subset", validate)
     with pytest.raises(orch.Pause, match="waiting for CP_EARLY"):
         run.stage_extract(run.state())
-    assert calls == ["A05-KE_R0001", "A05-KE_R0006", "A05-KE_R0007"]     # one full text, two abstracts, manifest order
+    assert calls == ["A05-KE_R0001", "A05-KE_R0006", "A05-KE_R0007", "A06-SV_R0001_v1", "A06-SV_R0006_v1", "A06-SV_R0007_v1"]     # one full text, two abstracts, manifest order
     report = run.load("early_check.json")
     assert [p["level"] for p in report["papers"]] == ["FULL_TEXT", "ABSTRACT", "ABSTRACT"]
-    assert report["papers"][0]["comparator_not_reported"] == 1 and "extrapolated_extraction_usd" in report
+    assert report["papers"][0]["comparator_not_reported"] == 1 and "forecast" in report
     access = run.load("source_access.json")
-    assert access["R0006"]["level"] == "ABSTRACT" and access["R0001"]["figures_inspected"] is True
+    assert access["R0006"]["level"] == "ABSTRACT" and access["R0001"]["figure_images_inspected"] is False
     cp = orch.checkpoints.cp_dir(run.dir)
     with pytest.raises(orch.checkpoints.DecisionIncomplete, match="record what you inspected"):
         orch.checkpoints.approve(run.dir, "CP_EARLY", run.prov)
@@ -346,4 +354,4 @@ def test_extraction_stops_after_one_full_text_and_two_abstracts_until_the_resear
     (cp / "CP_EARLY_decision.json").write_text(json.dumps(decision))
     orch.checkpoints.approve(run.dir, "CP_EARLY", run.prov)
     assert run.stage_extract(run.state()) == "validate"
-    assert len(calls) == 15 and len(set(calls)) == 15                     # the first three are not read again
+    assert len(calls) == 18 and len(set(calls)) == 18                     # the first three are not read again

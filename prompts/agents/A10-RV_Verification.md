@@ -82,3 +82,6 @@ Example shape only:
 ```json
 {"agent_id":"A10-RV","prompt_version":"2.0","mode":"GLOBAL","status":"COMPLETE","verdicts":[],"issues":[],"retrieval_requests":[],"inventory_fingerprint":"x","reviewed_index_ids":[]}
 ```
+
+
+Access and scope constraints: `figure_legends_read` means text captions only. `figure_images_inspected` is false for this text-only route; captions never establish image inspection. Retain source-access limits on each claim. Distinguish limited corpus coverage, inaccessible sources, insufficient reporting, and demonstrated scientific limitations. A small selected corpus does not establish a field-wide evidence gap.

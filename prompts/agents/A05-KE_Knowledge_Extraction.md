@@ -288,3 +288,6 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 ## Source-material availability
 
 When machine-readable table/legend JSON accompanies verbatim source text, use exact original cell/row/legend text for supporting spans; serialization metadata is not an experimental observation. Keep table headings, row labels, units and values associated. Respect the Source access and completeness record: a supplement link does not mean its contents were inspected, and a figure legend does not provide image-only measurements. Record unavailable evidence rather than infer or reconstruct it.
+
+
+Access and scope constraints: `figure_legends_read` means text captions only. `figure_images_inspected` is false for this text-only route; captions never establish image inspection. Retain source-access limits on each claim. Distinguish limited corpus coverage, inaccessible sources, insufficient reporting, and demonstrated scientific limitations. A small selected corpus does not establish a field-wide evidence gap.
