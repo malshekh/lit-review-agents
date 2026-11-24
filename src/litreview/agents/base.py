@@ -78,6 +78,12 @@ def validate(agent_id: str, output: dict, schema_file: str | None = None) -> Non
         if problems:raise jsonschema.ValidationError("; ".join(problems))
 
 
+def prepare_output(agent_id, text, payload):
+    from ..extraction_mode import active, accept
+    if active(agent_id):return accept(text,payload)
+    return parse_json(text)
+
+
 def _provider_response_schema(agent_id, schema_file, provider, model):
     from .. import structured
     return structured.response_schema(agent_id, schema_file, provider, model)
@@ -228,11 +234,16 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
     if agent_id not in AGENTS:
         raise AgentError(f"Unknown agent {agent_id}")
     m = model or config.agent_model(agent_id)
+    from ..extraction_mode import active, identity, record_identity
+    if active(agent_id):
+        if m.provider!="anthropic" or m.model!="claude-sonnet-5-5":raise AgentError("A05 ordinary JSON pilot mode requires configured Sonnet 5.5; no automatic substitution")
+        record_identity(run_dir)
     budget.check_priced(m.model)
     loops = loops if loops is not None else config.load("pipeline")["loops"]   # the run's own limits when given
     max_repairs = int(loops.get("max_json_repair_attempts", 1)) if repair_limit is None else int(repair_limit)
     truncations_left = (int(loops.get("max_truncation_retries", 0)) if truncation_retries is None
                         else int(truncation_retries))
+    if active(agent_id):truncations_left=0  # Never increase pilot A05 limits automatically.
     factor = float(loops.get("truncation_retry_factor", 1.5))
     ceiling = int(loops.get("max_output_tokens_ceiling", 64000))
 
@@ -321,10 +332,18 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                                 effort=call_model.effort, cache_system=call_model.cache_system,
                                 cache_ttl=call_model.cache_ttl, **({"response_schema": shape} if shape else {}),
                                 trace={"agent": agent_id, "step": step, "run_id": Path(run_dir).name,
-                                       "attempt": attempt, "prompt_version": version})
+                                       "attempt": attempt, "prompt_version": version,
+                                       **({"generation_mode":identity()["generation_mode"]} if active(agent_id) else {})})
             except Exception as exc:  # noqa: BLE001 — provider SDKs raise unrelated families; all end the call with a status
                 provenance.agent_call(agent_id, step, call_model.model, version, "", "FAILED")
-                if _not_sent(exc):   # rejected before it ran: nothing billed, so the hold is given back
+                keep_unknown_billing=active(agent_id) or "FUNCTIONAL_SOURCE_1" in step
+                if keep_unknown_billing:
+                    from ..structured import _error_text
+                    (out_dir/f"{step}.error{attempt}.json").write_text(json.dumps({
+                        "provider":call_model.provider,"model":call_model.model,"http_status":getattr(exc,"status_code",None),
+                        "provider_request_id":getattr(exc,"request_id",None),"error":_error_text(exc),
+                        "reservation":held,"billing_status":"UNRESOLVED; hold retained, no zero-cost assumption"},indent=2),encoding="utf-8")
+                if _not_sent(exc) and not keep_unknown_billing:   # legacy non-A05 behavior
                     if ledger is not None:
                         ledger.record(step, attempt, "API_ERROR", error=f"{type(exc).__name__}: {str(exc)[:200]}")
                     if guarded:
@@ -381,9 +400,11 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             last_error = (f"Output was truncated at max_tokens ({cap}). The partial output is saved as "
                           f"outputs/{step}.raw{attempt}.txt. Increase max_tokens for this call in config/pipeline.yaml.")
             break
+        if active(agent_id) and resp.stop_reason!="end_turn":
+            raise AgentError("A05 response lacks successful end_turn; raw reply retained")
         try:
-            output = parse_json(resp.text)
-            if agent_id == "A05-KE" and call_model.provider == "anthropic" and _provider_response_schema(agent_id, schema_file, call_model.provider, call_model.model):
+            output = prepare_output(agent_id,resp.text,payload)
+            if not active(agent_id) and agent_id == "A05-KE" and call_model.provider == "anthropic" and _provider_response_schema(agent_id, schema_file, call_model.provider, call_model.model):
                 from ..tools.extraction_transport import decode
                 output, decoded_paths = decode(output)
                 provenance.tool_run("a05_nullable_transport", step, {"decoded_paths": decoded_paths,
@@ -409,7 +430,12 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             attempt += 1
             continue
         if repairing is not None and repairing["before"] is not None:
-            lost = preservation_problems(repairing["before"], output)
+            before_compare,after_compare=repairing["before"],output
+            if active(agent_id):
+                trusted_keys={"record_id","content_level","source_access"}
+                before_compare={k:v for k,v in before_compare.items() if k not in trusted_keys}
+                after_compare={k:v for k,v in after_compare.items() if k not in trusted_keys}
+            lost = preservation_problems(before_compare, after_compare)
             if lost:   # a repair that loses evidence is not a repair
                 (out_dir / f"{step}.repair.rejected.json").write_text(json.dumps(
                     {"problems": lost, "repair_reply": f"{step}.raw{attempt}.txt", "original": repairing["source"]},

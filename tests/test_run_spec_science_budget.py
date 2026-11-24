@@ -358,6 +358,8 @@ def test_extraction_stops_after_one_full_text_and_two_abstracts_until_the_resear
     report = run.load("early_check.json")
     assert [p["level"] for p in report["papers"]] == ["FULL_TEXT", "ABSTRACT", "ABSTRACT"]
     assert report["papers"][0]["comparator_not_reported"] == 1 and "forecast" in report
+    assert report["papers"][0]["omission_review"]["status"]=="REQUIRES_SOURCE_COMPARISON"
+    assert "Concentration classification" in report["papers"][0]["omission_review"]["instruction"]
     access = run.load("source_access.json")
     assert access["R0006"]["level"] == "ABSTRACT" and access["R0001"]["figure_images_inspected"] is False
     cp = orch.checkpoints.cp_dir(run.dir)

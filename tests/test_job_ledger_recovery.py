@@ -194,3 +194,12 @@ def test_a_structural_repair_that_keeps_everything_is_accepted(run, monkeypatch)
     _model(monkeypatch, [(json.dumps(ORIGINAL), "end_turn"), (json.dumps({**ORIGINAL, "mode": "GROUP"}), "end_turn")])
     assert run.agent("A05-KE", {"x": 1}, "A05-KE_R0001")["mode"] == "GROUP"
     assert config.load("pipeline")["loops"]["max_json_repair_attempts"] == 1
+
+
+@pytest.fixture(autouse=True)
+def _generic_transport_legacy_mode(monkeypatch):
+    """These generic recovery/routing tests use tiny non-scientific JSON fixtures and exercise legacy retry policy.
+    The ordinary canonical mode and its no-increase policy have dedicated nonempty integration tests.
+    """
+    from litreview import config as mode_config
+    monkeypatch.setitem(mode_config.load('pipeline')['extraction'],'generation_mode','anthropic_strict_legacy')

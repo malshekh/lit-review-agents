@@ -113,8 +113,8 @@ def legacy_a02(tmp_path,monkeypatch):
 
 def test_every_configured_schema_is_audited_and_legacy_gaps_are_blockers(legacy_a02):
     rows=structured.schema_inventory()
-    assert len(rows)==15
-    assert not next(r for r in rows if r['schema_file']=='A05-KE.schema.json')['problems']
+    assert len(rows)==14  # A05 ordinary JSON is checked separately by a nonempty functional task.
+    assert not any(r['schema_file']=='A05-KE.schema.json' for r in rows)
     assert next(r for r in rows if r['schema_file']=='A02-SP.schema.json')['problems']
     with pytest.raises(structured_contract.SchemaCompatibilityError):structured.targets()
 

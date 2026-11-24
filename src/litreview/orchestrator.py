@@ -589,9 +589,11 @@ class Run:
         from .agents.registry import AGENTS
         from .synthesis_registry import fingerprint
         schema = (SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)).read_bytes()
-        return fingerprint([agent_id, payload, m.provider, m.model,
-                            hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),
-                            hashlib.sha256(schema).hexdigest()])
+        from .extraction_mode import active, identity
+        basis=[agent_id, payload, m.provider, m.model,
+               hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),hashlib.sha256(schema).hexdigest()]
+        if active(agent_id):basis.append(identity())
+        return fingerprint(basis)
 
     def _receipt_reuse(self, agent_id: str, step: str, request_id: str, schema_file: str | None):
         """The accepted output saved for this step, if its receipt matches this request (or it is a researcher's
@@ -615,6 +617,10 @@ class Run:
                         "after acceptance; restore it or import it with `litreview repair-import`.")
         try:
             validate(agent_id, accepted, schema_file)
+            from .extraction_mode import active
+            if active(agent_id):
+                # The receipt request already binds the original payload; run_many also rechecks its source.
+                if not (self.dir/'input/extraction_generation.json').exists():raise ValueError('Missing ordinary-mode receipt identity')
         except Exception as exc:   # noqa: BLE001 — jsonschema raises several families; any means "not reusable"
             raise Pause(f"{step}: the saved output fails its current schema ({str(exc)[:200]}). Repair it with "
                         "`litreview repair-import` or delete its receipt to pay for a fresh call.") from exc
@@ -1642,7 +1648,13 @@ class Run:
                 continue
             done = self.dir / "outputs" / f"{step}.json"
             if done.exists():
-                on_output(step, json.loads(done.read_text(encoding="utf-8")))
+                from .extraction_mode import active,record_identity
+                if active(agent_id):
+                    from .agents.base import prepare_output
+                    record_identity(self.dir)
+                    accepted=prepare_output(agent_id,done.read_text(encoding="utf-8"),payload)
+                else:accepted=json.loads(done.read_text(encoding="utf-8"))
+                on_output(step,accepted)
             else:
                 pending.append((step, payload))
         bcfg = self.cfg.get("batch") or {}
@@ -1786,7 +1798,9 @@ class Run:
         the run from these measurements: the remaining papers at the measured cost per level, and the downstream
         stages at the findings count the measured papers imply."""
         from .synthesis_registry import fingerprint
-        digest = fingerprint({"run": self.id, "first_tranche": sorted(first)})
+        from .extraction_mode import identity as extraction_identity
+        digest = fingerprint({"run": self.id, "first_tranche": sorted(first),"extraction_generation":extraction_identity(),
+            "reviewed_artifacts":{rid:{name:self.load(f"{name}/{rid}.json") for name in ("extractions","validations","fulltext")} for rid in sorted(first)}})
         if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
             return
         from . import run_spec
@@ -1825,6 +1839,10 @@ class Run:
                    "access_limitations": a.get("meaning") if a.get("category") != "FULL_TEXT_RETRIEVED" else
                    "legends read as text; images and supplements not retrieved",
                    "projected_per_paper_usd": projected_per_paper.get(lv)}
+            row["omission_review"]={"status":"REQUIRES_SOURCE_COMPARISON",
+                "source":f"data/fulltext/{rid}.json","extraction":f"data/extractions/{rid}.json",
+                "independent_validation":f"data/validations/{rid}.json",
+                "instruction":"Inspect relevant source passages for omitted analytes, matrices, measurement tasks, numerical values/units, comparators, uncertainty, contrary findings and author qualifications. Matching spans and a complete schema do not establish recall. Concentration classification does not establish numerical estimation."}
             row["measured_per_paper_usd"] = round(row["extraction_usd"] + row["validation_usd"], 4)
             papers.append(row)
             measured.setdefault(lv, []).append(row)

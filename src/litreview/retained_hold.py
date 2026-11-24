@@ -40,6 +40,8 @@ def _authorized_key(budget, auth):
     if len(matches) != 1:
         raise ValueError("no unique confirmed HTTP 400 evidence; uncertain dispatch cannot be repeated")
     from .structured import slim
-    if slim(receipt["target"], auth["provider"])[1] == auth["rejected_schema_sha256"]:
+    from .extraction_mode import active
+    changed_to_ordinary=receipt["target"]=="A05-KE.schema.json" and active()
+    if not changed_to_ordinary and slim(receipt["target"], auth["provider"])[1] == auth["rejected_schema_sha256"]:
         raise ValueError("rejected schema is unchanged")
     return key

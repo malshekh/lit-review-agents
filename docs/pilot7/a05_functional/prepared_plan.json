@@ -1,0 +1,222 @@
+{
+  "status": "PREPARED_NOT_DISPATCHED",
+  "fingerprint": "076cd17577f92a2b65429e62f368874a08da3030484ac5c517afca77e6c21e97",
+  "identity": {
+    "generation_mode": "ordinary_json_local_v1",
+    "contract_version": "A05-KE-canonical-0.9",
+    "canonical_schema_sha256": "beb3c86a7921ce8705849a3d0ddde0a28254c022a3a424c1b8886fba65a39b8e",
+    "acceptance_version": 1,
+    "provider_schema_submitted": false,
+    "functional_check_version": 1,
+    "source_expectations_sha256": "b70bd09f24f57f09511eaabf79cfc312f3573c5c2afc10d42d57956eff9f7e3b",
+    "models": {
+      "A05-KE": {
+        "agent_id": "A05-KE",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5-5",
+        "max_tokens": 48000,
+        "temperature": 0.0,
+        "effort": "medium",
+        "cache_system": true,
+        "cache_payload": [],
+        "cache_ttl": "5m"
+      },
+      "A06-SV": {
+        "agent_id": "A06-SV",
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "max_tokens": 24000,
+        "temperature": 0.0,
+        "effort": "medium",
+        "cache_system": false,
+        "cache_payload": [],
+        "cache_ttl": "5m"
+      }
+    },
+    "prompts": {
+      "A05-KE": "1f7cd9ccd3a678cb9fd6abb2bdc89b890e83e1766025b92fb6a9e983a923d055",
+      "A06-SV": "3157e4d884a39418f164c05769c2cde7784fb7110956c77864766f256868a1ff"
+    },
+    "a06_submitted_schema_sha256": "157cbeb66719080072638fdd497a2d4f42ee6c1897a1f10c00271e84ca1389b6",
+    "caps": {
+      "A05": 4000,
+      "A06": 2500,
+      "input_bytes_A05": 52000,
+      "input_bytes_A06": 64000,
+      "framing_reserve_tokens": 1024,
+      "cache_system": false,
+      "cache_payload": false,
+      "format_repairs_per_agent": 1,
+      "truncation_retries": 0
+    }
+  },
+  "mode": "ordinary_json_local_v1",
+  "provider_strict_schema_submitted": false,
+  "source": {
+    "title": "A Phase 1/2 Study of Disulfiram and Copper With Concurrent Radiation Therapy and Temozolomide for Patients With Newly Diagnosed Glioblastoma.",
+    "pmid": "38768767",
+    "doi": "10.1016/j.ijrobp.2024.05.009",
+    "local_record_id": "R0016",
+    "local_source": "runs/20261025-100039/data/records.json",
+    "local_source_sha256": "91f496f6916df6d80229ea87199aa6271efb6310048b74dc579018e0b03e3391",
+    "abstract_sha256": "f234c79dcf8e2e276ed9224ad3ece0f87e4f9d5cecb3c375006ce427324090d7",
+    "access": "ABSTRACT_EXCERPT",
+    "figure_images_inspected": false,
+    "preparation": "Each quoted sentence was directly checked as an exact substring of the already cached abstract by Codex. No reference evaluation key was consulted."
+  },
+  "expected_findings": {
+    "checked_by": "Codex, direct comparison with the quoted cached abstract; engineering expectation, not a scientific checkpoint approval",
+    "min_findings": 3,
+    "requirements": [
+      {
+        "analyte_contains": "diethyl-dithiocarbamate-copper",
+        "matrix": "plasma",
+        "predicate": "DETECTED_IN",
+        "polarity": "POSITIVE",
+        "quote": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+        "task": "presence_detection"
+      },
+      {
+        "analyte_contains": "diethyl-dithiocarbamate-copper",
+        "matrix": "tumors",
+        "predicate": "DETECTED_IN",
+        "polarity": "NEGATIVE",
+        "quote": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+        "task": "presence_detection"
+      },
+      {
+        "analyte_contains": "dsf",
+        "predicate": "MAXIMUM_TOLERATED_DOSE",
+        "polarity": "POSITIVE",
+        "quote": "The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d.",
+        "raw_value": "375",
+        "raw_unit": "mg/d",
+        "task": "tolerated_dose"
+      }
+    ],
+    "forbidden_inferences": [
+      "A numerical concentration estimate from a detection statement",
+      "A concentration value inferred from the 375 mg/d dose",
+      "A reported plasma-versus-tumor concentration ratio"
+    ],
+    "unreported": [
+      "Numerical concentrations",
+      "Concentration uncertainty",
+      "An experimental comparator in these three sentences"
+    ]
+  },
+  "functional_worst_case_usd": 0.594,
+  "separate_worst_case_usd": {
+    "A05-KE": 0.288,
+    "A06-SV": 0.306
+  },
+  "basis": "At most one primary and one saved-response format repair for each agent, fixed output caps, hard byte bound on every request, bytes as input-token upper bound; no automatic truncation retry or model change.",
+  "actual_a05_input_bytes": 45836,
+  "per_request_overhead_token_reserve": 1024,
+  "strict_checks_remaining": [
+    "A06-SV.schema.json",
+    "A08-OL.schema.json",
+    "A10-RV.bounded.schema.json",
+    "A12-EDI.schema.json",
+    "A12-EDI.unit.schema.json"
+  ],
+  "strict_remaining_worst_case_usd": 0.11837400000000001,
+  "prior_successes_still_matching": [
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672",
+      "schema_file": "A07-SYN.bounded-reconcile.schema.json",
+      "receipt": "smoke-18ff5ab4bbf845729c74c510c9382d86.json",
+      "receipt_sha256": "95bb772d32205677ee3f09ca24b769f5252d058c20db85fe3a7b00020a7f6e5c",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0",
+      "schema_file": "A07-SYN.bounded-group.schema.json",
+      "receipt": "smoke-2737963220ce4299bfe44fce8d980b3b.json",
+      "receipt_sha256": "137fdf1f8cb14a34197e10125f4c70e2890c9f7106c917257370f296befddb1d",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_sha256": "0f43e2b45387073914ab0d4b3a352664c3fa2891d83f8a3891dc63955989e9f9",
+      "schema_file": "A03-LM.schema.json",
+      "receipt": "smoke-45cee9fded374163b2b477bae6a685a5.json",
+      "receipt_sha256": "0cb1cb12a35fe8098c8c7ef1b1ff9ec83f04ab80e03bc76c5273d6bb577da15b",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b",
+      "schema_file": "A09-WRI.section.schema.json",
+      "receipt": "smoke-4c660ea6a34c46c1aef32cea6a49fa99.json",
+      "receipt_sha256": "390dc6b7c387ce91ae71211d35e5b5912d6b79cb93b1a72a7bdbed8dc94621da",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_sha256": "d76487961257884d9e44a87211e42cb2091590343f9fa32743d8e0c37390c269",
+      "schema_file": "A02-SP.schema.json",
+      "receipt": "smoke-9339531a43b14446bc2a683a9a497e17.json",
+      "receipt_sha256": "ab8438b965e1dba64b5edc33e6cee6095e7c2116ecea3e1fb1c3ff88539dcdd7",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b",
+      "schema_file": "A09-WRI.front.schema.json",
+      "receipt": "smoke-9fe15ae0350b494a8f61a41695796a90.json",
+      "receipt_sha256": "f0406cb20faee2a6664472782127ef287535ed552469bd3f487504894f63a3a0",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8",
+      "schema_file": "A07-SYN.bounded-final.schema.json",
+      "receipt": "smoke-a33868034a354804b0c37e5dca506a7b.json",
+      "receipt_sha256": "c0a26b83fd30c68179aaae3687f521f57a7df3efd91b24ce43be27611bc7b2a2",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "schema_sha256": "d82af624db2e303f8c7895c98e422bdd8c6fb5498210e71775cd87f05d4ab2c4",
+      "schema_file": "A04-CQ.schema.json",
+      "receipt": "smoke-a384dfc56dde48baaab6d0ee9f84eb6f.json",
+      "receipt_sha256": "c90cac6cc523d60e5267fd38bf14cb7cbcd92efeb4c7c7811f7b8e12952d987f",
+      "exact_response_validation": true
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92",
+      "schema_file": "A07-SYN.bounded-plan.schema.json",
+      "receipt": "smoke-aa3424031e194a0aafe2a862da263179.json",
+      "receipt_sha256": "d645323de6ed67b3c7b69d4375bb98b114f9330ce7cb8a1da62f49c02d6cd848",
+      "exact_response_validation": true
+    }
+  ],
+  "prior_success_count": 9,
+  "combined_remaining_worst_case_usd": 0.712374,
+  "recorded_spend_usd": 0.0690631,
+  "held_usd": 0.099409,
+  "smoke_remaining_after_spend_and_holds_usd": 0.8315279,
+  "paid_dispatch_authorized": false,
+  "pending_decisions": [
+    "Newest $0.041668 hold",
+    "New A05 ordinary JSON functional check"
+  ],
+  "pilot_caps": {
+    "total": 50,
+    "smoke": 1
+  },
+  "pilot_scientific_outputs_carried_over": false
+}

@@ -41,7 +41,7 @@ from typing import TYPE_CHECKING, Callable
 
 from . import model_record
 from .agents.base import (AgentError, build_system_prompt, parse_json, prompt_version, user_parts,
-                          validate)
+                          validate, prepare_output)
 from .budget import BudgetExceeded
 from .llm import batch
 
@@ -155,6 +155,9 @@ class BatchStage:
                 redo = json.loads(note.read_text(encoding="utf-8"))
                 raw = self.run.dir / "outputs" / redo["raw"]
                 if redo["why"] == "TRUNCATED":
+                    from .extraction_mode import active
+                    if active(self.agent_id) or int(loops.get("max_truncation_retries",0))<=0:
+                        raise AgentError("Truncated batch response retained; automatic token-limit increase is disabled")
                     extra["overrides"] = {"max_tokens": min(
                         int(redo["max_tokens"] * float(loops.get("truncation_retry_factor", 1.5)) + 0.999),
                         int(loops.get("max_output_tokens_ceiling", 64000)))}
@@ -166,13 +169,18 @@ class BatchStage:
 
     # --- submission -------------------------------------------------------
     def _requests(self, m, ids: dict[str, str]) -> tuple[list[dict], dict]:
+        from .extraction_mode import active, identity, record_identity
+        mode=identity() if active(self.agent_id) else None
+        if mode:
+            if m.provider!="anthropic" or m.model!="claude-sonnet-5-5":raise AgentError("A05 ordinary JSON mode requires Sonnet 5.5")
+            record_identity(self.run.dir)
         system = build_system_prompt(self.agent_id)
         ttl = self.cfg.get("cache_ttl", m.cache_ttl)
         reqs, chars = [], {}
         for cid, step in ids.items():
             parts = user_parts(self.payloads[step], m.cache_payload)
             reqs.append(batch.request(m.provider, cid, system, parts, m.model, self._cap(m, step), m.temperature,
-                                      m.effort, m.cache_system, ttl))
+                                      m.effort, m.cache_system, ttl, **({"trace":{"agent":self.agent_id,"generation_mode":mode["generation_mode"]}} if mode else {})))
             chars[step] = len(system) + sum(len(p["text"]) for p in parts)
         return reqs, {"chars": chars, "system_chars": len(system), "ttl": ttl}
 
@@ -249,6 +257,8 @@ class BatchStage:
         fingerprint = {"run_id": self.run.id, "stage": self.agent_id, "submission_id": sub_id,
                        "custom_ids": sorted(ids), "manifest_sha256": digest,
                        "manifest_file": str(manifest_file.relative_to(self.run.dir))}
+        from .extraction_mode import active, identity
+        if active(self.agent_id):fingerprint["extraction_generation"]=identity()
         rec = {"intent_at": time.time(), "status": "INTENT", "submission_id": sub_id, "provider": m.provider,
                "model": m.model, "steps": steps, "custom_ids": ids, "count": len(steps), "input_file_id": file_id,
                "batch_id": None, "fingerprint": fingerprint, "estimate": est, "prompt_chars": shape["chars"],
@@ -432,8 +442,12 @@ class BatchStage:
         if resp.stop_reason in ("max_tokens", "length"):
             redo("TRUNCATED")
             return
+        from .extraction_mode import active
+        if active(self.agent_id) and resp.stop_reason!="end_turn":
+            redo("INVALID","A05 response lacks successful end_turn")
+            return
         try:
-            out = parse_json(resp.text)
+            out = prepare_output(self.agent_id,resp.text,self.payloads[step])
             validate(self.agent_id, out)
         except (json.JSONDecodeError, jsonschema.ValidationError) as exc:   # repaired from the saved reply
             redo("INVALID", str(exc)[:2000])

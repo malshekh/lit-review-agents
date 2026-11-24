@@ -1,0 +1,88 @@
+{
+  "engineering_only": true,
+  "corpus_selection": false,
+  "source": {
+    "title": "A Phase 1/2 Study of Disulfiram and Copper With Concurrent Radiation Therapy and Temozolomide for Patients With Newly Diagnosed Glioblastoma.",
+    "pmid": "38768767",
+    "doi": "10.1016/j.ijrobp.2024.05.009",
+    "local_record_id": "R0016",
+    "local_source": "runs/20261025-100039/data/records.json",
+    "local_source_sha256": "91f496f6916df6d80229ea87199aa6271efb6310048b74dc579018e0b03e3391",
+    "abstract_sha256": "f234c79dcf8e2e276ed9224ad3ece0f87e4f9d5cecb3c375006ce427324090d7",
+    "access": "ABSTRACT_EXCERPT",
+    "figure_images_inspected": false,
+    "preparation": "Each quoted sentence was directly checked as an exact substring of the already cached abstract by Codex. No reference evaluation key was consulted."
+  },
+  "payload": {
+    "review_spec": {
+      "central_question": "What was detected in plasma and tumors, and what maximum tolerated dose was reported? This is an isolated engineering check, not pilot corpus selection."
+    },
+    "content_level": "ABSTRACT",
+    "record": {
+      "record_id": "FUNCTIONAL_SOURCE_1",
+      "pmid": "38768767",
+      "doi": "10.1016/j.ijrobp.2024.05.009",
+      "title": "A Phase 1/2 Study of Disulfiram and Copper With Concurrent Radiation Therapy and Temozolomide for Patients With Newly Diagnosed Glioblastoma.",
+      "content": {
+        "Abstract": "Pharmacokinetic analyses determined drug concentrations in plasma and tumors using high-performance liquid chromatography-mass spectrometry. Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors. The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d."
+      }
+    },
+    "source_access": {
+      "level": "ABSTRACT",
+      "figure_legends_read": false,
+      "figure_images_inspected": false,
+      "supplements_inspected": false,
+      "note": "Only three cached abstract sentences supplied; no full text inspected."
+    },
+    "theme_framework": {
+      "primary_themes": [
+        {
+          "theme_id": "T1",
+          "name": "Measured exposure and tolerability",
+          "scope": "Directly reported detection and dose findings."
+        }
+      ]
+    }
+  },
+  "expected": {
+    "checked_by": "Codex, direct comparison with the quoted cached abstract; engineering expectation, not a scientific checkpoint approval",
+    "min_findings": 3,
+    "requirements": [
+      {
+        "analyte_contains": "diethyl-dithiocarbamate-copper",
+        "matrix": "plasma",
+        "predicate": "DETECTED_IN",
+        "polarity": "POSITIVE",
+        "quote": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+        "task": "presence_detection"
+      },
+      {
+        "analyte_contains": "diethyl-dithiocarbamate-copper",
+        "matrix": "tumors",
+        "predicate": "DETECTED_IN",
+        "polarity": "NEGATIVE",
+        "quote": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+        "task": "presence_detection"
+      },
+      {
+        "analyte_contains": "dsf",
+        "predicate": "MAXIMUM_TOLERATED_DOSE",
+        "polarity": "POSITIVE",
+        "quote": "The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d.",
+        "raw_value": "375",
+        "raw_unit": "mg/d",
+        "task": "tolerated_dose"
+      }
+    ],
+    "forbidden_inferences": [
+      "A numerical concentration estimate from a detection statement",
+      "A concentration value inferred from the 375 mg/d dose",
+      "A reported plasma-versus-tumor concentration ratio"
+    ],
+    "unreported": [
+      "Numerical concentrations",
+      "Concentration uncertainty",
+      "An experimental comparator in these three sentences"
+    ]
+  }
+}

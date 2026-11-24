@@ -95,7 +95,8 @@ def main():
         raise SystemExit('BLOCKED: configured model availability has not passed')
     if args.action=='smoke':
         structured.recover_smoke_receipts(run.budget)
-        smoke_spent=sum(e['cost_usd'] or 0 for e in run.budget.entries() if e['agent']=='smoke-test')
+        from litreview.a05_functional import smoke_spent as combined_smoke_spent
+        smoke_spent=combined_smoke_spent(run.budget)
         remaining=1-smoke_spent
         assert remaining>=0
         run.budget.operational_ceiling=min(50,run.budget.spent()+remaining)
@@ -106,6 +107,8 @@ def main():
         (run.dir/'smoke_result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
         print(json.dumps(result,indent=2))
         return 0 if result['tested']==result['accepted'] and all(t['already_verified'] for t in structured.targets()) and not blocking_holds(run.budget,authorization) else 2
+    from litreview import extraction_mode,a05_functional
+    if extraction_mode.active() and not a05_functional.verified(run.dir):raise SystemExit('BLOCKED: A05 ordinary JSON nonempty functional check has not passed')
     smoke=json.loads((run.dir/'smoke_result.json').read_text(encoding='utf-8'))
     if smoke['tested']!=smoke['accepted'] or blocking_holds(run.budget,authorization) or not all(t['already_verified'] for t in structured.targets()):raise SystemExit('BLOCKED: smoke test failed or unsettled')
     if run.state()['stage'] not in ['scope','cp1']:raise SystemExit('BLOCKED: this launch stops at CP1; later continuation requires the researcher')

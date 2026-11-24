@@ -68,6 +68,9 @@ def message_params(system: str, user, model: str, max_tokens: int, temperature: 
             raise ValueError("Controlled PLAN requires adaptive thinking, medium effort and no manual budget")
         kwargs["thinking"] = {"type":"adaptive"}
         kwargs["output_config"] = {"effort":"medium"}
+    if (trace or {}).get("generation_mode") == "ordinary_json_local_v1":
+        if (trace or {}).get("agent")!="A05-KE" or model!="claude-sonnet-5-5" or response_schema is not None:
+            raise ValueError("A05 ordinary JSON generation must not submit a provider schema")
     if response_schema:   # structured output: shape, types, required keys and enumerations (structured.py)
         kwargs.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": response_schema["schema"]}
     return kwargs

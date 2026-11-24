@@ -47,6 +47,7 @@ def test_retained_authorization_fails_closed(retained,change):
 
 def test_same_rejected_schema_cannot_repeat(retained,monkeypatch):
     b,a,p=retained;monkeypatch.setattr(structured,"slim",lambda *args: ({},"old"))
+    monkeypatch.setattr("litreview.extraction_mode.active",lambda *args:False)
     with pytest.raises(ValueError,match="unchanged"):blocking_holds(b,a)
 
 

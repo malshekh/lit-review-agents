@@ -1,0 +1,79 @@
+{
+  "run_id": "20261123-214928",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v22-pilot7-retained-hold-50usd",
+  "status": "OFFLINE_MODE_CHANGE_PREPARED_NO_DISPATCH",
+  "ledger_spend_usd": 0.0690631,
+  "held_usd": 0.099409,
+  "holds": {
+    "smoke-a7002e97d157452281d47d14d836bc48": {
+      "usd": 0.019586,
+      "agent": "smoke-test",
+      "batch_id": null,
+      "note": "live schema check; uncertain calls retain reservation",
+      "reserved_at": "2026-11-23T22:00:50",
+      "reserved_epoch": 1795489250.0935347
+    },
+    "smoke-40b97da422624626bfe52134a40465e8": {
+      "usd": 0.001107,
+      "agent": "smoke-test",
+      "batch_id": null,
+      "note": "live schema check; uncertain calls retain reservation",
+      "reserved_at": "2026-11-24T09:52:52",
+      "reserved_epoch": 1795531972.7771275
+    },
+    "smoke-cf915e7cd207476399c034b44c539d2a": {
+      "usd": 0.037048,
+      "agent": "smoke-test",
+      "batch_id": null,
+      "note": "live schema check; uncertain calls retain reservation",
+      "reserved_at": "2026-11-24T10:02:19",
+      "reserved_epoch": 1795532539.9461737
+    },
+    "smoke-06b75cd9b38647d29a3e16fc3e902aa7": {
+      "usd": 0.041668,
+      "agent": "smoke-test",
+      "batch_id": null,
+      "note": "live schema check; uncertain calls retain reservation",
+      "reserved_at": "2026-11-24T15:02:43",
+      "reserved_epoch": 1795550563.374412
+    }
+  },
+  "files_sha256": {
+    "costs.jsonl": "75d1857d2ad230bafb587167907987c3884416b3cf04e11974b612df9bf1f7b1",
+    "reservations.json": "77682cc9a6626ba421b78bc0291a228b0be024d49bacc46c811ccfb1070d8c03",
+    "smoke_receipts/smoke-02d0d755e0ad4ebd804f65d321b23dfb.json": "0b932c1a5d3a358b4a752412c0dd4cb7cd37da61b965b9d3916d064ef07e5ebf",
+    "smoke_receipts/smoke-06b75cd9b38647d29a3e16fc3e902aa7.json": "bb99b90644845f2262231821164d6cd6b6c9d825333a79212d7730833636ff5c",
+    "smoke_receipts/smoke-0878fb7b8f8244a699cafd0a426bcdbd.json": "d59a136506cb0ea0ed166dc494268d19acf8ab9b634a517b1ef57fe13e7d1841",
+    "smoke_receipts/smoke-18ff5ab4bbf845729c74c510c9382d86.json": "95bb772d32205677ee3f09ca24b769f5252d058c20db85fe3a7b00020a7f6e5c",
+    "smoke_receipts/smoke-2737963220ce4299bfe44fce8d980b3b.json": "137fdf1f8cb14a34197e10125f4c70e2890c9f7106c917257370f296befddb1d",
+    "smoke_receipts/smoke-2a802695e92b4110acd7ec4b5bf95f52.json": "5e08a00790d7e383d01d50de42993846c2b7a451608f3bf33f171b958a1bffc6",
+    "smoke_receipts/smoke-2d20ad03c8bd45898c9eee508ee80fdf.json": "2c6ae91cd6ef41ef28d68c769f4ddf2811a6fb1b2e29f082c7b0b823b9bfc2a8",
+    "smoke_receipts/smoke-3ff0b90912c14e3aab3b448140437bf0.json": "58d749824b761f4b6ca28ebd65bf8f267b96a5ca90f932fbadf41abe893957b1",
+    "smoke_receipts/smoke-40b97da422624626bfe52134a40465e8.json": "4c0dc00f0908b4306a5ccaad17988f3b0251c785145596aad123553ad794a4cd",
+    "smoke_receipts/smoke-45cee9fded374163b2b477bae6a685a5.json": "0cb1cb12a35fe8098c8c7ef1b1ff9ec83f04ab80e03bc76c5273d6bb577da15b",
+    "smoke_receipts/smoke-4c660ea6a34c46c1aef32cea6a49fa99.json": "390dc6b7c387ce91ae71211d35e5b5912d6b79cb93b1a72a7bdbed8dc94621da",
+    "smoke_receipts/smoke-5d604f4a70a04fa19e3e5058b7cf408c.json": "f34f8234ac4b2a5a88874a5b07c2abaa4a66517100e3fd5e0487c52b474f9c7e",
+    "smoke_receipts/smoke-7d76a302d8da48508d8aa5c8131bfed1.json": "d257dff043f0ac8881e6e963207945d534e97ad4c215b56b1a8e66f4e3c7ef2c",
+    "smoke_receipts/smoke-9339531a43b14446bc2a683a9a497e17.json": "ab8438b965e1dba64b5edc33e6cee6095e7c2116ecea3e1fb1c3ff88539dcdd7",
+    "smoke_receipts/smoke-9fe15ae0350b494a8f61a41695796a90.json": "f0406cb20faee2a6664472782127ef287535ed552469bd3f487504894f63a3a0",
+    "smoke_receipts/smoke-a33868034a354804b0c37e5dca506a7b.json": "c0a26b83fd30c68179aaae3687f521f57a7df3efd91b24ce43be27611bc7b2a2",
+    "smoke_receipts/smoke-a384dfc56dde48baaab6d0ee9f84eb6f.json": "c90cac6cc523d60e5267fd38bf14cb7cbcd92efeb4c7c7811f7b8e12952d987f",
+    "smoke_receipts/smoke-a7002e97d157452281d47d14d836bc48.json": "899ee911e3b49aa4ee519ad2b13b1dbcc3a56d9c6ecb82fd6a8cd6f5ab9baf6f",
+    "smoke_receipts/smoke-aa3424031e194a0aafe2a862da263179.json": "d645323de6ed67b3c7b69d4375bb98b114f9330ce7cb8a1da62f49c02d6cd848",
+    "smoke_receipts/smoke-afbed1c13ca142caa7fcefc83e8e4822.json": "57b840832072b652978ec19ed70dbefd759824ef62d02927cb062c45f14b0409",
+    "smoke_receipts/smoke-ca6943142a8447e0a1d92a23455f42d5.json": "886022d2bb596e1402bad28184964c9e2e22fbe6740a6a42327df848d6d65c02",
+    "smoke_receipts/smoke-cf915e7cd207476399c034b44c539d2a.json": "96de9352bc8e2f3842db9ec421e2b5b8486c7f0344dc18b849f9fe2ff940d910",
+    "smoke_receipts/smoke-f3efa18906ef4cb1aae56a0c39121708.json": "7744457428d54b3ef729b08ec6c3997f19095b01e03c7269afe1529fe74844ad"
+  },
+  "smoke_receipts_preserved": 23,
+  "state": {
+    "stage": "scope",
+    "status": "READY",
+    "counters": {},
+    "execution_mode": "STANDARD",
+    "corpus_policy_fingerprint": "2350eb129f671f8cff979dc2a5e513cc0188063272622dd7d4e7009c0e52305c",
+    "profile": "pilot7"
+  },
+  "scientific_approvals_added": 0,
+  "new_paid_calls": 0
+}

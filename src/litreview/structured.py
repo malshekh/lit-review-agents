@@ -77,6 +77,8 @@ def enabled(provider: str) -> bool:
 def response_schema(agent_id: str, schema_file: str | None, provider: str, model: str) -> dict | None:
     """{"name", "schema"} when this exact combination has passed the smoke test; otherwise None."""
     from .agents.registry import AGENTS
+    from .extraction_mode import active
+    if active(agent_id):return None
     if not enabled(provider):
         return None
     name = schema_file or AGENTS[agent_id].schema_file
@@ -94,6 +96,8 @@ def schema_inventory() -> list[dict]:
     rows = []
     for agent in AGENTS:
         model = config.agent_model(agent)
+        from .extraction_mode import active
+        if active(agent):continue
         if not enabled(model.provider):continue  # JSON-object providers receive no schema; full local validation still applies.
         for name in schema_files(agent):
             try:
@@ -115,6 +119,8 @@ def targets() -> list[dict]:
     out, seen = [], set()
     for agent in AGENTS:
         m = config.agent_model(agent)
+        from .extraction_mode import active
+        if active(agent):continue  # Separate nonempty functional check; never a strict-schema smoke success.
         if not enabled(m.provider):
             continue
         for name in schema_files(agent):

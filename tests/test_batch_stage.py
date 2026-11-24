@@ -482,3 +482,12 @@ def test_a_chunk_that_cannot_fit_alone_stops_the_stage(run, monkeypatch):
         run.run_many("A05-KE", items(STEPS7), lambda s, o: None)
     assert fake.created == [] and run.budget.reservations() == {}
     assert not (run.data("batches") / "manifests").exists() or not any((run.data("batches") / "manifests").iterdir())
+
+
+@pytest.fixture(autouse=True)
+def _generic_transport_legacy_mode(monkeypatch):
+    """These generic recovery/routing tests use tiny non-scientific JSON fixtures and exercise legacy retry policy.
+    The ordinary canonical mode and its no-increase policy have dedicated nonempty integration tests.
+    """
+    from litreview import config as mode_config
+    monkeypatch.setitem(mode_config.load('pipeline')['extraction'],'generation_mode','anthropic_strict_legacy')
