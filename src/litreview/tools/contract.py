@@ -5,9 +5,9 @@ never hand-written: a prompt that describes a different contract from the schema
 is how the pilot's PLAN came back complete and unusable. tests/test_contracts.py fails when a prompt's contract
 line differs from what the schema generates (`python -m litreview.tools.contract --write` regenerates them).
 
-`for_structured_output(schema)` returns a copy a provider's structured-output feature can accept: the keywords
-providers do not enforce (length and count limits, patterns, numeric ranges, conditionals) are removed and listed.
-The provider then guarantees shape, types, required keys and enumerations; the complete schema is still applied
+`for_structured_output(schema)` returns a copy a provider's structured-output feature can accept: the constraints
+delegated to the complete local validator (length and count limits, patterns, numeric ranges, conditionals) are removed and listed.
+No object closure or required field is invented; provider-specific checks reject incomplete contracts before dispatch. The provider then guarantees shape, types, required keys and enumerations; the complete schema is still applied
 locally to every reply, so nothing the provider ignores goes unchecked.
 """
 from __future__ import annotations
@@ -67,8 +67,10 @@ def summary(schema: dict) -> str:
     return "; ".join(out)
 
 
-def for_structured_output(schema: dict) -> tuple[dict, list[str]]:
-    """(schema with unenforced keywords removed and every object closed, the JSON paths of what was removed)."""
+def for_structured_output(schema: dict, provider: str = "anthropic") -> tuple[dict, list[str]]:
+    """(schema with locally enforced constraints omitted; undefined/unsafe shapes fail closed, the JSON paths of what was removed)."""
+    from .structured_contract import source_problems, SchemaCompatibilityError
+    invalid = source_problems(schema)
     removed: list[str] = []
 
     def strip(node, path):
@@ -92,10 +94,12 @@ def for_structured_output(schema: dict) -> tuple[dict, list[str]]:
                     out[k] = kept
             else:
                 out[k] = strip(v, f"{path}.{k}") if isinstance(v, (dict, list)) else v
-        if out.get("type") == "object" and "properties" in out:
-            out["additionalProperties"] = False
         return out
-    return strip(copy.deepcopy(schema), "$"), removed
+    result = strip(copy.deepcopy(schema), "$")
+    from .structured_contract import problems
+    invalid += problems(result, provider)
+    if invalid:raise SchemaCompatibilityError("; ".join(sorted(set(invalid))))
+    return result, removed
 
 
 def regenerate(prompt_text: str, schemas_dir: Path) -> tuple[str, list[str]]:

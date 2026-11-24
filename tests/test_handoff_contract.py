@@ -91,8 +91,8 @@ def test_run_20261025_meaning_survives_serialization(monkeypatch):
 
 def test_the_schema_requires_a_named_relation_and_a_real_object():
     def out(*fs):
-        return {"agent_id": "A5-KE", "prompt_version": "0.5", "status": "COMPLETE", "warnings": [], "limitations": [],
-                "record_id": "R1", "content_level": "ABSTRACT", "study_profile": {}, "entities": [], "contexts": [],
+        return {"agent_id": "A05-KE", "prompt_version": "0.5", "status": "COMPLETE", "warnings": [], "limitations": [],
+                "record_id": "R1", "content_level": "ABSTRACT", "study_profile": {"study_type": "PRIMARY_RESEARCH", "evidence_systems": ["NOT_REPORTED"]}, "entities": [], "contexts": [],
                 "author_stated_limitations": [], "findings": list(fs)}
     jsonschema.validate(out(finding("F1", "ANTAGONIZES"), finding("F2", "MAXIMUM_TOLERATED_DOSE", obj=None),
                             finding("F3", "OTHER_SPECIFIED", predicate_detail="biphasic change in")), SCHEMA)

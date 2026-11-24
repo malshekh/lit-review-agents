@@ -233,9 +233,17 @@ class Run:
             "family. If the refusals look like classifier false positives on the wording, reword the topic and "
             "start a run under a new family; otherwise the family is blocked for this agent.")
 
+    def _require_provider_contracts(self) -> None:
+        from . import structured
+        schema_problems = [r for r in structured.schema_inventory() if r["problems"]]
+        if schema_problems:
+            self.save("schema_compatibility.json", schema_problems)
+            raise Pause("configured provider schema compatibility failed; see data/schema_compatibility.json")
+
     def preflight_routing(self) -> None:
         """At run start: stop before any spending if some agent has no unrefused model in this family,
         rather than paying for search and extraction and stopping at synthesis."""
+        self._require_provider_contracts()
         refused = model_record.refused(self.family())
         done = STAGES[:STAGES.index(self.state()["stage"])]
         for agent_id in self.cfg["agents"]:
@@ -1784,7 +1792,8 @@ class Run:
             val = self.load(f"validations/{rid}.json") or {}
             lv = ext.get("content_level") or corpus.get(rid, {}).get("intended_reading_level") or "ABSTRACT"
             contexts = {c.get("context_id"): c for c in ext.get("contexts") or []}
-            comparators = [(contexts.get(f.get("context_id")) or f.get("context") or {}).get("comparator") for f in ext.get("findings") or []]
+            finding_contexts = [contexts.get(f.get("context_id")) or f.get("context") or {} for f in ext.get("findings") or []]
+            comparators = [(c.get("fields") or c).get("comparator") for c in finding_contexts]
             disp = [v.get("disposition") for v in val.get("validations") or []]
             a = retrieval.get(rid) or {}
             row = {"record_id": rid, "paper_id": corpus.get(rid, {}).get("manifest_paper_id"), "level": lv,

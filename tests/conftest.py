@@ -68,6 +68,7 @@ def _no_network(monkeypatch):
 
 
 def pytest_configure(config):
+    config.addinivalue_line("markers", "provider_contract_guard: exercise the actual provider-schema preflight")
     config.addinivalue_line("markers", "projection_guard: run with the CP2 cost-projection spend guard on")
 
 
@@ -81,3 +82,14 @@ def _stable_environment(monkeypatch):
     for name in ("ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "OPENAI_BASE_URL", "LITREVIEW_PROFILE"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(references, "crossref_lookup", lambda *a, **k: None)
+
+
+@pytest.fixture(autouse=True)
+def _provider_contract_guard(request, monkeypatch):
+    """Fake pipeline tests isolate other stages; dedicated provider_contract_guard tests exercise the real guard."""
+    if request.node.get_closest_marker("provider_contract_guard"):
+        return
+    from litreview.orchestrator import Run
+    monkeypatch.setattr(Run, "_require_provider_contracts", lambda self: None)
+    from litreview.agents import base
+    monkeypatch.setattr(base, "_provider_response_schema", lambda *a: None)

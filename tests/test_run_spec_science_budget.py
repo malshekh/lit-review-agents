@@ -223,7 +223,11 @@ def test_structured_output_is_used_only_for_a_combination_the_smoke_test_confirm
     assert structured.response_schema("A07-SYN", "A07-SYN.bounded-plan.schema.json", "anthropic", "claude-opus-5") is None
     schema, sha = structured.slim("A07-SYN.bounded-plan.schema.json")
     assert "maxLength" not in json.dumps(schema) and schema["additionalProperties"] is False
-    structured.record("anthropic", "claude-opus-5", sha, True, "stop_reason end_turn")
+    from litreview.smoke_validation import inspect_response
+    example=json.loads((REPO_ROOT / "docs/a07_a12_contract_hardening/schema_examples.json").read_text(encoding="utf-8"))["A07-SYN.bounded-plan.schema.json"]
+    proof=inspect_response("anthropic",json.dumps(example),"end_turn",schema,sha)
+    assert proof["accepted"]
+    structured.record("anthropic", "claude-opus-5", sha, True, "stop_reason end_turn",validation=proof)
     got = structured.response_schema("A07-SYN", "A07-SYN.bounded-plan.schema.json", "anthropic", "claude-opus-5")
     assert got["schema"] == schema and got["name"] == "A07_SYN_bounded_plan"
     assert structured.response_schema("A07-SYN", "A07-SYN.bounded-plan.schema.json", "anthropic", "claude-opus-5-5") is None
@@ -244,6 +248,11 @@ def test_the_request_carries_the_schema_and_the_full_validator_still_runs():
 
 
 def test_smoke_test_lists_targets_and_refuses_without_an_approved_amount(tmp_path, monkeypatch):
+    from litreview.smoke_validation import schema_hash
+    shape={"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":False}
+    sample=[{"agent":a,"provider":p,"model":m,"effort":None,"schema_file":a+".fixture","schema":shape,"schema_sha256":schema_hash(shape),"already_verified":False}
+        for a,p,m in [("A05-KE","anthropic","claude-haiku-5-5"),("A07-SYN","anthropic","claude-opus-5"),("A10-RV","openai","gpt-6.1-sol")]]
+    monkeypatch.setattr(structured,"targets",lambda:sample)
     monkeypatch.setattr(structured, "RECORD", tmp_path / "structured_output.json")
     b = BudgetTracker(tmp_path)
     usd, todo = structured.smoke_estimate(b)
@@ -259,7 +268,7 @@ def test_smoke_test_lists_targets_and_refuses_without_an_approved_amount(tmp_pat
         if kw["model"] == "claude-haiku-5-5":
             raise RuntimeError("400 schema not supported")
         from litreview.llm.base import LLMResponse
-        return LLMResponse("{}", provider, kw["model"], 500, 20, "end_turn")
+        return LLMResponse('{"ok":true}', provider, kw["model"], 500, 20, "end_turn" if provider=="anthropic" else "stop")
     monkeypatch.setattr("litreview.llm.complete", complete)
     result = structured.smoke_test(b, usd + 1, "May Khalid", tmp_path / "smoke.jsonl")
     assert result["tested"] == len(todo) == len(calls) and all(c[2] for c in calls)

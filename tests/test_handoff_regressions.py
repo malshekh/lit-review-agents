@@ -57,10 +57,14 @@ def test_level_agnostic_tranche_uses_three_papers(run,levels):
 def test_smoke_receipts_charge_run_once_and_block_uncertain_retry(tmp_path,monkeypatch):
     from litreview.llm.base import LLMResponse
     budget=BudgetTracker(tmp_path)
-    target={"agent":"A05-KE","provider":"openai","model":"gpt-6.1-sol","effort":None,"schema_file":"fixture","schema":{},"schema_sha256":"abc","already_verified":False}
-    monkeypatch.setattr(structured,"targets",lambda:[target] if not structured.verified().get("openai|gpt-6.1-sol|abc",{}).get("accepted") else [])
+    from litreview.smoke_validation import schema_hash
+    shape={"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":False}
+    digest=schema_hash(shape)
+    monkeypatch.setattr(structured,"slim",lambda *a:(shape,digest))
+    target={"agent":"A05-KE","provider":"openai","model":"gpt-6.1-sol","effort":None,"schema_file":"fixture","schema":shape,"schema_sha256":digest,"already_verified":False}
+    monkeypatch.setattr(structured,"targets",lambda:[target] if not structured.verified().get("openai|gpt-6.1-sol|"+digest,{}).get("accepted") else [])
     monkeypatch.setattr(structured,"RECORD",tmp_path/"verified.json")
-    monkeypatch.setattr("litreview.llm.complete",lambda *a,**k: LLMResponse("{}","openai","gpt-6.1-sol",500,20,"end_turn"))
+    monkeypatch.setattr("litreview.llm.complete",lambda *a,**k: LLMResponse('{"ok":true}',"openai","gpt-6.1-sol",500,20,"stop"))
     result=structured.smoke_test(budget,1,"Fixture",tmp_path/"smoke.jsonl")
     assert result["spent_usd"] == pytest.approx(budget.spent(),abs=0.0001)
     assert len(budget.entries())==1 and not budget.reservations()
@@ -73,6 +77,7 @@ def test_smoke_receipts_charge_run_once_and_block_uncertain_retry(tmp_path,monke
 
 def test_smoke_cannot_exceed_combined_run_cap(tmp_path,monkeypatch):
     budget=BudgetTracker(tmp_path); budget.cap=0
+    monkeypatch.setattr(structured,"targets",lambda:[{"agent":"A05-KE","provider":"anthropic","model":"claude-sonnet-5-5","schema":{},"already_verified":False}])
     monkeypatch.setattr(structured,"RECORD",tmp_path/"verified.json")
     monkeypatch.setattr("litreview.llm.complete",lambda *a,**k: pytest.fail("paid dispatch"))
     with pytest.raises(ValueError,match="combined run allowance"):
@@ -109,10 +114,13 @@ def test_received_smoke_receipt_recovers_once_after_interruption(tmp_path,monkey
     monkeypatch.setattr(structured,"RECORD",tmp_path/"verified.json")
     monkeypatch.setattr("litreview.llm.complete",lambda *a,**k: pytest.fail("receipt must not be dispatched again"))
     budget.reserve("smoke-received",0.1,"smoke-test")
+    from litreview.smoke_validation import schema_hash
+    shape={"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":False}
+    digest=schema_hash(shape)
     receipts=tmp_path/"smoke_receipts"; receipts.mkdir()
     (receipts/"smoke-received.json").write_text(json.dumps({"state":"RECEIVED","reservation":"smoke-received",
-        "provider":"openai","model":"gpt-6.1-sol","schema_sha256":"fixture","input_tokens":500,"output_tokens":20,"text":"{}"}))
+        "provider":"openai","model":"gpt-6.1-sol","schema_sha256":digest,"input_tokens":500,"output_tokens":20,"text":'{"ok":true}',"submitted_schema":shape,"stop_reason":"stop"}))
     structured.recover_smoke_receipts(budget)
     structured.recover_smoke_receipts(BudgetTracker(tmp_path))
     assert len(budget.entries())==1 and not budget.reservations()
-    assert structured.verified()["openai|gpt-6.1-sol|fixture"]["accepted"]
+    assert structured.verified()["openai|gpt-6.1-sol|"+digest]["accepted"]

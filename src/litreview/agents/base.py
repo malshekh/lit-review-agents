@@ -72,6 +72,15 @@ def validate(agent_id: str, output: dict, schema_file: str | None = None) -> Non
     schema_path = SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)
     schema = json.loads(_read(schema_path))
     jsonschema.validate(output, schema)
+    if agent_id == "A05-KE":
+        from ..tools.extraction_checks import check
+        problems = check(output)
+        if problems:raise jsonschema.ValidationError("; ".join(problems))
+
+
+def _provider_response_schema(agent_id, schema_file, provider, model):
+    from .. import structured
+    return structured.response_schema(agent_id, schema_file, provider, model)
 
 
 def _json(obj) -> str:
@@ -291,6 +300,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                                                                    "already_accounted": already_accounted})
             recovered = None
         else:
+            shape = _provider_response_schema(agent_id, schema_file, call_model.provider, call_model.model)
             if reservation_key:
                 budget.ensure_headroom(reservation_key)
             else:
@@ -305,8 +315,6 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             if ledger is not None:
                 ledger.record(step, attempt, "RESERVED", reservation=held)
                 ledger.record(step, attempt, "DISPATCHED", reservation=held)   # before the send: a crash here is ambiguous
-            from .. import structured
-            shape = structured.response_schema(agent_id, schema_file, call_model.provider, call_model.model)
             try:
                 resp = complete(call_model.provider, system=call_system, user=message, model=call_model.model,
                                 max_tokens=call_model.max_tokens, temperature=call_model.temperature,

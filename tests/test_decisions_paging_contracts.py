@@ -282,7 +282,7 @@ def test_unresolved_questions_is_typed_and_a_list_inside_a_string_is_refused():
 def test_contract_summary_and_structured_output_form():
     schema = {"type": "object", "required": ["mode", "items"], "additionalProperties": False,
               "properties": {"mode": {"const": "X"}, "note": {"type": ["string", "null"], "maxLength": 9},
-                             "items": {"type": "array", "maxItems": 2, "items": {"type": "object", "required": ["id"],
+                             "items": {"type": "array", "maxItems": 2, "items": {"type": "object", "required": ["id"], "additionalProperties": False,
                                        "properties": {"id": {"type": "string", "pattern": "^F"}}}}},
               "allOf": [{"if": {"properties": {"mode": {"const": "X"}}}, "then": {"required": ["note"]}}]}
     text = contract.summary(schema)

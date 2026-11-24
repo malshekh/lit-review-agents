@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FROM_GIT = ["src", "config", "prompts", "schemas", "records", "a07_a09_sample.py", "scripts/reconcile_billing.py",
-            "scripts/plan_budget.py", "scripts/runtime_bootstrap.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
+            "scripts/plan_budget.py", "scripts/runtime_bootstrap.py", "scripts/pilot_smoke_continue.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
             "pyproject.toml", "requirements.txt",
             "LICENSE.md"]
 FROM_RUNTIME = ["vendor", "cli_entry.py", "candidate/model_record_baseline.jsonl",
@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     (dest / "runs").mkdir(exist_ok=True)
     if run_src is not None:
         shutil.copytree(run_src, dest / "runs" / args.run_id)
-    shutil.copy2(dest / "scripts/runtime_bootstrap.py", dest / "bootstrap.py")
+    shutil.copy2(dest / "scripts/runtime_bootstrap.py", "scripts/pilot_smoke_continue.py", dest / "bootstrap.py")
     # 4. manifest
     files = {p.relative_to(dest).as_posix(): sha(p) for p in sorted(dest.rglob("*"))
              if p.is_file() and p.relative_to(dest).parts[0] != "runs" and p.relative_to(dest).as_posix() != TELEMETRY}

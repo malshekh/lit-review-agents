@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
 from . import config
 from .paths import RECORDS_DIR, SCHEMAS_DIR
 from .tools import contract
+from . import smoke_validation
 
 RECORD = RECORDS_DIR / "structured_output.json"
 MODE_SCHEMAS = {
@@ -36,15 +38,30 @@ def schema_files(agent_id: str) -> list[str]:
     return MODE_SCHEMAS.get(agent_id) or [AGENTS[agent_id].schema_file]
 
 
-def slim(schema_file: str) -> tuple[dict, str]:
+def slim(schema_file: str, provider: str = "anthropic") -> tuple[dict, str]:
     """(the schema in structured-output form, its SHA-256)."""
     schema = json.loads((SCHEMAS_DIR / schema_file).read_text(encoding="utf-8"))
-    out, _ = contract.for_structured_output(schema)
+    out, _ = contract.for_structured_output(schema, provider)
     return out, hashlib.sha256(json.dumps(out, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _key(provider: str, model: str, sha: str) -> str:
     return f"{provider}|{model}|{sha}"
+
+
+def _write_json(path: Path, value: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _error_text(exc: Exception) -> str:
+    text = f"{type(exc).__name__}: {exc}"
+    for provider in config.load("pipeline")["providers"].values():
+        secret = os.environ.get(provider.get("key_env", ""))
+        if secret:text = text.replace(secret, "[REDACTED]")
+    return text[:1000]
 
 
 def verified(path: Path | None = None) -> dict:
@@ -62,39 +79,61 @@ def response_schema(agent_id: str, schema_file: str | None, provider: str, model
     if not enabled(provider):
         return None
     name = schema_file or AGENTS[agent_id].schema_file
-    schema, sha = slim(name)
+    schema, sha = slim(name, provider)
     entry = verified().get(_key(provider, model, sha))
-    if not entry or not entry.get("accepted"):
+    if not entry or not entry.get("accepted") or entry.get("validation_version") != smoke_validation.VERSION:
         return None
     return {"name": name.replace(".schema.json", "").replace(".", "_").replace("-", "_")[:60], "schema": schema}
+
+
+def schema_inventory() -> list[dict]:
+    """Audit every configured strict provider schema, collecting every blocker rather than stopping at the first."""
+    from .agents.registry import AGENTS
+    from .tools.structured_contract import SchemaCompatibilityError
+    rows = []
+    for agent in AGENTS:
+        model = config.agent_model(agent)
+        if not enabled(model.provider):continue  # JSON-object providers receive no schema; full local validation still applies.
+        for name in schema_files(agent):
+            try:
+                shape, digest = slim(name, model.provider)
+                rows.append({"provider":model.provider,"model":model.model,"schema_file":name,"schema_sha256":digest,"problems":[]})
+            except SchemaCompatibilityError as exc:
+                rows.append({"provider":model.provider,"model":model.model,"schema_file":name,"problems":str(exc).split("; ")})
+    return rows
 
 
 def targets() -> list[dict]:
     """Every (agent, schema) the configured primary models would use, for the smoke test."""
     from .agents.registry import AGENTS
+    inventory = schema_inventory()
+    failures = [r for r in inventory if r["problems"]]
+    if failures:
+        from .tools.structured_contract import SchemaCompatibilityError
+        raise SchemaCompatibilityError("configured schemas incompatible: " + "; ".join(r["schema_file"] + ": " + ", ".join(r["problems"]) for r in failures))
     out, seen = [], set()
     for agent in AGENTS:
         m = config.agent_model(agent)
         if not enabled(m.provider):
             continue
         for name in schema_files(agent):
-            schema, sha = slim(name)
+            schema, sha = slim(name, m.provider)
             if (m.provider, m.model, sha) in seen:
                 continue
             seen.add((m.provider, m.model, sha))
             out.append({"agent": agent, "provider": m.provider, "model": m.model, "effort": m.effort,
                         "schema_file": name, "schema": schema, "schema_sha256": sha,
-                        "already_verified": bool(verified().get(_key(m.provider, m.model, sha), {}).get("accepted"))})
+                        "already_verified": bool(verified().get(_key(m.provider, m.model, sha), {}).get("accepted") and verified().get(_key(m.provider, m.model, sha), {}).get("validation_version") == smoke_validation.VERSION)})
     return out
 
 
-def record(provider: str, model: str, sha: str, accepted: bool, detail: str, path: Path | None = None) -> None:
+def record(provider: str, model: str, sha: str, accepted: bool, detail: str, path: Path | None = None, validation: dict | None = None) -> None:
     p = path or RECORD
     table = verified(p)
     table[_key(provider, model, sha)] = {"accepted": accepted, "checked_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                                         "detail": detail[:300]}
+                                         "detail": detail[:300], **(validation or {})}
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(table, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _write_json(p, table)
 
 
 SMOKE_SYSTEM = ("This is a connectivity check. Return the smallest JSON object that fits the required output format: "
@@ -122,11 +161,22 @@ def recover_smoke_receipts(budget) -> None:
         if not any(e["step"] == key for e in budget.entries()):
             budget.record("smoke-test", receipt["provider"], receipt["model"],
                           receipt["input_tokens"], receipt["output_tokens"], step=key, reservation_key=key)
-        try:
-            accepted = isinstance(json.loads(receipt["text"]), dict)
-        except (ValueError, TypeError):
-            accepted = False
-        record(receipt["provider"], receipt["model"], receipt["schema_sha256"], accepted, "recovered persisted receipt")
+        enrichment_path = budget.log_path.parent / "smoke_receipt_enrichment.json"
+        enrichment = json.loads(enrichment_path.read_text(encoding="utf-8")) if enrichment_path.exists() else {}
+        _, validation = smoke_validation.receipt_evidence(p, enrichment)
+        extra = enrichment.get(validation.get("receipt_sha256"), {})
+        name = receipt.get("schema_file", extra.get("schema_file"))
+        if name:
+            try:
+                _, current_hash = slim(name, receipt["provider"])
+                if current_hash != receipt["schema_sha256"]:
+                    validation["accepted"] = False
+                    validation["problems"].append("actual submitted schema changed; retest required")
+            except (ValueError, OSError) as exc:
+                validation["accepted"] = False
+                validation["problems"].append("current provider contract incompatible; no approval retained")
+        record(receipt["provider"], receipt["model"], receipt["schema_sha256"], validation["accepted"],
+               "reassessed persisted receipt", validation=validation)
         budget.release(key)
 
 
@@ -156,7 +206,8 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
             raise ValueError(f"smoke test exceeds combined run allowance (${room:.4f} available)")
         receipt = budget.log_path.parent / "smoke_receipts" / (key + ".json")
         receipt.parent.mkdir(exist_ok=True)
-        receipt.write_text(json.dumps({"state": "DISPATCHED", "reservation": key, "target": t["schema_file"]}))
+        _write_json(receipt, {"state": "DISPATCHED", "reservation": key, "target": t["schema_file"], "provider": t["provider"], "model": t["model"],
+                                     "submitted_schema": t["schema"], "schema_sha256": t["schema_sha256"]})
         row = {"time": time.strftime("%Y-%m-%dT%H:%M:%S"), "approved_by": by.strip(),
                **{k: t[k] for k in ("agent", "provider", "model", "schema_file", "schema_sha256")}}
         try:
@@ -164,20 +215,32 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
                             max_tokens=SMOKE_MAX_TOKENS, temperature=0.0, effort=t["effort"],
                             response_schema={"name": "smoke", "schema": t["schema"]},
                             trace={"agent": "smoke-test", "step": t["schema_file"]})
-            receipt.write_text(json.dumps({"state": "RECEIVED", "reservation": key,
+            _write_json(receipt, {"state": "RECEIVED", "reservation": key,
                 "input_tokens": resp.input_tokens, "output_tokens": resp.output_tokens,
-                "provider": t["provider"], "model": t["model"], "schema_sha256": t["schema_sha256"], "text": resp.text}))
+                "provider": t["provider"], "model": t["model"], "schema_sha256": t["schema_sha256"], "text": resp.text,
+                "submitted_schema": t["schema"], "stop_reason": resp.stop_reason, "schema_file": t["schema_file"], "response_provider": resp.provider, "response_model": resp.model})
             budget.record("smoke-test", t["provider"], t["model"], resp.input_tokens, resp.output_tokens,
                           step=key, reservation_key=key)
             row.update(input_tokens=resp.input_tokens, output_tokens=resp.output_tokens,
                        cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens))
-            parsed = isinstance(json.loads(resp.text), dict)
+            validation = smoke_validation.inspect_response(t["provider"], resp.text, resp.stop_reason, t["schema"], t["schema_sha256"])
+            if (resp.provider, resp.model) != (t["provider"], t["model"]):
+                validation["accepted"] = False
+                validation["problems"].append("response provider/model differs from submitted request")
+            parsed = validation["accepted"]
             row.update(accepted=parsed, stop_reason=resp.stop_reason, input_tokens=resp.input_tokens,
                        output_tokens=resp.output_tokens,
                        cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens))
-            record(t["provider"], t["model"], t["schema_sha256"], parsed, f"stop_reason {resp.stop_reason}")
+            record(t["provider"], t["model"], t["schema_sha256"], parsed, f"stop_reason {resp.stop_reason}", validation=validation)
         except Exception as exc:   # noqa: BLE001 — the point of the test is to learn what each provider does with the schema
-            row.update(accepted=False, error=f"{type(exc).__name__}: {str(exc)[:300]}")
+            row.update(accepted=False, error=_error_text(exc))
+            if getattr(exc, "status_code", None) is not None:
+                saved = json.loads(receipt.read_text(encoding="utf-8"))
+                if saved["state"] == "DISPATCHED":
+                    saved.update(state="ERROR_RESPONSE", http_status=exc.status_code,
+                                 provider_request_id=getattr(exc, "request_id", None), error=row["error"],
+                                 billing_status="UNRECONCILED; no zero-cost assumption")
+                    _write_json(receipt, saved)
             record(t["provider"], t["model"], t["schema_sha256"], False, row["error"])
         if any(e["step"] == key for e in budget.entries()):
             budget.release(key)
