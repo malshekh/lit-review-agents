@@ -271,8 +271,12 @@ def test_smoke_test_lists_targets_and_refuses_without_an_approved_amount(tmp_pat
         return LLMResponse('{"ok":true}', provider, kw["model"], 500, 20, "end_turn" if provider=="anthropic" else "stop")
     monkeypatch.setattr("litreview.llm.complete", complete)
     result = structured.smoke_test(b, usd + 1, "May Khalid", tmp_path / "smoke.jsonl")
-    assert result["tested"] == len(todo) == len(calls) and all(c[2] for c in calls)
-    assert result["accepted"] == result["tested"] - sum(1 for t in todo if t["model"] == "claude-haiku-5-5")
+    assert result["tested"] == len(calls) == 1 and all(c[2] for c in calls)
+    assert result["accepted"] == 0
+    assert b.reserved() > 0 and not b.entries()
+    with pytest.raises(ValueError, match="unsettled smoke"):
+        structured.smoke_test(b, usd + 1, "May Khalid")
+    assert len(calls) == 1
     assert structured.smoke_estimate(b)[1] != [] or result["accepted"] == result["tested"]    # rejected ones stay listed
 
 

@@ -258,12 +258,13 @@ def settle_smoke_hold(budget, reservation: str, billed_usd: float, evidence: str
     return {"reservation": reservation, **settlement}
 
 
-def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None) -> dict:
+def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None, *, retained_hold_authorization: Path | None = None) -> dict:
     """One tiny live request per unverified combination. Refused unless its worst case fits the approved amount.
     Records what each provider accepted; a rejected schema is recorded too, so it is never tried in a paid stage."""
     from .llm import complete
     recover_smoke_receipts(budget)
-    if any(k.startswith("smoke-") for k in budget.reservations()):
+    from .retained_hold import blocking_holds
+    if blocking_holds(budget, retained_hold_authorization):
         raise ValueError("unsettled smoke receipt: settle it on billing evidence first (litreview settle-smoke-hold "
                          "<run_id>); no call sent")
     usd, todo = smoke_estimate(budget)
@@ -326,5 +327,7 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
         results.append(row)
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
+        if not row["accepted"]:
+            break  # Preserve failure evidence; no further dispatch until reviewed.
     return {"tested": len(results), "accepted": sum(r["accepted"] for r in results),
             "spent_usd": round(sum(r.get("cost_usd") or 0 for r in results), 4), "results": results}
