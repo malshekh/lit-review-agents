@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     (dest / "runs").mkdir(exist_ok=True)
     if run_src is not None:
         shutil.copytree(run_src, dest / "runs" / args.run_id)
-    shutil.copy2(dest / "scripts/runtime_bootstrap.py", "scripts/pilot_smoke_continue.py", dest / "bootstrap.py")
+    shutil.copy2(dest / "scripts/runtime_bootstrap.py", dest / "bootstrap.py")
     # 4. manifest
     files = {p.relative_to(dest).as_posix(): sha(p) for p in sorted(dest.rglob("*"))
              if p.is_file() and p.relative_to(dest).parts[0] != "runs" and p.relative_to(dest).as_posix() != TELEMETRY}
