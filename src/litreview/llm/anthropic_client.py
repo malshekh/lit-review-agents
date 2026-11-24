@@ -27,7 +27,7 @@ def _get_client():
         from ..preflight import require_clean_endpoints
         require_clean_endpoints()   # never build a client that the environment could point at another vendor
         pcfg = config.load("pipeline")["providers"]["anthropic"]
-        _client = anthropic.Anthropic(api_key=os.environ.get(pcfg["key_env"]),
+        _client = anthropic.Anthropic(max_retries=0, api_key=os.environ.get(pcfg["key_env"]),
                                       base_url=pcfg.get("base_url") or "https://api.anthropic.com")
     return _client
 

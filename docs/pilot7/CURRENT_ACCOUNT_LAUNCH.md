@@ -26,3 +26,5 @@ test that passed.
 The live pilot retains its explicit $50 combined maximum, $1 smoke authorization, $25/$48 review pauses,
 disabled automatic alternate-model routes, dispatch receipts and every scientific checkpoint. No checkpoint
 approval or model substitution is implemented by the bootstrap.
+
+Interactive Anthropic, OpenAI and Kimi SDK clients explicitly set `max_retries=0`. A timeout reaches the existing dispatch ledger or smoke reservation as uncertain, rather than silently resubmitting inside the SDK. Pipeline-controlled retries and repairs retain their existing budget checks and receipts.

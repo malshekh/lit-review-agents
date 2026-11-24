@@ -43,3 +43,21 @@ def test_other_account_credential_file_is_refused(tmp_path,monkeypatch):
     p=tmp_path/'other.env'; p.write_text('OPENAI_API_KEY=secret\n')
     monkeypatch.setattr(Path,'home',lambda:own)
     with pytest.raises(identity.ExecutionRefused):identity.load_current_account_keys(p,{})
+
+
+def test_provider_sdks_cannot_retry_a_dispatch_behind_the_ledger(monkeypatch):
+    import sys, types
+    from litreview.llm import openai_compatible, anthropic_client
+    seen=[]
+    def client(**kwargs):
+        seen.append(kwargs)
+        assert kwargs['max_retries']==0
+        return object()
+    monkeypatch.setitem(sys.modules,'openai',types.SimpleNamespace(OpenAI=client))
+    monkeypatch.setitem(sys.modules,'anthropic',types.SimpleNamespace(Anthropic=client))
+    monkeypatch.setattr(openai_compatible,'_clients',{})
+    monkeypatch.setattr(anthropic_client,'_client',None)
+    openai_compatible._get_client('openai')
+    openai_compatible._get_client('kimi')
+    anthropic_client._get_client()
+    assert len(seen)==3

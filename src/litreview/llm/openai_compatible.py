@@ -29,7 +29,7 @@ def _get_client(provider: str):
         from ..preflight import require_clean_endpoints
         require_clean_endpoints()
         p = config.load("pipeline")["providers"][provider]
-        _clients[provider] = OpenAI(api_key=os.environ.get(p["key_env"]),
+        _clients[provider] = OpenAI(max_retries=0, api_key=os.environ.get(p["key_env"]),
                                     base_url=p.get("base_url") or "https://api.openai.com/v1")
     return _clients[provider]
 
