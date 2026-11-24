@@ -1,0 +1,42 @@
+{
+  "manifest_version": 1,
+  "papers": [
+    {
+      "paper_id": "P01",
+      "pmid": "34638842",
+      "doi": "10.3390/ijms221910496",
+      "title": "REPLACE: title of the paper",
+      "selection_reason": "REPLACE: why this paper is in the corpus (at least a sentence).",
+      "scientific_importance": "CORE",
+      "intended_reading_level": "FULL_TEXT",
+      "source_files": [],
+      "informs_sections": [
+        "S2",
+        "S2.1"
+      ],
+      "actual_access": {
+        "level": "FULL_TEXT",
+        "figures_inspected": true,
+        "supplements_inspected": false,
+        "note": "REPLACE: e.g. open-access HTML from PMC; supplement not opened"
+      }
+    },
+    {
+      "paper_id": "P02",
+      "pmid": "27006494",
+      "title": "REPLACE: title of the paper",
+      "selection_reason": "REPLACE: why this paper is in the corpus (at least a sentence).",
+      "scientific_importance": "CORE",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S2"
+      ],
+      "actual_access": {
+        "level": "ABSTRACT",
+        "figures_inspected": false,
+        "supplements_inspected": false,
+        "note": "REPLACE: important paper, abstract only (paywalled)"
+      }
+    }
+  ]
+}

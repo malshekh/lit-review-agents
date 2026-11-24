@@ -23,7 +23,8 @@ def _run(tmp_path, monkeypatch):
     run = orch.Run("t")
     run.save_state({"stage": "validate", "status": "READY", "counters": {}})
     run.save("selected_corpus.json", [{"record_id": "R0001"}])
-    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma."})
+    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma. " +
+        ' '.join(f'DSF suppressed growth ({i}).' for i in (1,2,3))})
     run.save("extractions/R0001.json", {
         "record_id": "R0001",
         "entities": [{"entity_id": "E1", "mention": "DSF", "type": "APPROVED_DRUG", **WRONG},
@@ -42,7 +43,9 @@ def _v(fid, disposition, constraints=(), gate2="ALIGNED"):
 
 
 def _doc(*vals):
-    return {"record_id": "R0001", "validations": list(vals)}
+    present = {v['finding_id'] for v in vals}
+    return {"record_id": "R0001", "validations": list(vals) +
+        [_v(f'F{i}', 'SUPPORTED') for i in (1,2,3) if f'F{i}' not in present]}
 
 
 def _finding(run, fid):
@@ -200,10 +203,12 @@ def test_committed_a07_turns_are_not_priced_again():
     from pathlib import Path
     b, cfg = BudgetTracker(Path(tempfile.mkdtemp())), config.load("pipeline")
     route = lambda a, ex=frozenset(): config.agent_candidates(a)[0]
+    from litreview.tools import forecast
     full = cp.downstream(b, route, cfg, 120)[0]
     rest = cp.downstream(b, route, cfg, 120, a07_done=3)[0]
-    assert full["calls"] - rest["calls"] == 3
-    assert rest["usd"] == pytest.approx(full["usd"] * rest["calls"] / full["calls"], abs=0.001)
+    expected = 2 + forecast.A07_GROUP_CALLS(120) + -(-forecast.A07_PROPOSITIONS_PER_FINDING * 120 // 32)
+    assert rest["usd"] == pytest.approx(full["usd"] * (1 - 3 / expected), abs=0.001)
+    assert rest["calls"] < full["calls"]
 
 
 @pytest.mark.projection_guard
@@ -219,7 +224,8 @@ def test_a_stopped_a07_job_supersedes_the_projection_until_it_is_redone(tmp_path
 
 def test_a_new_run_records_the_code_it_starts_from(tmp_path, monkeypatch):
     monkeypatch.setattr(orch, "RUNS_DIR", tmp_path)
-    run_id = orch.new_run("topic")
+    from corpus_fixture import authority
+    run_id = orch.new_run("topic",budget_authority=authority(tmp_path/"new-authority.json"))
     import json
     v = json.loads((tmp_path / run_id / "input" / "code_version.json").read_text(encoding="utf-8"))
     assert set(v) == {"commit", "clean", "recorded_at"} and (v["commit"] is None or len(v["commit"]) == 40)

@@ -18,3 +18,7 @@ class LLMResponse:
     cached_input_tokens: int = 0           # read from the prompt cache
     cache_write_tokens: int = 0            # written to the prompt cache (5-minute, or provider default)
     cache_write_1h_tokens: int = 0         # written to Anthropic's 1-hour cache (priced separately)
+
+    raw_provider_response: dict | None = None  # PLAN diagnostics; never fed to another agent
+    raw_provider_response_path: str | None = None
+    provider_response_metadata: dict | None = None

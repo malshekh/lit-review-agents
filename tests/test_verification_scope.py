@@ -68,6 +68,8 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
     run.save("manuscript_plan.json", PLAN)
     run.save("synthesis_approved.json", PACKAGE)
     run.save("validated_findings.json", FINDINGS)
+    from evidence_fixtures import seed_sources
+    seed_sources(run, FINDINGS)
     monkeypatch.setattr(run, "_deterministic_report", lambda m: {})
     _wrote(run, "A09-WRI", "A09-WRI_draft1", "anthropic")
     sent = []
@@ -78,7 +80,7 @@ def test_verify_sends_the_scope_and_runs_one_detail_round(tmp_path, monkeypatch)
         sent.append((step, payload))
         assert kw["exclude_providers"] == frozenset({"anthropic"})
         if len(sent) == 1:
-            return {**response('LOCAL'),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+            return {**response('LOCAL'),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1'],'query':None,'source_item_ids':[],'proposition_ids':[]}]}
         out = base(payload['mode'],payload,step)
         if payload['mode']=='LOCAL':
             out['issues']=[{'occurrence_ids':[payload['occurrences'][0]['occurrence_id']],
@@ -110,6 +112,8 @@ def _run(tmp_path, monkeypatch):
     run.save_state({"stage": "draft", "status": "READY", "counters": {}})
     (run.dir / "input").mkdir(parents=True, exist_ok=True)
     (run.dir / "input" / "topic_family.txt").write_text("onc", encoding="utf-8")
+    from evidence_fixtures import seed_sources
+    seed_sources(run, FINDINGS)
     return run
 
 

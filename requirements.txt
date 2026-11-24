@@ -1,5 +1,5 @@
 anthropic>=0.40
-openai>=1.50
+openai>=3.32.0
 pyyaml>=6.0
 python-dotenv>=1.0
 requests>=2.31

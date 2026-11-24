@@ -1,0 +1,765 @@
+{
+  "method": "offline production request builders; UTF8-byte input upper bounds, mocked judgments; no provider token counts or paid calls",
+  "papers": 120,
+  "findings": 1996,
+  "word_count": 5000,
+  "occurrences": 257,
+  "table_occurrences": 53,
+  "coverage": {
+    "occurrences_total": 257,
+    "occurrences_reviewed": 257,
+    "global_index_entries_reviewed": 2892,
+    "inventory_fingerprint": "1184adb9b0897c831ac999fcfe2caf15d7ff409fad415b8d6b0aaa24f3b8a73e"
+  },
+  "global_finding_coverage": 1996,
+  "status": "COMPLETE",
+  "first": {
+    "calls": {
+      "LOCAL": 42,
+      "GLOBAL": 23
+    },
+    "total_calls": 65,
+    "input_upper_tokens": 12965188,
+    "output_allowance": 604000,
+    "max_input_plus_output": 239074,
+    "cost_input_bytes_div3_output25pct": 10.153458666666666,
+    "cost_all_input_byte_bound_all_output_caps": 31.970376,
+    "per_request": [
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_8a2ca2cb47fc3f90b50c_R0",
+        "input_upper_tokens": 214415,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4569,
+        "request_sha256": "c3e59473bbf6f901b6d272c0f5d862a80e58cb48373f9aeb137f2b7fb898e8e1"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_ae2bb760224ac0955f22_R0",
+        "input_upper_tokens": 109241,
+        "output_allowance": 10000,
+        "response_upper_tokens": 2547,
+        "request_sha256": "6a256eb89e6c0dbe72766a0fee3b452c8355699d70d6492bbae8e58d1bde3e28"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_feb02b0d633e5bb2f9e5_R0",
+        "input_upper_tokens": 212853,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3893,
+        "request_sha256": "3de9feb041afb6980696f413b77056c88e4eab9bd9783cbd08e64fca558b28b3"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_3c7b3497f556a6b2ea4d_R0",
+        "input_upper_tokens": 208749,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3658,
+        "request_sha256": "0932e7efcd69f54082d3153cb5c1c5123ee2f9167aa4d5c26fba10f85cbdee84"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_6377612b6104e0bd8c3f_R0",
+        "input_upper_tokens": 211941,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3857,
+        "request_sha256": "91039721bb73fb1434f6506273d3ad20d36cef7772b5f74e8372f8b08a7df06f"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_661489f961d5b5ef900c_R0",
+        "input_upper_tokens": 198185,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4156,
+        "request_sha256": "463b1790e6b5a24422ccd096db0cfd148df8c8566d10827647e73759d0afc4d5"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_e37682865d1e09784e0f_R0",
+        "input_upper_tokens": 208084,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3867,
+        "request_sha256": "e9e12d620c2cea44e2477c1e9dcf261e190e184918af3f1d055e8f237ba1e4f1"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_01d75186a126c0adf5cf_R0",
+        "input_upper_tokens": 208380,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3666,
+        "request_sha256": "2620397db7b6be5df9e057e168c61c5cb28041708d8b4a1f12992dff90d0073b"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_e00d0b519f9d5661179d_R0",
+        "input_upper_tokens": 202493,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3871,
+        "request_sha256": "6f3c59af3e1fb711ab2363bce7f03da3512b3dd0bfcdccf0efd51998f2915c1e"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_cb9e4171e2d3e4339f8b_R0",
+        "input_upper_tokens": 193598,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3903,
+        "request_sha256": "2587c8ff6b1b845454bd5846aa49a15a5d707840853dcc7d8fc88757d7b14345"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_8b350490ca360d5298eb_R0",
+        "input_upper_tokens": 199405,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4037,
+        "request_sha256": "6d868dc564cf9706622509cf6e00cef39db1fab7dd9b4bd2ae6f92167d8029f5"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_d8bce89082f8113e3ff8_R0",
+        "input_upper_tokens": 211882,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3892,
+        "request_sha256": "166e784421d3cfe4b4f4f5389667b5c2d48602029f31328d511649a1e5baea69"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_3e2ed8db86d516050de7_R0",
+        "input_upper_tokens": 224437,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4215,
+        "request_sha256": "414477973e54fb5e6a3c64e9765610396e067ad58bd55c76bb6af2c3545b4973"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_e4f0ca1e4411e317e7f2_R0",
+        "input_upper_tokens": 148988,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3410,
+        "request_sha256": "14ee0d4e76a477205551e84bfc42df00e7361153cb1b475279e4de1f1ee34116"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_418ad6ca9c4bc9ac06b1_R0",
+        "input_upper_tokens": 219474,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4525,
+        "request_sha256": "a0cd682f98a6160f4c5fea8ab10517939645a5ed000b2f2c75043648e42bdc4a"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_8a28dacf6d995b1c52a6_R0",
+        "input_upper_tokens": 186251,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "ae2d3a5ff1783061de341f4d28a854e5410aa426356b0c6f23f97f97c0377f87"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_5040af2f1519fd26b5b3_R0",
+        "input_upper_tokens": 219515,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3889,
+        "request_sha256": "6e860e6aa76dca11e28004e9cc7bf7028e679dac2d6c3757dc6866a8f38aaeee"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_806c252f2e09fa901cbe_R0",
+        "input_upper_tokens": 177401,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3437,
+        "request_sha256": "683b1112a33a2986fa7605057c66aec4240c5bb2816cebd92541bff949a5ba57"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_2f8169c31478adbb38c9_R0",
+        "input_upper_tokens": 207593,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3858,
+        "request_sha256": "943342a70988c9dce56ede8a3d3120f6e8a557a9fd988822e204eb25c0cd3317"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_5ab8fad30b6ea88b9651_R0",
+        "input_upper_tokens": 206710,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4152,
+        "request_sha256": "d995de7bd8a71988574c332ea9344a54b3faf59a0e18101021786541ec3c1d6a"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_723012181695a692eabe_R0",
+        "input_upper_tokens": 207765,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3860,
+        "request_sha256": "f3a9cd3e54ed61c96629cb5b2176988e9aa2ffad89ac857a4517ed3494f0230f"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_0912858388a30825bf78_R0",
+        "input_upper_tokens": 206849,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3894,
+        "request_sha256": "5caaac99728bd9d6126653fb15dfd05ca1239acd5190ba56b8add5f2c5185bca"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_1e10b90f48040d0526d8_R0",
+        "input_upper_tokens": 212900,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3892,
+        "request_sha256": "7a9854102617c46c265f4d07379c1cc9f3f2a22e8f89c01385733aaf7d3e75d5"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_8aa905bc91d6ad17af52_R0",
+        "input_upper_tokens": 210136,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3661,
+        "request_sha256": "8d2a5ac74c0695cc190d2035362ca70472ae23f2aac358cecc147a84136a6a4c"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_4467761150eefb3a2432_R0",
+        "input_upper_tokens": 205551,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3857,
+        "request_sha256": "51715aee03038bb2412b5eb648aa304f0d2ae3f1128bdbe79bbbec4b0f454c39"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_b007c9f74add62f2a850_R0",
+        "input_upper_tokens": 205226,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4153,
+        "request_sha256": "b7962427a7f53200f95f639e7a44eb92b386a4e9f60ed18222b17a03a740b7da"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_86972bc35435726ff28e_R0",
+        "input_upper_tokens": 205880,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3869,
+        "request_sha256": "f1371930f1dc110677bbcbb3cb168c72f579e738d1073ed68ec4f2e4cc69d45a"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_fcb32911177d8b719b53_R0",
+        "input_upper_tokens": 205737,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3666,
+        "request_sha256": "c7a55c2c90da9fc153ec270494eb0f72382097de12002a9fc71f60f5960b754b"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_e40cc3320f265cb997cc_R0",
+        "input_upper_tokens": 203298,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3872,
+        "request_sha256": "6fcbad03d63aca56a57c496714783a5ea0a2cdd1e1fa03c3fb5c1b95f2e2fd36"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_6cfd02cc5218d8ee0372_R0",
+        "input_upper_tokens": 197056,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3903,
+        "request_sha256": "7877d7a976c41441a49c25d54bca45d513b9f58e796d9464e686494b5fda6ce1"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_739f505ddc71f19b3483_R0",
+        "input_upper_tokens": 229074,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4484,
+        "request_sha256": "d6612dd40350b1d009dd09de5024034087ce5f5c76e3d58d8ce2b985cfb9b642"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_3f70e86fef1c117dd7a9_R0",
+        "input_upper_tokens": 184646,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3445,
+        "request_sha256": "b246396563b1626ee862da4d310c20ae08c77c1431410c1e14adafbac1854c9f"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_a7bba129fef2c49a49b4_R0",
+        "input_upper_tokens": 221670,
+        "output_allowance": 10000,
+        "response_upper_tokens": 4210,
+        "request_sha256": "5781491e2a658eb3f271e27ac48f0c7cb4502dae80fca9e2b1d50c0ee692b7c9"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_4edaba6acb83c0da07d2_R0",
+        "input_upper_tokens": 151647,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3409,
+        "request_sha256": "514707598fb28dcb68c895d9fd45e7b28ea1ef1826c54b684e8b40092eb9f7a8"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_75198cbde44dc2f3b68a_R0",
+        "input_upper_tokens": 152859,
+        "output_allowance": 10000,
+        "response_upper_tokens": 5464,
+        "request_sha256": "568ca5b3f80b44674cac02bbd284df3a928f392d1ed07dc4f6e23fba50f40434"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_1d933638ebda089faf7b_R0",
+        "input_upper_tokens": 222022,
+        "output_allowance": 10000,
+        "response_upper_tokens": 5700,
+        "request_sha256": "7a892149b9c500a0f200431a73d546e4d61a910247bdb944d94f47d6ac80e834"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_2349b17a1fc5a165ba52_R0",
+        "input_upper_tokens": 58586,
+        "output_allowance": 10000,
+        "response_upper_tokens": 2103,
+        "request_sha256": "f23e12738536ec745ec7599280ac0b7a8de2c6d690d28792f496f9eb019c93ee"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_145803de3b4633d400d7_R0",
+        "input_upper_tokens": 227070,
+        "output_allowance": 10000,
+        "response_upper_tokens": 6125,
+        "request_sha256": "7e80a438c615ad27972f8d8fb3b544e50b9cc5d21999cecb7e283186edd7f470"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_84cdeb6a561b08571fa0_R0",
+        "input_upper_tokens": 49302,
+        "output_allowance": 10000,
+        "response_upper_tokens": 1651,
+        "request_sha256": "3f2e62ec07312b19320a1704f41de18c2e76647d6992488912de018c340c949d"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_12432c51a0c32d0bd343_R0",
+        "input_upper_tokens": 220912,
+        "output_allowance": 10000,
+        "response_upper_tokens": 5683,
+        "request_sha256": "8d5400a9adf5a7e6347f1874a0b1babf1050e0c336ffd2c8d5acaf6dcd575c2d"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_37038afd8d110c745f34_R0",
+        "input_upper_tokens": 59746,
+        "output_allowance": 10000,
+        "response_upper_tokens": 2099,
+        "request_sha256": "51c0197b15120d052fc1725623bbb59a6c8a84e5eacc3cb86a54762a0476d63f"
+      },
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_dd8c3230b6aeeb785a5a_R0",
+        "input_upper_tokens": 106806,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3455,
+        "request_sha256": "86f1dec54663392d15f7c0aa9e6d3be5c6cf86f730f15281f37119159c7901c1"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0000_R0",
+        "input_upper_tokens": 226374,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2727,
+        "request_sha256": "c495c88f1eabc152343726bbc2ca5dce3d316caa59854f6d59c54d15e3bf1413"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0001_R0",
+        "input_upper_tokens": 225088,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2729,
+        "request_sha256": "34269655903ad7ab503dd9c69f79a05b3ade98228856e24fdf45fc79352e6377"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0002_R0",
+        "input_upper_tokens": 223291,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2763,
+        "request_sha256": "46595b7f8ba0c9962514dc0ad047f0ecae19136e4ec95d9b28c271e0e98a3c10"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0003_R0",
+        "input_upper_tokens": 226142,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2739,
+        "request_sha256": "58f9a9f5ef993178e33b4a8416cac8bb5e23af6f4dadb93212f514dd25cd8138"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0004_R0",
+        "input_upper_tokens": 226126,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2728,
+        "request_sha256": "2b11057143bdae749012ec24182f99010211f81a6b58c74ba6159077711d8d91"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0005_R0",
+        "input_upper_tokens": 223948,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2737,
+        "request_sha256": "957a384d0e6641a957bc9cb5b3eb2726382afc25893e258e0b72b666a3cd5982"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0006_R0",
+        "input_upper_tokens": 224045,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2763,
+        "request_sha256": "7b34a4b6190b73c382032b5d6a6784e8fb9b7c418e9cce7319b83b6fecde94a2"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0007_R0",
+        "input_upper_tokens": 226682,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2739,
+        "request_sha256": "a5a12eddae73a43d6f72a135ac7747e4892d5676ebca6c29cef2833c446134a3"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0008_R0",
+        "input_upper_tokens": 225099,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2724,
+        "request_sha256": "84fd1a45aacb5aaba383d7d09000a78548dc8ddad4407583e09e5ef843b7b270"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0009_R0",
+        "input_upper_tokens": 224439,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2746,
+        "request_sha256": "b3b567d71b3b1fa9124384f4463a2233ef02ae90f5cb3d81c15b68ac17d0fadf"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0010_R0",
+        "input_upper_tokens": 224868,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2758,
+        "request_sha256": "8a76122de5e63d05079ae0a3668c3460de74b53603940b0e58489bceee79f516"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0011_R0",
+        "input_upper_tokens": 226696,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2725,
+        "request_sha256": "996ac10edc9298a6c33fbdac44f5f62be38575d8c27691cb10dc129c4993c67f"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0012_R0",
+        "input_upper_tokens": 225138,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2730,
+        "request_sha256": "4e311615b725f2bab9a6e3c4a975eb2ca855a7f0c04c6c9ddd78829ec6e9aeac"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0013_R0",
+        "input_upper_tokens": 223360,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2762,
+        "request_sha256": "c13813c8ff07c07e41c153fe0abb3fb1705db857cef4ed4f2c254c99e53c51b2"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0014_R0",
+        "input_upper_tokens": 225951,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2742,
+        "request_sha256": "ae2eaba2cdb84364c8b573162ebb760cd754ccb9637b4869e566a6a361452bd9"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0015_R0",
+        "input_upper_tokens": 227555,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3020,
+        "request_sha256": "2a30f92b744b79e715761f9f78fd6be36025b3731704ca727f5ce1f83ba6d29a"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0016_R0",
+        "input_upper_tokens": 229390,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "f65807ed1979b28b58163b36a5db3931a1d2a71ed5765eee815032cdacb8b59f"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0017_R0",
+        "input_upper_tokens": 229286,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "58febee9111a88351ed11f7915b1b64995668d88d0b3d93f799e75f8b389588e"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0018_R0",
+        "input_upper_tokens": 202561,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "40801f85c0ca766fbbecd72fdfd20b38fc3229c336b692fff704b3587fd64441"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0019_R0",
+        "input_upper_tokens": 198696,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3472,
+        "request_sha256": "6fb7ff74bb5975d84bafb8badec6dbeadb1510d50254121d50ecc87f00e22756"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0020_R0",
+        "input_upper_tokens": 198752,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3500,
+        "request_sha256": "cb8869eb898285aa371d6f93691bef547e758be42b27f57c17997564a5cdcc66"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0021_R0",
+        "input_upper_tokens": 198752,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3500,
+        "request_sha256": "4537d6dee1da4091138e0e25e1fef9a78d459b37e9db7e2680624b55aa5385f0"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0022_R0",
+        "input_upper_tokens": 188616,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2592,
+        "request_sha256": "56c25f4d16394b7d0611f150dffbfa3e447d841ba8d7e5b10d1c677c8a311cf7"
+      }
+    ]
+  },
+  "one_edit": {
+    "calls": {
+      "LOCAL": 1,
+      "GLOBAL": 23
+    },
+    "total_calls": 24,
+    "input_upper_tokens": 5228585,
+    "output_allowance": 194000,
+    "max_input_plus_output": 237404,
+    "cost_input_bytes_div3_output25pct": 3.9707233333333334,
+    "cost_all_input_byte_bound_all_output_caps": 12.39717,
+    "per_request": [
+      {
+        "mode": "LOCAL",
+        "name": "LOCAL_1836877ebf5b0ea9fbf8_R0",
+        "input_upper_tokens": 177408,
+        "output_allowance": 10000,
+        "response_upper_tokens": 3437,
+        "request_sha256": "682e2fa1234d8810894580553943c6bbbe59d70322a713c4e348ce5b5f256698"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0000_R0",
+        "input_upper_tokens": 226388,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2727,
+        "request_sha256": "a4c5bddb404aeefd33b1d97248fe9a4ad46622db7a866c4cc83fc19d3769cc74"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0001_R0",
+        "input_upper_tokens": 225102,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2729,
+        "request_sha256": "bc405c0de14b744b2f6ef0f377e05ad25e9f76bf9d1f70c00ffb4f38e6211922"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0002_R0",
+        "input_upper_tokens": 223305,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2763,
+        "request_sha256": "f166d2dd20c2844b0fc9162e7a28d1357d7b411d2a75ac65e77a7253e567c617"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0003_R0",
+        "input_upper_tokens": 226156,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2739,
+        "request_sha256": "d9d327ea7fb44ed0de562053be4f54314a270c687ad5fa1275f9ef2823aca6dd"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0004_R0",
+        "input_upper_tokens": 226140,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2728,
+        "request_sha256": "e7985caed41dfed5d57910ef2658b9879e0898838e3c46f8112893411341d33f"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0005_R0",
+        "input_upper_tokens": 223962,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2737,
+        "request_sha256": "9b85176f9ac3e0fb2c3cf097d433ffc11d183dc1325dc547a0b7c5f3905866b0"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0006_R0",
+        "input_upper_tokens": 224059,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2763,
+        "request_sha256": "433d708a148a0117596cefd023397e6db7b9f5b66bef58525edca8ddd873d0bb"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0007_R0",
+        "input_upper_tokens": 226696,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2739,
+        "request_sha256": "52814b3a6add4c1965c529ecc1f4ae78e38c74bc3bc1d184c33f7d3fa32ce9b5"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0008_R0",
+        "input_upper_tokens": 225113,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2724,
+        "request_sha256": "5f5ce1a9c22322fdee1b6c749348c89216c30911abcb937b9b5ce91234ed7b59"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0009_R0",
+        "input_upper_tokens": 224453,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2746,
+        "request_sha256": "b74a62f2626f11fcb93f62855b32b142ce6880cf06aa7ea6b24daa64119d7dbc"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0010_R0",
+        "input_upper_tokens": 224882,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2758,
+        "request_sha256": "89bcd5286cf58db781c7914ddef413d6507ca2680bca225ab178207d3ea67b5a"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0011_R0",
+        "input_upper_tokens": 226710,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2725,
+        "request_sha256": "8210a14cd90a83a24889448ed9f726fcd111812ee0029400d6d742167b734c2d"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0012_R0",
+        "input_upper_tokens": 225152,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2730,
+        "request_sha256": "4f606c6ac53c393652368ba5d6ae71203737ab1cf3c6217fa29f4a922fa3f72e"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0013_R0",
+        "input_upper_tokens": 223374,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2762,
+        "request_sha256": "f228a9603e4720b45de1bb7e6cc846c73420dce6d09767c97547971eab868cb0"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0014_R0",
+        "input_upper_tokens": 225965,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2742,
+        "request_sha256": "fbc52b89685945336dd29f8c5876a74714846b06f5331b2c91a97b515080b16d"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0015_R0",
+        "input_upper_tokens": 227569,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3020,
+        "request_sha256": "3e7990e7ee55c117fdbbc60cc6f57af36b6f9e8ede50578b3021e49c665e7908"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0016_R0",
+        "input_upper_tokens": 229404,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "9a94945b0961bd20b141d81316021ccd99294ee4d18b93171f6d675e9c5d96f7"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0017_R0",
+        "input_upper_tokens": 229300,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "695ed7cadb72d2dbe6f707abc8ea77f88e9af6e2b28ae9ef5b3aad1c592a4a20"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0018_R0",
+        "input_upper_tokens": 202575,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3444,
+        "request_sha256": "c05d2edbcec65eefa3224f4aea1011826c712848e65a744dbb8d79fdcdf5949c"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0019_R0",
+        "input_upper_tokens": 198710,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3472,
+        "request_sha256": "c18cc6e84b7a1d6b692335caaa01a63e9ef88e0b6eb5f3aef448a15a216211f2"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0020_R0",
+        "input_upper_tokens": 198766,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3500,
+        "request_sha256": "88a5063dd9597aac74fa841dacfbe3d5bd1186ab141ad09b52044cbb4f7016bc"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0021_R0",
+        "input_upper_tokens": 198766,
+        "output_allowance": 8000,
+        "response_upper_tokens": 3500,
+        "request_sha256": "7c5b18c4b1b884b1d98ce77505f5ce7ebc38bb4d103c86d2b84fc7fc52ac34fd"
+      },
+      {
+        "mode": "GLOBAL",
+        "name": "GLOBAL_0022_R0",
+        "input_upper_tokens": 188630,
+        "output_allowance": 8000,
+        "response_upper_tokens": 2592,
+        "request_sha256": "2aed21ddef7fbfb0ed04ba1d262526441f7d194a2d3c2e889652fbf98635c56f"
+      }
+    ]
+  },
+  "legacy_same_fixture_input_upper": 6563415,
+  "legacy_output_allowance": 32000,
+  "single_edit_coverage": {
+    "occurrences_total": 257,
+    "occurrences_reviewed": 257,
+    "global_index_entries_reviewed": 2892,
+    "inventory_fingerprint": "fde0c43bf3e761920fe378b360956f3598cd81359ca459a022e898850e00c98a"
+  },
+  "unchanged_A07_registry": "631d6744bcad9006356382aa392d72edb6635c135eaa9b5c1f6871acf6de8b7d"
+}

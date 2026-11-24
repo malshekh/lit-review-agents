@@ -1,0 +1,73 @@
+{
+  "retrieved_at": "2026-10-30T00:47:24",
+  "models": {
+    "claude-opus-5": {
+      "source": "GET https://api.anthropic.com/v1/models/claude-opus-5",
+      "status": 200,
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "configured_window": 1000000,
+      "configured_within_provider": true
+    },
+    "claude-sonnet-5-5": {
+      "source": "GET https://api.anthropic.com/v1/models/claude-sonnet-5-5",
+      "status": 200,
+      "max_input_tokens": 1000000,
+      "max_tokens": 128000,
+      "configured_window": 1000000,
+      "configured_within_provider": true
+    },
+    "kimi-k3.1-pro": {
+      "source": "GET https://api.moonshot.ai/v1/models",
+      "status": 200,
+      "context_length": 1048576,
+      "reasoning": {
+        "type": "only",
+        "effort": {
+          "valid": [
+            "low",
+            "high",
+            "max"
+          ],
+          "default": "max"
+        }
+      },
+      "configured_window": 1048576,
+      "configured_within_provider": true
+    },
+    "kimi-k3": {
+      "source": "GET https://api.moonshot.ai/v1/models",
+      "status": 200,
+      "context_length": 1048576,
+      "reasoning": {
+        "type": "only",
+        "effort": {
+          "valid": [
+            "low",
+            "high",
+            "max"
+          ],
+          "default": "max"
+        }
+      },
+      "configured_window": null,
+      "configured_within_provider": null
+    },
+    "kimi-k2.6": {
+      "source": "GET https://api.moonshot.ai/v1/models",
+      "status": 200,
+      "context_length": 262144,
+      "reasoning": null,
+      "configured_window": null,
+      "configured_within_provider": null
+    },
+    "gpt-6.1-sol": {
+      "source": "GET https://api.openai.com/v1/models/gpt-6.1-sol",
+      "status": 200,
+      "reported_window": null,
+      "note": "the endpoint reports no context window",
+      "configured_window": 1050000,
+      "configured_within_provider": null
+    }
+  }
+}

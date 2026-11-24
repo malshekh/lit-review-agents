@@ -1,0 +1,947 @@
+{
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "const": "A05-KE"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "content_level": {
+      "enum": [
+        "ABSTRACT",
+        "FULL_TEXT"
+      ]
+    },
+    "sections_inspected": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "study_profile": {
+      "type": "object",
+      "properties": {
+        "study_type": {
+          "type": "string",
+          "enum": [
+            "PRIMARY_RESEARCH",
+            "REVIEW",
+            "SYSTEMATIC_REVIEW_META_ANALYSIS",
+            "METHODS_PAPER",
+            "COMMENTARY",
+            "CASE_REPORT",
+            "PROTOCOL",
+            "NOT_REPORTED"
+          ]
+        },
+        "evidence_systems": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "IN_SILICO",
+              "IN_VITRO_CELL_FREE",
+              "IN_VITRO_CELLULAR",
+              "IN_VITRO_3D",
+              "EX_VIVO",
+              "IN_VIVO_ANIMAL",
+              "HUMAN_OBSERVATIONAL",
+              "HUMAN_INTERVENTIONAL",
+              "NOT_REPORTED"
+            ]
+          },
+          "minItems": 1
+        },
+        "in_silico_subtype": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "human_design": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trial_phase": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "registration_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "funding_and_conflicts": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "study_type",
+        "evidence_systems",
+        "in_silico_subtype",
+        "human_design",
+        "trial_phase",
+        "registration_id",
+        "funding_and_conflicts"
+      ],
+      "additionalProperties": false
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subtype": {
+            "type": "string"
+          },
+          "molecule_species": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "measured_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "identity_relation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status_source": {
+            "type": "string"
+          },
+          "entity_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mention": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "construct": {
+            "type": "object",
+            "properties": {
+              "form": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              },
+              "species_of_construct": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "form",
+              "source",
+              "tag",
+              "variant",
+              "species_of_construct"
+            ],
+            "additionalProperties": false
+          },
+          "normalized_id": {
+            "type": "null"
+          },
+          "normalization_state": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "subtype",
+          "molecule_species",
+          "measured_at",
+          "identity_relation",
+          "status_source",
+          "entity_id",
+          "mention",
+          "type",
+          "roles",
+          "construct",
+          "normalized_id",
+          "normalization_state"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "contexts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fields": {
+            "type": "object",
+            "properties": {
+              "species": {
+                "type": "string"
+              },
+              "strain": {
+                "type": "string"
+              },
+              "sex": {
+                "type": "string"
+              },
+              "age_or_stage": {
+                "type": "string"
+              },
+              "model_type": {
+                "type": "string"
+              },
+              "cell_line_or_type": {
+                "type": "string"
+              },
+              "primary_or_immortalized": {
+                "type": "string"
+              },
+              "donor_disease_status": {
+                "type": "string"
+              },
+              "genetic_modification": {
+                "type": "string"
+              },
+              "authentication_reported": {
+                "type": "string"
+              },
+              "population": {
+                "type": "string"
+              },
+              "sex_distribution": {
+                "type": "string"
+              },
+              "age": {
+                "type": "string"
+              },
+              "setting": {
+                "type": "string"
+              },
+              "inclusion_criteria_summary": {
+                "type": "string"
+              },
+              "relationship_to_disease": {
+                "type": "string"
+              },
+              "agent": {
+                "type": "string"
+              },
+              "route": {
+                "type": "string"
+              },
+              "frequency": {
+                "type": "string"
+              },
+              "duration": {
+                "type": "string"
+              },
+              "timepoint": {
+                "type": "string"
+              },
+              "vehicle": {
+                "type": "string"
+              },
+              "assay": {
+                "type": "string"
+              },
+              "readout": {
+                "type": "string"
+              },
+              "measured_at": {
+                "type": "string"
+              },
+              "endpoint": {
+                "type": "string"
+              },
+              "replicate_type": {
+                "type": "string"
+              },
+              "biological_vs_technical": {
+                "type": "string"
+              },
+              "randomization": {
+                "type": "string"
+              },
+              "blinding": {
+                "type": "string"
+              },
+              "statistics_test": {
+                "type": "string"
+              },
+              "matrix": {
+                "type": "string"
+              },
+              "sample_preparation": {
+                "type": "string"
+              },
+              "reference_method": {
+                "type": "string"
+              },
+              "evaluation_unit": {
+                "type": "string"
+              },
+              "data_split": {
+                "type": "string"
+              },
+              "uncertainty": {
+                "type": "string"
+              },
+              "limitations": {
+                "type": "string"
+              },
+              "n": {
+                "type": "string"
+              },
+              "n_organisms": {
+                "type": "string"
+              },
+              "n_participants": {
+                "type": "string"
+              },
+              "dose_or_concentration": {
+                "type": "string"
+              },
+              "evidence_system": {
+                "type": "string",
+                "enum": [
+                  "IN_SILICO",
+                  "IN_VITRO_CELL_FREE",
+                  "IN_VITRO_CELLULAR",
+                  "IN_VITRO_3D",
+                  "EX_VIVO",
+                  "IN_VIVO_ANIMAL",
+                  "HUMAN_OBSERVATIONAL",
+                  "HUMAN_INTERVENTIONAL",
+                  "NOT_REPORTED"
+                ]
+              },
+              "comparator": {
+                "type": "string",
+                "enum": [
+                  "UNTREATED",
+                  "VEHICLE",
+                  "PLACEBO",
+                  "SHAM",
+                  "WILD_TYPE",
+                  "SCRAMBLED_OR_NON_TARGETING",
+                  "ISOTYPE",
+                  "ACTIVE_COMPARATOR",
+                  "BASELINE",
+                  "NONE_REPORTED",
+                  "NOT_APPLICABLE",
+                  "NOT_REPORTED"
+                ]
+              },
+              "statistical_test": {
+                "type": "string"
+              },
+              "species_from_cell_line_lookup": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "species",
+              "strain",
+              "sex",
+              "age_or_stage",
+              "model_type",
+              "cell_line_or_type",
+              "primary_or_immortalized",
+              "donor_disease_status",
+              "genetic_modification",
+              "authentication_reported",
+              "population",
+              "sex_distribution",
+              "age",
+              "setting",
+              "inclusion_criteria_summary",
+              "relationship_to_disease",
+              "agent",
+              "route",
+              "frequency",
+              "duration",
+              "timepoint",
+              "vehicle",
+              "assay",
+              "readout",
+              "measured_at",
+              "endpoint",
+              "replicate_type",
+              "biological_vs_technical",
+              "randomization",
+              "blinding",
+              "statistics_test",
+              "matrix",
+              "sample_preparation",
+              "reference_method",
+              "evaluation_unit",
+              "data_split",
+              "uncertainty",
+              "limitations",
+              "n",
+              "n_organisms",
+              "n_participants",
+              "dose_or_concentration",
+              "evidence_system",
+              "comparator",
+              "statistical_test",
+              "species_from_cell_line_lookup",
+              "note"
+            ],
+            "additionalProperties": false
+          },
+          "context_source": {
+            "type": "string",
+            "enum": [
+              "IN_SPAN",
+              "ELSEWHERE_IN_PAPER",
+              "NOT_REPORTED"
+            ]
+          },
+          "context_spans": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "context_id",
+          "fields",
+          "context_source",
+          "context_spans"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject_entity_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "span": {
+            "type": "string",
+            "minLength": 1
+          },
+          "warrant_note": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "primary_theme_id": {
+            "type": "string"
+          },
+          "predicate": {
+            "enum": [
+              "ASSOCIATED_WITH",
+              "CORRELATES_WITH",
+              "PREDICTS",
+              "DETECTS",
+              "EXPRESSED_IN",
+              "LOCALIZES_TO",
+              "COLOCALIZES_WITH",
+              "INTERACTS_WITH",
+              "BINDS",
+              "TARGETS",
+              "INHIBITS",
+              "ACTIVATES",
+              "CATALYZES",
+              "IS_SUBSTRATE_OF",
+              "METABOLIZES",
+              "INCREASES",
+              "DECREASES",
+              "REGULATES",
+              "REQUIRED_FOR",
+              "CAUSES",
+              "PREVENTS",
+              "IMPROVES_OUTCOME",
+              "WORSENS_OUTCOME",
+              "NO_EFFECT_ON",
+              "NO_SIGNIFICANT_DIFFERENCE",
+              "SYNERGIZES_WITH",
+              "ANTAGONIZES",
+              "ADDITIVE_WITH",
+              "POTENTIATES",
+              "SENSITIZES_TO",
+              "REVERSES_EFFECT_OF",
+              "ACTIVE_AGAINST",
+              "MORE_EFFECTIVE_THAN",
+              "SIMILAR_TO",
+              "DETECTED_IN",
+              "CROSSES",
+              "CONVERTED_TO",
+              "EXPLAINED_BY",
+              "PRECEDES",
+              "DISTINCT_FROM",
+              "USED_FOR",
+              "UNDER_INVESTIGATION_FOR",
+              "OBSERVED_OUTCOME",
+              "TOLERATED",
+              "MAXIMUM_TOLERATED_DOSE",
+              "HALF_LIFE",
+              "OTHER_SPECIFIED"
+            ]
+          },
+          "predicate_detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "object_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "polarity": {
+            "type": "string",
+            "enum": [
+              "POSITIVE",
+              "NEGATIVE",
+              "NULL",
+              "UNSPECIFIED"
+            ]
+          },
+          "modality": {
+            "type": "string",
+            "enum": [
+              "ASSERTED",
+              "HEDGED",
+              "SPECULATIVE",
+              "NEGATED",
+              "REPORTED_BY_OTHERS"
+            ]
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "INCREASE",
+              "DECREASE",
+              "NO_CHANGE",
+              "ALTERED_UNSPECIFIED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "assertion_type": {
+            "type": "string",
+            "enum": [
+              "REPORTED_RESULT",
+              "AUTHORS_INTERPRETATION"
+            ]
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "EXPLICIT",
+              "SAME_SOURCE_IMPLICIT"
+            ]
+          },
+          "span_location": {
+            "type": "object",
+            "properties": {
+              "section": {
+                "type": "string"
+              },
+              "figure_or_table": {
+                "type": "string"
+              },
+              "paragraph": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "section",
+              "figure_or_table",
+              "paragraph"
+            ],
+            "additionalProperties": false
+          },
+          "premise_spans": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "bridge": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "measured_property": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "raw_value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "raw_unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value_type": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variance_or_ci": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "p_value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "n": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "converted": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "value": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string"
+                        },
+                        "conversion": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "value",
+                        "unit",
+                        "conversion"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "measured_property",
+                "raw_value",
+                "raw_unit",
+                "value_type",
+                "variance_or_ci",
+                "p_value",
+                "n",
+                "converted"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "contradicts_prior_report": {
+            "type": "boolean"
+          },
+          "attributed_to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subthemes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "emerging": {
+            "type": "boolean"
+          },
+          "emerging_note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "knowledge_assist": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "finding_id",
+          "subject_entity_id",
+          "span",
+          "warrant_note",
+          "context_id",
+          "primary_theme_id",
+          "predicate",
+          "predicate_detail",
+          "object_entity_id",
+          "polarity",
+          "modality",
+          "direction",
+          "assertion_type",
+          "origin",
+          "span_location",
+          "premise_spans",
+          "bridge",
+          "quantities",
+          "contradicts_prior_report",
+          "attributed_to",
+          "subthemes",
+          "emerging",
+          "emerging_note",
+          "knowledge_assist"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "predicate": {
+                  "const": "OTHER_SPECIFIED"
+                }
+              },
+              "required": [
+                "predicate"
+              ]
+            },
+            "then": {
+              "required": [
+                "predicate_detail"
+              ],
+              "properties": {
+                "predicate_detail": {
+                  "type": "string",
+                  "minLength": 3
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "predicate": {
+                  "not": {
+                    "enum": [
+                      "HALF_LIFE",
+                      "MAXIMUM_TOLERATED_DOSE",
+                      "OBSERVED_OUTCOME",
+                      "TOLERATED"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "predicate"
+              ]
+            },
+            "then": {
+              "required": [
+                "object_entity_id"
+              ],
+              "properties": {
+                "object_entity_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "author_stated_limitations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "location"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "in_paper_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_ids",
+          "description"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "out_of_scope_observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "span": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "span",
+          "note"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "source_access": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "ABSTRACT",
+            "FULL_TEXT"
+          ]
+        },
+        "figure_legends_read": {
+          "type": "boolean"
+        },
+        "figure_images_inspected": {
+          "const": false
+        },
+        "supplements_inspected": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "figure_legends_read",
+        "figure_images_inspected",
+        "supplements_inspected",
+        "note"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "record_id",
+    "content_level",
+    "sections_inspected",
+    "study_profile",
+    "entities",
+    "contexts",
+    "findings",
+    "author_stated_limitations",
+    "in_paper_conflicts",
+    "out_of_scope_observations",
+    "source_access"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Anthropic extraction wire contract; all local scientific fields retained"
+}

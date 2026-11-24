@@ -79,8 +79,9 @@
       },
       "maxItems": 8
     },
-    "fivew1h": {
+    "unresolved_questions": {
       "type": "array",
+      "maxItems": 12,
       "items": {
         "type": "object",
         "properties": {
@@ -89,19 +90,23 @@
             "minLength": 1,
             "maxLength": 120
           },
-          "unresolved": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 480
+          "questions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 480
+            }
           }
         },
         "required": [
           "theme_id",
-          "unresolved"
+          "questions"
         ],
         "additionalProperties": false
-      },
-      "maxItems": 9
+      }
     }
   },
   "required": [
@@ -113,7 +118,7 @@
     "limitations",
     "theme_change_proposals",
     "scope_drift",
-    "fivew1h"
+    "unresolved_questions"
   ],
   "additionalProperties": false
 }

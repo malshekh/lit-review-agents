@@ -4,9 +4,12 @@
   litreview new --topic topic.md [--notes notes.md] [--seeds seeds.txt] [--family NAME]
   litreview run <run_id> [--until STAGE]   run or resume until the next checkpoint, the end, or STAGE
   litreview status <run_id>                current stage, status and spend
-  litreview approve <run_id> CP1|CP2|CP3   record your checkpoint decision
+  litreview approve <run_id> CP1|CP2|CP3|CP_LEDGER|CP_CONTRARY|CP_CONTEXT|CP_SPEND   record a decision
   litreview revise <run_id> CP1|CP3 --feedback feedback.md   send the stage back with your corrections
   litreview costs <run_id>                 per-agent cost breakdown
+  litreview repair-import <run_id> <step> --agent A0X --file fixed.json --by NAME --reason TEXT
+                                           use your repair of an output that failed its schema (no second payment)
+  litreview submission-check <run_id>      recompute the submission checklist after editing final/declarations
   litreview verify <run_id> <record_id> --statement TEXT [--matches TEXT]
                                            record that you verified an inconsistency inside a paper
 """
@@ -56,7 +59,13 @@ def cmd_check(args) -> int:
 
 def cmd_new(args) -> int:
     seeds = [s for s in _read(args.seeds).splitlines() if s.strip()]
-    run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family)
+    run_id = new_run(_read(args.topic), _read(args.notes), seeds, args.family, budget_authority=args.budget_authority, corpus_mode=args.corpus_mode,
+                     scope_configuration=json.loads(_read(args.scope_configuration)) if args.scope_configuration else None,
+                     profile=args.profile,
+                     outline=json.loads(_read(args.outline)) if args.outline else None,
+                     corpus_manifest=json.loads(_read(args.corpus)) if args.corpus else None,
+                     spec_base_dir=Path(args.corpus).resolve().parent if args.corpus else None)
+    print(f"Created run {run_id}. Next: litreview run {run_id}")
     print(f"Created run {run_id}. Start it with:  litreview run {run_id}")
     return 0
 
@@ -65,6 +74,197 @@ def cmd_run(args) -> int:
     status = Run(args.run_id).run(until=args.until)
     print(status)
     return 0
+
+
+def cmd_repair_import(args) -> int:
+    from .repair_import import ImportRefused, import_output
+    try:
+        audit = import_output(Run(args.run_id), args.step, args.agent, Path(args.file), args.by, args.reason, args.schema)
+    except ImportRefused as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Imported outputs/{args.step}.json ({len(audit['changed_paths'])} JSON path(s) differ from the saved reply; "
+          f"audit in outputs/{args.step}.repair.audit.json). The next `litreview run {args.run_id}` uses it without "
+          "paying for the call again.")
+    return 0
+
+
+def cmd_output_shares(args) -> int:
+    from .tools import output_shares
+    try:
+        measured = output_shares.measure(RUNS_DIR / args.run_id)
+    except output_shares.NotRepresentative as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(json.dumps(measured, indent=2))
+    if args.write:
+        written = output_shares.write(measured)
+        print(f"records/output_shares.json: {len(written)} cell(s) now MEASURED: {', '.join(written) or 'none'} "
+              f"(a cell needs at least {output_shares.MIN_CALLS} completed calls)")
+    return 0
+
+
+def cmd_clear_refusal(args) -> int:
+    from . import model_record
+    if args.model not in model_record.refused(args.family):
+        print(f"{args.model} has no standing refusal in topic family '{args.family}'")
+        return 1
+    model_record.clear(args.model, args.family, args.by, args.reason)
+    print(f"Recorded: refusals of {args.model} in '{args.family}' before now no longer disqualify it. "
+          "A new refusal disqualifies it again.")
+    return 0
+
+
+def cmd_decide(args) -> int:
+    from .decisions import DecisionError
+    targets = {"finding_ids": args.findings, "record_ids": args.records, "section_ids": args.sections,
+               "theme_ids": args.themes, "agents": args.agents, "all": args.all}
+    targets = {k: ([x.strip() for x in v.split(",")] if isinstance(v, str) else v) for k, v in targets.items() if v}
+    try:
+        entry = Run(args.run_id).decide(args.kind, args.instruction or "", targets, args.by, args.checkpoint or "",
+                                        args.reason or "", args.id, args.withdraw)
+    except DecisionError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(json.dumps(entry, indent=2, ensure_ascii=False))
+    print("Applied. Every request that contains an item this decision names now carries it, and outputs made "
+          "without it are no longer reused.")
+    return 0
+
+
+def cmd_revise_framework(args) -> int:
+    try:
+        themes = json.loads(Path(args.file).read_text(encoding="utf-8"))
+        themes = themes.get("primary_themes", themes) if isinstance(themes, dict) else themes
+        new = Run(args.run_id).revise_framework(themes, args.by, args.reason)
+    except (ValueError, OSError) as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Theme framework is now version {new['version']}. Theme records are marked stale and will be rebuilt.")
+    return 0
+
+
+def cmd_resolve_dispatch(args) -> int:
+    from .job_ledger import Ledger
+    run = Run(args.run_id)
+    ledger = Ledger(run.dir)
+    if not args.step:
+        rows = ledger.ambiguous()
+        for e in rows:
+            print(f"  {e['step']}  sent {e['time']}  (attempt {e['attempt']}, reservation {e.get('reservation')})")
+        print(f"{len(rows)} request(s) in flight with no saved reply." if rows else "No request is in an ambiguous state.")
+        return 0
+    if args.billed == args.not_billed:
+        print("Say what the provider's usage page shows: --billed or --not-billed")
+        return 1
+    try:
+        event = ledger.resolve(args.step, args.billed, args.by or "", args.note or "")
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    run.prov.human_decision("DISPATCH_RESOLVED", {"step": args.step, "billed": args.billed, "by": args.by}, args.note)
+    if event.get("reservation") and event["reservation"] in run.budget.reservations():
+        if args.billed:
+            print(f"The hold {event['reservation']} stays: the provider billed a reply this run never received. Record "
+                  "the billed amount with scripts/reconcile_billing.py; the call will be sent again when you run.")
+        run.budget.release(event["reservation"])
+    print(f"Recorded. `litreview run {args.run_id}` will send {args.step} again.")
+    return 0
+
+
+def cmd_spec_check(args) -> int:
+    from . import config, run_spec
+    try:
+        summary = run_spec.check(json.loads(_read(args.outline)), json.loads(_read(args.corpus)),
+                                 config.load("pipeline").get("run_spec") or {}, Path(args.corpus).resolve().parent)
+    except run_spec.SpecError as e:
+        print(f"{len(e.problems)} problem(s):")
+        for p in e.problems:
+            print(f"  - {p}")
+        return 1
+    except (OSError, ValueError) as e:
+        print(f"cannot read the files: {e}")
+        return 1
+    print(json.dumps(summary, indent=2))
+    print("The outline and the corpus manifest are valid. No model was called.")
+    return 0
+
+
+def cmd_smoke_test(args) -> int:
+    import tempfile
+    from . import structured
+    run_id = getattr(args, "run_id", None)
+    if args.approve_usd is not None and not run_id:
+        print("REFUSED: paid smoke tests require --run-id so receipts count against the combined run cap")
+        return 1
+    budget = Run(run_id).budget if run_id else BudgetTracker(Path(tempfile.mkdtemp()))
+    usd, todo = structured.smoke_estimate(budget)
+    print(f"{len(todo)} provider/model/schema combination(s) not yet confirmed; worst case ${usd:.2f}:")
+    for t in todo:
+        print(f"  {t['agent']:8s} {t['provider']:9s} {t['model']:18s} {t['schema_file']}")
+    if args.approve_usd is None:
+        print("Nothing was sent. To run it: litreview smoke-test --approve-usd <amount> --by <your name>")
+        return 0
+    try:
+        result = structured.smoke_test(budget, args.approve_usd, args.by or "")
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    print(f"Tested {result['tested']}, accepted {result['accepted']}, spent ${result['spent_usd']:.4f} "
+          "(run smoke_tests.jsonl and smoke_receipts/; records/structured_output.json).")
+    for r in result["results"]:
+        if not r["accepted"]:
+            print(f"  NOT accepted: {r['provider']} {r['model']} {r['schema_file']}: {r.get('error') or r.get('stop_reason')}")
+    return 0 if result["tested"] == result["accepted"] else 1
+
+
+def cmd_settle_smoke_hold(args) -> int:
+    """List a run's uncertain smoke holds; with --reservation, --billed-usd, --evidence and --by, settle one."""
+    from . import structured
+    run = Run(args.run_id)
+    holds = structured.unsettled_smoke_holds(run.budget)
+    if not args.reservation:
+        if not holds:
+            print("No smoke reservation is held in this run.")
+            return 0
+        print(f"{len(holds)} smoke reservation(s) held (nothing is assumed free; each needs billing evidence):")
+        for h in holds:
+            print(f"  {h['reservation']}  ${h['held_usd']:.6f}  {h['state']}  {h.get('provider', '?')} {h.get('model', '?')}"
+                  f"  request {h.get('provider_request_id') or 'not recorded'}  {h.get('error', '')[:160]}")
+        print("To settle one: litreview settle-smoke-hold <run_id> --reservation <key> --billed-usd <amount> "
+              "--evidence \"<what shows the billed amount>\" --by \"<your name>\" [--request-id <ID>] [--provider <p> --model <m>]")
+        return 0
+    missing = [n for n, v in (("--billed-usd", args.billed_usd), ("--evidence", args.evidence), ("--by", args.by))
+               if v is None or (isinstance(v, str) and not v.strip())]
+    if missing:
+        print(f"REFUSED: settling a hold needs {', '.join(missing)}; nothing was changed")
+        return 1
+    try:
+        done = structured.settle_smoke_hold(run.budget, args.reservation, args.billed_usd, args.evidence, args.by,
+                                            provider_request_id=args.request_id, provider=args.provider, model=args.model)
+    except ValueError as e:
+        print(f"REFUSED: {e}")
+        return 1
+    run.prov.human_decision("SMOKE_HOLD_SETTLEMENT", done, "uncertain smoke dispatch settled on attested billing evidence")
+    print(f"Settled {done['reservation']}: billed ${done['billed_usd']:.6f} (held ${done['held_usd']:.6f}), "
+          f"attested by {done['attested_by']}. The reservation is released; the amount is in costs.jsonl.")
+    return 0
+
+
+def cmd_submission_check(args) -> int:
+    try:
+        ready = Run(args.run_id).submission_check()
+    except ValueError as e:
+        print(e)
+        return 1
+    if ready["submission_ready"]:
+        print("Submission checklist: all items pass. Re-run `litreview run` to write the final declarations into "
+              "the manuscript files if you edited them after the export.")
+        return 0
+    print(f"NOT submission-ready: {len(ready['blockers'])} blocker(s)")
+    for b in ready["blockers"]:
+        print(f"  - {b}")
+    return 1
 
 
 def cmd_verify(args) -> int:
@@ -208,7 +408,10 @@ def cmd_review_validation(args) -> int:
 
 
 def cmd_cost_rates(args) -> int:
-    from .tools import cost_projection
+    from .tools import cost_projection, output_shares
+    if output_shares.is_sample(RUNS_DIR / args.run_id):
+        print(f"REFUSED: {args.run_id} is a NON-REPRESENTATIVE sample run; its costs never enter the rates or the forecast")
+        return 1
     rates = cost_projection.measured_rates(RUNS_DIR / args.run_id)
     cost_projection.rates_path().write_text(json.dumps(rates, indent=1) + "\n", encoding="utf-8")
     print(json.dumps(rates, indent=1))
@@ -216,13 +419,43 @@ def cmd_cost_rates(args) -> int:
     return 0
 
 
+def cmd_calibration_report(args) -> int:
+    from .tools import calibration_report
+    print(json.dumps(calibration_report.report(RUNS_DIR / args.run_id), indent=1))
+    return 0
+
+
 def cmd_project(args) -> int:
     from .tools import cost_projection
     run = Run(args.run_id)
+    from . import pilot_authorization as pilot
+    if pilot.enabled(run):
+        scope=pilot.STAGE_2 if getattr(args,'stage',None)=='2' else pilot.STAGE_1
+        try: review=pilot.request(run,scope)
+        except pilot.AuthorizationRequired as exc:print(str(exc));return 2
+        print(json.dumps(review,indent=2))
+        return 0 if review['projection']['verdict']=='WITHIN_CAP' else 2
     proj = cost_projection.remaining_for_run(run)
     run.save("cost_projection.json", proj)
     print(cost_projection.text(proj))
     return 0 if proj["verdict"] == "WITHIN_CAP" else 2
+
+
+def cmd_pilot_reference(args) -> int:
+    from . import pilot_authorization as pilot
+    try:pilot.record_key(Run(args.run_id),json.loads(_read(args.metadata)))
+    except (ValueError,OSError) as exc:print(str(exc));return 2
+    print('Human reference-key metadata recorded; key contents never enter research payloads.')
+    return 0
+
+
+def cmd_authorize_stage(args) -> int:
+    from . import pilot_authorization as pilot
+    scope=pilot.STAGE_1 if args.stage=='1' else pilot.STAGE_2
+    try:pilot.approve(Run(args.run_id),scope,args.fingerprint,args.reviewer)
+    except ValueError as exc:print(str(exc));return 2
+    print(scope+' recorded; all scientific checkpoints still apply.')
+    return 0
 
 
 def cmd_mark_evaluation_only(args) -> int:
@@ -249,6 +482,13 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("--seeds")
     n.add_argument("--family", default="unspecified",
                    help="topic family for refusal routing, e.g. oncology-drug-repurposing (see records/model_record.jsonl)")
+    n.add_argument("--scope-configuration", help="human scope configuration with parent CP1 hash; does not approve new checkpoints")
+    n.add_argument("--budget-authority", help="reviewed cumulative evaluation-cost metadata; required for fixed pilot")
+    n.add_argument("--corpus-mode", choices=["FIXED_CORPUS", "OPEN_CORPUS"], default="FIXED_CORPUS")
+    n.add_argument("--outline", help="your outline (JSON; template in docs/run_spec/outline.template.json)")
+    n.add_argument("--corpus", help="your corpus manifest (JSON; template in docs/run_spec/corpus.template.json)")
+    n.add_argument("--profile", help="spend profile from config/pipeline.yaml -> profiles (pilot, sample, manuscript); "
+                                     "recorded with the run, so its cap travels with it")
     n.set_defaults(fn=cmd_new)
     for name, fn in (("run", cmd_run), ("status", cmd_status), ("costs", cmd_costs)):
         s = sub.add_parser(name)
@@ -264,7 +504,8 @@ def main(argv: list[str] | None = None) -> int:
     vf.set_defaults(fn=cmd_verify)
     a = sub.add_parser("approve")
     a.add_argument("run_id")
-    a.add_argument("checkpoint", choices=["CP1", "CP2", "CP_SYN", "CP3"])
+    a.add_argument("checkpoint", choices=["CP1", "CP2", "CP_SYN", "CP3", "CP_LEDGER", "CP_CONTRARY",
+                                         "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW", "CP_EARLY"])
     a.set_defaults(fn=cmd_approve)
     aa = sub.add_parser("approve-alternate", help="accept a costlier alternate model after a refusal (this run only)")
     aa.add_argument("run_id")
@@ -301,15 +542,96 @@ def main(argv: list[str] | None = None) -> int:
     cr = sub.add_parser("cost-rates", help="measure per-paper and per-theme costs from a run (records/cost_rates.json)")
     cr.add_argument("run_id")
     cr.set_defaults(fn=cmd_cost_rates)
+    cb = sub.add_parser("calibration-report", help="report what a run measured for calibration (read only)")
+    cb.add_argument("run_id")
+    cb.set_defaults(fn=cmd_calibration_report)
     pj = sub.add_parser("project", help="project what a run still has to spend; required before spend after CP2")
     pj.add_argument("run_id")
+    pj.add_argument('--stage',choices=['1','2'],default='1',help='staged pilot financial scope; no authorization is granted by projection')
     pj.set_defaults(fn=cmd_project)
+    pr=sub.add_parser('pilot-reference',help='record a human-approved external reference-key version/hash, not its contents')
+    pr.add_argument('run_id');pr.add_argument('--metadata',required=True);pr.set_defaults(fn=cmd_pilot_reference)
+    au=sub.add_parser('authorize-stage',help='explicit human financial approval of the exact pending stage projection')
+    au.add_argument('run_id');au.add_argument('stage',choices=['1','2'])
+    au.add_argument('--fingerprint',required=True);au.add_argument('--reviewer',required=True);au.set_defaults(fn=cmd_authorize_stage)
+    ri = sub.add_parser("repair-import", help="import your repair of a complete output that failed its schema (free)")
+    ri.add_argument("run_id")
+    ri.add_argument("step", help="the step name, as in outputs/<step>.raw0.txt")
+    ri.add_argument("--agent", required=True, help="e.g. A07-SYN")
+    ri.add_argument("--file", required=True, help="the repaired JSON file")
+    ri.add_argument("--schema", help="schema file name when the step used a mode schema, e.g. A07-SYN.bounded-group.schema.json")
+    ri.add_argument("--by", required=True, help="your name")
+    ri.add_argument("--reason", required=True, help="what was wrong and what you changed")
+    ri.set_defaults(fn=cmd_repair_import)
+    os_ = sub.add_parser("output-shares", help="measured output tokens per call from a run (never a sample run)")
+    os_.add_argument("run_id")
+    os_.add_argument("--write", action="store_true", help="replace the measured cells of records/output_shares.json")
+    os_.set_defaults(fn=cmd_output_shares)
+    cl = sub.add_parser("clear-refusal", help="record that a model's earlier refusals in a topic family no longer disqualify it")
+    cl.add_argument("model")
+    cl.add_argument("--family", required=True)
+    cl.add_argument("--by", required=True, help="your name")
+    cl.add_argument("--reason", required=True, help="why, e.g. the result of a one-mode retest")
+    cl.set_defaults(fn=cmd_clear_refusal)
+    dc = sub.add_parser("decide", help="apply a researcher decision to named findings, records, sections or themes")
+    dc.add_argument("run_id")
+    dc.add_argument("--kind", required=True, choices=["WORDING", "CONSTRAINT", "EXCLUSION", "INTERPRETATION_LIMIT"])
+    dc.add_argument("--instruction", help="the exact instruction the agents must follow")
+    dc.add_argument("--findings"); dc.add_argument("--records"); dc.add_argument("--sections"); dc.add_argument("--themes")
+    dc.add_argument("--agents", help="limit to these agents, e.g. A07-SYN,A09-WRI")
+    dc.add_argument("--all", action="store_true", help="every request of the listed agents")
+    dc.add_argument("--by", required=True, help="your name")
+    dc.add_argument("--checkpoint"); dc.add_argument("--reason")
+    dc.add_argument("--id", help="an existing decision to replace with a new version")
+    dc.add_argument("--withdraw", action="store_true")
+    dc.set_defaults(fn=cmd_decide)
+    rf = sub.add_parser("revise-framework", help="change the approved theme framework (the only way to relabel a theme)")
+    rf.add_argument("run_id")
+    rf.add_argument("--file", required=True, help="JSON: the full list of primary themes after the change")
+    rf.add_argument("--by", required=True)
+    rf.add_argument("--reason", required=True)
+    rf.set_defaults(fn=cmd_revise_framework)
+    rd = sub.add_parser("resolve-dispatch", help="list, or settle, a request that was in flight when a run stopped")
+    rd.add_argument("run_id")
+    rd.add_argument("step", nargs="?")
+    rd.add_argument("--billed", action="store_true"); rd.add_argument("--not-billed", action="store_true")
+    rd.add_argument("--by"); rd.add_argument("--note")
+    rd.set_defaults(fn=cmd_resolve_dispatch)
+    sk = sub.add_parser("spec-check", help="validate your outline and corpus manifest (free; no model call)")
+    sk.add_argument("--outline", required=True)
+    sk.add_argument("--corpus", required=True)
+    sk.set_defaults(fn=cmd_spec_check)
+    sm = sub.add_parser("smoke-test", help="list, or run with approval, one tiny live request per model/schema pair")
+    sm.add_argument("--approve-usd", type=float, help="the amount you approve; without it nothing is sent")
+    sm.add_argument("--by", help="your name")
+    sm.add_argument("--run-id", help="run whose combined spending allowance pays for the smoke test")
+    sm.set_defaults(fn=cmd_smoke_test)
+    sh = sub.add_parser("settle-smoke-hold", help="list, or settle on attested billing evidence, an uncertain smoke hold")
+    sh.add_argument("run_id")
+    sh.add_argument("--reservation", help="the held smoke reservation key (smoke-...)")
+    sh.add_argument("--billed-usd", type=float, help="what the provider actually billed for that request")
+    sh.add_argument("--evidence", help="what shows the billed amount (e.g. console usage for the request's window)")
+    sh.add_argument("--by", help="your name")
+    sh.add_argument("--request-id", help="the provider request ID, when the receipt does not record it")
+    sh.add_argument("--provider", help="the provider, when the receipt does not record it")
+    sh.add_argument("--model", help="the model, when the receipt does not record it")
+    sh.set_defaults(fn=cmd_settle_smoke_hold)
+    sc = sub.add_parser("submission-check", help="recompute the submission checklist after editing final/declarations")
+    sc.add_argument("run_id")
+    sc.set_defaults(fn=cmd_submission_check)
     me = sub.add_parser("mark-evaluation-only", help="stamp a run's synthesis so no publication stage accepts it")
     me.add_argument("run_id")
     me.add_argument("--reason", required=True)
     me.set_defaults(fn=cmd_mark_evaluation_only)
     args = p.parse_args(argv)
-    return args.fn(args)
+    from .preflight import PreflightRefused, require_clean_endpoints
+    try:
+        if args.cmd not in ("check", "status", "costs"):   # reading is always allowed; nothing else starts
+            require_clean_endpoints()
+        return args.fn(args)
+    except PreflightRefused as exc:
+        print(f"REFUSED: {exc}")
+        return 2
 
 
 if __name__ == "__main__":

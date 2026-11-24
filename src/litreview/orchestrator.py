@@ -8,31 +8,33 @@ Stage order
   -> outline -> draft -> review_loop -> finish_edit -> finalize -> done
 """
 from __future__ import annotations
+from decimal import Decimal
 
 import dataclasses
 import hashlib
 import json
 import os
+import tempfile
 import re
 import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import checkpoints, config, evidence, handoff, model_record, notify, publication
+from . import checkpoints, config, evidence, handoff, model_record, notify, publication, corpus_policy
 from .agents import AgentError, RefusalError, run_agent
 from .agents.base import prompt_version
 from .budget import BatchGateRefused, BudgetExceeded, BudgetTracker, UnpricedModel
 from .paths import RUNS_DIR, SCHEMAS_DIR
 from .provenance import ProvenanceLog
-from . import synthesis_input, theme_framework
+from . import synthesis_input, theme_framework, pilot_authorization as pilot
 from .agents.base import build_system_prompt, user_parts
 from .batch_stage import BatchStage
 from .synthesis_job import JobStopped
 from .tools import cost_projection
-from .tools import (compliance, display_items, manuscript_export, references, span_check, tags, themes,
-                    verification_scope)
-from .tools.fulltext import fetch_sections
+from .tools import (compliance, display_items, manuscript_export, references, span_check, submission, tags,
+                    themes, verification_scope)
+from .tools.fulltext import fetch_sections, fetch_verified_sections, verify_cached_source, FullTextUnavailable
 from .tools.literature import Record, enabled_sources, search
 from .tools.literature.dedup import deduplicate
 from .tools.literature.expansion import choose_next_seeds, choose_seeds, expand
@@ -56,7 +58,40 @@ class Pause(Exception):
 
 
 # ------------------------------------------------------------------ run setup
-def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified") -> str:
+def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family: str = "unspecified",
+            budget_authority=None, corpus_mode="FIXED_CORPUS", scope_configuration=None,
+            profile: str | None = None, outline: dict | None = None, corpus_manifest: dict | None = None,
+            spec_base_dir: Path | None = None) -> str:
+    from .evaluation_budget import prepare
+    from . import run_spec
+    if corpus_manifest is not None and outline is None:
+        raise ValueError("a corpus manifest needs an outline")
+    spec_limits = config.effective(profile).get("run_spec") or {}
+    if outline is not None and corpus_manifest is None:
+        if corpus_mode != "OPEN_CORPUS":
+            raise ValueError("a discovery run (an outline without a corpus manifest) uses --corpus-mode OPEN_CORPUS")
+        run_spec.check_outline(outline, spec_limits)
+    elif outline is not None:
+        if corpus_mode == "FIXED_CORPUS":
+            raise ValueError("a run with an outline and a corpus manifest uses --corpus-mode OPEN_CORPUS (the manifest "
+                             "fixes the corpus; FIXED_CORPUS is the closed staged pilot)")
+        run_spec.check(outline, corpus_manifest, spec_limits, spec_base_dir)
+    profile = config.run_settings(profile).get("profile")   # an unknown profile is refused here, before any file
+    if profile == "manuscript" and corpus_mode == "FIXED_CORPUS":
+        raise ValueError("The manuscript profile is for the full run: use --corpus-mode OPEN_CORPUS. FIXED_CORPUS "
+                         "is the staged pilot, which keeps its own $35 authorization.")
+    if budget_authority is None and corpus_mode == "OPEN_CORPUS":
+        # A standard run starts from zero under its spend profile. The $35 evaluation authority belongs to the
+        # staged pilot: no earlier spend, approval or financial authorization is carried into a fresh run.
+        authority = None
+    else:
+        authority = prepare(budget_authority)
+        if authority["authority"].get("corpus_mode", "FIXED_CORPUS") != corpus_mode:
+            raise ValueError("Requested corpus mode differs from reviewed budget authority")
+    if scope_configuration is not None and (not isinstance(scope_configuration, dict) or set(scope_configuration) - {
+            "parent_run_id", "parent_cp1_sha256", "purpose", "central_question", "perspective",
+            "selection_criteria", "theme_framework", "qualifications"}):
+        raise ValueError("Scope configuration accepts human-approved scope only, not prior scientific outputs")
     run_id = time.strftime("%Y%m%d-%H%M%S")
     d = RUNS_DIR / run_id / "input"
     d.mkdir(parents=True)
@@ -65,8 +100,40 @@ def new_run(topic: str, notes: str = "", seeds: list[str] | None = None, family:
     (d / "seeds.txt").write_text("\n".join(seeds or []), encoding="utf-8")
     (d / "topic_family.txt").write_text(family, encoding="utf-8")
     (d / "code_version.json").write_text(json.dumps(code_version(), indent=2), encoding="utf-8")
-    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {}})
+    if scope_configuration is not None:
+        (d / "human_scope_configuration.json").write_text(json.dumps(scope_configuration, indent=2), encoding="utf-8")
+    if outline is not None and corpus_manifest is None:
+        run_spec.install_discovery(d.parent, outline, spec_limits)
+    elif outline is not None:
+        run_spec.install(d.parent, outline, corpus_manifest, spec_limits, spec_base_dir)
+        seeds = sorted({p["pmid"] for p in corpus_manifest["papers"] if p.get("pmid")} | set(seeds or []))
+        (d / "seeds.txt").write_text("\n".join(seeds), encoding="utf-8")
+    policy_fingerprint = corpus_policy.initialize(
+        d.parent, corpus_policy.manifest_policy(corpus_manifest) if corpus_manifest is not None
+        else corpus_policy.default_policy(corpus_mode))
+    if authority:
+        (d / "evaluation_budget.json").write_text(json.dumps(authority, indent=2), encoding="utf-8")
+    Run(run_id).save_state({"stage": "scope", "status": "READY", "counters": {},
+                           "execution_mode": "STAGED_PILOT" if corpus_mode == "FIXED_CORPUS" else "STANDARD",
+                           "corpus_policy_fingerprint": policy_fingerprint,
+                           **({"profile": profile} if profile else {})})
     return run_id
+
+
+def compiled_queries(family: dict) -> dict[str, str]:
+    """A query family's compiled queries as {source: query}. The A03 contract returns them as a list of
+    {source, query} (strict structured output has no free-form maps); a plan saved before that change is a map.
+    A source compiled twice is ambiguous and refused rather than silently taking one of the two."""
+    raw = family.get("compiled") or {}
+    if isinstance(raw, dict):
+        return {str(k): v for k, v in raw.items()}
+    out: dict[str, str] = {}
+    for entry in raw:
+        source = entry.get("source")
+        if source in out:
+            raise ValueError(f"query family {family.get('family_id')}: source {source} is compiled twice")
+        out[source] = entry.get("query") or ""
+    return out
 
 
 def code_version() -> dict:
@@ -92,7 +159,12 @@ class Run:
         self.dir = RUNS_DIR / run_id
         self.budget = BudgetTracker(self.dir)
         self.prov = ProvenanceLog(self.dir)
-        self.cfg = config.load("pipeline")
+        recorded = None
+        try:
+            recorded = json.loads((self.dir / "state.json").read_text(encoding="utf-8")).get("profile")
+        except (OSError, ValueError):
+            pass
+        self.cfg = config.effective(recorded)
         self.last_model: str | None = None   # model that served the most recent agent call
 
     # --- state and data helpers ---------------------------------------
@@ -109,11 +181,27 @@ class Run:
         return p
 
     def save(self, name: str, obj) -> None:
-        self.data(name).write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+        # Stream encoder chunks: dumps + write_text holds the full Unicode document,
+        # newline translation and UTF-8 buffers together on Windows. Keep the previous
+        # accepted artifact intact if encoding/writing is interrupted.
+        target = self.data(name)
+        fd, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as stream:
+                json.dump(obj, stream, ensure_ascii=False, indent=2)
+            os.replace(temporary, target)
+        finally:
+            Path(temporary).unlink(missing_ok=True)
 
     def load(self, name: str, default=None):
         p = self.data(name)
-        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
+        if not p.exists():
+            return default
+        # Decode containers incrementally: json.load(stream) calls read() without
+        # a size, retaining a full Unicode document alongside the decoded graph.
+        from .json_stream import load
+        with p.open(encoding="utf-8", newline="") as stream:
+            return load(stream)
 
     def family(self) -> str:
         p = self.dir / "input" / "topic_family.txt"
@@ -161,12 +249,21 @@ class Run:
             "family. If the refusals look like classifier false positives on the wording, reword the topic and "
             "start a run under a new family; otherwise the family is blocked for this agent.")
 
+    def _require_provider_contracts(self) -> None:
+        from . import structured
+        schema_problems = [r for r in structured.schema_inventory() if r["problems"]]
+        if schema_problems:
+            self.save("schema_compatibility.json", schema_problems)
+            raise Pause("configured provider schema compatibility failed; see data/schema_compatibility.json")
+
     def preflight_routing(self) -> None:
         """At run start: stop before any spending if some agent has no unrefused model in this family,
         rather than paying for search and extraction and stopping at synthesis."""
+        self._require_provider_contracts()
         refused = model_record.refused(self.family())
         done = STAGES[:STAGES.index(self.state()["stage"])]
         for agent_id in self.cfg["agents"]:
+            if pilot.enabled(self) and STAGES.index(self.state()["stage"])<=STAGES.index("cp3") and agent_id in pilot.SECOND:continue
             if AGENT_LAST_STAGE.get(agent_id) in done:   # this run no longer needs the agent
                 continue
             tried = [m.model for m in config.agent_candidates(agent_id)]
@@ -213,6 +310,8 @@ class Run:
     def _require_projection(self) -> None:
         """No agent call after CP2 without a cost projection within the cap (cost_projection.py). Spend is
         decided at CP2, where changing the selection is cheap; `litreview project RUN` re-projects."""
+        if pilot.enabled(self):
+            return  # stage-specific guard runs before dispatch/reservation, including before CP2
         stage = self.state().get("stage")
         if stage not in STAGES or STAGES.index(stage) <= STAGES.index("cp2"):
             return
@@ -236,7 +335,8 @@ class Run:
         proj = self.load("cost_projection.json")
         if not proj or proj.get("verdict") != "WITHIN_CAP":
             return   # _require_projection has already stopped the call
-        line = next((x for x in proj.get("lines", []) if x.get("basis") == "WORST_CASE" and x["stage"] == agent_id), None)
+        line = next((x for x in proj.get("lines", []) if x.get("basis") in ("WORST_CASE", "CALIBRATED_FORECAST")
+                     and x["stage"] == agent_id), None)
         if line is None:
             return
         since = [e for e in self.budget.entries() if e["agent"] == agent_id and e["time"] >= proj["created"]]
@@ -253,6 +353,13 @@ class Run:
     def _batch_gate(self, agent_id: str, steps: list[str], reserve_usd: float) -> dict:
         """The runtime gate before any batch (pipeline.yaml -> batch.gate_usd), recorded in provenance whatever
         the verdict. Steps held by unsettled batches are committed spend, not projected spend."""
+        if pilot.enabled(self):
+            try:
+                pilot.require(self,agent_id)
+                p=pilot.project(self,pilot.stage_for(self,agent_id),in_flight=frozenset(steps),candidate=(agent_id,reserve_usd))
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            if p['verdict']!='WITHIN_CAP':raise Pause('Pilot batch exceeds remaining authorized budget')
+            return p
         limit = (self.cfg.get("batch") or {}).get("gate_usd")
         if limit is None:
             raise BatchGateRefused(f"{agent_id}: batch.gate_usd is not set; no batch is submitted without the gate")
@@ -273,9 +380,35 @@ class Run:
                 f"the scope and re-project (`litreview project {self.id}`); scientific checks are not cut to fit.")
         return g
 
+    def _reserve(self,key,usd,agent_id,note="",steps=(),margin_included=False):
+        # margin_included: the caller's amount already carries the 30% margin (plan_retry's approved hold);
+        # adding it again would over-hold and break the exact-candidate check in the stage projection.
+        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"} and not margin_included:
+            # Hold the future-work margin, not merely check it. Actual charges settle this hold.
+            usd = float(Decimal(str(usd)) * Decimal("1.30"))
+        if pilot.enabled(self):
+            try:
+                pilot.require(self,agent_id)
+                in_flight={s for p in (self.dir/'data'/'batches').glob('*.json')
+                           for r in json.loads(p.read_text(encoding='utf-8'))
+                           if r['status'] in ('INTENT','SUBMITTED','UNRESOLVED') for s in r['steps']}
+                p=pilot.project(self,pilot.stage_for(self,agent_id),in_flight=frozenset(in_flight|set(steps)),candidate=(agent_id,usd))
+                if p['verdict']!='WITHIN_CAP':raise pilot.AuthorizationRequired('New commitment would exceed $35 future-work admission')
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+        ok,available=self.budget.reserve(key,usd,agent_id,note)
+        if ok and pilot.enabled(self):
+            meta=self.load('pilot_reservations.json',{})
+            scope=pilot.stage_for(self,agent_id)
+            meta[key]={'scope':scope,'steps':list(steps),'authorization':self.load('pilot_'+scope+'.json')['fingerprint']}
+            pilot.atomic(self.data('pilot_reservations.json'),meta)
+        return ok,available
+
     def _supersede_projection(self, reason: str) -> None:
         """Spend the projection did not plan for (a paid turn that produced nothing) makes it stale: the next
         agent call requires a new one, priced from what has actually been spent."""
+        if pilot.enabled(self):
+            from .synthesis_registry import fingerprint
+            self.save('pilot_financial_plan.json',{'superseded_reason':reason,'previous':fingerprint(self.load('pilot_financial_plan.json'))})
         proj = self.load("cost_projection.json")
         if proj is not None:
             proj.update(verdict="SUPERSEDED", superseded_reason=reason[:300],
@@ -284,24 +417,308 @@ class Run:
 
     def agent(self, agent_id: str, payload: dict, step: str, overrides: dict | None = None,
               schema_file: str | None = None, exclude_providers: frozenset = frozenset(),
-              reservation_key: str | None = None) -> dict:
+              reservation_key: str | None = None, repair_limit: int | None = None,
+              truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
+        from . import a06_batches, decisions
+        if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+            payload = {**payload, "source_access": payload.get("source_access", self.load("source_access.json", {}))}
+        payload = decisions.attach(self.dir, agent_id, payload)   # applied decisions travel in the request identity
+        if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
+            try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
+            except ValueError as exc:raise Pause("A06 batch validation rejected: " + str(exc)) from exc
+        try:
+            corpus_policy.resolve(self)
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
+        if pilot.enabled(self):
+            try:
+                corpus_policy.resolve(self)
+                if agent_id in {"A04-CQ", "A05-KE"}:
+                    records = payload.get("records") if agent_id == "A04-CQ" else [payload.get("record") or {}]
+                    if not records:
+                        raise ValueError("Publication-bound agent request lacks canonical records")
+                    corpus_policy.require_records(self, records, internal_ids=True)
+                    for rec in records:
+                        level = payload.get("content_level") if agent_id == "A05-KE" else rec.get("content_level")
+                        required = corpus_policy.fixed(self)[str(rec["pmid"])]
+                        if agent_id == "A05-KE" and level != required:
+                            raise ValueError("Extraction access level differs from corpus authority")
+                        if level == "FULL_TEXT":
+                            corpus_policy.require_source(self, rec)
+                            verify_cached_source(rec, rec.get("content") or rec.get("sections"), self.load(f"fulltext_provenance/{rec['record_id']}.json"))
+                        elif agent_id == "A05-KE" and set(rec.get("content") or {}) != {"Abstract"}:
+                            raise ValueError("Abstract-only extraction contains unapproved source sections")
+            except ValueError as exc:
+                raise Pause(str(exc)) from exc
+            # Reuse an accepted, version-identical output before considering another paid submission.
+            # A logged response settles only its own hold; uncertain provider usage remains held.
+            try:pilot.require(self,agent_id,financial=False)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            from .synthesis_registry import fingerprint
+            actual_model=self.route(agent_id,exclude_providers)
+            if overrides:actual_model=dataclasses.replace(actual_model,**overrides)
+            approved_route=self.load('pilot_'+pilot.stage_for(self,agent_id)+'.json')['context']['routes'][agent_id]
+            if actual_model.model!=approved_route['model'] or actual_model.provider!=approved_route['provider']:
+                raise Pause('Actual route differs from the financially approved route; re-project before dispatch')
+            replay=fingerprint([agent_id,payload,dataclasses.asdict(actual_model),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
+            saved=self.load('pilot_requests.json',{}).get(step)
+            accepted_path=self.dir/'outputs'/f'{step}.json'
+            if saved and saved['request']==replay and accepted_path.exists():
+                from .agents.base import validate
+                accepted=json.loads(accepted_path.read_text(encoding='utf-8'));validate(agent_id,accepted,schema_file)
+                if saved.get('output_hash') and saved['output_hash']!=fingerprint(accepted):raise Pause('Accepted output changed')
+                logged={e.get('reservation_key') for e in self.budget.entries() if e['step']==step}
+                for key,meta in self.load('pilot_reservations.json',{}).items():
+                    if step in meta.get('steps',[]) and key in logged:self.budget.release(key)
+                return accepted
+            try: pilot.require(self,agent_id,financial=not bool(reservation_key))
+            except pilot.AuthorizationRequired as exc: raise Pause(str(exc)) from exc
         self._require_projection()
         self._check_worst_case_line(agent_id)
         m = self.route(agent_id, exclude_providers)
+        if "max_tokens" not in (overrides or {}):   # a cap sized to the content level (A05: abstract or full text)
+            m = dataclasses.replace(m, max_tokens=config.level_cap(agent_id, payload, m.max_tokens))
         if overrides:
             m = dataclasses.replace(m, **overrides)
+        staged = pilot.enabled(self)
+        receipt_id = None
+        if not staged:
+            # A resume never pays twice: an accepted output saved under this step for this exact request is reused.
+            receipt_id = self._receipt_request(agent_id, payload, m, schema_file)
+            reused = self._receipt_reuse(agent_id, step, receipt_id, schema_file)
+            if reused is not None:
+                if reservation_key:
+                    self.budget.release(reservation_key)
+                return reused
+        watched = self._context_check(agent_id, payload, step, m)
+        if reservation_key:   # the call's cost is already held under the cap
+            self._spend_review(agent_id, step, 0.0)
+        else:                 # worst case for this call: its input (count, else bound) and every output token
+            self._spend_review(agent_id, step, self.budget.cost(
+                m.model, watched["input_counted"] or watched["input_byte_bound"], watched["output_reserve"]) or 0.0)
         try:
-            extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+            if staged:   # the staged pilot's approved holds cover exactly one attempt per call
+                extra = {"reservation_key": reservation_key, "repair_limit": 0} if reservation_key else {}
+                extra["truncation_retries"] = 0
+            else:        # every send, a truncation retry and a repair included, is reserved by the guard below
+                extra = ({"reservation_key": reservation_key,
+                          "repair_limit": int(self.cfg["loops"].get("reserved_call_repairs", 0))}
+                         if reservation_key else {})
+                extra["dispatch_guard"] = self._call_guard(agent_id, step, reservation_key)
+                from .job_ledger import Ledger
+                extra["ledger"] = Ledger(self.dir)
+                extra["request_id"] = receipt_id
+            if repair_limit is not None:extra['repair_limit']=repair_limit
+            if truncation_retries is not None:extra['truncation_retries']=truncation_retries
+            if repair_from is not None:extra['repair_from']=repair_from
+            if pilot.enabled(self):
+                from .synthesis_registry import fingerprint
+                request_id=fingerprint([agent_id,payload,dataclasses.asdict(m),schema_file,pilot.identity(self,pilot.stage_for(self,agent_id))['versions']])
+                cached=self.load('pilot_requests.json',{}).get(step)
+                if cached:
+                    if cached['request']!=request_id:raise Pause('Changed paid request identity; review and use a new step after approval')
+                    output=self.dir/'outputs'/f'{step}.json'
+                    if output.exists():
+                        from .agents.base import validate
+                        accepted=json.loads(output.read_text(encoding='utf-8'));validate(agent_id,accepted,schema_file)
+                        if cached.get('output_hash') and cached['output_hash']!=fingerprint(accepted):raise Pause('Accepted output changed')
+                        return accepted
+                    if any(e['step']==step for e in self.budget.entries()) or any(k.startswith('pilot-'+request_id[:24]) for k in self.budget.reservations()):
+                        raise Pause('Interrupted paid request: reconcile provider billing/accepted output before retry')
+                requests=self.load('pilot_requests.json',{})
+                requests[step]={'request':request_id}
+                pilot.atomic(self.data('pilot_requests.json'),requests)
+                def guard(attempt,system,message,model):
+                    try: pilot.require(self,agent_id,financial=False)
+                    except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+                    if reservation_key:
+                        if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
+                            from .writing_admission import quote_call, require_hold
+                            required = quote_call(system, message, model, self.cfg['admission'], self.budget)
+                            require_hold(self.budget, reservation_key, required)
+                        meta=self.load('pilot_reservations.json',{}).get(reservation_key,{})
+                        if meta.get('scope')!=pilot.stage_for(self,agent_id) or meta.get('authorization')!=(self.load('pilot_'+meta.get('scope','')+'.json') or {}).get('fingerprint'):
+                            raise Pause('Reservation lacks current stage authorization')
+                        return reservation_key
+                    from .synthesis_registry import offline_tokens
+                    tokens=offline_tokens(system)+offline_tokens(message)
+                    from .admission import output_reserve
+                    amount=self.budget.cost(model.model,0,output_reserve(model,self.cfg['admission']),0,0,tokens)
+                    key='pilot-'+request_id[:24]+'-'+str(attempt)
+                    if key in self.budget.reservations():raise Pause('Unsettled pilot request; reconcile before retry')
+                    self._spend_review(agent_id,step,amount)
+                    if not self._reserve(key,amount,agent_id,'pilot per-attempt reservation',steps=[step])[0]:
+                        raise BudgetExceeded('Pilot request exceeds remaining $35 authorization')
+                    return key
+                extra['dispatch_guard']=guard
+            if not staged:
+                extra["loops"] = self.cfg["loops"]
             out = run_agent(agent_id, payload, self.dir, step, self.budget, self.prov, model=m,
                             schema_file=schema_file, **extra)
         except RefusalError as e:
             model_record.add(e.model, agent_id, self.family(), "REFUSED", self.id, step, e.category)
             raise
+        except Exception as e:   # noqa: BLE001 — only to turn one named state into a pause; everything else re-raises
+            from .job_ledger import AmbiguousDispatch
+            if isinstance(e, AmbiguousDispatch):
+                raise Pause(str(e)) from e
+            raise
+        if pilot.enabled(self):
+            requests=self.load('pilot_requests.json',{})
+            requests[step]['output_hash']=fingerprint(out)
+            if agent_id in pilot.SECOND:
+                from .admission import input_bound, output_reserve
+                s=self.cfg['forecast']['scenarios']['baseline']
+                forecast_usd=self.budget.cost(m.model,int(input_bound(build_system_prompt(agent_id),payload)/float(s['bytes_per_token'])),
+                                              int(output_reserve(m,self.cfg['admission'])*float(s['output'])))
+                requests[step].update(agent=agent_id,projection_basis=pilot.work_basis(self),forecast_usd=forecast_usd)
+            pilot.atomic(self.data('pilot_requests.json'),requests)
+        if receipt_id is not None:
+            self._receipt_save(step, receipt_id, out, m)
+        self._context_actual(watched)
         model_record.add(m.model, agent_id, self.family(), "COMPLETED", self.id, step)
         self.last_model = m.model
         if self.budget.should_warn():
             notify.send("budget_warning", f"Run {self.id}: 80% of budget used", self.budget.summary_text())
         return out
+
+    # --- receipts: what was paid for and accepted, so a resume reuses it ---------------------------------
+    def _receipt_request(self, agent_id: str, payload: dict, m, schema_file: str | None) -> str:
+        """Identity of a request for reuse: agent, payload, vendor and model, system prompt and schema. Output caps
+        and effort are left out: an output accepted under one cap is the same accepted output under another."""
+        from .agents.registry import AGENTS
+        from .synthesis_registry import fingerprint
+        schema = (SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)).read_bytes()
+        return fingerprint([agent_id, payload, m.provider, m.model,
+                            hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),
+                            hashlib.sha256(schema).hexdigest()])
+
+    def _receipt_reuse(self, agent_id: str, step: str, request_id: str, schema_file: str | None):
+        """The accepted output saved for this step, if its receipt matches this request (or it is a researcher's
+        repair import, which binds to the first request that asks for the step). None: the call must be made."""
+        from .agents.base import validate
+        from .synthesis_registry import fingerprint
+        receipts = self.load("receipts.json", {})
+        rec = receipts.get(step)
+        path = self.dir / "outputs" / f"{step}.json"
+        if not rec or not path.exists():
+            return None
+        if rec.get("imported") and not rec.get("request"):
+            rec["request"] = request_id
+            receipts[step] = rec
+            pilot.atomic(self.data("receipts.json"), receipts)
+        if rec.get("request") != request_id:
+            return None   # the input, prompt, schema or model changed: this is a different request
+        accepted = json.loads(path.read_text(encoding="utf-8"))
+        if rec.get("output_sha256") != fingerprint(accepted):
+            raise Pause(f"{step}: the saved output no longer matches its receipt (data/receipts.json). It was edited "
+                        "after acceptance; restore it or import it with `litreview repair-import`.")
+        try:
+            validate(agent_id, accepted, schema_file)
+        except Exception as exc:   # noqa: BLE001 — jsonschema raises several families; any means "not reusable"
+            raise Pause(f"{step}: the saved output fails its current schema ({str(exc)[:200]}). Repair it with "
+                        "`litreview repair-import` or delete its receipt to pay for a fresh call.") from exc
+        self.prov.tool_run("receipt_reuse", step, {"request": request_id[:16], "imported": bool(rec.get("imported")),
+                                                   "paid_again": False})
+        return accepted
+
+    def _receipt_save(self, step: str, request_id: str, out: dict, m) -> None:
+        from .synthesis_registry import fingerprint
+        receipts = self.load("receipts.json", {})
+        receipts[step] = {"request": request_id, "output_sha256": fingerprint(out), "model": m.model,
+                          "provider": m.provider, "accepted_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        pilot.atomic(self.data("receipts.json"), receipts)
+
+    def _call_guard(self, agent_id: str, step: str, reservation_key: str | None):
+        """reserve() before every send on the standard path. The first send uses the caller's reservation when it
+        made one; every other send (a first send with none, a truncation retry, a repair) holds its own cold worst
+        case, input at the cache-write rate and output at the cap, and is refused if that does not fit."""
+        from .synthesis_registry import fingerprint, offline_tokens
+        from .writing_admission import worst_case_usd
+
+        def guard(attempt, system, message, model):
+            if attempt == 0 and reservation_key:
+                return reservation_key
+            reserve = (self.cfg.get("admission") or {}).get("reasoning_reserve_tokens") or {}
+            out_tokens = int(model.max_tokens) + int(reserve.get(model.provider) or 0)
+            usd = worst_case_usd(self.budget, model, offline_tokens(system) + offline_tokens(message), out_tokens)
+            if usd is None:
+                raise UnpricedModel(model.model)
+            key = "call-" + fingerprint([step, attempt, model.model, model.max_tokens])[:24]
+            if key in self.budget.reservations():
+                raise Pause(f"unsettled reservation {key} for {step}: a previous attempt ended without a logged "
+                            "response. Reconcile provider billing (scripts/reconcile_billing.py) before retrying.")
+            ok, available = self._reserve(key, usd, agent_id, "pre-call reservation", steps=[step])
+            if not ok:
+                raise BudgetExceeded(f"{agent_id} {step}: this call reserves ${usd:.2f}; only ${available:.2f} "
+                                     f"remains under the ${self.budget.cap:.2f} cap")
+            return key
+        return guard
+
+    def _context_check(self, agent_id: str, payload: dict, step: str, m) -> dict:
+        """(input + reserved output) / window for this exact request (context_watch.py), logged with both the byte
+        bound and the provider's count where available. WARN: logged and notified. REVIEW: stops for the
+        researcher's approval of this request (CP_CONTEXT), unless it is already recorded. Operational defaults,
+        not reliability guarantees; the hard admission ceilings are unchanged."""
+        from . import context_watch
+        from .agents.base import build_system_prompt, user_parts
+        from .synthesis_registry import fingerprint
+        system, user = build_system_prompt(agent_id), user_parts(payload, m.cache_payload)
+        counting = ((self.cfg.get("context_utilisation") or {}).get("provider_count") or {}).get(m.provider)
+        rec = context_watch.measure(agent_id, step, system, user, payload, m, self.cfg,
+                                    context_watch.anthropic_counter if counting else None)
+        if rec["level"] == "REVIEW":
+            rec["review_fingerprint"] = fingerprint({"agent": agent_id, "step": step, "model": m.model,
+                                                     "max_tokens": m.max_tokens, "payload": payload})
+            rec["approved"] = checkpoints.review_approved(self.dir, "CP_CONTEXT", rec["review_fingerprint"]) is not None
+        self.prov.tool_run("context_utilisation", step, rec)
+        if rec["level"] == "WARN":
+            notify.send("context_warning", f"Run {self.id}: {step} uses {rec['utilisation']:.0%} of {m.model}'s window",
+                        f"Basis {rec['basis']}; warn at {rec['thresholds']['warn']:.0%}, review at "
+                        f"{rec['thresholds']['review']:.0%} (operational defaults, not reliability guarantees).")
+        if rec["level"] == "REVIEW" and not rec["approved"]:
+            checkpoints.write_context_review(self.dir, rec["review_fingerprint"], {
+                k: rec[k] for k in ("agent", "model", "step", "utilisation", "window", "basis", "input_byte_bound",
+                                    "input_counted", "output_reserve", "utilisation_byte_bound", "utilisation_counted")}
+                | {"warn_threshold": rec["thresholds"]["warn"], "review_threshold": rec["thresholds"]["review"]})
+            self.pause_for_checkpoint("CP_CONTEXT")
+        return rec
+
+    def _spend_review(self, agent_id: str, step: str, request_usd: float) -> None:
+        """The run's spend review point (run.spend_review_usd): before the call that would take committed spend
+        (spent + reserved + this call's worst case not yet reserved) past it, the run stops and asks (CP_SPEND,
+        recorded in provenance); after approval it continues to the hard cap, which never moves."""
+        from .synthesis_registry import fingerprint
+        legacy = (self.cfg.get("run") or {}).get("spend_review_usd")
+        points = sorted(set(getattr(self.budget, "review_points", None) or [])) \
+            if getattr(self.budget, "profile", None) not in (None, "pilot", "sample") else \
+            ([float(legacy)] if legacy is not None else [])
+        spent, reserved = self.budget.spent(), self.budget.reserved()
+        after = spent + reserved + float(request_usd)
+        point = digest = None
+        for candidate in points:   # the lowest point passed and not yet approved
+            if after <= candidate:
+                break
+            d = fingerprint({"run": self.id, "spend_review_usd": float(candidate)})
+            if not checkpoints.review_approved(self.dir, "CP_SPEND", d):
+                point, digest = candidate, d
+                break
+        if point is None:
+            return
+        detail = {"agent": agent_id, "step": step, "spent_usd": round(spent, 4), "reserved_usd": round(reserved, 4),
+                  "request_usd": round(float(request_usd), 4), "committed_after_usd": round(after, 4),
+                  "review_point_usd": float(point), "cap_usd": self.budget.cap}
+        self.prov.tool_run("spend_review_point", step, detail)
+        checkpoints.write_spend_review(self.dir, digest, detail)
+        self.pause_for_checkpoint("CP_SPEND")
+
+    def _context_actual(self, rec: dict) -> None:
+        """After the call: utilisation from the provider-reported input tokens (calibrates the bound and count)."""
+        from . import context_watch
+        entry = next((e for e in reversed(self.budget.entries()) if e.get("step") == rec["step"]), None)
+        act = context_watch.actual(rec, entry)
+        if act:
+            self.prov.tool_run("context_utilisation_actual", rec["step"], act)
 
     def counter(self, st: dict, key: str) -> int:
         st["counters"][key] = st["counters"].get(key, 0) + 1
@@ -321,7 +738,17 @@ class Run:
                                                          "verified": True}, statement)
 
     def run(self, until: str | None = None) -> str:
+        from . import preflight
+        from .job_ledger import RunLock
+        preflight.require_start(self.dir)   # redirected provider endpoints or an archived run: nothing starts
+        with RunLock(self.dir) as lock:     # two processes never dispatch for one run
+            if lock.took_over:
+                self.prov.tool_run("run_lock_takeover", "run", lock.took_over)
+            return self._run(until)
+
+    def _run(self, until: str | None = None) -> str:
         st = self.state()
+        corpus_policy.resolve(self)
         st["status"] = "RUNNING"
         self.save_state(st)
         try:
@@ -329,10 +756,32 @@ class Run:
             while st["stage"] != "done":
                 if until and st["stage"] == until:
                     raise Pause(f"stopped before {until} (--until)")
+                if pilot.enabled(self):
+                    try:
+                        agent='A08-OL' if STAGES.index(st['stage'])>STAGES.index('cp3') else 'A02-SP'
+                        pilot.require(self,agent)
+                    except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
                 handler = getattr(self, f"stage_{st['stage']}")
                 nxt = handler(st)
+                if pilot.enabled(self) and nxt=='outline':
+                    try:pilot.require(self,'A08-OL')
+                    except pilot.AuthorizationRequired as exc:
+                        pilot.partial(self,str(exc))
+                        raise Pause(str(exc)) from exc
                 st = self.state() | {"stage": nxt}
                 self.save_state(st)
+                if pilot.enabled(self):
+                    # Recalculate from accepted work at every completed stage. Reprojection is not approval.
+                    financial_stage=pilot.STAGE_2 if STAGES.index(nxt)>STAGES.index('cp3') else pilot.STAGE_1
+                    try:
+                        projection=pilot.project(self,financial_stage)
+                        self.save('pilot_live_projection.json',projection)
+                    except pilot.AuthorizationRequired as exc:
+                        if financial_stage==pilot.STAGE_2:pilot.partial(self,str(exc))
+                        raise Pause(str(exc)) from exc
+                    if nxt=='outline':
+                        try:pilot.require(self,'A08-OL')
+                        except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
             st["status"] = "COMPLETE"
         except Pause as p:
             st = self.state()
@@ -382,10 +831,20 @@ class Run:
             "topic_statement": (inp / "topic.md").read_text(encoding="utf-8"),
             "researcher_notes": (inp / "notes.md").read_text(encoding="utf-8"),
             "seed_papers": [s for s in (inp / "seeds.txt").read_text(encoding="utf-8").splitlines() if s.strip()],
-            "journal_profile": config.load("journal_scirev"),
+            "journal_profile": pilot.journal(self),
+            "corpus_policy": corpus_policy.resolve(self),
+            "human_scope_configuration": json.loads((inp / "human_scope_configuration.json").read_text(encoding="utf-8")) if (inp / "human_scope_configuration.json").exists() else None,
             "theme_guidance": self.cfg.get("themes", {"primary_min": 5, "primary_max": 8}),
             "revision_feedback": feedback,
+            **self._outline_input(),
         }, step=f"A02-SP_scope_v{self.counter(st, 'scope')}")
+        spec["corpus_policy"] = corpus_policy.resolve(self)
+        from . import run_spec
+        outline, _ = run_spec.load(self.dir)
+        if outline:   # the researcher's subsections are the themes; A02's proposal is kept for the record only
+            spec["theme_framework_proposed_by_A02"] = spec.get("theme_framework")
+            spec["theme_framework"] = run_spec.framework_from_outline(outline)
+            spec["researcher_outline"] = run_spec.outline_brief(outline)
         self.save("spec.json", spec)
         return "cp1"
 
@@ -408,6 +867,46 @@ class Run:
         self.save("spec_approved.json", spec)
         return "search"
 
+    def _decision_identity(self, agent_id: str) -> dict:
+        """{} when no applied decision can reach this agent (identities of runs without decisions are unchanged);
+        otherwise the decisions' fingerprint, so a job whose turns depend on each other is rebuilt when one changes."""
+        from . import decisions
+        if not [d for d in decisions.active(self.dir)
+                if not d["applies_to"].get("agents") or agent_id in d["applies_to"]["agents"]]:
+            return {}
+        return {"applied_decisions": decisions.fingerprint(self.dir, agent_id)}
+
+    def decide(self, kind: str, instruction: str, applies_to: dict, author: str, checkpoint: str = "",
+               reason: str = "", decision_id: str | None = None, withdraw: bool = False) -> dict:
+        """Record an applied researcher decision (decisions.py) and log it as a human decision."""
+        from . import decisions
+        entry = decisions.add(self.dir, kind, instruction, applies_to, author, checkpoint, reason, decision_id, withdraw)
+        self.prov.human_decision("APPLIED_DECISION", {k: entry[k] for k in ("decision_id", "version", "status", "kind",
+                                                                           "instruction", "applies_to", "author")},
+                                 reason)
+        return entry
+
+    def revise_framework(self, primary_themes: list[dict], author: str, note: str) -> dict:
+        """The one way a theme is relabelled, redefined, added or removed after CP1: a new framework version.
+        Everything built on the framework carries it in its input, so the affected identities regenerate; theme
+        records are marked stale so the theme pass is rebuilt before synthesis."""
+        if not (author or "").strip() or not (note or "").strip():
+            raise ValueError("a framework revision needs its author and the reason for the change")
+        fw = self.load("theme_framework.json")
+        if not fw:
+            raise ValueError("this run has no approved theme framework yet (it is created at CP1)")
+        ids = [t.get("theme_id") for t in primary_themes]
+        if not ids or any(not i for i in ids) or len(ids) != len(set(ids)):
+            raise ValueError("every primary theme needs a unique theme_id")
+        new = theme_framework.revise(fw, primary_themes, "RESEARCHER_REVISION", f"{author.strip()}: {note.strip()}")
+        self.save("theme_framework.json", new)
+        if self.data("theme_records.json").exists():
+            self.save("theme_records_stale.json", sorted(set(self.load("theme_records.json", {}))
+                                                         | set(self.load("theme_records_stale.json", []))))
+        self.prov.human_decision("THEME_FRAMEWORK", {"version": new["version"], "author": author.strip(),
+                                                     **{k: new["history"][-1][k] for k in ("added", "removed")}}, note)
+        return new
+
     def _framework_update(self, decision: dict, checkpoint: str) -> None:
         """A framework change approved at CP2 or CP3: a new version, logged as the researcher's decision."""
         upd = decision.get("theme_framework_update")
@@ -419,13 +918,27 @@ class Run:
         self.prov.human_decision("THEME_FRAMEWORK", {"version": new["version"], **{k: new["history"][-1][k]
                                  for k in ("added", "removed")}}, upd.get("note", ""))
 
+    def _agent_human_review(self, agent, step, output):
+        if output.get("status") != "NEEDS_HUMAN_INPUT":
+            return
+        from .synthesis_registry import fingerprint
+        digest = fingerprint([agent, step, output, self.load("spec_approved.json"), corpus_policy.resolve(self)])
+        if checkpoints.review_approved(self.dir, "CP_AGENT_REVIEW", digest):
+            return
+        checkpoints.write_agent_review(self.dir, digest, agent, step, output)
+        self.pause_for_checkpoint("CP_AGENT_REVIEW")
+
     def stage_search(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
         sources = enabled_sources()
         rcfg = self.cfg["retrieval"]
         budget = {"max_records_total": rcfg["max_records_total"], "max_records_per_family": rcfg["max_records_per_family"]}
         plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
-                                     "budget": budget}, step="A03-LM_plan")
+                                     "budget": budget, "corpus_policy": corpus_policy.resolve(self),
+                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
+                                     **self._outline_input()}, step="A03-LM_plan")
+        self.save("search_plan.json", plan)
+        self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
         seeds = spec.get("search_seeds", {}).get("seed_papers", [])
         for i in range(int(self.cfg["loops"]["max_search_repairs"])):
@@ -435,7 +948,10 @@ class Run:
             plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
                                          "budget": budget, "previous_plan": plan,
                                          "execution_report": report["families"],
-                                         "seed_recall": report["seed_recall"]}, step=f"A03-LM_repair{i + 1}")
+                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
+                                         **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
+            self.save("search_plan.json", plan)
+            self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)
         self.save("search_plan.json", plan)
         all_records = [Record(**{k: v for k, v in r.items() if k in Record.__dataclass_fields__})
@@ -448,12 +964,27 @@ class Run:
 
     def _execute_plan(self, plan: dict, sources: dict) -> list[dict]:
         out = []
-        for fam in plan.get("query_families", []):
+        # Preflight every query before dispatching even the first source request.
+        families = plan.get("query_families", [])
+        try:
+            compiled = [compiled_queries(family) for family in families]
+            for family, queries in zip(families, compiled):
+                for source in family.get("sources", []):
+                    corpus_policy.require_query(self, source, family, queries.get(source, ""))
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
+        for fam, queries in zip(families, compiled):
             for src in fam.get("sources", []):
-                if src not in sources or src not in fam.get("compiled", {}):
+                if src not in sources or src not in queries:
                     continue
-                res = search(src, fam["compiled"][src], fam["family_id"],
+                res = search(src, queries[src], fam["family_id"],
                              min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"]))
+                try:
+                    corpus_policy.require_records(self, [r.to_dict() for r in res.records])
+                except ValueError as exc:
+                    self.save("retrieval_boundary_error.json", {"source": src, "family_id": fam["family_id"],
+                        "unexpected_pmids": [r.pmid for r in res.records if str(r.pmid) not in corpus_policy.fixed(self)]})
+                    raise Pause(str(exc)) from exc
                 out.append({"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
                             "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
                             "error": res.error, "records": [r.to_dict() for r in res.records]})
@@ -484,6 +1015,9 @@ class Run:
         """Citation expansion, one depth at a time: expand, deduplicate, qualify the new records.
         Depth 2 seeds only from depth-1 records A04-CQ qualified, so it follows relevant papers,
         not the whole citation neighbourhood."""
+        if corpus_policy.fixed(self):
+            self.prov.tool_run("citation_expansion_skipped", "expand", {"reason": "FIXED_CORPUS"})
+            return "cp2"
         ecfg = self.cfg["retrieval"].get("citation_expansion", {})
         if not ecfg.get("enabled"):
             return "cp2"
@@ -515,19 +1049,47 @@ class Run:
     def _qualify_pending(self) -> None:
         spec = self.load("spec_approved.json")
         records = self.load("records.json")
+        try:
+            corpus_policy.require_records(self, records, internal_ids=True)
+        except ValueError as exc:
+            raise Pause(str(exc)) from exc
+        reviews = self.load("screening_review.json", {})
+        for bid, review in reviews.items():
+            self._agent_human_review("A04-CQ", bid, review)
+        identities = corpus_policy.registry(records, corpus_policy.fixed(self))
+        prior_registry = self.load("corpus_membership.json")
+        if prior_registry is not None and prior_registry != identities:
+            raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+        if prior_registry is None:
+            self.save("corpus_membership.json", identities)
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
         fw = self.load("theme_framework.json")
         todo = [r for r in records if r["record_id"] not in quals]
         size = int(self.cfg["loops"]["cq_batch_size"])
         fields = ("record_id", "title", "abstract", "authors", "year", "venue", "publication_type", "doi",
-                  "pmid", "nct_id", "is_preprint", "query_family_ids", "expansion")
+                  "pmid", "pmcid", "nct_id", "is_preprint", "query_family_ids", "expansion")
         for i in range(0, len(todo), size):
             batch = [{**{k: r.get(k) for k in fields},
                       "content_level": "ABSTRACT" if r.get("abstract") else "METADATA_ONLY"} for r in todo[i:i + size]]
             # numbered across resumes, so a rerun batch never overwrites an earlier batch's outputs
             bid = f"B{self.counter(self.state(), 'cq_batch'):03d}"
             out = self.agent("A04-CQ", {"review_spec": spec, "theme_framework": fw, "batch_id": bid,
-                                        "records": batch}, step=f"A04-CQ_{bid}")
+                                        "records": batch, "identifier_registry": identities, **self._outline_input()},
+                             step=f"A04-CQ_{bid}")
+            reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+            reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_{bid}", input_record_ids=[r["record_id"] for r in batch])
+            reviews[bid]["identifier_registry"] = identities
+            self.save("screening_review.json", reviews)
+            known = {x["record_id"] for x in batch}
+            returned = [q.get("record_id") for q in out.get("qualifications", [])]
+            references = [q.get("record_id") for q in out.get("human_review_queue", []) if q.get("record_id")]
+            if (any(i not in known for i in returned) or len(returned) != len(set(returned))
+                    or any(i not in {r["record_id"] for r in records} for i in references)):
+                raise Pause("A04 identifier integrity: record_id must match canonical registry; no PMID substitution")
+            if corpus_policy.fixed(self) and any(q.get("exclusion_code") == "OUTSIDE_FIXED_CORPUS" for q in out.get("qualifications", [])):
+                reviews[bid]["identifier_conflict"] = "Canonical fixed-corpus member incorrectly classified OUTSIDE_FIXED_CORPUS"
+                self.save("screening_review.json", reviews)
+                raise Pause("A04 canonical corpus membership contradicts classification; human correction required")
             got = {q["record_id"]: q for q in out.get("qualifications", [])}
             for r in batch:  # nothing may disappear: any record without a disposition is flagged
                 quals[r["record_id"]] = {**(got.get(r["record_id"]) or {
@@ -536,21 +1098,62 @@ class Run:
                     **self._screener()}
                 quals[r["record_id"]] = theme_framework.normalize(quals[r["record_id"]], fw) \
                     if quals[r["record_id"]].get("disposition") == "QUALIFIED" else quals[r["record_id"]]
+                if corpus_policy.fixed(self):
+                    claimed = quals[r["record_id"]].get("in_fixed_corpus")
+                    if claimed is False:
+                        reviews[bid].setdefault("membership_claim_conflicts", []).append({"record_id": r["record_id"],
+                            "pmid": str(r["pmid"]), "model_claim": False, "canonical_membership": True})
+                        self.save("screening_review.json", reviews)
+                    quals[r["record_id"]]["in_fixed_corpus"] = True
+                    quals[r["record_id"]]["membership_source"] = "PERSISTED_RUN_POLICY"
             self.save("qualifications.json", list(quals.values()))
+            self._agent_human_review("A04-CQ", bid, reviews[bid])
         # Level 2: full text for records the agent could not decide from the abstract
         by_id = {r["record_id"]: r for r in records}
         need_ft = [q["record_id"] for q in quals.values() if q["disposition"] == "UNRESOLVED_FULL_TEXT_REQUIRED"
                    and not q.get("_fulltext_checked")]
         for rid in need_ft:
-            sections = fetch_sections(by_id[rid].get("pmcid"))
+            if corpus_policy.fixed(self).get(str(by_id[rid].get("pmid"))) == "ABSTRACT":
+                continue
+            if corpus_policy.fixed(self).get(str(by_id[rid].get("pmid"))) == "FULL_TEXT":
+                try:
+                    corpus_policy.require_source(self, by_id[rid])
+                    sections = self.load(f"fulltext/{rid}.json")
+                    source = self.load(f"fulltext_provenance/{rid}.json")
+                    if sections:
+                        verify_cached_source(by_id[rid], sections, source)
+                    else:
+                        sections, source = fetch_verified_sections(by_id[rid])
+                except ValueError as exc:
+                    raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+                self.save(f"fulltext/{rid}.json", sections)
+                self.save(f"fulltext_provenance/{rid}.json", source)
+            else:
+                sections = fetch_sections(by_id[rid].get("pmcid"))
             quals[rid]["_fulltext_checked"] = True
             if not sections:
                 continue
             out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": f"FT-{rid}", "records": [
-                {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}]},
-                step=f"A04-CQ_FT_{rid}")
-            for q in out.get("qualifications", []):
-                quals[rid] = {**q, "_fulltext_checked": True, **self._screener()}
+                {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}],
+                "identifier_registry": identities}, step=f"A04-CQ_FT_{rid}")
+            bid = f"FT-{rid}"
+            reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+            reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_FT_{rid}", input_record_ids=[rid])
+            reviews[bid]["identifier_registry"] = identities
+            self.save("screening_review.json", reviews)
+            returned = out.get("qualifications", [])
+            if len(returned) != 1 or returned[0].get("record_id") != rid:
+                raise Pause("A04 full-text identifier integrity mismatch")
+            if corpus_policy.fixed(self) and returned[0].get("exclusion_code") == "OUTSIDE_FIXED_CORPUS":
+                raise Pause("A04 canonical corpus membership contradicts full-text classification")
+            quals[rid] = {**returned[0], "_fulltext_checked": True, **self._screener()}
+            if corpus_policy.fixed(self):
+                if returned[0].get("in_fixed_corpus") is False:
+                    reviews[bid]["membership_claim_conflicts"] = [{"record_id": rid, "canonical_membership": True, "model_claim": False}]
+                    self.save("screening_review.json", reviews)
+                quals[rid].update(in_fixed_corpus=True, membership_source="PERSISTED_RUN_POLICY")
+            self.save("qualifications.json", list(quals.values()))
+            self._agent_human_review("A04-CQ", bid, reviews[bid])
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
 
@@ -597,30 +1200,404 @@ class Run:
             quals = self.load("qualifications.json")
             checkpoints.write_cp2(self.dir, self.load("records.json"), quals, self.load("bias_report.json"),
                                   emerging=theme_framework.emerging(quals, "record_id"),
-                                  framework=self.load("theme_framework.json"))
+                                  framework=self.load("theme_framework.json"),
+                                  review_issues={"search_plan": {k: (self.load("search_plan.json") or {}).get(k)
+                                      for k in ("status", "warnings", "limitations")},
+                                      "screening": self.load("screening_review.json", {})},
+                                  identities=corpus_policy.registry(self.load("records.json"), corpus_policy.fixed(self)),
+                                  source_readiness={"required": corpus_policy.fixed(self),
+                                      "materialization_stage": "extract before A05 dispatch",
+                                      "verified_sources": self.load("source_readiness.json", {})})
             self._cp2_costs(quals)
+            self._retraction_check([r for r in self.load("records.json")], "cp2")
+            self._propose_selection(quals)
             self.pause_for_checkpoint("CP2")
+        checkpoints.require_cp2_current(self.dir)
         self._framework_update(decision, "CP2")
         by_id = {r["record_id"]: r for r in self.load("records.json")}
+        report = self._retraction_check([by_id[rid] for rid in decision["selected_record_ids"]], "cp2_selection")
+        excused = decision.get("retraction_exceptions") or {}
+        retracted = [r["record_id"] for r in report["retracted"] if not str(excused.get(r["record_id"]) or "").strip()]
+        if retracted:
+            raise Pause(f"CP2 selection includes retracted paper(s) {', '.join(retracted)} (Crossref; see "
+                        "checkpoints/CP2_retractions.md). Deselect them, or record a reason for citing each one "
+                        'under "retraction_exceptions" in CP2_approved.json, then approve CP2 again.')
         quals = {q["record_id"]: q for q in self.load("qualifications.json")}
         corpus = []
-        for rid in decision["selected_record_ids"]:
-            q = quals.get(rid, {})
-            corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
-                           "subthemes": q.get("subthemes", []),
-                           "tier": decision["tier_overrides"].get(rid) or q.get("proposed_tier"),
-                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence")})
+        from . import run_spec
+        _, manifest = run_spec.load(self.dir)
+        outline, _ = run_spec.load(self.dir)
+        if outline and not manifest:   # a discovery run: check provisionally, show, and only then freeze
+            review = self._cp2_review_selection(decision["selected_record_ids"], by_id, quals)
+            self._write_cp2_selection_review(review, approved=True)
+            if review["problems"] or decision.get("selection_review_fingerprint") != review["fingerprint"]:
+                self.save("corpus_manifest.provisional.json", review["manifest"])
+                self.save("cost_projection.provisional.json", review["projection"])
+                why = ("; ".join(review["problems"]) + ". Change the marks in checkpoints/CP2_records.csv, then approve CP2 again "
+                       "(search and screening are kept; nothing is frozen)") if review["problems"] else \
+                    ("the selection's actual reading levels and its revised projection are now in checkpoints/CP2_review.md "
+                     "(Selection under review). Read them, then approve CP2 again to freeze this corpus")
+                raise Pause(f"CP2 selection not frozen: {why}.")
+            self.save("cost_projection.json", review["projection"])
+            self.prov.tool_run("cost_projection", "cp2", {k: review["projection"][k] for k in
+                                                          ("projected_total_usd", "cap_usd", "verdict", "papers")})
+            self._derive_stage_caps(review["projection"])
+            manifest = self._freeze_corpus(review["manifest"])
+            self.save("selected_corpus.json", self._corpus_records(decision["selected_record_ids"], by_id, quals, manifest))
+            return "extract"
+        if manifest:
+            mismatch = run_spec.selection_problems(manifest, [by_id[rid] for rid in decision["selected_record_ids"]])
+            if mismatch:
+                raise Pause("CP2 selection differs from the corpus manifest (input/corpus_manifest.json): "
+                            + "; ".join(mismatch) + ". The manifest is the corpus: fix the selection, or change the "
+                            "manifest in a new run.")
+        corpus = self._corpus_records(decision["selected_record_ids"], by_id, quals, manifest, decision)
         # the projection decides here, where changing the selection is still cheap
-        proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
-                                             self.cfg)
+        if pilot.enabled(self):
+            try:proj=pilot.project(self,pilot.STAGE_1,records=corpus)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+        else:
+            proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
+                                                 self.cfg)
         self.save("cost_projection.json", proj)
         self.prov.tool_run("cost_projection", "cp2", {k: proj[k] for k in ("projected_total_usd", "cap_usd", "verdict", "papers")})
+        if proj["verdict"] == "WITHIN_CAP":
+            self._derive_stage_caps(proj)
         if proj["verdict"] != "WITHIN_CAP":
             raise Pause(f"CP2 selection of {len(corpus)} papers is projected at ${proj['projected_total_usd']:.2f}, over "
                         f"the ${proj['cap_usd']:.2f} cap (data/cost_projection.json). Deselect papers or raise the cap, "
                         "then approve CP2 again.")
         self.save("selected_corpus.json", corpus)
         return "extract"
+
+    def accounts(self, proj: dict | None = None, caps: dict | None = None) -> dict:
+        """The money in one view: actual discovery and screening spend, prior spend carried into the run (the smoke
+        test), spend so far, the projection of what is ahead (PROVISIONAL), the retry and repair allowance, the
+        combined maximum exposure, the hard cap, and the projected spend by provider."""
+        proj = proj if proj is not None else (self.load("cost_projection.json") or {})
+        caps = caps if caps is not None else self.load("stage_caps.json")
+        entries = self.budget.entries()
+        spent_by = lambda agents: sum(e["cost_usd"] or 0.0 for e in entries if e["agent"] in agents)   # noqa: E731
+        projected = float(proj.get("projected_remaining_usd", proj.get("projected_total_usd")) or 0.0)
+        caps_total = float((caps or {}).get("total_usd") or 0.0)
+        allowance = max(0.0, caps_total - sum(float(v) for v in ((caps or {}).get("projected_usd") or {}).values()))
+        by_provider: dict[str, float] = {}
+        for line in proj.get("lines", []):
+            agent = line["stage"] if line.get("stage") in self.cfg["agents"] else \
+                "A05-KE" if str(line.get("stage", "")).startswith(("A05", "A06")) else None
+            if agent and line.get("usd") is not None:
+                prov = config.agent_model(agent).provider
+                by_provider[prov] = by_provider.get(prov, 0.0) + float(line["usd"])
+        spent_now = self.budget.spent()
+        exposure = min(self.budget.cap, spent_now + max(projected, caps_total - spent_by(("A02-SP", "A03-LM", "A04-CQ"))))
+        return {"discovery_and_screening_spent_usd": round(spent_by(("A02-SP", "A03-LM", "A04-CQ")), 4),
+                "smoke_test_and_other_prior_spend_usd": round(self.budget.prior_spend(), 4),
+                "smoke_test_spent_in_run_usd": round(spent_by(("smoke-test",)), 4),
+                "unsettled_reservations_usd": round(self.budget.reserved(), 4),
+                "spent_so_far_total_usd": round(spent_now, 4),
+                "projected_remaining_usd_provisional": round(projected, 4),
+                "retry_and_repair_allowance_usd": round(allowance, 4),
+                "combined_maximum_exposure_usd": round(exposure, 4),
+                "hard_cap_usd": self.budget.cap,
+                "projected_by_provider_usd": {k: round(v, 4) for k, v in sorted(by_provider.items())},
+                "spent_by_provider_usd": {p: round(sum(e["cost_usd"] or 0.0 for e in entries if e["provider"] == p), 4)
+                                          for p in sorted({e["provider"] for e in entries})},
+                "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed "
+                         "output sizes; not a measured current-code cost. Provider allocation is estimated; the early "
+                         "combined extraction/validation forecast is split equally between their providers"}
+
+    def _corpus_records(self, selected_ids, by_id, quals, manifest=None, decision=None) -> list[dict]:
+        from . import run_spec
+        discovered = bool(manifest and manifest.get("generated_from") == "DISCOVERY_AND_SCREENING")
+        corpus = []
+        for rid in selected_ids:
+            q = quals.get(rid, {})
+            paper = (next(p for p in manifest["papers"] if p["record_id"] == rid) if discovered
+                     else run_spec.paper_for(manifest, by_id[rid]))
+            corpus.append({**by_id[rid], "role": q.get("role") or "PRIMARY", "themes": q.get("themes", []),
+                           "subthemes": q.get("subthemes", []),
+                           "tier": (paper["scientific_importance"] if paper else
+                                    ((decision or {}).get("tier_overrides") or {}).get(rid) or q.get("proposed_tier")),
+                           "flags": q.get("flags", []), "is_contrary_evidence": q.get("is_contrary_evidence"),
+                           **({"manifest_paper_id": paper["paper_id"],
+                               "intended_reading_level": paper["intended_reading_level"]} if paper else {}),
+                           **({"corpus_source": "DISCOVERY", "source_access": paper.get("actual_access")} if discovered else {})})
+        return corpus
+
+    def _stage_caps_for(self, proj: dict) -> tuple[dict | None, str | None]:
+        """(the stage sub-caps this projection needs, or None for a profile without derived caps; why they do not fit,
+        or None). Profiles with `stage_caps_usd: derived` only. Saves nothing."""
+        from .budget import derive_stage_caps
+        settings = config.run_settings(self.state().get("profile"))
+        if settings.get("stage_caps_usd") != "derived":
+            return None, None
+        stage_usd: dict[str, float] = {}
+        for x in proj.get("lines", []):   # per-paper lines are named by work, not agent: map them to their stage
+            agent = x.get("stage") if x.get("stage") in self.cfg["agents"] else \
+                "A05-KE" if str(x.get("stage", "")).startswith(("A05", "A06")) else None
+            if agent and x.get("usd") is not None:
+                stage_usd[agent] = stage_usd.get(agent, 0.0) + float(x["usd"])
+        for e in self.budget.entries():   # stages already paid for keep at least what they spent
+            stage_usd[e["agent"]] = stage_usd.get(e["agent"], 0.0) + (e["cost_usd"] or 0.0)
+        derived = derive_stage_caps(stage_usd, float(settings.get("recovery_allowance", 0.15)))
+        derived["from_projection_created"] = proj.get("created")
+        room = self.budget.cap - self.budget.prior_spend() - sum(
+            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"]))
+        problem = (f"the stage limits this projection needs add up to ${derived['total_usd']:.2f}, over the "
+                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend; reduce the selection"
+                   if derived["total_usd"] > room else None)
+        return derived, problem
+
+    def _derive_stage_caps(self, proj: dict) -> None:
+        """Save the sub-caps for an accepted projection (the checks ran before: _stage_caps_for)."""
+        derived, problem = self._stage_caps_for(proj)
+        if derived is None:
+            return
+        if problem:
+            raise Pause(problem + " (data/stage_caps.json).")
+        self.save("stage_caps.json", {**derived, "run_cap_usd": self.budget.cap})
+        self.budget = BudgetTracker(self.dir)
+        self.prov.tool_run("stage_caps", "cp2", derived)
+
+    def _outline_input(self) -> dict:
+        """{"researcher_outline": ...} for the agents before A08, in an outlined run; {} otherwise."""
+        from . import run_spec
+        outline, _ = run_spec.load(self.dir)
+        return {"researcher_outline": run_spec.outline_brief(outline)} if outline else {}
+
+    def _propose_selection(self, quals: list[dict]) -> None:
+        """A discovery run: propose the corpus from the screening results and pre-mark it in CP2_records.csv. Only
+        rows the researcher has not touched are marked; the researcher confirms or changes the selection."""
+        from . import run_spec
+        outline, manifest = run_spec.load(self.dir)
+        if not outline or manifest:
+            return
+        limit = int((self.cfg.get("run_spec") or {}).get("max_papers", 15))
+        proposal = run_spec.propose_selection(quals, self.load("records.json"), self.load("theme_framework.json"), limit)
+        self.save("selection_proposal.json", {"max_papers": limit, "proposed": proposal,
+                                              "rule": "qualified records, strongest tier first, greedy coverage of the "
+                                                      "outline's subsections, one contrary-evidence paper if screening "
+                                                      "found any; access level not considered"})
+        checkpoints.prefill_cp2(self.dir, {p["record_id"]: p["reason"] for p in proposal}, limit)
+        self.prov.tool_run("selection_proposal", "cp2", {"proposed": [p["record_id"] for p in proposal], "max_papers": limit})
+        if proposal:   # access and costs of the proposal, checked for free, before the researcher decides
+            by_id = {r["record_id"]: r for r in self.load("records.json")}
+            review = self._cp2_review_selection([p["record_id"] for p in proposal], by_id, {q["record_id"]: q for q in quals})
+            self._write_cp2_selection_review(review, approved=False)
+
+    def _write_cp2_selection_review(self, review: dict, approved: bool) -> None:
+        """Append the selection's access, projection, limits and accounts to CP2_review.md, and put its fingerprint in
+        CP2_decision.json: approving CP2 then accepts exactly what was shown."""
+        d = checkpoints.cp_dir(self.dir)
+        proj, caps, acc = review["projection"], review["stage_caps"] or {}, review["accounts"]
+        log = self.load("retrieval_log.json", {})
+        lines = ["", "## Selection under review" + (" (as approved)" if approved else " (the proposal)"), "",
+                 "Access was checked for free before any extraction is budgeted. Scientific relevance was decided by "
+                 "screening, independently of access.", "",
+                 "| Paper | Record | Importance | Access found | Read as | Legends read | Images inspected |",
+                 "|---|---|---|---|---|---|---|"]
+        for p in review["manifest"]["papers"]:
+            a = log.get(p["record_id"]) or {}
+            lines.append(f"| {p['paper_id']} | {p['record_id']} | {p['scientific_importance']} | {a.get('category')} | "
+                         f"{a.get('level_read')} | {'yes' if a.get('figure_legends_read') else 'no'} | no |")
+        lines += ["", "Routes not attempted for any paper: " + ", ".join(next(iter(log.values()), {}).get("routes_not_attempted", [])) + ".",
+                  "", f"**Projection (PROVISIONAL):** ${proj['projected_total_usd']:.2f} for the stages ahead, margin "
+                  "included. It rests on per-paper rates from the October 2026 run re-priced (an older procedure) and on "
+                  "assumed output sizes; it is not a measured current-code cost.", "",
+                  "| Account | USD |", "|---|---:|"]
+        lines += [f"| {k.replace('_', ' ')} | {v:.2f} |" for k, v in acc.items() if isinstance(v, (int, float))]
+        lines += ["", "Estimated by provider (projected, stages ahead): "
+                  + ", ".join(f"{k} ${v:.2f}" for k, v in acc["projected_by_provider_usd"].items()), ""]
+        if caps:
+            lines += ["Stage limits this selection needs: " + ", ".join(f"{k} ${v:.2f}" for k, v in caps["caps_usd"].items()), ""]
+        lines += (["**Problems (the corpus cannot be frozen until they are resolved):**", *[f"- {x}" for x in review["problems"]], ""]
+                  if review["problems"] else ["No problem found: approving CP2 freezes this selection.", ""])
+        text = (d / "CP2_review.md").read_text(encoding="utf-8")
+        cut = text.find("\n## Selection under review")
+        (d / "CP2_review.md").write_text((text if cut < 0 else text[:cut]) + "\n".join(lines) + "\n", encoding="utf-8")
+        decision_path = d / "CP2_decision.json"
+        decision = json.loads(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {}
+        decision["selection_review_fingerprint"] = review["fingerprint"]
+        decision_path.write_text(json.dumps(decision, indent=2), encoding="utf-8")
+        self.save("cp2_selection_review.json", {k: review[k] for k in ("problems", "fingerprint", "accounts")}
+                  | {"papers": [p["record_id"] for p in review["manifest"]["papers"]]})
+
+    def _provisional_discovered_corpus(self, selected_ids: list[str], by_id: dict, quals: dict) -> tuple[dict, list[str]]:
+        """A discovery run's selection as a PROVISIONAL manifest: the cap and duplicate checks, then the free access
+        check of every selected paper, so the extraction budget is set from what can actually be read. Nothing is
+        frozen here. Returns (manifest, problems that stop the selection)."""
+        from . import run_spec
+        from .synthesis_registry import fingerprint
+        limit = int((self.cfg.get("run_spec") or {}).get("max_papers", 15))
+        selected = [by_id[rid] for rid in selected_ids]
+        problems = []
+        if len(selected) > limit:
+            problems.append(f"{len(selected)} papers are selected; this run allows at most {limit}")
+        seen: dict[str, str] = {}
+        for r in selected:
+            for key in ([f"doi:{r['doi'].lower()}"] if r.get("doi") else []) + ([f"pmid:{r['pmid']}"] if r.get("pmid") else []) \
+                    + [f"title:{run_spec._norm_title(r.get('title'))}"]:
+                if key in seen and seen[key] != r["record_id"]:
+                    problems.append(f"{seen[key]} and {r['record_id']} look like versions of one publication (same "
+                                    f"{key.split(':')[0]}); keep one")
+                seen[key] = r["record_id"]
+        access = {r["record_id"]: self._access_check(r) for r in selected[:max(limit, 0) or len(selected)]}
+        for rid, a in access.items():
+            if a["category"] == "NO_SOURCE_TEXT":
+                problems.append(f"{rid}: neither full text nor an abstract could be obtained, so it cannot be read")
+        proposals = {p["record_id"]: p["reason"] for p in (self.load("selection_proposal.json", {}) or {}).get("proposed", [])}
+        manifest = run_spec.build_manifest(selected, quals, proposals, self.load("theme_framework.json"),
+                                           run_spec.load(self.dir)[0], fingerprint(selected_ids), access)
+        return manifest, problems
+
+    def _cp2_review_selection(self, selected_ids: list[str], by_id: dict, quals: dict) -> dict:
+        """Everything CP2 must show for a selection before its corpus can be frozen: access per paper, the projection
+        from actual reading levels, the stage limits it needs, the accounts, and every problem. Writes nothing that
+        freezes; returns the review, with a fingerprint the CP2 approval must carry."""
+        from .synthesis_registry import fingerprint
+        manifest, problems = self._provisional_discovered_corpus(selected_ids, by_id, quals)
+        corpus = self._corpus_records(selected_ids, by_id, quals, manifest)
+        levels = {p["record_id"]: (self.load("retrieval_log.json", {}).get(p["record_id"]) or {}).get("level_for_budget", "ABSTRACT")
+                  for p in manifest["papers"]}
+        proj = cost_projection.for_selection(cost_projection.load_rates(), corpus, self.dir, self.budget, self.route,
+                                             self.cfg, levels=levels)
+        derived, cap_problem = self._stage_caps_for(proj)
+        if proj["verdict"] != "WITHIN_CAP":
+            problems.append(f"the projection is ${proj['projected_total_usd']:.2f}, over the ${proj['cap_usd']:.2f} cap")
+        if cap_problem:
+            problems.append(cap_problem)
+        digest = fingerprint({"selected": list(selected_ids), "levels": levels, "projected": round(proj["projected_total_usd"], 2),
+                              "caps": derived and derived["caps_usd"], "problems": problems})
+        return {"manifest": manifest, "corpus": corpus, "projection": proj, "stage_caps": derived, "problems": problems,
+                "fingerprint": digest, "accounts": self.accounts(proj, derived)}
+
+    def _freeze_corpus(self, manifest: dict) -> dict:
+        """Freeze the checked selection as the corpus manifest (once; a later different freeze is refused)."""
+        from . import run_spec
+        from .synthesis_registry import fingerprint
+        prior = run_spec.generated_manifest(self.dir)
+        if prior is not None:
+            if [p["record_id"] for p in prior["papers"]] != [p["record_id"] for p in manifest["papers"]]:
+                raise Pause("the corpus is already frozen (data/corpus_manifest.json) with different papers; start a new "
+                            "run to change it")
+            return prior
+        manifest = {**manifest, "frozen_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        self.save("corpus_manifest.json", manifest)
+        self.prov.human_decision("CORPUS_FROZEN", {"papers": [p["record_id"] for p in manifest["papers"]],
+                                                   "manifest_sha256": fingerprint(manifest)},
+                                 "corpus manifest generated from discovery and screening; frozen at CP2 after its access, "
+                                 "projection and stage limits were checked")
+        return manifest
+
+    ACCESS_CATEGORIES = {
+        "FULL_TEXT_RETRIEVED": "an open-access copy in PMC was found and its identity verified",
+        "NO_PMC_COPY_FOUND": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is "
+                             "paywalled or that no open-access full text exists elsewhere",
+        "PMC_COPY_NOT_VERIFIED": "a PMC copy is listed but could not be retrieved, or its identity or body did not verify",
+        "LOOKUP_UNAVAILABLE": "no lookup service could be reached; access is unresolved and is budgeted as full text",
+        "NO_SOURCE_TEXT": "neither full text nor an abstract could be obtained",
+    }
+
+    def _access_check(self, rec: dict, retry: bool = False) -> dict:
+        """The free retrieval and readiness check for one discovered paper, run at CP2 before its extraction budget is
+        set, and again before extraction only when access was unresolved. Caches what it obtains (data/fulltext,
+        data/fulltext_provenance) and logs every route tried and every route not tried (data/retrieval_log.json).
+        Never raises for a missing copy: access is recorded, scientific relevance is decided elsewhere."""
+        from .tools.fulltext import ROUTES_NOT_ATTEMPTED, find_pmcid, lookup_status
+        rid = rec["record_id"]
+        log = self.load("retrieval_log.json", {})
+        entry = log.get(rid)
+        if entry and not (retry and entry.get("category") == "LOOKUP_UNAVAILABLE"):
+            return entry
+        entry = {"record_id": rid, "pmid": rec.get("pmid"), "doi": rec.get("doi"), "attempts": (entry or {}).get("attempts", [])}
+        sections, category = None, None
+        pmcid = rec.get("pmcid")
+        if not pmcid:
+            pmcid, why = find_pmcid(rec.get("pmid"), rec.get("doi"))
+            status = lookup_status(pmcid, why)
+            entry["attempts"].append({"route": "PMC identifier lookup (Europe PMC, then NCBI)", "outcome": status,
+                                      "detail": pmcid or why, "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+            category = {"NOT_LISTED": "NO_PMC_COPY_FOUND", "UNAVAILABLE": "LOOKUP_UNAVAILABLE"}.get(status)
+        if pmcid:
+            try:
+                sections, source = fetch_verified_sections({**rec, "pmcid": pmcid})
+                self.save(f"fulltext/{rid}.json", sections)
+                self.save(f"fulltext_provenance/{rid}.json", source)
+                entry["attempts"].append({"route": "PMC open-access XML via Europe PMC", "outcome": "RETRIEVED_VERIFIED",
+                                          "detail": pmcid, "xml_sha256": source["xml_sha256"],
+                                          "identifiers_confirmed": source.get("identifiers_confirmed"),
+                                          "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                category = "FULL_TEXT_RETRIEVED"
+            except FullTextUnavailable as exc:
+                entry["attempts"].append({"route": "PMC open-access XML via Europe PMC", "outcome": "FAILED", "detail": str(exc),
+                                          "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+                category = "PMC_COPY_NOT_VERIFIED"
+        if category != "FULL_TEXT_RETRIEVED" and category != "LOOKUP_UNAVAILABLE":
+            if (rec.get("abstract") or "").strip():
+                self.save(f"fulltext/{rid}.json", {"Abstract": rec["abstract"]})
+            else:
+                category = "NO_SOURCE_TEXT"
+        legends = bool(sections) and any(k.lower().startswith(("figure legend", "verbatim figure legend")) for k in sections)
+        entry.update(category=category, meaning=self.ACCESS_CATEGORIES[category],
+                     level_read={"FULL_TEXT_RETRIEVED": "FULL_TEXT", "LOOKUP_UNAVAILABLE": "UNRESOLVED",
+                                 "NO_SOURCE_TEXT": "NONE"}.get(category, "ABSTRACT"),
+                     level_for_budget="FULL_TEXT" if category in ("FULL_TEXT_RETRIEVED", "LOOKUP_UNAVAILABLE") else "ABSTRACT",
+                     figure_legends_read=legends, figure_images_inspected=False, supplements_inspected=False,
+                     routes_not_attempted=ROUTES_NOT_ATTEMPTED,
+                     note="Figure legends are read as text only; figure images and supplementary files are not retrieved. "
+                          "Routes not attempted are listed, so a missing copy here says nothing about the paper's access "
+                          "elsewhere.")
+        log[rid] = entry
+        self.save("retrieval_log.json", log)
+        return entry
+
+    def _retrieve_discovered(self, rec: dict) -> tuple[dict, dict]:
+        """Extraction input for a discovered paper, from its access check (re-run only if access was unresolved)."""
+        rid = rec["record_id"]
+        entry = self._access_check(rec, retry=True)
+        if entry["category"] in ("NO_SOURCE_TEXT",) or (entry["category"] == "LOOKUP_UNAVAILABLE" and not (rec.get("abstract") or "").strip()):
+            raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
+                        "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
+                        f"data/fulltext/{rid}.json, or start a new run without it.")
+        if entry["category"] == "LOOKUP_UNAVAILABLE":   # still unresolved at extraction: read the abstract, recorded so
+            self.save(f"fulltext/{rid}.json", {"Abstract": rec["abstract"]})
+            entry = {**entry, "level_read": "ABSTRACT"}
+            log = self.load("retrieval_log.json", {})
+            log[rid] = {**entry, "note": entry["note"] + " Access was still unresolved at extraction: read as abstract."}
+            self.save("retrieval_log.json", log)
+        sections = self.load(f"fulltext/{rid}.json")
+        if entry["category"] == "FULL_TEXT_RETRIEVED":
+            verify_cached_source({**rec, "pmcid": self.load(f"fulltext_provenance/{rid}.json")["pmcid"]}, sections,
+                                 self.load(f"fulltext_provenance/{rid}.json"))
+        level = "FULL_TEXT" if entry["category"] == "FULL_TEXT_RETRIEVED" else "ABSTRACT"
+        return sections, {"level": level, "figure_legends_read": entry["figure_legends_read"],
+                          "figure_images_inspected": False, "supplements_inspected": False,
+                          "scientific_importance": rec.get("tier"), "access_category": entry["category"],
+                          "note": entry["note"] + ("" if level == "FULL_TEXT" else f" {entry['meaning'][0].upper()}{entry['meaning'][1:]}.")}
+
+    def _retraction_check(self, records: list[dict], label: str) -> dict:
+        """Crossref retraction status of the given records (free; cached in data/crossref_cache). Written to
+        data/retraction_<label>.json and, for the researcher, checkpoints/CP2_retractions.md. A record that cannot
+        be checked (no DOI, DOI unknown, Crossref unreachable) is listed as unchecked, never assumed clean."""
+        report = references.retraction_report(records, os.environ.get("CROSSREF_MAILTO"),
+                                              cache_dir=self.data("crossref_cache"))
+        self.save(f"retraction_{label}.json", report)
+        self.prov.tool_run("retraction_check", label, {"checked": report["checked"],
+                                                       "retracted": [r["record_id"] for r in report["retracted"]],
+                                                       "concern": [r["record_id"] for r in report["concern"]],
+                                                       "unchecked": len(report["unchecked"])})
+        lines = [f"# Retraction check ({label})", "",
+                 f"Checked against Crossref: {report['checked']} of {len(records)} records.", "",
+                 "## Retracted", *[f"- {r['record_id']} ({r['doi']}): {r.get('title')}" for r in report["retracted"]],
+                 *([] if report["retracted"] else ["- none found"]), "",
+                 "## Expression of concern", *[f"- {r['record_id']} ({r['doi']}): {r.get('title')}"
+                                               for r in report["concern"]],
+                 *([] if report["concern"] else ["- none found"]), "",
+                 "## Not checked (treat as unknown, not as clean)",
+                 *[f"- {r['record_id']}: {r['reason']}" for r in report["unchecked"]],
+                 *([] if report["unchecked"] else ["- none"])]
+        (checkpoints.cp_dir(self.dir) / "CP2_retractions.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return report
 
     def _cp2_costs(self, quals: list[dict]) -> None:
         """Cost lines in CP2_review.md: the projection for every qualified paper, and per paper by level."""
@@ -631,7 +1608,16 @@ class Run:
         else:
             by_id = {r["record_id"]: r for r in self.load("records.json")}
             qualified = [by_id[q["record_id"]] for q in quals if q.get("disposition") == "QUALIFIED" and q["record_id"] in by_id]
-            proj = cost_projection.for_selection(rates, qualified, self.dir, self.budget, self.route, self.cfg)
+            proj = (pilot.project(self, pilot.STAGE_1, records=qualified) if pilot.enabled(self)
+                    else cost_projection.for_selection(rates, qualified, self.dir, self.budget, self.route, self.cfg))
+            if pilot.enabled(self):
+                note = ("\n\n## Stage 1-only cost projection\n\nA02?A07 through CP3 only; Stage 2 excluded. "
+                        "Source levels are planning requirements, not proof of completed retrieval.\n\n```json\n"
+                        + json.dumps(proj, indent=2) + "\n```\n\n"
+                        "Selection/source-level/cost admission is enforced on resume; approval never authorizes Stage 2.\n")
+                p = checkpoints.cp_dir(self.dir) / "CP2_review.md"
+                p.write_text(p.read_text(encoding="utf-8") + note, encoding="utf-8")
+                return
             per = rates["per_paper"]
             note = ("\n\n## Cost projection\n\nEach selected paper adds about "
                     f"${per['ABSTRACT']['p90_usd']:.2f} (abstract only) or ${per['FULL_TEXT']['p90_usd']:.2f} (full text) "
@@ -650,6 +1636,10 @@ class Run:
         exclude = exclude or (lambda step: frozenset())
         pending = []
         for step, payload in items:
+            from . import a06_batches
+            if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
+                on_output(step,self.agent(agent_id,payload,step,exclude_providers=frozenset(exclude(step))))
+                continue
             done = self.dir / "outputs" / f"{step}.json"
             if done.exists():
                 on_output(step, json.loads(done.read_text(encoding="utf-8")))
@@ -669,16 +1659,217 @@ class Run:
             rid = rec["record_id"]
             if self.data(f"extractions/{rid}.json").exists():
                 continue
-            sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
-                or {"Abstract": rec.get("abstract") or ""}
+            required = corpus_policy.fixed(self).get(str(rec.get("pmid")))
+            if required == "ABSTRACT":
+                sections = {"Abstract": rec.get("abstract") or ""}
+            elif required == "FULL_TEXT":
+                sections = self.load(f"fulltext/{rid}.json")
+                try:
+                    if sections:
+                        verify_cached_source(rec, sections, self.load(f"fulltext_provenance/{rid}.json"))
+                    else:
+                        corpus_policy.require_source(self, rec)
+                        sections, source = fetch_verified_sections(rec)
+                        self.save(f"fulltext/{rid}.json", sections)
+                        self.save(f"fulltext_provenance/{rid}.json", source)
+                    ready = self.load("source_readiness.json", {})
+                    ready[rid] = {"required": required, "status": "VERIFIED"}
+                    self.save("source_readiness.json", ready)
+                except ValueError as exc:
+                    ready = self.load("source_readiness.json", {})
+                    ready[rid] = {"required": required, "status": "BLOCKED", "reason": str(exc)}
+                    self.save("source_readiness.json", ready)
+                    raise Pause(f"Required verified full text unavailable for {rid}: {exc}") from exc
+            elif rec.get("corpus_source") == "DISCOVERY":
+                sections, access_now = self._retrieve_discovered(rec)
+            elif rec.get("intended_reading_level") == "ABSTRACT":
+                sections = {"Abstract": rec.get("abstract") or ""}   # the manifest says abstract, whatever its importance
+            elif rec.get("intended_reading_level") == "FULL_TEXT":
+                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid"))
+                if not sections or len(sections) < 2:
+                    raise Pause(f"{rid} ({rec.get('manifest_paper_id')}) is marked for full-text reading in the corpus "
+                                "manifest, but no full text could be loaded. It is not silently read as an abstract: "
+                                f"place its sections in data/fulltext/{rid}.json, or start a run whose manifest says ABSTRACT.")
+            elif not self._tier_allows("extraction", "full_text_tiers", rec):
+                sections = {"Abstract": rec.get("abstract") or ""}   # not a full-text tier: abstract only, labelled so
+            else:
+                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
+                    or {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
             rid_of[f"A05-KE_{rid}"] = rid
-            items.append((f"A05-KE_{rid}", {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
-                                            "content_level": level, "record": {**rec, "content": sections}}))
-        self.run_many("A05-KE", items, lambda step, out: self.save(
-            f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out)))
+            payload = {"review_spec": spec, "theme_framework": self.load("theme_framework.json"),
+                       "content_level": level, "record": {**rec, "content": sections}}
+            from . import run_spec
+            outline, manifest = run_spec.load(self.dir)
+            paper = run_spec.paper_for(manifest, rec)
+            if rec.get("corpus_source") == "DISCOVERY":   # what retrieval actually obtained
+                payload["source_access"] = access_now
+                access = self.load("source_access.json", {})
+                access[rid] = {"paper_id": rec.get("manifest_paper_id"), **access_now}
+                self.save("source_access.json", access)
+            elif paper:   # what was actually accessible, so nothing is described that was never read
+                payload["source_access"] = run_spec.source_access(paper, level, sections)
+                access = self.load("source_access.json", {})
+                access[rid] = {"paper_id": paper["paper_id"], **payload["source_access"]}
+                self.save("source_access.json", access)
+            if outline:
+                payload["outline_questions"] = [{"section_id": s["section_id"], "heading": s["heading"],
+                                                 "questions": s["questions"], "guidance": s.get("guidance") or []}
+                                                for s in outline["sections"]]
+            items.append((f"A05-KE_{rid}", payload))
+        save = lambda step, out: self.save(f"extractions/{rid_of[step]}.json", self._normalize(rid_of[step], out))  # noqa: E731
+        first = self._first_tranche()
+        if first:
+            self.run_many("A05-KE", [it for it in items if rid_of[it[0]] in first], save)
+            self._validate_subset([r for r in self.load("selected_corpus.json") if r["record_id"] in first])   # the early check judges extraction and its independent validation together
+            self._early_check(first)
+            items = [it for it in items if rid_of[it[0]] not in first]
+        self.run_many("A05-KE", items, save)
         return "validate"
+
+    def _validate_papers(self, rids: list[str]) -> None:
+        """Independent A06 validation of these papers (those not validated yet), on a vendor other than the one that
+        extracted each. Used by the validate stage and, before CP_EARLY, for the first papers."""
+        spec = self.load("spec_approved.json")
+        items, rid_of = [], {}
+        for rid in rids:
+            if self.data(f"validations/{rid}.json").exists():
+                continue
+            ext, sections = self._prepare_validation(rid)
+            # a paper re-extracted before re-extraction was turned off keeps its label (v2)
+            n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
+            rid_of[f"A06-SV_{rid}_v{n}"] = rid
+            payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
+                       "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections,
+                       "source_access": self.load("source_access.json", {}).get(rid, {})}
+            self._save_a06_input(rid, f"A06-SV_{rid}_v{n}", payload)
+            items.append((f"A06-SV_{rid}_v{n}", payload))
+        entries = self.budget.entries()
+        vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
+        self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
+                      exclude=vendor.__getitem__)
+
+    def _first_tranche(self) -> list[str]:
+        """run_spec.first_tranche: the papers read (and validated) first, before the early check. {papers: N} takes N
+        papers in manifest order, at least one of each reading level actually obtained when the corpus has both, so
+        the check works for whatever mix of full texts and abstracts discovery and retrieval produced. The older
+        {full_text: a, abstract: b} form is honoured as a preference and filled up to a + b."""
+        from . import run_spec
+        want = (self.cfg.get("run_spec") or {}).get("first_tranche") or {}
+        manifest = run_spec.manifest_of(self.dir)
+        if not manifest or not want:
+            return []
+        order = {p["paper_id"]: i for i, p in enumerate(manifest["papers"])}
+        corpus = sorted((r for r in self.load("selected_corpus.json", []) if r.get("manifest_paper_id")),
+                        key=lambda r: order.get(r["manifest_paper_id"], 999))
+        actual_access = self.load("source_access.json", {})
+        level = lambda r: actual_access.get(r["record_id"], {}).get("level") or r.get("intended_reading_level")   # noqa: E731  (for discovered papers: what retrieval obtained)
+        out: list[str] = []
+        if "papers" in want:
+            total = int(want["papers"])
+            for lv in ("FULL_TEXT", "ABSTRACT"):
+                first = next((r["record_id"] for r in corpus if level(r) == lv), None)
+                if first and len(out) < total:
+                    out.append(first)
+        else:
+            total = int(want.get("full_text", 0)) + int(want.get("abstract", 0))
+            for lv, n in (("FULL_TEXT", int(want.get("full_text", 0))), ("ABSTRACT", int(want.get("abstract", 0)))):
+                out += [r["record_id"] for r in corpus if level(r) == lv][:n]
+        out += [r["record_id"] for r in corpus if r["record_id"] not in out][:max(0, total - len(out))]
+        return out if len(out) < len(corpus) else []   # a tranche that is the whole corpus is no early check
+
+    def _early_check(self, first: list[str]) -> None:
+        """Stop after the first papers are extracted AND independently validated, until the researcher has looked
+        (CP_EARLY, approved once per tranche). Reports extraction and validation separately, compares the one quantity
+        the projection forecast (extraction plus validation per paper, by reading level), and re-forecasts the rest of
+        the run from these measurements: the remaining papers at the measured cost per level, and the downstream
+        stages at the findings count the measured papers imply."""
+        from .synthesis_registry import fingerprint
+        digest = fingerprint({"run": self.id, "first_tranche": sorted(first)})
+        if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
+            return
+        from . import run_spec
+        corpus = {r["record_id"]: r for r in self.load("selected_corpus.json", [])}
+        proj = self.load("cost_projection.json") or {}
+        projected_per_paper = {}
+        for line in proj.get("lines", []):
+            for lv in ("FULL_TEXT", "ABSTRACT"):
+                if line.get("stage") == f"A05-KE + A06-SV per paper ({lv})" and line.get("calls"):
+                    projected_per_paper[lv] = float(line["usd"]) / int(line["calls"])
+        retrieval = self.load("retrieval_log.json", {}) or {}
+        entries = self.budget.entries()
+        cost = lambda agent, rid: sum(e["cost_usd"] or 0.0 for e in entries if e["agent"] == agent   # noqa: E731
+                                      and re.match(rf"{agent}_{rid}(_|$)", e["step"]))
+        groups = {"supported": ("SUPPORTED", "SUPPORTED_WITH_CONSTRAINTS", "SUPPORTED_FOR_OBSERVATION", "PARTIALLY_SUPPORTED"),
+                  "not_established": ("DOES_NOT_ESTABLISH",), "rejected": ("BLOCKED_PROVENANCE", "BLOCKED_ALIGNMENT"),
+                  "unresolved": ("HUMAN_REVIEW_REQUIRED", "UNRESOLVED_SOURCE_ACCESS")}
+        papers, measured = [], {}
+        for rid in first:
+            ext = self.load(f"extractions/{rid}.json") or {}
+            val = self.load(f"validations/{rid}.json") or {}
+            lv = ext.get("content_level") or corpus.get(rid, {}).get("intended_reading_level") or "ABSTRACT"
+            contexts = {c.get("context_id"): c for c in ext.get("contexts") or []}
+            finding_contexts = [contexts.get(f.get("context_id")) or f.get("context") or {} for f in ext.get("findings") or []]
+            comparators = [(c.get("fields") or c).get("comparator") for c in finding_contexts]
+            disp = [v.get("disposition") for v in val.get("validations") or []]
+            a = retrieval.get(rid) or {}
+            row = {"record_id": rid, "paper_id": corpus.get(rid, {}).get("manifest_paper_id"), "level": lv,
+                   "access_category": a.get("category"), "figure_legends_read": a.get("figure_legends_read", False),
+                   "figure_images_inspected": False,
+                   "extraction_usd": round(cost("A05-KE", rid), 4), "validation_usd": round(cost("A06-SV", rid), 4),
+                   "findings": len(ext.get("findings") or []),
+                   **{k: sum(d in v for d in disp) for k, v in groups.items()},
+                   "comparator_not_reported": sum(c in ("NONE_REPORTED",) for c in comparators),
+                   "comparator_missing": sum(c in (None, "") for c in comparators),
+                   "access_limitations": a.get("meaning") if a.get("category") != "FULL_TEXT_RETRIEVED" else
+                   "legends read as text; images and supplements not retrieved",
+                   "projected_per_paper_usd": projected_per_paper.get(lv)}
+            row["measured_per_paper_usd"] = round(row["extraction_usd"] + row["validation_usd"], 4)
+            papers.append(row)
+            measured.setdefault(lv, []).append(row)
+        # re-forecast the rest from the measurements
+        remaining = [r for rid, r in corpus.items() if rid not in first]
+        rest_usd, rest_findings = 0.0, 0
+        rates = cost_projection.load_rates().get("per_paper", {})
+        for r in remaining:
+            lv = r.get("intended_reading_level") or "ABSTRACT"
+            got = measured.get(lv)
+            rest_usd += (sum(x["measured_per_paper_usd"] for x in got) / len(got)) if got else projected_per_paper.get(lv, 0.0)
+            rest_findings += (sum(x["findings"] for x in got) / len(got)) if got else float((rates.get(lv) or {}).get("findings_p90", 0))
+        findings_total = int(round(sum(p["findings"] for p in papers) + rest_findings))
+        outline, _ = run_spec.load(self.dir)
+        downstream = cost_projection.downstream(self.budget, self.route, self.cfg, findings_total,
+                                                words=run_spec.total_words(outline) if outline else None)
+        downstream_usd = sum(float(x["usd"]) for x in downstream)
+        auxiliary = sum(float(x["usd"]) for x in proj.get("lines", [])
+                        if x.get("stage") in ("A06-SV whole-paper repeat (instability test)", "A06-SV per theme"))
+        revised = {**proj, "projected_remaining_usd": rest_usd + downstream_usd + auxiliary,
+                   "projected_total_usd": self.budget.spent() + rest_usd + downstream_usd + auxiliary,
+                   "lines": [{"stage": "A05-KE", "usd": rest_usd / 2},
+                             {"stage": "A06-SV", "usd": rest_usd / 2 + auxiliary}, *downstream]}
+        old_downstream = sum(float(x["usd"]) for x in proj.get("lines", []) if x.get("stage") in self.cfg["agents"])
+        report = {"papers": papers, "spent_usd": round(sum(p["measured_per_paper_usd"] for p in papers), 4),
+                  "forecast": {"remaining_papers": len(remaining),
+                               "remaining_extraction_and_validation_usd": round(rest_usd, 2),
+                               "findings_expected_total": findings_total,
+                               "downstream_usd_revised": round(downstream_usd, 2),
+                               "validation_retest_and_theme_reserve_usd": round(auxiliary, 2),
+                               "downstream_usd_at_cp2": round(old_downstream, 2),
+                               "basis": "remaining papers at the cost measured here for their reading level (the CP2 "
+                                        "per-paper projection where a level was not measured); downstream stages re-projected "
+                                        "at the findings count these papers imply. Three papers are an early signal, not an "
+                                        "average."},
+                  "accounts": self.accounts(revised)}
+        self.save("early_check.json", report)
+        self.prov.tool_run("early_check", "extract", {k: report[k] for k in ("spent_usd", "forecast")})
+        checkpoints.write_early_review(self.dir, digest, report)
+        self.pause_for_checkpoint("CP_EARLY")
+
+    def _tier_allows(self, section: str, key: str, rec: dict) -> bool:
+        """pipeline.yaml -> <section>.<key>: the tiers a costly step applies to. None or missing: every paper."""
+        tiers = (self.cfg.get(section) or {}).get(key)
+        return tiers is None or rec.get("tier") in tiers
 
     def _normalize(self, rid: str, ext: dict) -> dict:
         """Normalize a paper's entities against its own text (abbreviation expansions) and the run's conflict
@@ -696,10 +1887,19 @@ class Run:
         return {i["local_id"]: i for i in self.load("validation_review.json", []) if i["record_id"] == rid}
 
     def _record_review(self, rid: str, items: list[dict]) -> None:
-        """Replace this paper's undecided review items with `items`; human decisions already made stay."""
-        keep = [i for i in self.load("validation_review.json", []) if i["record_id"] != rid or i.get("decision")]
+        """Replace pending reviews; retain human decisions only for the same evidence/validation version."""
+        from .synthesis_registry import fingerprint
+        ext = self.load(f'extractions/{rid}.json', {})
+        fps = evidence.finding_fingerprints(ext)
+        source = self.load(f'fulltext/{rid}.json', {})
+        items = [{**i, 'validation_version':fingerprint([i.get('old_validation'),i.get('new_validation'),
+                   fps.get(i['local_id']),source])} for i in items]
+        versions = {i['finding_id']:i['validation_version'] for i in items}
+        keep = [i for i in self.load("validation_review.json", []) if i["record_id"] != rid or
+                (i.get('decision') and (i['finding_id'] not in versions or
+                                       i.get('validation_version') == versions[i['finding_id']]))]
         decided = {i["finding_id"] for i in keep}
-        self.save("validation_review.json", keep + [i for i in items if i["finding_id"] not in decided])
+        self._write_validation("validation_review.json", keep + [i for i in items if i["finding_id"] not in decided])
 
     def review_revalidations(self, notes: dict[str, str] | None = None) -> list[dict]:
         """Apply the revalidation review rule to every paper revalidated in this run, against the validations
@@ -772,7 +1972,18 @@ class Run:
         audit and the run's registry, and so cannot reach any consumer. The validation then records the
         identities it was made against, so a later identity change sends the finding back for revalidation
         instead of silently keeping (or gaining) its disposition."""
+        # Provider output cannot supply trusted replay/review/identity metadata.
+        if isinstance(val, dict):val = {k:v for k,v in val.items() if not k.startswith('_')}
         ext = self.load(f"extractions/{rid}.json", {})
+        self._require_complete_validation(rid, val, ext)
+        previous = self.load(f'validations/{rid}.json')
+        if previous and previous.get('_review_pending'):
+            self._recover_validation_review(rid, previous)
+        saved = self.load(f'a06_inputs/{rid}.json', {}).get('payload', {})
+        if 'extraction' in saved and 'paper_text' in saved:
+            if (evidence.finding_fingerprints(saved['extraction']) != evidence.finding_fingerprints(ext)
+                    or saved['paper_text'] != self.load(f'fulltext/{rid}.json', {})):
+                raise Pause(f'{rid}: A06 source input changed during validation; result not accepted')
         ents = {e.get("entity_id"): e for e in ext.get("entities", [])}
         audits = []
         for c in val.get("normalization_conflicts") or []:
@@ -787,13 +1998,50 @@ class Run:
             self.save(f"extractions/{rid}.json", ext)
         val["_entity_identities"] = evidence.identity_snapshot(ext)
         val["_finding_fingerprints"] = evidence.finding_fingerprints(ext)
+        from .scientific_validation import source_fingerprint
+        val['_source_fingerprint'] = source_fingerprint(self.load(f'fulltext/{rid}.json', {}))
         previous = self.load(f"validations/{rid}.json")
         if previous is not None:
             # a revalidation: a changed disposition with nothing in the input to explain it is not applied
             # (evidence.review_changes); the previous extraction is the archived one if identities moved since
             prev_ext = self.load(f"renormalization/extractions_before/{rid}.json") or ext
-            self._record_review(rid, evidence.review_changes(rid, previous, prev_ext, val, ext))
-        self.save(f"validations/{rid}.json", val)
+            val['_pending_review_items'] = evidence.review_changes(rid, previous, prev_ext, val, ext)
+            val['_review_pending'] = bool(val['_pending_review_items'])
+        self._write_validation(f'validations/{rid}.json', val)
+        self._recover_validation_review(rid, val)
+
+    def _recover_validation_review(self, rid, val):
+        if val.get('_review_pending'):
+            self._record_review(rid, val['_pending_review_items'])
+            val = {**val, '_review_pending':False}
+            self._write_validation(f'validations/{rid}.json', val)
+        return val
+
+    def _write_validation(self, name, val):
+        """Atomically install a validation or its associated source/review artifact."""
+        target = self.data(name)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_suffix('.pending')
+        temporary.write_text(json.dumps(val, ensure_ascii=False, indent=2), encoding='utf-8')
+        os.replace(temporary, target)
+
+    def _require_complete_validation(self, rid, val, ext):
+        from .scientific_validation import require_complete
+        try:require_complete(val or {}, ext, rid)
+        except ValueError as exc:
+            self.save(f'validation_rejections/{rid}.json', {'error':str(exc), 'response':val})
+            raise Pause(f'{rid}: {exc}; validation not accepted') from exc
+
+    def _prepare_validation(self, rid):
+        ext = self.load(f'extractions/{rid}.json', {})
+        sections = self.load(f'fulltext/{rid}.json', {})
+        repaired = span_check.repair_findings(ext, sections)
+        if repaired != ext:
+            self._write_validation(f'extractions/{rid}.json', repaired)
+            self.prov.tool_run('deterministic_span_repair', rid,
+                {'corrections':[{'finding_id':f['finding_id'], 'history':f['span_corrections']}
+                                for f in repaired.get('findings', []) if f.get('span_corrections')]})
+        return repaired, sections
 
     def _extraction_vendor(self, rid: str, entries: list[dict] | None = None) -> str:
         """The vendor that actually produced this paper's current extraction: the provider of the last call
@@ -807,30 +2055,12 @@ class Run:
                              f"for {step}), so vendor separation cannot be enforced; not validating it.")
         return calls[-1]["provider"]
 
-    def stage_validate(self, st: dict) -> str:
+    def _validate_subset(self, corpus: list[dict]) -> None:
+        """Validate selected papers, including configured repairs, without downstream theme work."""
         spec = self.load("spec_approved.json")
-        corpus = self.load("selected_corpus.json")
         max_re = int(self.cfg["loops"]["max_reextractions"])
         if max_re == 0:
-            # no extract-validate loop: every paper's validation is independent (and can be batched)
-            items, rid_of = [], {}
-            for rec in corpus:
-                rid = rec["record_id"]
-                if self.data(f"validations/{rid}.json").exists():
-                    continue
-                sections = self.load(f"fulltext/{rid}.json")
-                ext = self.load(f"extractions/{rid}.json")
-                # a paper re-extracted before re-extraction was turned off keeps its label (v2)
-                n = 2 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 1
-                rid_of[f"A06-SV_{rid}_v{n}"] = rid
-                payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                           "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections}
-                self._save_a06_input(rid, f"A06-SV_{rid}_v{n}", payload)
-                items.append((f"A06-SV_{rid}_v{n}", payload))
-            entries = self.budget.entries()
-            vendor = {step: frozenset({self._extraction_vendor(rid, entries)}) for step, rid in rid_of.items()}
-            self.run_many("A06-SV", items, lambda step, out: self._save_validation(rid_of[step], out),
-                          exclude=vendor.__getitem__)
+            self._validate_papers([r["record_id"] for r in corpus])
         for rec in corpus:
             rid = rec["record_id"]
             if self.data(f"validations/{rid}.json").exists():
@@ -840,10 +2070,10 @@ class Run:
             start = 1 if (self.dir / "outputs" / f"A05-KE_{rid}_reextract.json").exists() else 0
             label_offset = start - min(start, max_re)   # keeps v2 as v2 if re-extraction was later turned off
             for attempt in range(min(start, max_re), max_re + 1):
-                ext = self.load(f"extractions/{rid}.json")
+                ext, sections = self._prepare_validation(rid)
                 gate1 = span_check.check_findings(ext, sections)
                 payload = {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext, "gate1_results": gate1,
-                           "paper_text": sections}
+                           "paper_text": sections, "source_access": self.load("source_access.json", {}).get(rid, {})}
                 step = f"A06-SV_{rid}_v{attempt + 1 + label_offset}"
                 self._save_a06_input(rid, step, payload)
                 val = self.agent("A06-SV", payload, step=step,
@@ -868,6 +2098,14 @@ class Run:
                     break
                 self.save(f"extractions/{rid}.json", self._normalize(rid, ext))
             self._save_validation(rid, val)
+
+    def stage_validate(self, st: dict) -> str:
+        corpus = self.load("selected_corpus.json")
+        self._validate_subset(corpus)
+        for rec in corpus:
+            rid = rec['record_id']
+            self._require_complete_validation(rid, self.load(f'validations/{rid}.json'),
+                                               self.load(f'extractions/{rid}.json', {}))
         self._instability_test(corpus)
         findings = self._validated_findings(corpus)
         theme_records = self._theme_pass(corpus, findings)
@@ -920,6 +2158,9 @@ class Run:
             val = self.load(f"validations/{rid}.json") or {}
             if not any(str(v.get("disposition") or "").startswith("BLOCKED") for v in val.get("validations", [])):
                 continue
+            if not pilot.enabled(self) and not self._tier_allows("validation", "instability_tiers", rec):
+                skipped[rid] = f"tier {rec.get('tier')}: the retest runs for {self.cfg['validation']['instability_tiers']} only; its blocked findings stay blocked"
+                continue
             saved = self.load(f"a06_inputs/{rid}.json")
             if saved is None:
                 skipped[rid] = "no saved input for the original call"
@@ -936,12 +2177,19 @@ class Run:
             steps[f"A06-SV_{rid}_repeat"] = (rid, saved)
         todo = [(s, saved["payload"]) for s, (rid, saved) in steps.items()
                 if not self.data(f"validation_repeats/{rid}.json").exists()]   # each paper repeated once
-        self.run_many("A06-SV", todo,
-                      lambda step, out: self.save(f"validation_repeats/{steps[step][0]}.json", out),
+        def accept_repeat(step, out):
+            rid, saved = steps[step]
+            self._require_complete_validation(rid, out, saved['payload']['extraction'])
+            self._write_validation(f'validation_repeats/{rid}.json', out)
+        self.run_many("A06-SV", todo, accept_repeat,
                       exclude=lambda step: frozenset({self._extraction_vendor(steps[step][0])}))
         entries = self.budget.entries()
 
         def how(step: str) -> dict:
+            merged=self.load('a06_batch_receipts/'+step+'.json')
+            if merged:
+                return {'step':step,'channel':'bounded_interactive','model':merged['model'],'json_repair':False,
+                        'batch_steps':[b['step'] for b in merged['batches']]}
             calls = [e for e in entries if e["step"] == step]
             return {"step": step, "channel": ("batch" if calls and calls[-1].get("batch_id") else
                                               "interactive" if calls else "unknown"),
@@ -958,6 +2206,8 @@ class Run:
                 invalid[rid] = bad
                 continue
             orig = self.load(f"validations/{rid}.json")
+            self._require_complete_validation(rid, orig, saved['payload']['extraction'])
+            self._require_complete_validation(rid, rep, saved['payload']['extraction'])
             r, review = evidence.compare_repeat(rid, orig, rep)
             self._record_review(rid, review)
             rows += r
@@ -991,13 +2241,35 @@ class Run:
         for th, fs in by_theme.items():
             definition = next((t for t in (self.load("theme_framework.json") or {}).get("primary_themes", [])
                                if t["theme_id"] == th), None)
-            theme_records[th] = self.agent("A06-SV", {"mode": "PER_THEME", "theme": th, "theme_definition": definition,
-                                                      "validated_findings": fs,
-                                                      "same_study_flags": same_study,
-                                                      "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")}
-                                                                  for r in corpus]},
-                                           step=f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}",
-                                           exclude_providers=theme_exclude)
+            base = {"mode": "PER_THEME", "theme": th, "theme_definition": definition,
+                    "same_study_flags": same_study,
+                    "records": [{k: r.get(k) for k in ("record_id", "authors", "year", "title")} for r in corpus]}
+            step = f"A06-SV_theme_{re.sub(r'[^A-Za-z0-9]+', '_', th)[:40]}{label}"
+            from . import theme_paging
+            from .synthesis_registry import offline_tokens
+            paging = theme_paging.settings(self.cfg)
+            cap = self.route("A06-SV", theme_exclude).max_tokens
+            overhead = 0
+            if paging:
+                bpt = float(paging.get("bytes_per_token", 2.1))
+                overhead = int(offline_tokens(build_system_prompt("A06-SV")) / bpt) + theme_paging.est_tokens(base, bpt)
+            try:
+                paged = bool(paging) and theme_paging.needs_paging(fs, paging, cap, overhead)
+                if paged:   # bounded packets, then one reconciliation over the whole theme (theme_paging.py)
+                    theme_records[th] = theme_paging.run(
+                        th, fs, base, paging, cap, overhead,
+                        lambda suffix, payload: self.agent("A06-SV", payload, step=f"{step}_{suffix}",
+                                                           exclude_providers=theme_exclude),
+                        save=lambda proof: self.save(f"theme_paging/{theme_paging.slug(th)}{label}.json", proof))
+                    self.prov.tool_run("theme_paging", step, theme_records[th]["theme_paging"])
+            except theme_paging.PagingError as exc:
+                raise Pause(f"A06 theme pass for {th}: {exc}") from exc
+            if not paged:
+                theme_records[th] = self.agent("A06-SV", {**base, "validated_findings": fs}, step=step,
+                                               exclude_providers=theme_exclude)
+            from .scientific_validation import require_theme
+            try:require_theme(theme_records[th], th, fs)
+            except ValueError as exc:raise Pause(str(exc)) from exc
         return theme_records
 
     def _validated_findings(self, corpus: list[dict]) -> list[dict]:
@@ -1009,10 +2281,27 @@ class Run:
             rid = rec["record_id"]
             ext = self.load(f"extractions/{rid}.json", {})
             val_doc = self.load(f"validations/{rid}.json", {})
+            self._require_complete_validation(rid, val_doc, ext)
+            val_doc = self._recover_validation_review(rid, val_doc)
+            from .scientific_validation import source_fingerprint
+            sections = self.load(f'fulltext/{rid}.json', {})
+            gates = {g['finding_id']:g for g in span_check.check_findings(ext, sections)}
             review = self._review_items(rid)
             # the disposition, constraints and limit come from the same reading as the eligibility
             val = evidence.effective_validations(val_doc, review)
             elig = evidence.annotate_paper(ext, val_doc, review)
+            stale_source = val_doc.get('_source_fingerprint') != source_fingerprint(sections)
+            old_fingerprints = val_doc.get('_finding_fingerprints')
+            current_fingerprints = evidence.finding_fingerprints(ext)
+            for f in ext.get('findings', []):
+                fid = f['finding_id']
+                if not span_check.passed(gates[fid]) and elig[fid]['status'] not in ('QUARANTINED','REJECTED','REVALIDATION_REQUIRED'):
+                    elig[fid] = {**elig[fid], 'status':'HELD_FOR_CORRECTION',
+                                 'reason':'deterministic Gate 1 failed; source correction and revalidation required'}
+                elif (((old_fingerprints or {}).get(fid) != current_fingerprints[fid] or stale_source)
+                      and elig[fid]['status'] not in ('QUARANTINED','REJECTED','HELD_FOR_CORRECTION')):
+                    elig[fid] = {'status':'REVALIDATION_REQUIRED', 'disposition':val.get(fid, {}).get('disposition'),
+                                 'reason':'source or extracted finding changed after validation'}
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
@@ -1024,6 +2313,10 @@ class Run:
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
                             "disposition": v.get("disposition"), "eligibility": elig.get(f["finding_id"]),
+                            'provenance_gate1':{'passed':span_check.passed(gates[f['finding_id']]),
+                                'checks':gates[f['finding_id']], 'source_fingerprint':source_fingerprint(sections),
+                                'finding_fingerprint':current_fingerprints[f['finding_id']]},
+                            'span_corrections':f.get('span_corrections', []),
                             "constraints": v.get("constraints", []),
                             "plain_language_limit": v.get("plain_language_limit"),
                             # only this finding's own subject and object, not the paper's whole entity list;
@@ -1097,11 +2390,14 @@ class Run:
                 raise ValueError(f"{rid} is not in the selected corpus")
             if not self.data(f"renormalization/validations_before/{rid}.json").exists():
                 self.save(f"renormalization/validations_before/{rid}.json", self.load(f"validations/{rid}.json"))
-            sections, ext = self.load(f"fulltext/{rid}.json"), self.load(f"extractions/{rid}.json")
+            ext, sections = self._prepare_validation(rid)
             n = 1 + sum(1 for p in (self.dir / "outputs").glob(f"A06-SV_{rid}_reval*.json") if ".raw" not in p.name)
-            val = self.agent("A06-SV", {"mode": "PER_PAPER", "review_spec": spec, "extraction": ext,
-                                        "gate1_results": span_check.check_findings(ext, sections), "paper_text": sections},
-                             step=f"A06-SV_{rid}_reval{n}", exclude_providers=frozenset({self._extraction_vendor(rid)}))
+            payload = {"mode":"PER_PAPER", "review_spec":spec, "extraction":ext,
+                       "gate1_results":span_check.check_findings(ext, sections), "paper_text":sections}
+            step = f'A06-SV_{rid}_reval{n}'
+            self._save_a06_input(rid, step, payload)
+            val = self.agent('A06-SV', payload, step=step,
+                             exclude_providers=frozenset({self._extraction_vendor(rid)}))
             self._save_validation(rid, val)
         findings = self._validated_findings(list(corpus.values()))
         self.save("validated_findings.json", findings)
@@ -1124,20 +2420,19 @@ class Run:
         return sorted(stale)
 
     def _findings(self) -> list[dict]:
-        """validated_findings.json with eligibility. A file written before eligibility existed is annotated
-        from the extractions and validations (deterministic, no agent call) and saved, so every consumer
-        sees it."""
+        """Rebuild the evidence projection from current sources and complete A06 inputs."""
         findings = self.load("validated_findings.json")
-        if findings and any(k not in f for f in findings for k in handoff.CONTRACT):
-            rebuilt = {f["finding_id"]: f for f in self._validated_findings(self.load("selected_corpus.json", []))}
-            findings = [rebuilt.get(f["finding_id"]) or
-                        (f if "eligibility" in f else
-                         {**f, "eligibility": evidence.classify({}, {"disposition": f.get("disposition")}, [], set())})
-                        for f in findings]
-            self.save("validated_findings.json", findings)
-            self._save_held(findings)
-            self.prov.tool_run("evidence_eligibility", "annotate", evidence.summary(findings))
-        return findings
+        corpus = self.load('selected_corpus.json', [])
+        if not corpus:
+            if findings:raise Pause('cannot authorize cached evidence without selected source extractions')
+            return findings
+        if any(self.load(f"extractions/{r['record_id']}.json") is None for r in corpus):
+            raise Pause('cannot authorize cached evidence without selected source extractions')
+        fresh = self._validated_findings(corpus)
+        if fresh != findings:
+            self.save('validated_findings.json', fresh)
+            self._save_held(fresh)
+        return fresh
 
     def _save_held(self, findings: list[dict]) -> None:
         """Findings held for correction (a code-attached identity contradicts the source), kept recoverable:
@@ -1184,10 +2479,57 @@ class Run:
             out["primary_theme_id"] = (rec.get("themes") or [None])[0]
         return out
 
+    def _synthesis_settings(self) -> dict:
+        """The A07 settings that enter the job identity. Sample mode (singlepaper_eval) adds its scope here,
+        so a sample job never shares a job directory, ledger or turn with a full synthesis."""
+        return self.cfg["synthesis"]
+
+    def _synthesis_job_class(self):
+        from .synthesis_bounded import RegistrySynthesisJob
+        return RegistrySynthesisJob
+
+    def _a07_quote(self, mode: str, payload: dict, count) -> tuple[int, int, float]:
+        """(input bound, output cap, pre-margin reservation USD) for one A07 call. No cache hit assumed: the whole
+        prefix is charged as a 1h cache write. Run._reserve adds and HOLDS the 30% margin for A07-A12."""
+        scfg = self.cfg["synthesis"]
+        limit = int(scfg["output_limits"][mode])
+        tokens = count(payload)
+        m = self.route("A07-SYN")
+        usd = self.budget.cost(m.model, 0, limit, 0, 0, tokens)
+        if usd is None:
+            raise UnpricedModel(m.model)
+        return tokens, limit, usd
+
     def stage_synthesize(self, st: dict) -> str:
         """Bounded registry-backed A07 with a human alignment stop before detailed synthesis."""
+        from .synthesis_bounded import AlignmentRequired
+        job, tag = self._synthesis_job()
+        try:
+            pkg = job.run()
+        except AlignmentRequired as exc:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            raise Pause(str(exc)) from exc
+        except JobStopped as exc:
+            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
+            self._supersede_projection(f"A07 stopped: {exc}")
+            raise Pause(f"A07 stopped: {exc}; inspect the report and re-project before resuming") from exc
+        if pkg["status"] != "COMPLETE":
+            raise Pause("incomplete synthesis cannot proceed to CP3")
+        report = self._job_report(tag, pkg)
+        ev = self.state().get("evaluation_only")
+        if ev:
+            pkg = publication.stamp(pkg, ev["reason"], self.id)
+            report = publication.stamp(report, ev["reason"], self.id)
+        self.save(f"synthesis_job_{tag}/report.json", report)
+        self.save("synthesis_package.json", pkg)
+        self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
+                           {"models": pkg["models"], "models_by_turn": pkg["models_by_turn"], "identity": tag})
+        return "cp3"
+
+    def _synthesis_job(self):
+        """The A07 registry job for this run's current inputs, and its tag. Builds the registry and the job (which
+        writes only its own identity and registry snapshot); makes no model call."""
         from .synthesis_registry import EvidenceRegistry, fingerprint, offline_tokens
-        from .synthesis_bounded import RegistrySynthesisJob, AlignmentRequired
         from .paths import SCHEMAS_DIR
         corpus = self.load("selected_corpus.json")
         if self.load("theme_records_stale.json", []):
@@ -1216,10 +2558,11 @@ class Run:
         frozen["validated_findings"] = [{k: v for k, v in f.items() if k != "context"} for f in findings]
         frozen["revision_feedback"] = self.load("cp3_feedback.json")
         registry = EvidenceRegistry(frozen)
-        scfg = self.cfg["synthesis"]
+        scfg = self._synthesis_settings()
         identity = {"prompt": build_system_prompt("A07-SYN"),
                     "schemas": {p.name: p.read_text(encoding="utf-8") for p in sorted(SCHEMAS_DIR.glob("A07-SYN*.json"))},
-                    "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices}
+                    "model": dataclasses.asdict(self.route("A07-SYN")), "pricing": self.budget.prices,
+                    **self._decision_identity("A07-SYN")}
         tag = fingerprint({"corpus": registry.digest, "execution": identity, "settings": scfg})[:16]
         system = build_system_prompt("A07-SYN")
 
@@ -1227,19 +2570,13 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
-            limit = int(scfg["output_limits"][mode])
-            tokens = count(payload)
+            tokens, limit, usd = self._a07_quote(mode, payload, count)
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")
-            m = self.route("A07-SYN")
-            # No cache hit assumed. Charge the entire prefix as a 1h write for a conservative bound.
-            usd = self.budget.cost(m.model, 0, limit, 0, 0, tokens)
-            if usd is None:
-                raise UnpricedModel(m.model)
             key = f"a07-{tag}-{name}"
             if key in self.budget.reservations():
                 raise Pause("unsettled A07 call reservation: reconcile provider usage before retrying " + key)
-            ok, available = self.budget.reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation")
+            ok, available = self._reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation", steps=[f"A07-SYN_job{tag}_{name}"])
             if not ok:
                 raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
             try:
@@ -1265,29 +2602,9 @@ class Run:
             checkpoints.write_synthesis_alignment(self.dir, digest, alignment)
             return False
 
-        job = RegistrySynthesisJob(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
-                                   identity, approve, served_by=lambda: self.last_model)
-        try:
-            pkg = job.run()
-        except AlignmentRequired as exc:
-            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            raise Pause(str(exc)) from exc
-        except JobStopped as exc:
-            self.save(f"synthesis_job_{tag}/report.json", self._job_report(tag, job.assemble()))
-            self._supersede_projection(f"A07 stopped: {exc}")
-            raise Pause(f"A07 stopped: {exc}; inspect the report and re-project before resuming") from exc
-        if pkg["status"] != "COMPLETE":
-            raise Pause("incomplete synthesis cannot proceed to CP3")
-        report = self._job_report(tag, pkg)
-        ev = self.state().get("evaluation_only")
-        if ev:
-            pkg = publication.stamp(pkg, ev["reason"], self.id)
-            report = publication.stamp(report, ev["reason"], self.id)
-        self.save(f"synthesis_job_{tag}/report.json", report)
-        self.save("synthesis_package.json", pkg)
-        self.prov.tool_run("synthesis_job", f"A07-SYN_job{tag}",
-                           {"models": pkg["models"], "models_by_turn": pkg["models_by_turn"], "identity": tag})
-        return "cp3"
+        job = self._synthesis_job_class()(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
+                                          identity, approve, served_by=lambda: self.last_model)
+        return job, tag
 
     def _provenance_summary(self) -> dict:
         """The source for the AI-use disclosure. Names every model that produced output, per agent, and
@@ -1406,8 +2723,16 @@ class Run:
             self.pause_for_checkpoint("CP3")
         self._framework_update(decision, "CP3")
         pkg = self._publishable("synthesis_package.json")
+        if pkg.get("sample") and not self._sample_mode():
+            raise Pause("a NON-REPRESENTATIVE sample synthesis can never feed a full writing run")
         if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
             raise Pause("incomplete synthesis cannot proceed to A08")
+        from .scientific_validation import require_package
+        try:require_package(pkg, self._findings() or [])
+        except ValueError as exc:raise Pause(str(exc)) from exc
+        from .synthesis_registry import fingerprint
+        if decision.get('synthesis_fingerprint') != fingerprint(pkg):
+            raise Pause('CP3 approval is stale; review current synthesis package')
         pkg["researcher_decision"] = decision
         adopted = set(decision.get("adopted_interpretations", []))
         pkg["author_interpretations"] = [{**p, "type": "AUTHOR_INTERPRETATION", "id": p["pi_id"].replace("PI", "AI")}
@@ -1417,17 +2742,93 @@ class Run:
         return "outline"
 
     def stage_outline(self, st: dict) -> str:
-        plan = self.agent("A08-OL", {"synthesis_package": self._publishable("synthesis_approved.json"),
-                                     "selected_corpus": self.load("selected_corpus.json"),
-                                     "journal_profile": config.load("journal_scirev"),
-                                     "display_preference": (self.cfg.get("outline") or {}).get("display_preference")},
-                          step=f"A08-OL_v{self.counter(st, 'outline')}")
-        self.save("manuscript_plan.json", plan)
-        if plan.get("status") == "NEEDS_HUMAN_INPUT":
-            raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
-                        "adjust the selection or plan, then run again")
-        self._build_display_items(plan)
+        """A08 plans from the bridge's compact inputs (argument map, element index, table coverage), never the full
+        package. The single comparative table is built by code first, so A08 knows what it already shows. The plan
+        and its allocation ledger are checked by code (bridge.validate_plan; no repair loop), then held for the
+        researcher's approval of the ledger (CP_LEDGER) when bridge.ledger_approval is on."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
+        self._reproject("outline")
+        pkg, findings, corpus = self._bridge_inputs()
+        bcfg, journal = self._bridge_cfg(), self._journal()
+        try:
+            table = bridge.comparative_table(pkg, findings, corpus, int(bcfg.get("table_max_rows", 25)))
+        except bridge.BridgeError as exc:
+            raise Pause(f"comparative table: {exc}") from exc
+        table["inconsistency_notes"] = display_items.inconsistency_notes(table, self.load("inconsistencies.json", []), corpus)
+        basis = {"package": fingerprint(pkg), "evidence": bridge.evidence_version(pkg, findings), "table": fingerprint(table)}
+        check = self.load("bridge/plan_check.json") or {}
+        plan, ledger = self.load("manuscript_plan.json"), self.load("allocation_ledger.json")
+        reuse = (plan is not None and ledger is not None and check.get("basis") == basis and not check.get("problems")
+                 and check.get("plan_version") == bridge.plan_version(plan, ledger))
+        if not reuse:
+            payload = self._outline_payload(pkg, corpus, journal, table, bcfg, findings)
+            try:
+                out = self._admitted("A08-OL", payload, step=f"A08-OL_v{self.counter(st, 'outline')}")
+            except AdmissionRefused as exc:
+                raise Pause(f"A08 request not admitted: {exc}. The outline is one request (it is not subdivided); "
+                            "nothing is dropped to make it fit") from exc
+            ledger = out.pop("allocation_ledger", None) or []
+            plan = out
+            self.save("manuscript_plan.json", plan)
+            self.save("allocation_ledger.json", ledger)
+            if plan.get("status") == "NEEDS_HUMAN_INPUT":
+                raise Pause("A08-OL needs input (see data/manuscript_plan.json warnings); "
+                            "adjust the selection or plan, then run again")
+            problems, report = bridge.validate_plan(plan, ledger, pkg, corpus, table, journal, bcfg, findings)
+            from . import run_spec
+            outline, _ = run_spec.load(self.dir)
+            if outline:
+                extra, coverage = run_spec.plan_problems(plan, outline)
+                problems = problems + extra
+                queue = run_spec.unmapped(ledger)
+                self.save("unmapped_evidence.json", {"status": "NEEDS_RESEARCHER_REVIEW" if queue else "EMPTY",
+                                                     "items": queue, "outline_coverage": coverage})
+                (checkpoints.cp_dir(self.dir) / "CP_LEDGER_unmapped_evidence.md").write_text(
+                    "# Evidence outside the outline\n\n"
+                    f"{len(queue)} item(s) fit no section of your outline. They are not written about and not lost. "
+                    "Decide for each: extend the outline (new run specification), or leave it out and say why.\n\n"
+                    + "\n".join(f"- {q['item_id']}: {q.get('reason') or 'no reason given'}" for q in queue)
+                    + "\n\n## Outline sections the evidence does not fill\n\n"
+                    + ("\n".join(f"- {s}" for s in coverage["sections_without_evidence"]) or "- none")
+                    + "\n\nA section without evidence is reported as such; it is not padded.\n", encoding="utf-8")
+                self.prov.tool_run("unmapped_evidence", "outline", {"items": len(queue), **coverage})
+            check = {"basis": basis, "plan_version": bridge.plan_version(plan, ledger), "problems": problems,
+                     "report": report}
+            self.save("bridge/plan_check.json", check)
+            self.prov.tool_run("plan_check", "outline", {"problems": len(problems), "counts": report["counts"],
+                                                         "theme_to_sections": report["theme_to_sections"]})
+            if problems:
+                raise Pause(f"A08 plan rejected by the bridge ({len(problems)} problems; first: {problems[0]}). "
+                            "See data/bridge/plan_check.json; rerun the outline stage")
+        self._save_comparative_table(table, plan, ledger, pkg, findings)
+        self.save("bridge/argument_map.json", bridge.argument_map(pkg, corpus, findings))
+        if bcfg.get("ledger_approval", True):
+            self._ledger_approved(plan, ledger, check["report"], pkg, corpus, table)
         return "draft"
+
+    def _save_comparative_table(self, table: dict, plan: dict | None = None, ledger: list | None = None,
+                                pkg: dict | None = None, findings: list | None = None) -> None:
+        from . import bridge
+        discussed_in = None
+        if plan is not None and ledger is not None and pkg is not None and findings is not None:
+            register = bridge.contrary_register(pkg, findings, table, plan, ledger)
+            self.save("bridge/contrary_register.json", register)
+            used = {s for e in register if not e["in_table"] for s in e.get("sections") or []}
+            discussed_in = [s.get("heading") for s in plan.get("sections") or [] if s.get("section_id") in used]
+        out_dir = self.dir / "data" / "display_items"
+        if out_dir.exists():
+            shutil.rmtree(out_dir)   # one display item: the comparative table replaces anything built before
+        out_dir.mkdir(parents=True)
+        display_items._write_csv(out_dir / "T1.csv", table["columns"], table["rows"])
+        (out_dir / "T1.json").write_text(json.dumps(table, ensure_ascii=False, indent=2), encoding="utf-8")
+        # A10 and the export see the reader-facing table only (bridge.reader_table); the selection record stays above
+        self.save("display_items.json", [bridge.reader_table(table, self.load("selected_corpus.json", []), discussed_in)])
+        self.prov.tool_run("display_items", "outline", {"T1": table["status"], "rows": len(table["rows"]),
+                                                        "contrary_findings": len(table["contrary_finding_ids"]),
+                                                        "contrary_findings_not_shown": table["contrary_findings_not_shown"],
+                                                        "eligible_findings_not_shown": table["eligible_findings_not_shown"]})
 
     def _build_display_items(self, plan: dict) -> list[dict]:
         """Tables and the evidence map from validated findings (code only; A08-OL supplies no values)."""
@@ -1465,7 +2866,8 @@ class Run:
         system = build_system_prompt('A10-RV')
         count = lambda p: offline_tokens(system)+offline_tokens(user_parts(p))
         execution = {'model':dataclasses.asdict(self.route('A10-RV',prose)), 'prices':self.budget.prices,
-                     'prompt':system,'schema':(SCHEMAS_DIR/'A10-RV.bounded.schema.json').read_text()}
+                     'prompt':system,'schema':(SCHEMAS_DIR/'A10-RV.bounded.schema.json').read_text(),
+                     **self._decision_identity('A10-RV')}
         def call(mode, payload, name):
             cap = cfg['output_limits'][mode]
             model = self.route('A10-RV',prose)
@@ -1474,7 +2876,7 @@ class Run:
             if usd is None:raise UnpricedModel(model.model)
             key = 'a10-'+fingerprint([execution,mode,payload])[:32]
             if key in self.budget.reservations():raise Pause('unsettled A10 reservation: reconcile provider billing before retry '+key)
-            if not self.budget.reserve(key,usd,'A10-RV','bounded verification pre-call reservation')[0]:
+            if not self._reserve(key,usd,'A10-RV','bounded verification pre-call reservation',steps=[step+'_'+key+'_'+name])[0]:
                 raise BudgetExceeded('A10 request exceeds remaining budget')
             dispatch = step+'_'+key+'_'+name
             try:
@@ -1488,10 +2890,12 @@ class Run:
             self.budget.release(key)
             return out
         tables = self.load('display_items.json', [])
+        register = self._contrary_register(pkg, self._findings() or [], plan or None, self.load('allocation_ledger.json'))
         from .verification_job import version
         digest = fingerprint([version(manuscript,plan,pkg,registry,tables),execution,cfg])[:24]
         job = VerificationJob(self.data('verification_jobs')/digest,manuscript,plan,pkg,registry,tables,
-            cfg,call,count,execution,cache_directory=self.data('verification_cache'),prior_report=self.load('rv_latest.json',{}))
+            cfg,call,count,execution,cache_directory=self.data('verification_cache'),prior_report=self.load('rv_latest.json',{}),
+            contrary_register=register)
         try:rv = job.run(pass_)
         except (JobStopped,AgentError) as exc:
             self.save('verification_jobs/'+digest+'/report.json',{
@@ -1508,8 +2912,14 @@ class Run:
         from .synthesis_registry import EvidenceRegistry
         from .synthesis_input import build_corpus
         if not pkg:raise Pause('approved synthesis missing for A10 verification')
+        if (pkg.get('status', 'COMPLETE') != 'COMPLETE' or pkg.get('coverage_incomplete_item_ids')
+                or pkg.get('findings_unaccounted')):
+            raise Pause('incomplete synthesis cannot proceed to A10 verification')
         findings = self._findings()
         if pkg.get('registry_fingerprint'):
+            from .scientific_validation import require_package
+            try:require_package(pkg, findings or [])
+            except ValueError as exc:raise Pause(str(exc)) from exc
             for path in (self.dir/'data').glob('synthesis_job_*/registry.json'):
                 registry = EvidenceRegistry(json.loads(path.read_text(encoding='utf-8')))
                 if registry.digest == pkg['registry_fingerprint']:
@@ -1546,8 +2956,13 @@ class Run:
     def _verification_current(self, report, manuscript):
         from .verification_job import current, version, policy_hash
         pkg = self._publishable('synthesis_approved.json')
-        digest = version(manuscript,self.load('manuscript_plan.json',{}),pkg,self._verification_registry(pkg),self.load('display_items.json',[]))
-        return current(report,digest,policy_hash(self.cfg['scientific_verification']))
+        registry = self._verification_registry(pkg)
+        digest = version(manuscript,self.load('manuscript_plan.json',{}),pkg,registry,self.load('display_items.json',[]))
+        expected = set(registry.findings) | {p['proposition_id'] for p in pkg.get('propositions', [])}
+        expected |= {g['gap_id'] for g in pkg.get('knowledge_gaps', [])}
+        expected |= {'RECONCILIATION:'+str(n) for n,_ in enumerate(pkg.get('reconciliation', []))}
+        return (current(report,digest,policy_hash(self.cfg['scientific_verification']))
+                and set(report.get('global_index_ids_reviewed', [])) == expected)
 
     def _a10_detail_report(self) -> dict | None:
         return verification_scope.detail_report(self.prov.events(), self.budget.entries())
@@ -1606,72 +3021,562 @@ class Run:
     def _current(self) -> dict:
         return self.load(f"manuscripts/{self.state()['current_manuscript']}.json")
 
+    # --- the bridge: admission, gates and fingerprints for A08, A09, A11 and A12 -----------------------------
+    def _bridge_cfg(self) -> dict:
+        return self.cfg.get("bridge") or {}
+
+    def _journal_limits(self) -> dict:
+        return config.load("journal_scirev").get("limits") or {}
+
+    def submission_check(self) -> dict:
+        """Recompute final/submission_status.json after the researcher edited the declarations (no model call).
+        A finalised declaration is written into the exported manuscript's back matter by re-running the export."""
+        final_dir = self.dir / "final"
+        checks_path = final_dir / "export_checks.json"
+        if not checks_path.exists():
+            raise ValueError(f"run {self.id} has no export yet (final/export_checks.json): finish the run first")
+        checks = json.loads(checks_path.read_text(encoding="utf-8"))
+        ready = submission.status(final_dir, checks["reference_problems"], checks["table_problems"],
+                                  checks["compliance"], self.load("retraction_cp2_selection.json"),
+                                  checks.get("science_lint"))
+        (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
+        self.prov.tool_run("submission_status", "recheck", {"submission_ready": ready["submission_ready"],
+                                                            "blockers": len(ready["blockers"])})
+        return ready
+
+    def _journal(self) -> dict:
+        """Journal profile handed to A08/A09 (pilot limits applied). Sample mode narrows the word limit."""
+        return pilot.journal(self)
+
+    def _outline_payload(self, pkg, corpus, journal, table, bcfg, findings) -> dict:
+        from . import bridge, run_spec
+        payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
+        outline, _ = run_spec.load(self.dir)
+        if outline:
+            payload["researcher_outline"] = outline
+            payload["source_access"] = self.load("source_access.json", {})
+        return payload
+
+    def _sample_mode(self) -> bool:
+        return False
+
+    def _bridge_inputs(self) -> tuple[dict, list[dict], list[dict]]:
+        pkg = self._publishable("synthesis_approved.json")
+        if not pkg:
+            raise Pause("approved synthesis missing: the bridge has nothing to hand to the writing agents")
+        findings = self._findings() or []
+        from .scientific_validation import require_package
+        try:   # Task 1's contract, against current evidence: the bridge never hands on what CP3 could not approve
+            require_package(pkg, findings)
+        except ValueError as exc:
+            raise Pause(f"approved synthesis no longer satisfies its evidence contract: {exc}") from exc
+        return pkg, findings, self.load("selected_corpus.json", [])
+
+    def _reproject(self, stage: str) -> None:
+        """Re-project the rest of the run from what has been spent, before the stage makes its first call. A
+        projection over the cap stops the next call (_require_projection)."""
+        proj = (pilot.project(self,pilot.STAGE_2 if STAGES.index(self.state()['stage'])>STAGES.index('cp3') else pilot.STAGE_1) if pilot.enabled(self) else cost_projection.remaining_for_run(self))
+        if pilot.enabled(self):proj={**proj,'created':time.strftime('%Y-%m-%dT%H:%M:%S')}
+        self.save("cost_projection.json", proj)
+        self.prov.tool_run("reprojection", stage, {"projected_remaining_usd": proj["projected_remaining_usd"],
+                                                   "projected_total_usd": proj["projected_total_usd"],
+                                                   "verdict": proj["verdict"]})
+
+    def _admitted(self, agent_id: str, payload: dict, step: str, schema_file: str | None = None,
+                  exclude: frozenset = frozenset(), limit: str | None = None, extra: dict | None = None) -> dict:
+        """One downstream request: bounded and checked against the model's window (admission.py), the pricing
+        threshold, the projection line, the runtime gate and the cap (an existing reservation, held for the call).
+        Raises AdmissionRefused when the request does not fit; the caller subdivides by its fixed rule or stops."""
+        from . import admission
+        from .synthesis_registry import fingerprint
+        m = self.route(agent_id, exclude)
+        overrides = {}
+        if limit:   # an output cap sized to the unit requested (pipeline.yaml -> bridge.output_limits)
+            overrides = {"max_tokens": int(self._bridge_cfg()["output_limits"][limit])}
+            m = dataclasses.replace(m, **overrides)
+        if extra:   # sample mode only: its own output cap / effort (singlepaper_eval.SAMPLE); default runs pass none
+            overrides = {**overrides, **extra}
+            m = dataclasses.replace(m, **extra)
+        a = admission.assess(agent_id, payload, m, self.cfg.get("admission") or {}, self.budget.prices)
+        from .writing_admission import worst_case_usd
+        usd = worst_case_usd(self.budget, m, a["input_bound"], a["output_reserve"])   # input at cache-write rate
+        if usd is None:
+            raise UnpricedModel(m.model)
+        self.prov.tool_run("admission", step, {**a, "reserve_usd": round(usd, 4)})
+        if not a["fits"]:
+            raise admission.AdmissionRefused(
+                f"{agent_id} {step}: input bound {a['input_bound']:,} + output reserve {a['output_reserve']:,} "
+                f"exceeds the {a['window']:,}-token window of {m.model}")
+        self._require_projection()
+        if a["crosses_threshold"]:
+            self._check_long_context(agent_id, a)
+        self._check_request_line(agent_id)
+        self._downstream_gate(agent_id, usd)
+        key = f"{agent_id.lower()}-" + fingerprint([step, m.model, payload])[:24]
+        if key in self.budget.reservations():
+            raise Pause(f"unsettled {agent_id} reservation {key}: reconcile provider usage before retrying")
+        ok, available = self._reserve(key, usd, agent_id, "downstream pre-call reservation", steps=[step])
+        if not ok:
+            raise BudgetExceeded(f"{agent_id} request reserves ${usd:.2f}; only ${available:.2f} remains under the cap")
+        try:
+            out = self.agent(agent_id, payload, step=step, overrides=overrides or None, schema_file=schema_file,
+                             exclude_providers=exclude, reservation_key=key)
+        except AgentError:
+            if any(e["step"] == step for e in self.budget.entries()):
+                self.budget.release(key)   # the call was logged; an unlogged failure stays held until reconciled
+            raise
+        except (Pause, BudgetExceeded, UnpricedModel):
+            self.budget.release(key)
+            raise
+        self.budget.release(key)
+        return out
+
+    def _check_long_context(self, agent_id: str, a: dict) -> None:
+        """A request over the model's long-context threshold is repriced in full: it needs a projection that
+        priced that many such calls for the agent, or the projection is superseded and the run re-projected."""
+        proj = self.load("cost_projection.json") or {}
+        line = next((x for x in proj.get("lines", []) if x.get("stage") == agent_id), {})
+        planned = int(line.get("long_context_calls") or 0)
+        made = sum(1 for e in self.prov.events() if e["type"] == "tool_run" and e["tool"] == "admission"
+                   and e["summary"].get("agent") == agent_id and e["summary"].get("crosses_threshold")
+                   and e["time"] >= proj.get("created", ""))
+        if made > planned:
+            reason = (f"{agent_id}: input bound {a['input_bound']:,} crosses the {a['long_context_threshold']:,}-token "
+                      f"pricing threshold of {a['model']} (call {made}; the projection priced {planned})")
+            self._supersede_projection(reason)
+            raise Pause(f"{reason}. The whole request is repriced above the threshold: re-project with "
+                        f"`litreview project {self.id}` before the call")
+
+    def _check_request_line(self, agent_id: str) -> None:
+        """The projection line for this agent is the authorized spend: past its calls or its dollars, the projection
+        is superseded before the next call."""
+        proj = self.load("cost_projection.json") or {}
+        if proj.get("verdict") != "WITHIN_CAP":
+            return
+        line = next((x for x in proj.get("lines", []) if x.get("stage") == agent_id
+                     and x.get("basis") in ("REQUEST_BOUND", "ESTIMATED_ENVELOPE")), None)
+        if line is None:
+            return
+        since = [e for e in self.budget.entries() if e["agent"] == agent_id and e["time"] >= proj["created"]]
+        usd = sum(e["cost_usd"] or 0 for e in since)
+        reason = (f"{agent_id} has spent ${usd:.2f} since the projection, over its line (${line['usd']:.2f})"
+                  if usd > line["usd"] else f"{agent_id} has made {len(since)} calls since the projection, all its "
+                  f"line ({line['calls']}) allows" if len(since) >= int(line["calls"]) else None)
+        if reason:
+            self._supersede_projection(f"projection line overrun: {reason}")
+            raise Pause(f"projection line overrun: {reason}. Re-project with `litreview project {self.id}`.")
+
+    def _downstream_gate(self, agent_id: str, usd: float) -> None:
+        """The runtime gate (batch.gate_usd, $150) before every downstream call, as before every batch: spent +
+        committed (reservations held) + the rest of the run as projected + this request's reserve. Recorded
+        whatever the verdict. The run's spend cap stays absolute on its own (the reservation enforces it)."""
+        limit = (self.cfg.get("batch") or {}).get("gate_usd")
+        if limit is None:
+            raise BudgetExceeded(f"{agent_id}: batch.gate_usd is not set; no downstream call without the runtime gate")
+        if pilot.enabled(self):
+            try:pilot.require(self,agent_id)
+            except pilot.AuthorizationRequired as exc:raise Pause(str(exc)) from exc
+            return
+        p = cost_projection.remaining_for_run(self)
+        spent, committed = self.budget.spent(), self.budget.reserved()
+        total = spent + committed + p["projected_remaining_usd"] + usd
+        verdict = "PASS" if total <= float(limit) else "STOP"
+        self.prov.tool_run("downstream_gate", agent_id, {"spent_usd": round(spent, 4), "committed_usd": round(committed, 4),
+                                                         "projected_usd": p["projected_remaining_usd"],
+                                                         "reserve_usd": round(usd, 4), "total_usd": round(total, 2),
+                                                         "limit_usd": float(limit), "verdict": verdict})
+        if verdict != "PASS":
+            raise BudgetExceeded(f"{agent_id}: spent ${spent:.2f} + committed ${committed:.2f} + projected "
+                                 f"${p['projected_remaining_usd']:.2f} + this request ${usd:.2f} = ${total:.2f}, over the "
+                                 f"${float(limit):.2f} gate. Revise the scope and re-project; any increase is a separate "
+                                 "priced decision")
+
+    def _ledger_approved(self, plan, ledger, report, pkg, corpus, table) -> None:
+        from . import bridge
+        digest = bridge.plan_version(plan, ledger)
+        decision = checkpoints.approved(self.dir, "CP_LEDGER")
+        if decision and decision.get("fingerprint") == digest and decision.get("approve_ledger") is True:
+            return
+        index = {e["id"]: e for e in bridge.element_index(pkg, corpus, set(table.get("propositions_fully_shown") or []))}
+        checkpoints.write_ledger_review(self.dir, digest, ledger, report, index)
+        self.pause_for_checkpoint("CP_LEDGER")
+
+    def _plan_state(self):
+        """Everything the writing stages work from, checked: approved ledger, packets, map and versions."""
+        from . import bridge
+        pkg, findings, corpus = self._bridge_inputs()
+        plan, ledger = self.load("manuscript_plan.json"), self.load("allocation_ledger.json")
+        if plan is None or ledger is None:
+            raise Pause("no manuscript plan and allocation ledger: run the outline stage")
+        pv = bridge.plan_version(plan, ledger)
+        if (self.load("bridge/plan_check.json") or {}).get("plan_version") != pv:
+            raise Pause("the plan or ledger changed after the bridge checked it: rerun the outline stage")
+        if self._bridge_cfg().get("ledger_approval", True):
+            d = checkpoints.approved(self.dir, "CP_LEDGER")
+            if not d or d.get("fingerprint") != pv or d.get("approve_ledger") is not True:
+                raise Pause("the allocation ledger is not approved for this plan (CP_LEDGER)")
+        try:
+            packets = bridge.section_packets(plan, ledger, pkg, findings, corpus,
+                                             self._contrary_register(pkg, findings, plan, ledger))
+        except bridge.BridgeError as exc:
+            raise Pause(f"section packets: {exc}") from exc
+        ev = bridge.evidence_version(pkg, findings)
+        for sid, packet in packets.items():   # evidence A09 retrieved for a section stays in its packet
+            saved = self.load(f"sections/{pv[:16]}/{sid}.json")
+            if saved and saved.get("evidence_version") == ev:
+                packet["retrieved"] = saved.get("retrieved") or {}
+        return {"pkg": pkg, "findings": findings, "corpus": corpus, "plan": plan, "ledger": ledger, "packets": packets,
+                "amap": bridge.argument_map(pkg, corpus, findings), "pv": pv, "ev": ev, "journal": self._journal(),
+                "table": (self.load("display_items.json") or [None])[0]}
+
+    def _contrary_register(self, pkg: dict, findings: list, plan: dict | None, ledger: list | None) -> list | None:
+        """The contrary-evidence register for the current evidence, table record and plan (None before a table)."""
+        from . import bridge
+        full = self.load("display_items/T1.json")
+        if not full or full.get("type") != "TABLE_COMPARISON" or full.get("status") != "BUILT":
+            return None
+        return bridge.contrary_register(pkg, findings, full, plan, ledger)
+
+    def _contrary_release(self, m: dict, rv: dict) -> None:
+        """Release gate: every material contrary finding is in the final table, addressed in A10-verified cited
+        prose, or excluded by the researcher with a recorded justification (CP_CONTRARY, bound to this register and
+        this verified manuscript). Anything else pauses the run; no table row may conceal its contrary evidence."""
+        from . import bridge
+        from .synthesis_registry import fingerprint
+        full = self.load("display_items/T1.json") or {}
+        if full.get("type") != "TABLE_COMPARISON" or full.get("status") != "BUILT":
+            return    # no comparative table was built by the bridge (legacy runs): nothing to account for
+        pkg, findings, _ = self._bridge_inputs()
+        register = self._contrary_register(pkg, findings, self.load("manuscript_plan.json"),
+                                           self.load("allocation_ledger.json"))
+        if register is None:
+            return
+        digest = fingerprint({"register": register, "verification": rv.get("verification_fingerprint")})
+        approved = checkpoints.review_approved(self.dir, "CP_CONTRARY", digest) or {}
+        exclusions = {x["finding_id"]: x["justification"] for x in approved.get("exclusions") or []}
+        acc = bridge.contrary_accounting(register, rv, self.load("display_items/T1.json"), exclusions)
+        self.save("bridge/contrary_release.json", {"fingerprint": digest, **acc})
+        self.prov.tool_run("contrary_release", rv.get("pass") or "release",
+                           {"counts": acc["counts"], "unaddressed": acc["unaddressed"],
+                            "table_conceals": acc["table_conceals"], "exclusions": exclusions})
+        if acc["release_blocked"]:
+            checkpoints.write_contrary_review(self.dir, digest, acc, register)
+            self.pause_for_checkpoint("CP_CONTRARY")
+
+    def _bridge_fingerprint(self, m: dict, ps: dict | None = None) -> str:
+        from . import bridge
+        if ps is None:
+            pkg, findings, _ = self._bridge_inputs()
+            plan, ledger = self.load("manuscript_plan.json", {}), self.load("allocation_ledger.json", [])
+            return bridge.content_fingerprint(m, bridge.plan_version(plan, ledger), bridge.evidence_version(pkg, findings))
+        return bridge.content_fingerprint(m, ps["pv"], ps["ev"])
+
+    def _stamp(self, rv: dict, m: dict, ps: dict) -> dict:
+        """Record what an A10 report approved: the manuscript's content fingerprint (text, plan version and
+        evidence-registry version) under the report's verification fingerprint."""
+        stamps = self.load("bridge/verification_stamps.json", {})
+        stamps[rv.get("verification_fingerprint")] = self._bridge_fingerprint(m, ps)
+        self.save("bridge/verification_stamps.json", stamps)
+        self.save("bridge/fingerprints.json", {**self.load("bridge/fingerprints.json", {}),
+                                               self.state().get("current_manuscript") or "?": stamps[rv.get("verification_fingerprint")]})
+        return rv
+
+    def _require_current(self, rv: dict, m: dict, ps: dict, who: str) -> None:
+        """A11 and A12 refuse stale verification: A10's report must be current for this exact manuscript, and its
+        stamp must match the manuscript's fingerprint now (a plan or evidence-registry change invalidates it)."""
+        if not rv or not self._verification_current(rv, m):
+            raise Pause(f"{who}: A10 verification is not current for this manuscript; verify before continuing")
+        stamp = self.load("bridge/verification_stamps.json", {}).get(rv.get("verification_fingerprint"))
+        if stamp != self._bridge_fingerprint(m, ps):
+            raise Pause(f"{who}: A10 approval is stale: the text, plan or evidence registry changed since it was given")
+
+    def _binding_gate(self, m: dict, ps: dict, where: str) -> None:
+        """After any writer or editor output: every section's tags stay inside its packet, every number in the
+        records it is tagged with, every citation bound; the front matter against all packets."""
+        from . import bridge
+        problems = []
+        for s in m.get("sections") or []:
+            packet = ps["packets"].get(s.get("section_id"))
+            if packet is None:
+                problems.append(f"SECTION_UNKNOWN: {s.get('section_id')}")
+                continue
+            if s.get("heading") != packet.get("heading"):
+                problems.append(f"HEADING: {s.get('section_id')} heading differs from the approved plan")
+            problems += bridge.check_text(s.get("text_markdown") or "", packet, s.get("section_id"))
+        problems += self._front_problems(m, ps)
+        if [s.get("section_id") for s in m.get("sections") or []] != [s["section_id"] for s in ps["plan"]["sections"]]:
+            problems.append("SECTIONS: the manuscript's sections differ from the approved plan")
+        self.save(f"bridge/gate_{where}.json", {"problems": problems})
+        self.prov.tool_run("binding_gate", where, {"problems": len(problems)})
+        if problems:
+            raise Pause(f"{where}: evidence binding gate failed ({len(problems)}; first: {problems[0]}); see "
+                        f"data/bridge/gate_{where}.json")
+
+    def _front_problems(self, m: dict, ps: dict) -> list[str]:
+        from . import bridge
+        gp = bridge.global_packet(ps["packets"])
+        gp["retrieved"] = {k: v for p in ps["packets"].values() for k, v in (p.get("retrieved") or {}).items()}
+        title_ids = (ps["plan"].get("title") or {}).get("proposition_ids") or []
+        problems = bridge.check_text(f"{m.get('title') or ''} ⟦{','.join(title_ids) or 'ORG'}⟧", gp, "title")
+        problems += bridge.check_text(m.get("abstract") or "", gp, "abstract")
+        for c in m.get("table_captions") or []:
+            problems += bridge.check_text(c.get("caption") or "", gp, f"caption {c.get('display_id')}")
+        return problems
+
+    def _write_sections(self, ps: dict, label: str, redo: dict | None = None) -> list[dict]:
+        """A09, one section at a time in the plan's writing order. Each call gets the approved outline, its own
+        packet and the full prose of the sections written before it (narrative context only, never evidence). A
+        structured evidence request is fulfilled from the registry, at most bridge.max_retrieval_rounds times.
+        The deterministic section gate runs before the next section starts. Sections already written for the same
+        plan, evidence and earlier prose are kept on resume. redo: {section_id: revision request}."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
+        bcfg = self._bridge_cfg()
+        rounds, limit = int(bcfg.get("max_retrieval_rounds", 2)), int(bcfg.get("retrieval_limit", 12))
+        store, done = f"sections/{ps['pv'][:16]}", []
+        for sid in ps["plan"]["writing_order"]:
+            previous = list(done)
+            saved = self.load(f"{store}/{sid}.json")
+            keep = saved and saved.get("evidence_version") == ps["ev"] and (
+                sid not in redo if redo is not None else saved.get("previous_fingerprint") == fingerprint(previous))
+            if keep:
+                done.append(saved["section"])
+                continue
+            packet = ps["packets"][sid]
+            packet["retrieved"] = dict(packet.get("retrieved") or {})
+            request = (redo or {}).get(sid)
+            for n in range(rounds + 1):
+                payload = bridge.writer_payload(ps["plan"], packet, previous, ps["amap"], ps["journal"], request)
+                step = f"A09-WRI_{label}_{sid}_r{n}"
+                try:
+                    out = self._admitted("A09-WRI", payload, step, schema_file="A09-WRI.section.schema.json",
+                                         limit="A09_SECTION")
+                except AdmissionRefused as exc:
+                    raise Pause(f"{sid}: writer request not admitted ({exc}). A section is the subdivision unit: split "
+                                "it in the plan (rerun A08); no evidence is dropped to make it fit") from exc
+                if out.get("status") != "NEEDS_EVIDENCE":
+                    break
+                if n == rounds:
+                    raise Pause(f"{sid}: A09 still needs evidence after {rounds} retrieval rounds; nothing is inferred "
+                                "in its place (see outputs/" + step + ".json)")
+                try:
+                    found, log = bridge.fulfil_retrieval(out.get("retrieval_requests") or [], ps["pkg"], ps["findings"], limit)
+                except bridge.BridgeError as exc:
+                    raise Pause(f"{sid}: evidence request refused: {exc}") from exc
+                packet["retrieved"].update(found)
+                self.prov.tool_run("writer_retrieval", step, {"section_id": sid, "round": n + 1, "items": log})
+            if out.get("status") in ("NEEDS_HUMAN_INPUT", "ABSTAINED", "FAILED") or not out.get("section"):
+                raise Pause(f"{sid}: A09 returned {out.get('status')} (see outputs/{step}.json)")
+            section = out["section"]
+            problems = bridge.check_section(section, packet, ps["plan"], previous)
+            self.save(f"{store}/{sid}.gate.json", {"problems": problems, "step": step})
+            self.prov.tool_run("section_gate", step, {"section_id": sid, "problems": len(problems)})
+            if problems:
+                raise Pause(f"{sid}: section gate failed ({len(problems)}; first: {problems[0]}); the next section is "
+                            f"not started (data/{store}/{sid}.gate.json)")
+            self.save(f"{store}/{sid}.json", {
+                "section": section, "retrieved": packet["retrieved"], "evidence_version": ps["ev"],
+                "previous_fingerprint": fingerprint(previous), "plan_gaps": out.get("plan_gaps") or [],
+                "ceiling_unclear": out.get("ceiling_unclear") or [], "step": step,
+                "fingerprint": bridge.content_fingerprint(section, ps["pv"], ps["ev"])})
+            done.append(section)
+        return done
+
+    def _assemble(self, ps: dict, sections: list[dict], label: str) -> dict:
+        """Front matter (A09, from the written sections and the plan), then the draft in the plan's section order."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        from .synthesis_registry import fingerprint
+        payload = bridge.front_matter_payload(ps["plan"], sections, ps["amap"], ps["journal"], ps["table"])
+        key = fingerprint([ps["pv"], ps["ev"], payload])
+        cached = self.load(f"bridge/front_{label}.json") or {}
+        if cached.get("key") == key:   # resuming: the front matter for exactly these sections is not requested again
+            front = cached["front"]
+        else:
+            try:
+                front = self._admitted("A09-WRI", payload, f"A09-WRI_{label}_front", schema_file="A09-WRI.front.schema.json",
+                                       limit="A09_FRONT_MATTER")
+            except AdmissionRefused as exc:
+                raise Pause(f"front matter request not admitted ({exc})") from exc
+            self.save(f"bridge/front_{label}.json", {"key": key, "front": front})
+        by_id = {s["section_id"]: s for s in sections}
+        ordered = [by_id[s["section_id"]] for s in ps["plan"]["sections"]]
+        m = {"draft_version": label, "plan_version": ps["pv"], "title": front.get("title"), "abstract": front.get("abstract"),
+             "keywords": front.get("keywords") or [], "sections": ordered, "figure_legends": [],
+             "table_captions": front.get("table_captions") or [],
+             "main_text_word_count": sum(len(tags.strip_tags(s.get("text_markdown") or "").split()) for s in ordered),
+             "plan_gaps": [g for s in ps["plan"]["writing_order"]
+                           for g in (self.load(f"sections/{ps['pv'][:16]}/{s}.json") or {}).get("plan_gaps", [])]}
+        problems = self._front_problems(m, ps)
+        if problems:
+            self.save(f"bridge/gate_{label}_front.json", {"problems": problems})
+            raise Pause(f"front matter gate failed ({len(problems)}; first: {problems[0]})")
+        return m
+
+    def _edit(self, mode: str, m: dict, ps: dict, step: str, **extra) -> dict:
+        """A12 on the whole manuscript if the request is admitted; otherwise one unit at a time (front matter, then
+        each section), each unit's output replacing only that unit. Each unit request carries the same map, ledger,
+        outline and findings; a unit that alone does not fit stops the stage."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        try:
+            out = self._admitted("A12-EDI", bridge.editor_payload(mode, m, ps["amap"], ps["ledger"], ps["plan"], **extra), step)
+            edited = {**m, **{k: out[k] for k in ("title", "abstract", "sections") if k in out}}
+            for k in ("keywords", "table_captions", "figure_legends"):
+                if k in out:
+                    edited[k] = out[k]
+            edited.update(change_log=out.get("change_log") or [], queries=out.get("queries") or [],
+                          escalations=out.get("escalations") or [], edit_mode=mode)
+            return edited
+        except AdmissionRefused:
+            pass
+        outputs, log, queries, escalations = {}, [], [], []
+        for uid, part in bridge.manuscript_units(m):
+            try:
+                o = self._admitted("A12-EDI", bridge.editor_payload(mode, part, ps["amap"], ps["ledger"], ps["plan"],
+                                                                  unit=uid, **extra),
+                                   f"{step}_{uid}", schema_file="A12-EDI.unit.schema.json", limit="A12_UNIT")
+            except AdmissionRefused as exc:
+                raise Pause(f"{step}: unit {uid} not admitted ({exc}); nothing is dropped to make it fit") from exc
+            outputs[uid] = o
+            log += o.get("change_log") or []
+            queries += o.get("queries") or []
+            escalations += o.get("escalations") or []
+        edited = bridge.merge_units(m, outputs)
+        edited.update(change_log=log, queries=queries, escalations=escalations, edit_mode=mode, edited_by_unit=True)
+        return edited
+
+    def _integrate(self, draft: dict, ps: dict, label: str) -> dict:
+        """One A12 pass over the assembled draft for transitions, repetition, terminology and argument progression.
+        Every change to an element-tagged sentence is recorded as substantive; A10 verifies the integrated draft in
+        any case. The binding gate runs on the result."""
+        from . import bridge
+        from .synthesis_registry import fingerprint
+        key = fingerprint([ps["pv"], ps["ev"], draft])
+        cached = self.load(f"bridge/integrated_{label}.json") or {}
+        if cached.get("key") == key:   # resuming: the same draft is not integrated (paid) again
+            integrated = cached["integrated"]
+        else:
+            integrated = self._edit("INTEGRATION", draft, ps, f"A12-EDI_integration_{label}")
+            self.save(f"bridge/integrated_{label}.json", {"key": key, "integrated": integrated})
+        report = bridge.classify_integration(draft, integrated)
+        self.save(f"bridge/integration_{label}.json", report)
+        self.prov.tool_run("integration_pass", label, {"substantive": report["substantive"],
+                                                       "changed_sections": sorted(report["changed_sections"])})
+        self._binding_gate(integrated, ps, f"integration_{label}")
+        return {k: v for k, v in integrated.items() if k not in ("change_log", "queries", "escalations", "edit_mode",
+                                                                 "edited_by_unit")}
+
     def stage_draft(self, st: dict) -> str:
-        plan = self.load("manuscript_plan.json")
-        draft = self.agent("A09-WRI", {"manuscript_plan": plan, "journal_profile": config.load("journal_scirev")},
-                           step="A09-WRI_draft1")
+        """Sequential section writing, front matter, one integration pass, then A10 on the integrated draft.
+        A09 redrafts only the sections A10's blocking findings point at."""
+        self._reproject("draft")
+        ps = self._plan_state()
+        sections = self._write_sections(ps, "draft1")
+        draft = self._integrate(self._assemble(ps, sections, "draft1"), ps, "draft1")
         self._save_manuscript(draft, "m01_draft")
-        rv = self._verify(draft, "DRAFT", "A10-RV_draft1")
+        rv = self._stamp(self._verify(draft, "DRAFT", "A10-RV_draft1"), draft, ps)
         for i in range(int(self.cfg["loops"]["max_redrafts"])):
             blocking = [f for f in rv.get("findings", []) if f.get("severity") == "BLOCKING"
-                        and f.get("responsible_stage") == "A09-WRI"]
+                        and str(f.get("responsible_stage") or "").startswith("A09")]
             if not blocking and not rv.get("systemic_failure"):
                 break
-            draft = self.agent("A09-WRI", {"manuscript_plan": plan, "journal_profile": config.load("journal_scirev"),
-                                           "revision_request": rv.get("findings"), "previous_draft": draft},
-                               step=f"A09-WRI_draft{i + 2}")
+            redo = self._sections_named(rv, draft, blocking or rv.get("findings", []))
+            sections = self._write_sections(ps, f"draft{i + 2}", redo=redo)
+            draft = self._integrate(self._assemble(ps, sections, f"draft{i + 2}"), ps, f"draft{i + 2}")
             self._save_manuscript(draft, f"m01_draft{i + 2}")
-            rv = self._maybe_verify(draft, "DRAFT", f"A10-RV_draft{i + 2}", rv)
+            rv = self._stamp(self._maybe_verify(draft, "DRAFT", f"A10-RV_draft{i + 2}", rv), draft, ps)
         self.save("rv_latest.json", rv)
         return "review_loop"
 
+    @staticmethod
+    def _sections_named(rv: dict, m: dict, findings: list[dict]) -> dict:
+        """{section_id: [findings]} for the sections A10's findings point at (front matter is rewritten anyway)."""
+        where = {o["occurrence_id"]: o["path"] for o in rv.get("occurrence_inventory", [])}
+        out: dict[str, list] = {}
+        for f in findings:
+            for oid in f.get("occurrence_ids") or []:
+                path = where.get(oid) or []
+                if path[:2] == ["manuscript", "sections"] and len(path) > 2:
+                    out.setdefault(m["sections"][path[2]]["section_id"], []).append(f)
+        return out or {s["section_id"]: findings for s in m.get("sections") or []}
+
     def stage_review_loop(self, st: dict) -> str:
-        plan, pkg = self.load("manuscript_plan.json"), self._publishable("synthesis_approved.json")
+        """A11 critiques the manuscript with the compact map, the ledger and A10's findings (never the full plan or
+        package); A12 revises. Both refuse stale verification."""
+        from . import bridge
+        from .admission import AdmissionRefused
+        self._reproject("review_loop")
+        ps = self._plan_state()
         for cycle in range(1, int(self.cfg["loops"]["max_critique_cycles"]) + 1):
             m, rv = self._current(), self.load("rv_latest.json")
-            if not self._verification_current(rv or {},m):
-                rv = self._verify(m,'REVISION',f'A10-RV_precritique{cycle}')
-                self.save('rv_latest.json',rv)
-            rc = self.agent("A11-RC", {"manuscript": m, "manuscript_plan": plan, "synthesis_package": pkg,
-                                       "a10_findings": {k:v for k,v in rv.items() if k not in
-                                           ('occurrence_inventory','verdicts','global_index_ids_reviewed','request_metrics','correction_trace')},
-                                       "journal_profile": config.load("journal_scirev"),
-                                       "previous_critique": self.load("rc_latest.json")},
-                            step=f"A11-RC_cycle{cycle}", exclude_providers=self._prose_vendors("A11-RC"))
+            if not self._verification_current(rv or {}, m):
+                rv = self._stamp(self._verify(m, 'REVISION', f'A10-RV_precritique{cycle}'), m, ps)
+                self.save('rv_latest.json', rv)
+            self._require_current(rv, m, ps, "A11-RC")
+            summary = {k: v for k, v in rv.items() if k not in ('occurrence_inventory', 'verdicts',
+                       'global_index_ids_reviewed', 'request_metrics', 'correction_trace')}
+            payload = bridge.critique_payload(m, ps["amap"], ps["ledger"], summary, ps["journal"], self.load("rc_latest.json"))
+            try:
+                rc = self._admitted("A11-RC", payload, f"A11-RC_cycle{cycle}", exclude=self._prose_vendors("A11-RC"))
+            except AdmissionRefused as exc:
+                raise Pause(f"A11 request not admitted ({exc}); the critique reads the whole manuscript and is not "
+                            "subdivided") from exc
+            rc["bridge_fingerprint"] = self._bridge_fingerprint(m, ps)
             self.save("rc_latest.json", rc)
             if rc["decision"] == "ACCEPT":
-                if any(f.get('severity')=='BLOCKING' for f in rv.get('findings',[])):
+                if any(f.get('severity') == 'BLOCKING' for f in rv.get('findings', [])):
                     raise Pause('A11 ACCEPT cannot override unresolved A10 BLOCKING defects')
                 return "finish_edit"
             if rc["decision"] == "HOLD_FOR_UPSTREAM_REVIEW":
                 raise Pause("A11-RC requests upstream review (see data/rc_latest.json)")
-            ed = self.agent("A12-EDI", {"mode": "REVISION", "manuscript": m, "manuscript_plan": plan,
-                                        "critique": rc, "verification_findings": rv.get("findings")},
-                            step=f"A12-EDI_revision{cycle}")
+            self._require_current(rv, m, ps, "A12-EDI REVISION")
+            if rc["bridge_fingerprint"] != self._bridge_fingerprint(m, ps):
+                raise Pause("A12-EDI REVISION: the critique is stale (text, plan or evidence changed after it)")
+            ed = self._edit("REVISION", m, ps, f"A12-EDI_revision{cycle}", critique=rc,
+                            verification_findings=rv.get("findings"))
+            self._binding_gate(ed, ps, f"revision{cycle}")
             self._save_manuscript(ed, f"m02_revision{cycle}")
-            rv = self._maybe_verify(ed, "REVISION", f"A10-RV_revision{cycle}", rv, ed.get("change_log"))
+            rv = self._stamp(self._maybe_verify(ed, "REVISION", f"A10-RV_revision{cycle}", rv, ed.get("change_log")), ed, ps)
             self.save("rv_latest.json", rv)
         raise Pause("critique cycles exhausted without ACCEPT — review data/rc_latest.json "
                     "(the draft is never accepted just because cycles ran out)")
 
     def stage_finish_edit(self, st: dict) -> str:
-        plan = self.load("manuscript_plan.json")
-        line = self.agent("A12-EDI", {"mode": "LINE", "manuscript": self._current(), "manuscript_plan": plan},
-                          step="A12-EDI_line")
+        self._reproject("finish_edit")
+        ps = self._plan_state()
+        m = self._current()
+        self._require_current(self.load("rv_latest.json") or {}, m, ps, "A12-EDI LINE")
+        line = self._edit("LINE", m, ps, "A12-EDI_line")
+        self._binding_gate(line, ps, "line")
         self._save_manuscript(line, "m03_line")
-        rv = self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log"))
+        rv = self._stamp(self._maybe_verify(line, "REVISION", "A10-RV_line", {}, line.get("change_log")), line, ps)
         self.save("rv_latest.json", rv)
         if rv.get("finding_severity") in ("MAJOR", "BLOCKING"):
             raise Pause("scientific findings after line edit require correction (see data/rv_latest.json)")
-        proof = self.agent("A12-EDI", {"mode": "PROOF", "manuscript": line, "manuscript_plan": plan,
-                                      "verification_findings":rv.get('findings',[])},
-                           step="A12-EDI_proof")
+        self._require_current(rv, line, ps, "A12-EDI PROOF")
+        proof = self._edit("PROOF", line, ps, "A12-EDI_proof", verification_findings=rv.get('findings', []))
+        self._binding_gate(proof, ps, "proof")
         self._save_manuscript(proof, "m04_proof")
-        final = self._verify(proof, "FINAL", "A10-RV_final")
+        self._compliance_gate(proof, "A12-EDI PROOF")
+        final = self._stamp(self._verify(proof, "FINAL", "A10-RV_final"), proof, ps)
         self.save("rv_final.json", final)
         if final.get("release_disposition") not in ("APPROVED", "APPROVED_WITH_MINOR_FINDINGS"):
             raise Pause(f"final verification: {final.get('release_disposition')} (see data/rv_final.json)")
         return "finalize"
+
+    def _compliance_gate(self, m: dict, where: str) -> None:
+        """A broken hard journal limit (tools/compliance.py) stops the run after editing: the edited manuscript is
+        saved for inspection, but it is not verified, exported or called complete over the limit."""
+        cited = tags.cited_records("\n".join(s.get("text_markdown", "") for s in m.get("sections", [])))
+        comp = compliance.check({**m, "references": cited,
+                                 "display_items": self.load("manuscript_plan.json", {}).get("display_items", [])})
+        self.save("compliance_latest.json", {"where": where, **comp})
+        if not comp["all_pass"]:
+            detail = "; ".join(f"{c['rule']} ({c['detail']})" for c in comp["checks"] if c["hard"] and not c["pass"])
+            raise Pause(f"{where}: the manuscript breaks journal limits: {detail}. See data/compliance_latest.json; "
+                        "revise at CP3/CP_LEDGER or edit the saved manuscript, then run again.")
 
     def stage_finalize(self, st: dict) -> str:
         m = self._current()
@@ -1679,6 +3584,7 @@ class Run:
         defects = any(f.get('severity') in ('MAJOR','BLOCKING') for f in report.get('findings',[]))
         if defects or not self._verification_current(report,m) or report.get('release_disposition') not in ('APPROVED','APPROVED_WITH_MINOR_FINDINGS'):
             raise Pause('final release requires current complete A10 approval with no unresolved major/blocking findings')
+        self._contrary_release(m, report)
         plan = self.load("manuscript_plan.json")
         corpus = {r["record_id"]: r for r in self.load("selected_corpus.json")}
         tables = self._built_tables()
@@ -1686,24 +3592,45 @@ class Run:
         texts = [s["text_markdown"] for s in m["sections"]] + [" ".join(c for row in t["rows"] for c in row)
                                                                 for t in tables]
         numbers = references.number_citations(texts)
+        missing = sorted(rid for rid in numbers if rid not in corpus)
+        if missing:
+            raise Pause(f"export stopped: the manuscript cites record ID(s) not in the selected corpus: "
+                        f"{', '.join(missing)}. A citation to an unknown record cannot be numbered or referenced; "
+                        "correct the text (data/manuscripts) and run again.")
 
-        def cite(match):
-            ids = [p.strip().lstrip("@") for p in match.group(1).split(";")]
-            return "[" + ",".join(str(numbers[i]) for i in ids if i in numbers) + "]"
+        def render(text: str, where: str) -> str:
+            try:
+                return references.render_citations(text, numbers, where)
+            except references.UnknownCitation as exc:
+                raise Pause(f"export stopped: {exc}") from exc
 
         levels = {s.get("section_id"): s.get("level", 1) for s in plan.get("sections", [])}
         body = []
         for s in m["sections"]:
             t = tags.strip_tags(s["text_markdown"])
-            t = tags.CITE_RE.sub(cite, t)
+            t = render(t, f"section '{s['heading']}'")
             t = tags.DISPLAY_RE.sub(lambda x: ("Fig. " if x.group(1)[0] == "F" else "Table ") + x.group(1)[1:], t)
             body.append({"heading": s["heading"], "level": levels.get(s.get("section_id"), 1), "text": t})
-        refs = []
+        refs, ref_problems, retracted = [], {}, []
         for rid, n in sorted(numbers.items(), key=lambda x: x[1]):
-            r = corpus.get(rid, {})
-            meta = references.crossref_lookup(r["doi"], os.environ.get("CROSSREF_MAILTO")) if r.get("doi") else None
-            refs.append(f"{n}. " + (references.format_nature(meta) if meta else
-                                    f"{', '.join(r.get('authors', [])[:1])} et al. {r.get('title')}. {r.get('venue')} ({r.get('year')}). [CHECK FORMAT]"))
+            try:
+                text, problems, meta = references.build_reference(corpus[rid], os.environ.get("CROSSREF_MAILTO"),
+                                                                  cache_dir=self.data("crossref_cache"))
+            except references.UnknownCitation as exc:
+                raise Pause(f"export stopped: {exc}") from exc
+            if meta is not None and references.is_retracted(meta):
+                retracted.append(rid)
+            refs.append(f"{n}. {text}")
+            if problems:
+                ref_problems[str(n)] = [f"{rid}: {p}" for p in problems]
+        excused = (checkpoints.approved(self.dir, "CP2") or {}).get("retraction_exceptions") or {}
+        retracted = [rid for rid in retracted if not str(excused.get(rid) or "").strip()]
+        self.prov.tool_run("retraction_check", "export", {"cited": len(numbers), "retracted": retracted,
+                                                          "references_with_problems": len(ref_problems)})
+        if retracted:
+            raise Pause(f"export stopped: cited paper(s) {', '.join(retracted)} are retracted according to Crossref "
+                        "(retracted after CP2, or not checkable then). Remove the citations, or record a reason "
+                        'under "retraction_exceptions" in CP2_approved.json, then run again.')
         final_dir = self.dir / "final"
         final_dir.mkdir(exist_ok=True)
         src_items, out_items = self.dir / "data" / "display_items", final_dir / "display_items"
@@ -1716,18 +3643,20 @@ class Run:
             figures.append({"display_id": leg["display_id"], "legend": tags.strip_tags(leg["legend"]),
                             "image": out_items / b["image"] if b.get("image") else None, "brief": b.get("brief")})
         captions = {c["display_id"]: tags.strip_tags(c["caption"]) for c in m.get("table_captions", [])}
+        provenance_summary = self._provenance_summary()
+        declarations = submission.write_declaration_drafts(final_dir, provenance_summary)
         doc = {"title": m["title"], "abstract": m["abstract"], "keywords": m.get("keywords", []),
                "sections": body, "references": refs,
-               "back_matter": [("Author contributions and biographies", "[TO BE WRITTEN BY THE AUTHORS]"),
-                               ("AI use disclosure", "[TO BE WRITTEN BY THE AUTHORS — see provenance_summary.json]"),
-                               ("Competing interests", "[TO BE WRITTEN BY THE AUTHORS]")],
+               "back_matter": submission.back_matter(declarations),
                "figures": figures,
                "tables": [{"display_id": t["display_id"], "columns": t["columns"],
                            "caption": captions.get(t["display_id"], "[CAPTION TO BE WRITTEN]"),
-                           "rows": [[tags.CITE_RE.sub(cite, c) for c in row] for row in t["rows"]],
+                           "rows": [[render(c, f"table {t['display_id']}") for c in row] for row in t["rows"]],
                            "notes": ["NR, not reported. Values are taken from validated findings; "
                                      "check against the source papers before submission."]
-                                    + [tags.CITE_RE.sub(cite, n["text"]) for n in t.get("inconsistency_notes", [])]
+                                    + [render(n["text"], f"table {t['display_id']} note")
+                                       for n in t.get("inconsistency_notes", [])]
+                                    + [tags.strip_tags(n) for n in t.get("notes", [])]
                                     + ([f"Left blank for the authors: {', '.join(t['unmapped_columns'])}."]
                                        if t.get("unmapped_columns") else [])}
                           for t in tables]}
@@ -1737,10 +3666,36 @@ class Run:
                                  "display_items": self.load("manuscript_plan.json").get("display_items", [])})
         (final_dir / "compliance.json").write_text(json.dumps(comp, indent=2), encoding="utf-8")
         (final_dir / "costs.txt").write_text(self.budget.summary_text(), encoding="utf-8")
-        (final_dir / "provenance_summary.json").write_text(json.dumps(self._provenance_summary(), indent=2),
+        (final_dir / "provenance_summary.json").write_text(json.dumps(provenance_summary, indent=2),
                                                            encoding="utf-8")
-        notify.send("complete", f"Run {self.id}: review draft complete",
-                    f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
+        exported = {d["display_id"]: d for d in doc["tables"]}
+        table_issues = submission.table_problems(
+            [{**t, "caption": exported[t["display_id"]]["caption"], "notes": exported[t["display_id"]]["notes"]}
+             for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
+        from . import run_spec
+        outline_now, _ = run_spec.load(self.dir)
+        lengths = (run_spec.chapter_word_report(outline_now, m["sections"], compliance.word_count,
+                                                float((self.cfg.get("run_spec") or {}).get("chapter_tolerance", 0.15)))
+                   if outline_now else [])
+        (final_dir / "chapter_lengths.json").write_text(json.dumps(lengths, indent=2), encoding="utf-8")
+        from .tools import science_lint
+        access = {rid: a.get("level") for rid, a in (self.load("source_access.json", {}) or {}).items()}
+        lint = science_lint.check_manuscript(m, access or None)
+        (final_dir / "science_lint.json").write_text(json.dumps(lint, ensure_ascii=False, indent=2), encoding="utf-8")
+        ready = submission.status(final_dir, ref_problems, table_issues, comp,
+                                  self.load("retraction_cp2_selection.json"), lint)
+        export_checks = {"reference_problems": ref_problems, "table_problems": table_issues, "compliance": comp,
+                         "science_lint": lint}
+        (final_dir / "export_checks.json").write_text(json.dumps(export_checks, indent=2), encoding="utf-8")
+        (final_dir / "submission_status.json").write_text(json.dumps(ready, indent=2), encoding="utf-8")
+        self.prov.tool_run("submission_status", "export", {"submission_ready": ready["submission_ready"],
+                                                           "blockers": len(ready["blockers"])})
+        notify.send("complete", f"Run {self.id}: review draft exported ("
+                    + ("submission-ready" if ready["submission_ready"] else f"{len(ready['blockers'])} blockers") + ")",
+                    ("Submission checklist: all items pass.\n" if ready["submission_ready"] else
+                     "NOT submission-ready. Blockers (final/submission_status.json):\n- "
+                     + "\n- ".join(ready["blockers"][:40]) + "\n\n")
+                    + f"Compliance: {'PASS' if comp['all_pass'] else 'see compliance.json'}\n"
                     f"Main text: {comp['main_text_words']} words, {comp['references']} references\n\n"
                     f"{self.budget.summary_text()}\n\n"
                     f"{verification_scope.detail_report_text(self._a10_detail_report())}",

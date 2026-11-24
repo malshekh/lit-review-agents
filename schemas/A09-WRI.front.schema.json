@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A09-WRI FRONT_MATTER output: title, abstract, keywords and the table caption (prompt v0.3)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "const": "FRONT_MATTER"
+    },
+    "title": {
+      "type": "string"
+    },
+    "abstract": {
+      "type": "string"
+    },
+    "keywords": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 6
+    },
+    "table_captions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "display_id": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_id",
+          "caption"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 1
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "title",
+    "abstract",
+    "keywords",
+    "table_captions"
+  ],
+  "additionalProperties": false
+}

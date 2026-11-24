@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 from statistics import median
 
-ROOT=Path(__file__).resolve().parents[1]
+ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'src'))
 from litreview import config
 from litreview.agents.base import build_system_prompt

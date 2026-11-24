@@ -1,0 +1,293 @@
+{
+  "method": "A07 and A10 request sizes at pilot scale, from the production builders. Offline; no API calls; no science.",
+  "basis": "byte bounds MEASURED with production builders on stand-in registries; model behaviour ASSUMED (forecast baseline)",
+  "selections": {
+    "2 full texts + 3 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112",
+        "R0155",
+        "R0060"
+      ],
+      "findings": 159,
+      "propositions": 28,
+      "a07_status": "COMPLETE",
+      "a07": {
+        "PLAN": {
+          "calls": 1,
+          "input_bytes": 112619,
+          "output_cap": 4000
+        },
+        "GROUP": {
+          "calls": 21,
+          "input_bytes": 873569,
+          "output_cap": 252000
+        },
+        "RECONCILE": {
+          "calls": 1,
+          "input_bytes": 35946,
+          "output_cap": 6000
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_bytes": 53767,
+          "output_cap": 6000
+        }
+      },
+      "a10": {
+        "LOCAL": {
+          "calls": 22,
+          "input_bytes": 4504907,
+          "output_cap": 220000
+        },
+        "GLOBAL": {
+          "calls": 4,
+          "input_bytes": 815517,
+          "output_cap": 32000
+        }
+      },
+      "a10_occurrences": 257,
+      "priced_baseline": {
+        "A07-SYN": {
+          "model": "claude-opus-5",
+          "expected_calls": 26.2,
+          "baseline_usd": 6.6223
+        },
+        "A10-RV": {
+          "model": "gpt-6.1-sol",
+          "expected_calls": 66.0,
+          "baseline_usd": 16.1982
+        }
+      }
+    },
+    "2 full texts + 2 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112",
+        "R0155"
+      ],
+      "findings": 141,
+      "propositions": 25,
+      "a07_status": "COMPLETE",
+      "a07": {
+        "PLAN": {
+          "calls": 1,
+          "input_bytes": 105407,
+          "output_cap": 4000
+        },
+        "GROUP": {
+          "calls": 21,
+          "input_bytes": 835465,
+          "output_cap": 252000
+        },
+        "RECONCILE": {
+          "calls": 1,
+          "input_bytes": 33651,
+          "output_cap": 6000
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_bytes": 52741,
+          "output_cap": 6000
+        }
+      },
+      "a10": {
+        "LOCAL": {
+          "calls": 22,
+          "input_bytes": 4292896,
+          "output_cap": 220000
+        },
+        "GLOBAL": {
+          "calls": 4,
+          "input_bytes": 807261,
+          "output_cap": 32000
+        }
+      },
+      "a10_occurrences": 257,
+      "priced_baseline": {
+        "A07-SYN": {
+          "model": "claude-opus-5",
+          "expected_calls": 26.2,
+          "baseline_usd": 6.4969
+        },
+        "A10-RV": {
+          "model": "gpt-6.1-sol",
+          "expected_calls": 66.0,
+          "baseline_usd": 15.7128
+        }
+      }
+    },
+    "2 full texts + 1 abstract": {
+      "stand_in_records": [
+        "R0042",
+        "R0045",
+        "R0112"
+      ],
+      "findings": 122,
+      "propositions": 21,
+      "a07_status": "COMPLETE",
+      "a07": {
+        "PLAN": {
+          "calls": 1,
+          "input_bytes": 97523,
+          "output_cap": 4000
+        },
+        "GROUP": {
+          "calls": 20,
+          "input_bytes": 778699,
+          "output_cap": 240000
+        },
+        "RECONCILE": {
+          "calls": 1,
+          "input_bytes": 30734,
+          "output_cap": 6000
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_bytes": 51411,
+          "output_cap": 6000
+        }
+      },
+      "a10": {
+        "LOCAL": {
+          "calls": 22,
+          "input_bytes": 4044491,
+          "output_cap": 220000
+        },
+        "GLOBAL": {
+          "calls": 3,
+          "input_bytes": 623197,
+          "output_cap": 24000
+        }
+      },
+      "a10_occurrences": 257,
+      "priced_baseline": {
+        "A07-SYN": {
+          "model": "claude-opus-5",
+          "expected_calls": 25.1,
+          "baseline_usd": 6.1458
+        },
+        "A10-RV": {
+          "model": "gpt-6.1-sol",
+          "expected_calls": 61.6,
+          "baseline_usd": 14.225
+        }
+      }
+    },
+    "1 full text + 2 abstracts": {
+      "stand_in_records": [
+        "R0042",
+        "R0112",
+        "R0155"
+      ],
+      "findings": 100,
+      "propositions": 18,
+      "a07_status": "COMPLETE",
+      "a07": {
+        "PLAN": {
+          "calls": 1,
+          "input_bytes": 88751,
+          "output_cap": 4000
+        },
+        "GROUP": {
+          "calls": 19,
+          "input_bytes": 724658,
+          "output_cap": 228000
+        },
+        "RECONCILE": {
+          "calls": 1,
+          "input_bytes": 28276,
+          "output_cap": 6000
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_bytes": 50363,
+          "output_cap": 6000
+        }
+      },
+      "a10": {
+        "LOCAL": {
+          "calls": 22,
+          "input_bytes": 3869475,
+          "output_cap": 220000
+        },
+        "GLOBAL": {
+          "calls": 3,
+          "input_bytes": 613822,
+          "output_cap": 24000
+        }
+      },
+      "a10_occurrences": 257,
+      "priced_baseline": {
+        "A07-SYN": {
+          "model": "claude-opus-5",
+          "expected_calls": 24.0,
+          "baseline_usd": 5.8017
+        },
+        "A10-RV": {
+          "model": "gpt-6.1-sol",
+          "expected_calls": 61.6,
+          "baseline_usd": 13.8135
+        }
+      }
+    },
+    "1 full text + 1 abstract": {
+      "stand_in_records": [
+        "R0042",
+        "R0112"
+      ],
+      "findings": 81,
+      "propositions": 14,
+      "a07_status": "COMPLETE",
+      "a07": {
+        "PLAN": {
+          "calls": 1,
+          "input_bytes": 80867,
+          "output_cap": 4000
+        },
+        "GROUP": {
+          "calls": 18,
+          "input_bytes": 667892,
+          "output_cap": 216000
+        },
+        "RECONCILE": {
+          "calls": 1,
+          "input_bytes": 25359,
+          "output_cap": 6000
+        },
+        "FINAL": {
+          "calls": 1,
+          "input_bytes": 49033,
+          "output_cap": 6000
+        }
+      },
+      "a10": {
+        "LOCAL": {
+          "calls": 22,
+          "input_bytes": 3613987,
+          "output_cap": 220000
+        },
+        "GLOBAL": {
+          "calls": 3,
+          "input_bytes": 604367,
+          "output_cap": 24000
+        }
+      },
+      "a10_occurrences": 257,
+      "priced_baseline": {
+        "A07-SYN": {
+          "model": "claude-opus-5",
+          "expected_calls": 22.9,
+          "baseline_usd": 5.4506
+        },
+        "A10-RV": {
+          "model": "gpt-6.1-sol",
+          "expected_calls": 61.6,
+          "baseline_usd": 13.2307
+        }
+      }
+    }
+  }
+}

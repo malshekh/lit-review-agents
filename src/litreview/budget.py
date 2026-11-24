@@ -5,6 +5,7 @@ token counts the APIs return and the per-million-token prices in config/prices.y
 """
 from __future__ import annotations
 
+import datetime as _dt
 import json
 import os
 import time
@@ -24,14 +25,76 @@ class BatchGateRefused(BudgetExceeded):
     the batch's worst case would exceed it. The stage stops; it does not wait for room."""
 
 
+class StageCapReached(BudgetExceeded):
+    """A stage group's sub-cap (profiles.<name>.stage_caps_usd) would be passed: the stage stops for the
+    researcher instead of borrowing from a later stage."""
+
+
 class UnpricedModel(RuntimeError):
     pass
 
 
+class StalePrice(UnpricedModel):
+    """The model's prices.yaml entry has no source or check date, or was checked too long ago."""
+
+
+def derive_stage_caps(stage_usd: dict[str, float], recovery_allowance: float, floor_usd: float = 1.0) -> dict:
+    """Stage sub-caps that the projected work fits by construction: each stage group's projected spend (already
+    including the uncertainty margin) plus an allowance for retries and repairs. A fixed table of sub-caps set
+    before the projection existed stopped stages the projection itself said would cost more."""
+    groups: dict[str, float] = {}
+    for agent, usd in stage_usd.items():
+        g = config.stage_group(agent)
+        if g:
+            groups[g] = groups.get(g, 0.0) + float(usd)
+    caps = {g: round(max(floor_usd, usd * (1 + recovery_allowance)) + 0.005, 2) for g, usd in sorted(groups.items())}
+    return {"caps_usd": caps, "projected_usd": {g: round(v, 4) for g, v in sorted(groups.items())},
+            "recovery_allowance": recovery_allowance, "total_usd": round(sum(caps.values()), 2)}
+
+
+def today() -> _dt.date:
+    """Today's date. Under pytest only, LITREVIEW_TEST_TODAY pins it so the price-age gate is testable."""
+    pinned = os.environ.get("LITREVIEW_TEST_TODAY") if "PYTEST_CURRENT_TEST" in os.environ else None
+    return _dt.date.fromisoformat(pinned) if pinned else _dt.date.today()
+
+
+def price_problem(prices: dict, model: str, max_age_days: int | None, on: _dt.date | None = None) -> str | None:
+    """Why this model's price entry cannot be trusted, or None. Every priced model needs `source` and `checked`."""
+    p = prices.get(model) or {}
+    if p.get("input") is None or p.get("output") is None:
+        return f"no price for '{model}' in config/prices.yaml"
+    if max_age_days is None:
+        return None
+    if not p.get("source") or not p.get("checked"):
+        return f"'{model}' in config/prices.yaml has no source or checked date"
+    try:
+        checked = _dt.date.fromisoformat(str(p["checked"]))
+    except ValueError:
+        return f"'{model}' in config/prices.yaml has an unreadable checked date ({p['checked']!r})"
+    age = ((on or today()) - checked).days
+    if age > int(max_age_days):
+        return (f"prices for '{model}' were last checked {checked} ({age} days ago; limit {max_age_days}). "
+                f"Re-read {p['source']} and update `checked` in config/prices.yaml")
+    return None
+
+
 class BudgetTracker:
     def __init__(self, run_dir: Path):
-        pipeline = config.load("pipeline")["run"]
+        recorded = None
+        try:   # the profile the run was created under travels with the run, not with the shell
+            recorded = json.loads((Path(run_dir) / "state.json").read_text(encoding="utf-8")).get("profile")
+        except (OSError, ValueError):
+            pass
+        pipeline = config.run_settings(recorded)
+        self.profile = pipeline.get("profile")
         self.cap = float(pipeline["spend_cap_usd"])
+        self.review_points = [float(x) for x in pipeline.get("spend_review_points_usd") or []]
+        caps = pipeline.get("stage_caps_usd") or {}
+        if caps == "derived":   # written at CP2 from the approved projection (Run._derive_stage_caps)
+            derived = Path(run_dir) / "data" / "stage_caps.json"
+            caps = json.loads(derived.read_text(encoding="utf-8"))["caps_usd"] if derived.exists() else {}
+        self.stage_caps = {k: float(v) for k, v in caps.items()}
+        self.price_max_age_days = pipeline.get("price_max_age_days")
         self.warn_fraction = float(pipeline.get("warn_at_fraction", 0.8))
         self.allow_unpriced = bool(pipeline.get("allow_unpriced_models", False))
         self.prices = config.load("prices")
@@ -54,6 +117,10 @@ class BudgetTracker:
                 f"No price for '{model}' in config/prices.yaml. Add it, or set "
                 "run.allow_unpriced_models: true in config/pipeline.yaml."
             )
+        if self.price_of(model) is not None:
+            problem = price_problem(self.prices, model, getattr(self, "price_max_age_days", None))
+            if problem:
+                raise StalePrice(problem[0].upper() + problem[1:] + ". No call is made on an unverified price.")
 
     def _rates(self, model: str, prompt_tokens: int, batch: bool = False) -> dict | None:
         """Per-million rates for one call. A missing cache rate never undercounts: reads and 5-minute
@@ -147,8 +214,25 @@ class BudgetTracker:
         with open(self.log_path, encoding="utf-8") as fh:
             return [json.loads(line) for line in fh if line.strip()]
 
+    def prior_spend(self) -> float:
+        """Spend made before the run existed and counted against it (input/prior_spend.json: the smoke test)."""
+        p = self.log_path.parent / "input" / "prior_spend.json"
+        if not p.exists():
+            return 0.0
+        import math
+        value = float(json.loads(p.read_text(encoding="utf-8")).get("total_usd") or 0.0)
+        if not math.isfinite(value) or value < 0:
+            raise BudgetExceeded("Prior spend must be finite and non-negative")
+        return value
+
     def spent(self) -> float:
-        return sum(e["cost_usd"] or 0.0 for e in self.entries())
+        from .evaluation_budget import prior
+        entries = self.entries()
+        try:
+            carried = prior(self.log_path.parent, entries)
+        except (ValueError, OSError, KeyError) as exc:
+            raise BudgetExceeded("Cumulative evaluation budget invalid: " + str(exc)) from exc
+        return carried + self.prior_spend() + sum(e["cost_usd"] or 0.0 for e in entries)
 
     def ensure_headroom(self, reservation_key: str | None = None) -> None:
         """Raise before a call if the cap is already reached, counting spend reserved by unsettled batches."""
@@ -201,22 +285,51 @@ class BudgetTracker:
         tmp.write_text(json.dumps(res, indent=1), encoding="utf-8")
         os.replace(tmp, self.reservations_path)
 
-    def reserved(self) -> float:
-        """Spend held by unsettled batches: each reservation less the costs its batch has already logged."""
+    def held(self) -> dict[str, float]:
+        """{reservation key: what it still holds}: each reservation less the costs already logged against it."""
         res = self.reservations()
         if not res:
-            return 0.0
+            return {}
         logged: dict[str, float] = defaultdict(float)
         for e in self.entries():
             if e.get("batch_id"):
                 logged[e["batch_id"]] += e["cost_usd"] or 0.0
-        return sum(max(0.0, r["usd"] - (logged[r["batch_id"]] if r.get("batch_id") else 0.0)) for r in res.values())
+            if e.get("reservation_key"):
+                logged[e["reservation_key"]] += e["cost_usd"] or 0.0
+        return {k: max(0.0, r["usd"] - (logged[r["batch_id"]] if r.get("batch_id") else logged[k]))
+                for k, r in res.items()}
+
+    def reserved(self) -> float:
+        """Spend held by unsettled calls and batches."""
+        return sum(self.held().values())
+
+    def stage_committed(self, group: str) -> float:
+        """Spent plus held by the agents of one stage group (config.STAGE_GROUPS)."""
+        agents = config.STAGE_GROUPS.get(group, ())
+        res, held = self.reservations(), self.held()
+        return (sum(e["cost_usd"] or 0.0 for e in self.entries() if e["agent"] in agents)
+                + sum(v for k, v in held.items() if res[k].get("agent") in agents))
+
+    def _stage_check(self, agent_id: str, usd: float) -> None:
+        group = config.stage_group(agent_id)
+        cap = (getattr(self, "stage_caps", None) or {}).get(group) if group else None
+        if cap is None:
+            return
+        committed = self.stage_committed(group)
+        if committed + usd > cap + 1e-9:
+            raise StageCapReached(
+                f"{agent_id}: this call would commit ${usd:.2f} on top of ${committed:.2f} already spent or held "
+                f"by stage {group}, over its ${cap:.2f} sub-cap (profile '{self.profile}'). The stage stops here; "
+                "review the spend, then raise the sub-cap in config/pipeline.yaml -> profiles or reduce the scope.")
 
     def reserve(self, key: str, usd: float, agent_id: str, note: str = "") -> tuple[bool, float]:
         """Hold `usd` under `key` if it fits under the cap after spend and every other reservation.
         Returns (reserved, what was available before this reservation)."""
         with self._lock():
+            self._stage_check(agent_id, usd)
             available = self.cap - self.spent() - self.reserved()
+            if getattr(self, "operational_ceiling", None) is not None:
+                available = min(available, self.operational_ceiling - self.spent() - self.reserved())
             if usd > available:
                 return False, available
             res = self.reservations()
@@ -242,7 +355,7 @@ class BudgetTracker:
                output_tokens: int, step: str = "", cached_input_tokens: int = 0,
                cache_write_tokens: int = 0, cache_write_1h_tokens: int = 0,
                started_at: float | None = None, cache_requested: bool = False, batch_id: str | None = None,
-               prompt_chars: int | None = None) -> dict:
+               prompt_chars: int | None = None, reservation_key: str | None = None) -> dict:
         """cache_requested: the request carried cache_control marks. A requested cache that neither read
         nor wrote (a prefix changed by a byte, or below the provider's minimum) is logged as a miss.
         batch_id: the call ran inside that batch and is billed at batch rates. prompt_chars: characters sent
@@ -265,6 +378,7 @@ class BudgetTracker:
             "cost_usd": None if parts is None else sum(parts.values()),
             "cost_parts_usd": None if parts is None else {k: round(v, 6) for k, v in parts.items()},
         }
+        if reservation_key:entry["reservation_key"]=reservation_key
         if batch_id:
             entry["batch_id"] = batch_id
         if prompt_chars:
@@ -377,7 +491,7 @@ class BudgetTracker:
         v = s["savings_usd"]
         if any(v.values()):
             lines.append(f"  cache: reads saved ${v['cache_read_saved']:.2f}; writes cost ${v['cache_write_premium']:.2f} "
-                         f"(5-minute) + ${v['cache_write_1h_premium']:.2f} (1-hour) over the input price; net "
+                         f"(default retention) + ${v['cache_write_1h_premium']:.2f} (Anthropic 1-hour) over the input price; net "
                          f"${v['cache_net']:.2f}.  Batch discount, separately: ${v['batch_discount']:.2f}")
         for agent, a in sorted(s["by_agent"].items()):
             cache = (f"  (cache: {a['cache_hits']}/{a['cache_calls']} calls hit, {a['cached_input_tokens']:,d} "

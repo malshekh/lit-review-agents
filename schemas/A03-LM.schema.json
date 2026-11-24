@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "A03-LM output (top-level contract; see the prompt's output schema for full detail)",
+  "title": "A03-LM output: the search plan (prompt v0.6). Every field is always present; unknown values are null.",
   "type": "object",
   "properties": {
     "agent_id": {
@@ -36,23 +36,284 @@
         "REPAIR"
       ]
     },
+    "spec_version": {
+      "type": "string"
+    },
     "plan_version": {
       "type": "string"
     },
     "concept_blocks": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "concept": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "term": {
+                  "type": "string"
+                },
+                "relation": {
+                  "enum": [
+                    "PREFERRED",
+                    "SYNONYM",
+                    "ABBREVIATION",
+                    "RELATED",
+                    "CONTROLLED_VOCAB"
+                  ]
+                },
+                "origin": {
+                  "enum": [
+                    "FROM_SPEC",
+                    "MODEL_SUGGESTED"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "term",
+                "relation",
+                "origin",
+                "note"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "concept",
+          "terms"
+        ],
+        "additionalProperties": false
+      }
     },
     "query_families": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "family_id": {
+            "type": "string"
+          },
+          "purpose": {
+            "enum": [
+              "CORE_TOPIC",
+              "THEME",
+              "CONTRARY_EVIDENCE",
+              "REVIEW_CHANNEL",
+              "RECENT_UPDATE",
+              "KNOWN_ITEM"
+            ]
+          },
+          "theme_or_position": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "section_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "logic": {
+            "type": "string"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "routing_reason": {
+            "type": "string"
+          },
+          "compiled": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "query": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "source",
+                "query"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "context_blocks_applied": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dimension": {
+                  "enum": [
+                    "ORGANISM",
+                    "STUDY_SYSTEM",
+                    "ENTITY_TYPE"
+                  ]
+                },
+                "value": {
+                  "type": "string"
+                },
+                "as_filter": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "dimension",
+                "value",
+                "as_filter"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "date_from": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "date_to": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "languages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "publication_types_excluded": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "date_from",
+              "date_to",
+              "languages",
+              "publication_types_excluded"
+            ],
+            "additionalProperties": false
+          },
+          "not_terms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_records": {
+            "type": "integer"
+          },
+          "expected_failure_modes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "family_id",
+          "purpose",
+          "theme_or_position",
+          "section_ids",
+          "logic",
+          "sources",
+          "routing_reason",
+          "compiled",
+          "context_blocks_applied",
+          "filters",
+          "not_terms",
+          "max_records",
+          "expected_failure_modes"
+        ],
+        "additionalProperties": false
+      }
     },
     "citation_expansion_seed_families": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "repairs": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "family_id": {
+            "type": "string"
+          },
+          "diagnosis": {
+            "enum": [
+              "QUERY_REPAIRED",
+              "QUERY_OVERCONSTRAINED",
+              "NO_RESULTS_CONFIRMED",
+              "SEARCH_FAILED"
+            ]
+          },
+          "cause": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "family_id",
+          "diagnosis",
+          "cause",
+          "change"
+        ],
+        "additionalProperties": false
+      }
     },
     "seeds_not_recalled": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seed": {
+            "type": "string"
+          },
+          "likely_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seed",
+          "likely_reason"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -62,6 +323,7 @@
     "warnings",
     "limitations",
     "mode",
+    "spec_version",
     "plan_version",
     "concept_blocks",
     "query_families",
@@ -69,5 +331,5 @@
     "repairs",
     "seeds_not_recalled"
   ],
-  "additionalProperties": true
+  "additionalProperties": false
 }

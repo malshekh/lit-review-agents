@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A09-WRI SECTION output: one section, or a structured request for evidence (prompt v0.3)",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_EVIDENCE",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "const": "SECTION"
+    },
+    "section": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "section_id": {
+              "type": "string"
+            },
+            "heading": {
+              "type": "string"
+            },
+            "text_markdown": {
+              "type": "string"
+            },
+            "word_count": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "section_id",
+            "heading",
+            "text_markdown",
+            "word_count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retrieval_requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "element_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "finding_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "element_ids",
+          "finding_ids",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 4
+    },
+    "plan_gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "gap_marker": {
+            "type": "string"
+          },
+          "section_id": {
+            "type": "string"
+          },
+          "missing": {
+            "type": "string"
+          },
+          "why_needed": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "gap_marker",
+          "section_id",
+          "missing",
+          "why_needed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "ceiling_unclear": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "proposition_id": {
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposition_id",
+          "question"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "section",
+    "retrieval_requests",
+    "plan_gaps",
+    "ceiling_unclear"
+  ],
+  "additionalProperties": false
+}

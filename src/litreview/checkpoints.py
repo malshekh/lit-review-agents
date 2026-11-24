@@ -47,10 +47,18 @@ def write_cp1(run_dir: Path, spec: dict) -> None:
               "## Assumptions", *[f"- {a}" for a in spec.get("assumptions", [])], "",
               "## Questions for you", *[f"- {q}" for q in spec.get("questions_for_researcher", [])], "",
               "Fill in `CP1_decision.json`, then run `litreview approve <run_id> CP1`."]
+    policy_path = Path(run_dir) / "input/corpus_policy.json"
+    if policy_path.exists():
+        from .synthesis_registry import fingerprint
+        policy = json.loads(policy_path.read_text(encoding="utf-8"))
+        lines += ["", "## Immutable run-level corpus authority", "```json", json.dumps(policy, indent=2), "```",
+                  "Confirm this policy explicitly; agents cannot change membership or expansion permissions."]
     (d / "CP1_review.md").write_text("\n".join(lines), encoding="utf-8")
     template = {"selected_option_id": None, "edited_angle": None,
                 "approve_selection_criteria": None, "edited_selection_criteria": None,
                 "edited_theme_framework": None, "answers_to_questions": {}, "notes": ""}
+    if policy_path.exists():
+        template.update(confirm_corpus_policy=False, corpus_policy_fingerprint=fingerprint(policy))
     (d / "CP1_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
 
@@ -87,9 +95,26 @@ def _emerging_lines(emerging: list[dict] | None, what: str) -> list[str]:
 
 
 def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report: dict,
-              emerging: list[dict] | None = None, framework: dict | None = None) -> None:
+              emerging: list[dict] | None = None, framework: dict | None = None,
+              review_issues: dict | None = None, identities: list | None = None,
+              source_readiness: dict | None = None) -> None:
     """Every record is listed — qualified (all tiers), unresolved and excluded. Nothing is hidden."""
     d = cp_dir(run_dir)
+    from .synthesis_registry import fingerprint
+    import shutil
+    old_rows = {}
+    csv_path = d / "CP2_records.csv"
+    if csv_path.exists():
+        with csv_path.open(encoding="utf-8", newline="") as existing:
+            old_rows = {(r["record_id"], r.get("pmid") or ""): r for r in csv.DictReader(existing)}
+    old_decision = json.loads((d / "CP2_decision.json").read_text(encoding="utf-8")) if (d / "CP2_decision.json").exists() else {}
+    preserved = [d / name for name in ("CP2_records.csv", "CP2_decision.json", "CP2_review.md", "CP2_review_state.json", "CP2_approved.json") if (d / name).exists()]
+    if preserved:
+        digest = fingerprint({p.name: p.read_text(encoding="utf-8") for p in preserved})
+        archive = d / "history" / "CP2" / digest
+        archive.mkdir(parents=True, exist_ok=True)
+        for p in preserved:
+            if not (archive / p.name).exists(): shutil.copy2(p, archive / p.name)
     by_id = {r["record_id"]: r for r in records}
     order = {"CORE": 0, "SUPPORTING": 1, "CONTEXT": 2, "PERIPHERAL": 3, None: 4}
     quals = sorted(quals, key=lambda q: (q["disposition"] != "QUALIFIED", order.get(q.get("proposed_tier"), 4)))
@@ -98,7 +123,8 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
         w.writeheader()
         for q in quals:
             r = by_id.get(q["record_id"], {})
-            w.writerow({"select": "", "tier_override": "", "record_id": q["record_id"],
+            prior = old_rows.get((q["record_id"], r.get("pmid") or ""), {})
+            w.writerow({"select": prior.get("select", ""), "tier_override": prior.get("tier_override", ""), "record_id": q["record_id"],
                         "disposition": q["disposition"], "proposed_tier": q.get("proposed_tier") or "",
                         "tier_signal": q.get("tier_signal") or "", "contrary": q.get("is_contrary_evidence"),
                         "themes": "; ".join(q.get("themes", [])), "year": r.get("year"),
@@ -125,9 +151,67 @@ def write_cp2(run_dir: Path, records: list[dict], quals: list[dict], bias_report
              "## Bias checks", "```json", json.dumps(bias_report, indent=2), "```", "",
              *_emerging_lines(emerging, "records"), *_framework_lines(framework, "Current theme framework"),
              "Then run `litreview approve <run_id> CP2`."]
+    issue_data = {"issues": review_issues or {}, "identifier_registry": identities or [],
+                  "source_readiness": source_readiness or {}}
+    digest = fingerprint([records, quals, framework, issue_data])
+    needs_ack = bool(review_issues)
+    lines += ["", "## Source readiness, canonical identifiers and unresolved review", "",
+              "Record IDs and PMIDs are distinct namespaces. The registry below is authoritative; raw model claims may be wrong.",
+              "Full text pending at CP2 is not certified by a PMCID. Required source verification occurs before extraction dispatch.",
+              "```json", json.dumps(issue_data, indent=2, ensure_ascii=False), "```",
+              "Acknowledge these issues with review_issues_acknowledged=true and substantive notes before approval."]
     (d / "CP2_review.md").write_text("\n".join(lines), encoding="utf-8")
-    (d / "CP2_decision.json").write_text(json.dumps({"theme_framework_update": None, "notes": ""}, indent=2),
-                                         encoding="utf-8")
+    decision = {"theme_framework_update": None, "notes": "", **old_decision,
+                "review_fingerprint": digest,
+                "review_issues_acknowledged": old_decision.get("review_issues_acknowledged", False)
+                    if old_decision.get("review_fingerprint") == digest else False}
+    import hashlib
+    paths = [Path(run_dir) / "data" / n for n in ("records.json", "qualifications.json", "spec_approved.json",
+             "theme_framework.json", "screening_review.json", "search_plan.json", "source_readiness.json")]
+    source_files = {str(p.relative_to(run_dir)): hashlib.sha256(p.read_bytes()).hexdigest() if p.exists() else None for p in paths}
+    (d / "CP2_review_state.json").write_text(json.dumps({"fingerprint": digest, "requires_ack": needs_ack,
+                                                        "source_files": source_files}), encoding="utf-8")
+    (d / "CP2_decision.json").write_text(json.dumps(decision, indent=2), encoding="utf-8")
+
+
+def require_cp2_current(run_dir: Path) -> None:
+    import hashlib
+    p = Path(run_dir) / "checkpoints" / "CP2_review_state.json"
+    if not p.exists():
+        return  # legacy run compatibility; new generated reviews always bind their sources
+    state = json.loads(p.read_text(encoding="utf-8"))
+    for name, expected in state.get("source_files", {}).items():
+        source = Path(run_dir) / name
+        actual = hashlib.sha256(source.read_bytes()).hexdigest() if source.exists() else None
+        if actual != expected:
+            raise DecisionIncomplete("CP2: source/review inputs changed; regenerate and review before approval")
+
+
+def prefill_cp2(run_dir: Path, proposed: dict[str, str], limit: int) -> None:
+    """Mark the proposed selection in CP2_records.csv (rows the researcher has not touched only) and explain it."""
+    d = cp_dir(run_dir)
+    path = d / "CP2_records.csv"
+    rows = list(csv.DictReader(open(path, encoding="utf-8")))
+    touched = any(r["select"].strip() for r in rows)
+    fields = list(rows[0].keys()) if rows else CP2_COLUMNS
+    if "proposed_reason" not in fields:
+        fields.append("proposed_reason")
+    for r in rows:
+        r["proposed_reason"] = proposed.get(r["record_id"], "")
+        if not touched and r["record_id"] in proposed:
+            r["select"] = "Y"
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        w.writerows(rows)
+    with open(d / "CP2_review.md", "a", encoding="utf-8") as fh:
+        fh.write("\n\n## Proposed selection\n\n"
+                 f"This run allows at most {limit} papers. The pipeline proposes {len(proposed)}, marked `Y` in "
+                 "`CP2_records.csv` with the reason in `proposed_reason` (screening tier, coverage of your outline's "
+                 "subsections, contrary evidence). Access was not a criterion. Change the marks freely; more than "
+                 f"{limit}, or two versions of one publication, is refused. On approval the selection is frozen as the "
+                 "corpus manifest (`data/corpus_manifest.json`).\n\n"
+                 + "\n".join(f"- {rid}: {why}" for rid, why in proposed.items()) + "\n")
 
 
 def read_cp2_selection(run_dir: Path) -> dict:
@@ -139,6 +223,7 @@ def read_cp2_selection(run_dir: Path) -> dict:
 
 # ---------------------------------------------------------------- CP3: argument
 def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, framework: dict | None = None) -> None:
+    from .synthesis_registry import fingerprint
     d = cp_dir(run_dir)
     lines = ["# Checkpoint 3 — Approve the argument", ""]
     if len(pkg.get("models") or []) > 1:
@@ -174,7 +259,7 @@ def write_cp3(run_dir: Path, pkg: dict, emerging: list[dict] | None = None, fram
     lines += [*_emerging_lines(emerging, "findings"), *_framework_lines(framework, "Current theme framework"),
               "Fill in `CP3_decision.json`, then run `litreview approve <run_id> CP3`."]
     (d / "CP3_review.md").write_text("\n".join(lines), encoding="utf-8")
-    template = {"selected_thesis": None, "adopted_interpretations": [], "rejected_interpretations": [],
+    template = {"synthesis_fingerprint":fingerprint(pkg), "selected_thesis": None, "adopted_interpretations": [], "rejected_interpretations": [],
                 "edits": None, "theme_framework_update": None, "notes": ""}
     (d / "CP3_decision.json").write_text(json.dumps(template, indent=2), encoding="utf-8")
 
@@ -209,15 +294,187 @@ def write_synthesis_alignment(run_dir: Path, digest: str, alignment: dict) -> No
                                         "keep_approved_framework": False, "proposal_review_notes": "", "notes": ""}, indent=2), encoding="utf-8")
 
 
+# ---------------------------------------------------------------- CP_LEDGER: allocation before writing
+def write_ledger_review(run_dir: Path, digest: str, ledger: list[dict], report: dict, elements: dict) -> None:
+    """The allocation ledger for approval before A09 writes: what is discussed individually, grouped, shown only
+    in the table, or not individually discussed (with A08's reason). Evidence selection is the authors' decision
+    under the journal's AI policy; nothing is written until it is approved for these exact plan and ledger."""
+    d = cp_dir(run_dir)
+    (d / "CP_LEDGER_ledger.json").write_text(json.dumps({"fingerprint": digest, "ledger": ledger, "report": report},
+                                                        indent=2, ensure_ascii=False), encoding="utf-8")
+    counts = report.get("counts", {})
+    lines = ["# Allocation ledger: what the review discusses", "",
+             "A08 has allocated every approved element (proposition, gap, adopted interpretation). Approve only if "
+             "this is the evidence selection you want: everything below NOT_INDIVIDUALLY_DISCUSSED will not be "
+             "written individually.", "",
+             *[f"- {k}: {v}" for k, v in counts.items()], "",
+             f"Mandatory elements (conflicts, contrary CORE evidence, researcher-verified inconsistencies, system gaps, "
+             f"NARRATIVE coverage): {len(report.get('mandatory', {}))}, all written (the bridge rejects any other plan).",
+             "", "## Theme to sections", *[f"- {t}: {', '.join(s)}" for t, s in report.get("theme_to_sections", {}).items()],
+             "", "## Not individually discussed", ""]
+    for e in ledger:
+        if e.get("outcome") == "NOT_INDIVIDUALLY_DISCUSSED":
+            text = (elements.get(e["item_id"]) or {}).get("text") or ""
+            lines.append(f"- **{e['item_id']}** {text} — reason: {e.get('reason')}")
+    lines += ["", "## Table only", ""]
+    lines += [f"- **{e['item_id']}** {(elements.get(e['item_id']) or {}).get('text') or ''}"
+              for e in ledger if e.get("outcome") == "TABLE_ONLY"]
+    lines += ["", "## Grouped passages", ""]
+    lines += [f"- {g}: {', '.join(m)}" for g, m in report.get("groups", {}).items()]
+    contrary = report.get("contrary_evidence")
+    if contrary:
+        lines += ["", "## Contrary evidence", "",
+                  f"{len(contrary['in_table'])} contrary findings are shown in the comparative table. The "
+                  f"{len(contrary['not_in_table'])} below are not; each stays mandatory and must be addressed in "
+                  "cited, verified prose before release (or excluded by you with a justification at CP_CONTRARY):", ""]
+        lines += [f"- {fid}: written by {', '.join(v['written_by'])} in {', '.join(v['sections']) or 'no section'}"
+                  for fid, v in contrary["not_in_table"].items()]
+    lines += ["", "Set approve_ledger to true in `CP_LEDGER_decision.json`, then run "
+                  "`litreview approve <run_id> CP_LEDGER`. To change the allocation, record what to change in notes "
+                  "and rerun the outline stage instead."]
+    (d / "CP_LEDGER_review.md").write_text("\n".join(lines), encoding="utf-8")
+    decision = d / "CP_LEDGER_decision.json"
+    if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
+        decision.write_text(json.dumps({"fingerprint": digest, "approve_ledger": False, "notes": ""}, indent=2),
+                            encoding="utf-8")
+
+
+# ---------------------------------------------------------------- review pauses bound to one fingerprint
+# CP_CONTRARY (release: contrary evidence neither in the table nor addressed in prose), CP_CONTEXT (a request near
+# its model's window), CP_SPEND (the run's spend review point). Each approval is bound to the fingerprint it was
+# written for, logged to provenance by `approve`, and kept in <cp>_approvals.json, so a later pause never erases it.
+REVIEW_CPS = ("CP_CONTRARY", "CP_CONTEXT", "CP_SPEND", "CP_AGENT_REVIEW", "CP_EARLY")
+
+
+def _write_review(run_dir: Path, cp: str, digest: str, lines: list[str], template: dict, state: dict) -> None:
+    d = cp_dir(run_dir)
+    (d / f"{cp}_state.json").write_text(json.dumps({"fingerprint": digest, **state}, indent=2, ensure_ascii=False),
+                                        encoding="utf-8")
+    (d / f"{cp}_review.md").write_text("\n".join(lines), encoding="utf-8")
+    decision = d / f"{cp}_decision.json"
+    if not decision.exists() or json.loads(decision.read_text(encoding="utf-8")).get("fingerprint") != digest:
+        decision.write_text(json.dumps({"fingerprint": digest, **template, "notes": ""}, indent=2), encoding="utf-8")
+
+
+def write_contrary_review(run_dir: Path, digest: str, accounting: dict, register: list[dict]) -> None:
+    """Release is blocked: material contrary findings are neither in the table nor addressed in verified prose."""
+    by_id = {e["finding_id"]: e for e in register}
+    lines = ["# Contrary evidence not accounted for: release blocked", "",
+             "Each finding below is contrary evidence (used as CONFLICTING evidence, or named by a reconciliation "
+             "issue). It is not in the comparative table, and no A10-verified sentence tagged with an element that "
+             "carries it cites its paper. Either revise the manuscript so the prose addresses it (then run again), or "
+             "exclude it with a scientific justification in `CP_CONTRARY_decision.json` (`exclusions`: a list of "
+             "objects with `finding_id` and `justification`), then run `litreview approve <run_id> CP_CONTRARY`.", ""]
+    for fid in accounting["unaddressed"]:
+        e = by_id.get(fid, {})
+        lines.append(f"- **{fid}** ({', '.join(e.get('reasons') or [])}); carried by "
+                     f"{', '.join(e.get('carried_by') or []) or 'no element'}; written in "
+                     f"{', '.join(e.get('sections') or []) or 'no section'}")
+    for c in accounting.get("table_conceals") or []:
+        lines.append(f"- table: {c} (not excludable: the table builder must be corrected)")
+    _write_review(run_dir, "CP_CONTRARY", digest, lines, {"exclusions": []},
+                  {"unaddressed": accounting["unaddressed"], "table_conceals": accounting.get("table_conceals") or []})
+
+
+def write_context_review(run_dir: Path, digest: str, detail: dict) -> None:
+    """A request's (input + reserved output) / window is at or above its review threshold (still under the hard
+    admission ceiling). Operational defaults, not reliability guarantees."""
+    lines = ["# Context window review", "",
+             f"{detail['agent']} ({detail['model']}), step {detail['step']}: input plus reserved output would use "
+             f"{detail['utilisation']:.1%} of the {detail['window']:,}-token window (basis {detail['basis']}).", "",
+             *[f"- {k}: {v}" for k, v in detail.items()], "",
+             "Thresholds are operational defaults, not reliability guarantees: a request this close to the window "
+             "may degrade. Approve this exact request (`approve_request: true`), or split the work and run again. "
+             "Then run `litreview approve <run_id> CP_CONTEXT`."]
+    _write_review(run_dir, "CP_CONTEXT", digest, lines, {"approve_request": False}, {"detail": detail})
+
+
+def write_agent_review(run_dir: Path, digest: str, agent: str, step: str, output: dict) -> None:
+    detail = {k: output.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
+    _write_review(run_dir, "CP_AGENT_REVIEW", digest,
+                  ["# Agent requests human input", "", f"{agent} ? {step}",
+                   "No retrieval/screening continuation before this review. Corpus/access/finance constraints cannot be waived here.",
+                   "```json", json.dumps(detail, indent=2, ensure_ascii=False), "```"],
+                  {"approve_continue": False}, {"agent": agent, "step": step, "detail": detail})
+
+
+def write_spend_review(run_dir: Path, digest: str, detail: dict) -> None:
+    """The run reached its spend review point: it pauses and asks before going further."""
+    lines = ["# Spend review point", "",
+             f"Spent ${detail['spent_usd']:.2f}, reserved ${detail['reserved_usd']:.2f}; the next call "
+             f"(${detail['request_usd']:.2f}, {detail['agent']}) would take committed spend to "
+             f"${detail['committed_after_usd']:.2f}, past the ${detail['review_point_usd']:.2f} review point. "
+             f"The hard cap stays ${detail['cap_usd']:.2f}.", "",
+             "Set `approve_continue` to true to continue to the cap, then run `litreview approve <run_id> CP_SPEND`."]
+    _write_review(run_dir, "CP_SPEND", digest, lines, {"approve_continue": False}, {"detail": detail})
+
+
+def write_early_review(run_dir: Path, digest: str, report: dict) -> None:
+    """The first papers are extracted: the run stops so the researcher can inspect quality and cost before the
+    rest of the corpus is read. Nothing already done is repeated after approval."""
+    lines = ["# Early check: the first papers are extracted and independently validated", "",
+             "Read these papers' extractions (`data/extractions/`) and validations (`data/validations/`) before the rest "
+             "of the corpus is processed. Compare a few findings with the paper: spans, comparators, doses, values, and "
+             "whether a result or an interpretation was recorded; then check that each validation disposition is right.", "",
+             "| Paper | Read as | Access | Legends read | Findings | Supported | Not established | Rejected | Unresolved | "
+             "Comparator not reported | Comparator missing |", "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for p in report["papers"]:
+        lines.append(f"| {p.get('paper_id') or p['record_id']} | {p['level']} | {p.get('access_category')} | "
+                     f"{'yes' if p.get('figure_legends_read') else 'no'} (images: no) | {p['findings']} | {p['supported']} | "
+                     f"{p['not_established']} | {p['rejected']} | {p['unresolved']} | {p['comparator_not_reported']} | "
+                     f"{p['comparator_missing']} |")
+    lines += ["", "| Paper | Extraction | Validation | Together | Projected at CP2 (same quantity) |", "|---|---:|---:|---:|---:|"]
+    for p in report["papers"]:
+        lines.append(f"| {p.get('paper_id') or p['record_id']} | ${p['extraction_usd']:.2f} | ${p['validation_usd']:.2f} | "
+                     f"${p['measured_per_paper_usd']:.2f} | "
+                     + (f"${p['projected_per_paper_usd']:.2f}" if p.get("projected_per_paper_usd") is not None else "n/a") + " |")
+    f = report["forecast"]
+    lines += ["", "Access limitations: " + "; ".join(f"{p.get('paper_id') or p['record_id']}: {p['access_limitations']}"
+                                                     for p in report["papers"]), "",
+              f"Re-forecast from these measurements: the remaining {f['remaining_papers']} papers about "
+              f"${f['remaining_extraction_and_validation_usd']:.2f} for extraction and validation; about "
+              f"{f['findings_expected_total']} findings in all; downstream stages ${f['downstream_usd_revised']:.2f} "
+              f"(${f['downstream_usd_at_cp2']:.2f} at CP2). {f['basis']}", "",
+              "Accounts: " + ", ".join(f"{k.replace('_', ' ')} ${v:.2f}" for k, v in report["accounts"].items()
+                                       if isinstance(v, (int, float))), "",
+              "To continue, set `approve_continue` to true and write what you checked in `notes` (at least a "
+              "sentence), then run `litreview approve <run_id> CP_EARLY`. To change course instead, record an applied "
+              "decision (`litreview decide`) or stop the run; nothing paid for is lost either way."]
+    _write_review(run_dir, "CP_EARLY", digest, lines, {"approve_continue": False}, {"report": report})
+
+
+def review_approved(run_dir: Path, cp: str, digest: str) -> dict | None:
+    """The approval recorded for exactly this fingerprint, if any."""
+    p = cp_dir(run_dir) / f"{cp}_approvals.json"
+    for a in json.loads(p.read_text(encoding="utf-8")) if p.exists() else []:
+        if a.get("fingerprint") == digest:
+            return a
+    return None
+
+
 def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
     d = cp_dir(run_dir)
     decision = json.loads((d / f"{cp}_decision.json").read_text(encoding="utf-8"))
     if cp == "CP1":
+        policy_path = Path(run_dir) / "input/corpus_policy.json"
+        if policy_path.exists():
+            from .synthesis_registry import fingerprint
+            expected = fingerprint(json.loads(policy_path.read_text(encoding="utf-8")))
+            if decision.get("confirm_corpus_policy") is not True or decision.get("corpus_policy_fingerprint") != expected:
+                raise DecisionIncomplete("CP1: explicitly confirm the persisted corpus authority")
         if not decision.get("selected_option_id"):
             raise DecisionIncomplete("CP1: set selected_option_id.")
         if decision.get("approve_selection_criteria") is not True and not decision.get("edited_selection_criteria"):
             raise DecisionIncomplete("CP1: set approve_selection_criteria to true, or supply edited_selection_criteria.")
     elif cp == "CP2":
+        require_cp2_current(run_dir)
+        state_path = d / "CP2_review_state.json"
+        if state_path.exists():
+            review = json.loads(state_path.read_text(encoding="utf-8"))
+            if decision.get("review_fingerprint") != review["fingerprint"]:
+                raise DecisionIncomplete("CP2: stale corpus review fingerprint")
+            if review["requires_ack"] and (decision.get("review_issues_acknowledged") is not True or len(decision.get("notes", "").strip()) < 20):
+                raise DecisionIncomplete("CP2: acknowledge review issues and record their disposition in notes")
         decision.update(read_cp2_selection(run_dir))
         if not decision["selected_record_ids"]:
             raise DecisionIncomplete("CP2: mark at least one paper with Y in CP2_records.csv.")
@@ -229,19 +486,67 @@ def approve(run_dir: Path, cp: str, provenance: ProvenanceLog) -> dict:
             raise DecisionIncomplete("CP_SYN: approve alignment and explicitly retain the approved framework")
         if alignment["planning"]["theme_change_proposals"] and not decision.get("proposal_review_notes", "").strip():
             raise DecisionIncomplete("CP_SYN: record the decision on proposed changes")
+    elif cp == "CP_LEDGER":
+        ledger = json.loads((d / "CP_LEDGER_ledger.json").read_text(encoding="utf-8"))
+        if decision.get("fingerprint") != ledger["fingerprint"]:
+            raise DecisionIncomplete("CP_LEDGER: stale ledger fingerprint (the plan or ledger changed)")
+        if decision.get("approve_ledger") is not True:
+            raise DecisionIncomplete("CP_LEDGER: set approve_ledger to true")
+    elif cp in REVIEW_CPS:
+        state = json.loads((d / f"{cp}_state.json").read_text(encoding="utf-8"))
+        if decision.get("fingerprint") != state["fingerprint"]:
+            raise DecisionIncomplete(f"{cp}: stale fingerprint (what is under review changed)")
+        if cp == "CP_AGENT_REVIEW" and (decision.get("approve_continue") is not True or len(decision.get("notes", "").strip()) < 20):
+            raise DecisionIncomplete("CP_AGENT_REVIEW: explicit continuation and resolution notes required")
+        if cp == "CP_CONTEXT" and decision.get("approve_request") is not True:
+            raise DecisionIncomplete("CP_CONTEXT: set approve_request to true, or split the work and run again")
+        if cp == "CP_EARLY" and (decision.get("approve_continue") is not True or len(decision.get("notes", "").strip()) < 20):
+            raise DecisionIncomplete("CP_EARLY: set approve_continue to true and record what you inspected in notes")
+        if cp == "CP_SPEND" and decision.get("approve_continue") is not True:
+            raise DecisionIncomplete("CP_SPEND: set approve_continue to true to continue to the cap")
+        if cp == "CP_CONTRARY":
+            ex = decision.get("exclusions") or []
+            if not ex:
+                raise DecisionIncomplete("CP_CONTRARY: list exclusions, or revise the manuscript and run again")
+            for x in ex:
+                if x.get("finding_id") not in state["unaddressed"]:
+                    raise DecisionIncomplete(f"CP_CONTRARY: {x.get('finding_id')} is not an unaddressed contrary finding")
+                if len(str(x.get("justification") or "").strip()) < 20:
+                    raise DecisionIncomplete(f"CP_CONTRARY: {x.get('finding_id')} needs a scientific justification")
     elif cp == "CP3":
+        from .synthesis_registry import fingerprint
+        from .scientific_validation import require_package
         pkg_path = Path(run_dir) / "data" / "synthesis_package.json"
-        if pkg_path.exists():
-            pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
-            if pkg.get("status") != "COMPLETE" or pkg.get("coverage_incomplete_item_ids") or pkg.get("findings_unaccounted"):
-                raise DecisionIncomplete("CP3: incomplete synthesis cannot be approved")
+        if not pkg_path.exists():raise DecisionIncomplete('CP3: synthesis package missing')
+        pkg = json.loads(pkg_path.read_text(encoding='utf-8'))
+        findings_path = Path(run_dir)/'data/validated_findings.json'
+        findings = json.loads(findings_path.read_text(encoding='utf-8')) if findings_path.exists() else []
+        try:require_package(pkg, findings)
+        except ValueError as exc:raise DecisionIncomplete('CP3: '+str(exc)) from exc
+        if decision.get('synthesis_fingerprint') != fingerprint(pkg):
+            raise DecisionIncomplete('CP3: stale synthesis fingerprint; review current package')
         if not decision.get("selected_thesis"):
             raise DecisionIncomplete("CP3: set selected_thesis.")
     provenance.human_decision(cp, decision, decision.get("notes", ""))
     (d / f"{cp}_approved.json").write_text(json.dumps(decision, indent=2), encoding="utf-8")
+    if cp in REVIEW_CPS:
+        p = d / f"{cp}_approvals.json"
+        log = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+        p.write_text(json.dumps(log + [decision], indent=2), encoding="utf-8")
     return decision
 
 
 def approved(run_dir: Path, cp: str) -> dict | None:
     p = cp_dir(run_dir) / f"{cp}_approved.json"
-    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+    if not p.exists():
+        return None
+    decision = json.loads(p.read_text(encoding="utf-8"))
+    if cp == "CP2" and (p.parent / "CP2_review_state.json").exists():
+        state = json.loads((p.parent / "CP2_review_state.json").read_text(encoding="utf-8"))
+        if decision.get("review_fingerprint") != state["fingerprint"]:
+            return None
+        try:
+            require_cp2_current(run_dir)
+        except DecisionIncomplete:
+            return None
+    return decision

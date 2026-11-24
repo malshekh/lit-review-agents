@@ -23,7 +23,7 @@ def _run(tmp_path, monkeypatch):
     run = orch.Run("t")
     run.save_state({"stage": "validate", "status": "READY", "counters": {}})
     run.save("selected_corpus.json", [{"record_id": "R0001"}])
-    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma."})
+    run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma. DSF suppressed growth by 92%."})
     run.save("extractions/R0001.json", {
         "record_id": "R0001",
         "entities": [{"entity_id": "E1", "mention": "DSF", "type": "APPROVED_DRUG", **WRONG},
@@ -304,6 +304,7 @@ def test_live_a06_conflict_output_strips_the_identity_and_keeps_the_findings(tmp
     run = orch.Run("live")
     run.save("selected_corpus.json", [{"record_id": "R0045"}])
     run.save("extractions/R0045.json", ext)
+    run.save('fulltext/R0045.json', json.loads((LIVE/'fulltext/R0045.json').read_text(encoding='utf-8')))
     run._save_validation("R0045", probe)
     vf = run._validated_findings(run.load("selected_corpus.json"))
     assert {f["eligibility"]["status"] for f in vf} == {"SUPPORTING"}

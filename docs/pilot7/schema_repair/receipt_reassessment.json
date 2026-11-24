@@ -1,0 +1,442 @@
+{
+  "source_run": "20261123-214928",
+  "prior_recorded_usd": 0.0593403,
+  "hold_preserved_usd": 0.019586,
+  "receipts": [
+    {
+      "receipt": "smoke-02d0d755e0ad4ebd804f65d321b23dfb.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A10-RV.bounded.schema.json",
+      "submitted_schema_sha256": "12376c93201143b909762fe58fa4f12a53cc1d0d3f9f7d21be38a6ef6aa3064f",
+      "offline_validation": {
+        "accepted": false,
+        "validation_version": 2,
+        "problems": [
+          "ValidationError: 'agent_id' is a required property"
+        ],
+        "submitted_schema_sha256": "12376c93201143b909762fe58fa4f12a53cc1d0d3f9f7d21be38a6ef6aa3064f",
+        "stop_reason": "stop",
+        "receipt_sha256": "0b932c1a5d3a358b4a752412c0dd4cb7cd37da61b965b9d3916d064ef07e5ebf"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-0878fb7b8f8244a699cafd0a426bcdbd.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A02-SP.schema.json",
+      "submitted_schema_sha256": "ce03db9249cf04567524b98b48e47895e1e0e55f6fb286f7e5626149ac1cef21",
+      "offline_validation": {
+        "accepted": false,
+        "validation_version": 2,
+        "problems": [
+          "ValidationError: 'agent_id' is a required property"
+        ],
+        "submitted_schema_sha256": "ce03db9249cf04567524b98b48e47895e1e0e55f6fb286f7e5626149ac1cef21",
+        "stop_reason": "stop",
+        "receipt_sha256": "d59a136506cb0ea0ed166dc494268d19acf8ab9b634a517b1ef57fe13e7d1841"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-18ff5ab4bbf845729c74c510c9382d86.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-reconcile.schema.json",
+      "submitted_schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "95bb772d32205677ee3f09ca24b769f5252d058c20db85fe3a7b00020a7f6e5c"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-2737963220ce4299bfe44fce8d980b3b.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-group.schema.json",
+      "submitted_schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "137fdf1f8cb14a34197e10125f4c70e2890c9f7106c917257370f296befddb1d"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-2a802695e92b4110acd7ec4b5bf95f52.json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "schema_file": "A12-EDI.unit.schema.json",
+      "submitted_schema_sha256": "b3d94d5cc8cf31c762019d8820446e247a5d8b9ca709639e4e50f9f131993f5f",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "b3d94d5cc8cf31c762019d8820446e247a5d8b9ca709639e4e50f9f131993f5f",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "5e08a00790d7e383d01d50de42993846c2b7a451608f3bf33f171b958a1bffc6"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-2d20ad03c8bd45898c9eee508ee80fdf.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A03-LM.schema.json",
+      "submitted_schema_sha256": "868c44cbeddd4bb55c72b0d0475ecf18ffcb6b70e013c204a182aff6235cb086",
+      "offline_validation": {
+        "accepted": false,
+        "validation_version": 2,
+        "problems": [
+          "ValidationError: 'agent_id' is a required property"
+        ],
+        "submitted_schema_sha256": "868c44cbeddd4bb55c72b0d0475ecf18ffcb6b70e013c204a182aff6235cb086",
+        "stop_reason": "stop",
+        "receipt_sha256": "2c6ae91cd6ef41ef28d68c769f4ddf2811a6fb1b2e29f082c7b0b823b9bfc2a8"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-3ff0b90912c14e3aab3b448140437bf0.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A08-OL.schema.json",
+      "submitted_schema_sha256": "f5494f3a39c0ec114d08d46d6a50c8dabf977b6dbe49e01ee06e883c7021c6ca",
+      "offline_validation": {
+        "accepted": false,
+        "validation_version": 2,
+        "problems": [
+          "ValidationError: 'agent_id' is a required property"
+        ],
+        "submitted_schema_sha256": "f5494f3a39c0ec114d08d46d6a50c8dabf977b6dbe49e01ee06e883c7021c6ca",
+        "stop_reason": "stop",
+        "receipt_sha256": "58d749824b761f4b6ca28ebd65bf8f267b96a5ca90f932fbadf41abe893957b1"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-4c660ea6a34c46c1aef32cea6a49fa99.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A09-WRI.section.schema.json",
+      "submitted_schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "390dc6b7c387ce91ae71211d35e5b5912d6b79cb93b1a72a7bdbed8dc94621da"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-5d604f4a70a04fa19e3e5058b7cf408c.json",
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "schema_file": "A12-EDI.schema.json",
+      "submitted_schema_sha256": "602fdaa15d1278dbbc8c0edd1eda4a14e5eb954cc6f089ef26a29cd3223aeb48",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "602fdaa15d1278dbbc8c0edd1eda4a14e5eb954cc6f089ef26a29cd3223aeb48",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "f34f8234ac4b2a5a88874a5b07c2abaa4a66517100e3fd5e0487c52b474f9c7e"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-7d76a302d8da48508d8aa5c8131bfed1.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A06-SV.schema.json",
+      "submitted_schema_sha256": "a285143fe2ce47330634ef7ddb979d2ab1843c37bbf4d08811defa5e0870b751",
+      "offline_validation": {
+        "accepted": false,
+        "validation_version": 2,
+        "problems": [
+          "ValidationError: 'agent_id' is a required property"
+        ],
+        "submitted_schema_sha256": "a285143fe2ce47330634ef7ddb979d2ab1843c37bbf4d08811defa5e0870b751",
+        "stop_reason": "stop",
+        "receipt_sha256": "d257dff043f0ac8881e6e963207945d534e97ad4c215b56b1a8e66f4e3c7ef2c"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    },
+    {
+      "receipt": "smoke-9fe15ae0350b494a8f61a41695796a90.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A09-WRI.front.schema.json",
+      "submitted_schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "f0406cb20faee2a6664472782127ef287535ed552469bd3f487504894f63a3a0"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-a33868034a354804b0c37e5dca506a7b.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-final.schema.json",
+      "submitted_schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "c0a26b83fd30c68179aaae3687f521f57a7df3efd91b24ce43be27611bc7b2a2"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-a7002e97d157452281d47d14d836bc48.json",
+      "state": "DISPATCHED",
+      "status": "UNRECONCILED_HOLD_PRESERVED"
+    },
+    {
+      "receipt": "smoke-aa3424031e194a0aafe2a862da263179.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-plan.schema.json",
+      "submitted_schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "d645323de6ed67b3c7b69d4375bb98b114f9330ce7cb8a1da62f49c02d6cd848"
+      },
+      "eligible_reuse": true,
+      "reason": "identical validated submission"
+    },
+    {
+      "receipt": "smoke-afbed1c13ca142caa7fcefc83e8e4822.json",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "schema_file": "A04-CQ.schema.json",
+      "submitted_schema_sha256": "8f4e41eb6534b16b5d43cc27f59c8bf7b1cb80c07bd06c5c80dabdf01cf4c6ad",
+      "offline_validation": {
+        "accepted": true,
+        "validation_version": 2,
+        "problems": [],
+        "submitted_schema_sha256": "8f4e41eb6534b16b5d43cc27f59c8bf7b1cb80c07bd06c5c80dabdf01cf4c6ad",
+        "stop_reason": "end_turn",
+        "receipt_sha256": "57b840832072b652978ec19ed70dbefd759824ef62d02927cb062c45f14b0409"
+      },
+      "eligible_reuse": false,
+      "reason": "response invalid, contract incompatible, or actual submitted schema changed"
+    }
+  ],
+  "eligible_reuse_count": 6,
+  "provider_schema_inventory": [
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A02-SP.schema.json",
+      "problems": [
+        "$.assumptions: array requires an item schema",
+        "$.perspective_options: array requires an item schema",
+        "$.questions_for_researcher: array requires an item schema",
+        "$.readiness: object closure must explicitly be false",
+        "$.readiness: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.researcher_decision: object closure must explicitly be false",
+        "$.researcher_decision: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.scope: object closure must explicitly be false",
+        "$.scope: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.search_seeds: object closure must explicitly be false",
+        "$.search_seeds: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.selection_criteria: object closure must explicitly be false",
+        "$.selection_criteria: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.theme_framework.primary_themes[]: object closure must explicitly be false",
+        "$.theme_framework.primary_themes[]: openai strict output requires every property in required (model optionality explicitly)",
+        "$.theme_framework.primary_themes[]: undeclared required fields excludes,includes,name,scope,theme_id",
+        "$.theme_framework.primary_themes[]: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.theme_framework: object closure must explicitly be false",
+        "$: object closure must explicitly be false"
+      ]
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A03-LM.schema.json",
+      "problems": [
+        "$.citation_expansion_seed_families: array requires an item schema",
+        "$.concept_blocks: array requires an item schema",
+        "$.query_families: array requires an item schema",
+        "$.repairs: array requires an item schema",
+        "$.seeds_not_recalled: array requires an item schema",
+        "$: object closure must explicitly be false"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "schema_file": "A04-CQ.schema.json",
+      "problems": [
+        "$.criteria_defects: array requires an item schema",
+        "$.human_review_queue: array requires an item schema",
+        "$.qualifications: array requires an item schema",
+        "$.received_record_ids: array requires an item schema",
+        "$.theme_suggestions: array requires an item schema",
+        "$: object closure must explicitly be false"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "schema_file": "A05-KE.schema.json",
+      "schema_sha256": "53e8885ee7020e64719fa73bea380d560d4a0fa562cf40cf86add2ff88419e56",
+      "problems": []
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A06-SV.schema.json",
+      "problems": [
+        "$.conflicts[]: object closure must explicitly be false",
+        "$.evidence_reach: object closure must explicitly be false",
+        "$.evidence_reach: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.independence: array requires an item schema",
+        "$.validations[]: object closure must explicitly be false",
+        "$: object closure must explicitly be false",
+        "$: openai strict output requires every property in required (model optionality explicitly)"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-plan.schema.json",
+      "schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92",
+      "problems": []
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-group.schema.json",
+      "schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0",
+      "problems": []
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-reconcile.schema.json",
+      "schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672",
+      "problems": []
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A07-SYN.bounded-final.schema.json",
+      "schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8",
+      "problems": []
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A08-OL.schema.json",
+      "problems": [
+        "$.budget_summary: object closure must explicitly be false",
+        "$.budget_summary: unspecified/empty object",
+        "define useful fields explicitly",
+        "$.title: openai strict output requires every property in required (model optionality explicitly)",
+        "$: object closure must explicitly be false",
+        "$: openai strict output requires every property in required (model optionality explicitly)"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A09-WRI.section.schema.json",
+      "schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b",
+      "problems": []
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_file": "A09-WRI.front.schema.json",
+      "schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b",
+      "problems": []
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "schema_file": "A10-RV.bounded.schema.json",
+      "problems": [
+        "$.retrieval_requests[]: openai strict output requires every property in required (model optionality explicitly)"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "schema_file": "A12-EDI.schema.json",
+      "problems": [
+        "$.change_log: array requires an item schema",
+        "$.escalations: array requires an item schema",
+        "$.queries: array requires an item schema",
+        "$.sections: array requires an item schema",
+        "$: object closure must explicitly be false"
+      ]
+    },
+    {
+      "provider": "anthropic",
+      "model": "claude-sonnet-5-5",
+      "schema_file": "A12-EDI.unit.schema.json",
+      "problems": [
+        "$.change_log: array requires an item schema",
+        "$.escalations: array requires an item schema",
+        "$.queries: array requires an item schema",
+        "$.sections: array requires an item schema",
+        "$: object closure must explicitly be false"
+      ]
+    }
+  ],
+  "billing_reconciliation": {
+    "status": "BLOCKED",
+    "request_id": "req_011ChM1MMKaDrZauPitV2pKC",
+    "evidence": "HTTP 400 invalid_request_error is preserved; no usage receipt, billing export or current-account admin billing credential is available.",
+    "inference": "A rejected schema is known, but that alone is not independent billing evidence. Hold remains; no retry permitted.",
+    "current_account_billing_query": {
+      "http_status": 401,
+      "operation": "read-only official cost report for smoke window",
+      "result": "Admin API requires an Admin API key or organization-scoped API key; no billed amount established",
+      "hold_released": false
+    }
+  }
+}

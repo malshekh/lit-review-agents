@@ -250,6 +250,96 @@ superseded and nothing more is called until the run is re-projected. Each A07 tu
 produces nothing and stops the job, so it supersedes the projection, and resuming requires a new one priced
 from actual spend (turns already committed are not priced again).
 
+**Downstream admission** (`admission`, `src/litreview/admission.py`). Before every A08, A09, A11 and A12
+request, the exact serialized request is bounded in UTF-8 bytes (never below its token count) and must fit
+the routed model's window (`admission.context_windows`) with its output reserve (`max_tokens`, plus
+`reasoning_reserve_tokens` for providers where reasoning is not established to count within it). A request
+that cannot be bounded, or whose model has no recorded window, is refused. The windows were read from the
+providers' model-metadata endpoints on 2026-10-30 (`scripts/live/model_window_probe.py`): Claude 1,000,000 input tokens,
+Kimi K3.1 Pro 1,048,576; OpenAI's endpoint reports none, so GPT-6.1's 1,050,000 is researcher-supplied. A request that does not fit is
+subdivided by a fixed rule or the stage stops. A09 writes one section per request, and a section too large
+for one request stops the stage: the plan must split it. A12 edits the whole manuscript, or one unit at a
+time (front matter, then each section) when the whole does not fit. A08 and A11 are single requests and stop.
+Nothing is truncated or dropped to fit.
+
+A request whose bound is above the model's long-context threshold (GPT-6.1: 272k) is repriced in full, so it
+is dispatched only if the current projection priced that many long-context calls for the agent
+(`long_context_calls`); otherwise the projection is superseded and the run re-projected. Each request then
+passes the runtime gate (`batch.gate_usd`, the same $150 stop as batches: spent + committed + projected +
+this request) and holds a reservation for its bound under `run.spend_cap_usd` until it settles. The A08 to
+A12 projection lines (`src/litreview/tools/downstream_projection.py`) come from the same request builders
+(`REQUEST_BOUND` once the approved package exists, `ESTIMATED_ENVELOPE` before it), price input at the byte
+bound divided by 1.8 (below every free provider count measured), and are re-made at the start of each of
+those stages. Spend or calls past a line supersede the projection before the next call.
+
+**Calibrated forecast** (`forecast`, `src/litreview/tools/forecast.py`). After CP2 every A07 to A12 projection
+line's `usd` is a calibrated baseline plus `forecast.uncertainty_margin` (30%), with the low, high and adverse
+scenarios and the strict adverse figure alongside, and `calls` set to the most the configured loops allow. A07 is
+fitted on provider-counted input of its production requests at 40, 80 and 120 papers; A10 on its production
+request bounds for a 5,000-word manuscript; A08 to A12 on the bridge's request builders; A05/A06 per-paper lines
+use the measured 90th percentile with the measured batch factor (0.5) after one interactive probe. The scenario
+assumptions (output share of caps, bytes per token, retrieval and redraft frequency, critique cycles, failed
+calls) are in `pipeline.yaml -> forecast` because nothing has measured them. The forecast plans; it never
+authorizes a call: each call is still admitted and reserved at its own strict bound, the runtime gate and the
+spend cap still stop it, and spend beyond a line supersedes the projection before the next call.
+`python -B tests/full_run_forecast.py` writes the whole-run forecast.
+
+**Two interface rules between the writer and A10.** The journal forbids references in the title and abstract,
+so A10 does not require a citation there, but a verified occurrence still has to name the evidence findings it
+rests on (`NO_CITATION_SURFACES` in `verification_job.py`). A10 records at most 24 evidence findings per
+occurrence, so the section gate refuses a sentence that binds more (`bridge.max_findings_per_sentence`, read from
+A10's schema): a grouped passage spans several sentences.
+
+**The bridge** (`bridge`, `src/litreview/bridge.py`). Code, not a model, hands the approved synthesis to the
+writing agents. A08 receives a compact argument map and one line per element, and returns a plan and an
+allocation ledger: every proposition, gap and adopted interpretation is `DISCUSSED`, `GROUPED_WITH`,
+`TABLE_ONLY` or `NOT_INDIVIDUALLY_DISCUSSED` (with a reason). Mandatory elements are always written: conflicts,
+contrary CORE evidence, researcher-verified inconsistencies, system gaps and NARRATIVE coverage. Groups have
+at most `max_group_size` members. The plan is checked by code, and with `ledger_approval` the run stops at
+`CP_LEDGER` (`litreview approve RUN CP_LEDGER`) before anything is written.
+
+A09 then writes section by section from packets. Each packet holds A07's records verbatim, the findings
+behind them, the union of a group's qualifications, and the contrary context from other sections. Each
+request also carries the outline and all earlier prose. A gate runs after every section: tags, numbers,
+citations, display references, heading and terminology. A09 may request evidence from the registry at most
+`max_retrieval_rounds` times per section. After assembly, one A12 `INTEGRATION` pass runs, then A10.
+
+The single display item is the comparative table `T1`, built by code with `table_max_rows` rows.
+`output_limits` size A09 and A12 requests to the unit written. Fingerprints of the text, plan and
+evidence-registry version stamp every A10 approval; A11 and A12 refuse a stale one.
+
+**Contrary evidence and the table** (researcher's rule of 2026-10-30). The table is a selective synthesis, not an
+inventory. Every contrary finding (used as CONFLICTING evidence or named by a reconciliation issue) is material
+unless the researcher excludes it with a justification. A supporting row appears only with every contrary finding
+of the claims it supports; the "Role and contrary evidence" column links rows for and against a claim by a set
+letter and says when further contrary evidence is in the text. Contrary findings left out of the table stay in
+the contrary-evidence register (`bridge.contrary_register`, `data/bridge/contrary_register.json`): the plan is
+refused if a written element does not carry each one (`CONTRARY_NOT_CARRIED`), section packets carry each entry
+with a comparability record (the context fields that differ between it and what it challenges), A09 must state
+those differences rather than present unlike systems, doses or arms as like-for-like, and A10's GLOBAL pages carry
+each entry beside its finding (issue codes `CONTRARY_EVIDENCE_UNADDRESSED` and `TABLE_CONCEALS_CONTRARY_EVIDENCE`
+kept at BLOCKING, `TABLE_PROSE_INCONSISTENT` and `FORCED_EQUIVALENCE` at MAJOR). Release (`finalize`) is blocked
+unless each one is in the final table, or in a body sentence A10 VERIFIED that is tagged with an element carrying
+it and cites its paper, or excluded at `CP_CONTRARY` with a justification of at least 20 characters (bound to this
+register and this verified manuscript, recorded in provenance): `litreview approve RUN CP_CONTRARY`.
+
+**Context utilisation** (`context_utilisation`, `src/litreview/context_watch.py`). Before every model call,
+interactive and batch, (input + reserved output) / the model's window is computed and logged with both the byte
+bound and, where `provider_count` enables it (Anthropic's free token count), the provider's count, which then
+decides; the provider's actual usage is logged after the call. At `warn` (default 0.80) the call proceeds with a
+notice; at `review` (default 0.90) the run stops at `CP_CONTEXT` until that exact request is approved
+(`litreview approve RUN CP_CONTEXT`). Thresholds are per model (`models`) and are operational defaults, not
+reliability guarantees. The hard admission ceilings are unchanged.
+
+**Spend review point** (`run.spend_review_usd`, $25 for the pilot). Before the call that would take spent +
+reserved + that call's worst case past it, the run stops at `CP_SPEND` and asks (`litreview approve RUN CP_SPEND`);
+it then continues to `run.spend_cap_usd`, which never moves.
+
+**Projections beyond the largest cohort run** (28 papers, 471 findings) are labelled UNVALIDATED (`forecast.validation`)
+until a larger cohort has run. `litreview calibration-report RUN` reports what a run measured (A06 repeat and theme
+pass, A09 retrieval and redrafts, A10 LOCAL and GLOBAL cost and what each caught, per-call rates, bytes per token);
+it changes nothing.
+
 **Evaluation-only runs** (`src/litreview/publication.py`). `litreview mark-evaluation-only RUN --reason ...`
 stamps the run's synthesis in its own data; CP3, the outline, display tables, verification, critique and
 every later stage refuse a stamped synthesis, in that run or any run it is copied into.

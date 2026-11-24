@@ -1,0 +1,71 @@
+{
+  "note": "Expected output tokens per call (visible output plus thinking/reasoning, as billed). The forecast uses these instead of a share of the output cap, so raising a cap to prevent truncation does not change the forecast. MEASURED cells come from run cost logs (litreview output-shares RUN); ASSUMED cells have no completed call behind them and must be replaced after the calibration run. The NON-REPRESENTATIVE A07->A09 sample is never used here.",
+  "updated": "2026-11-23",
+  "expected_output_tokens": {
+    "A07-SYN.PLAN": {
+      "tokens": 6000,
+      "basis": "MEASURED",
+      "source": "v10 pilot, 1 completed call: 6,005 at medium effort"
+    },
+    "A07-SYN.GROUP": {
+      "tokens": 6000,
+      "basis": "ASSUMED",
+      "source": "accepted output is at most 10,976 bytes (about 4.7k tokens) plus thinking"
+    },
+    "A07-SYN.RECONCILE": {
+      "tokens": 4000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A07-SYN.FINAL": {
+      "tokens": 4000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A08-OL": {
+      "tokens": 8000,
+      "basis": "ASSUMED",
+      "source": "a minimal 2-section outline is 2.3k-3.4k tokens; a full outline plus reasoning"
+    },
+    "A09-WRI.A09_SECTION": {
+      "tokens": 8000,
+      "basis": "ASSUMED",
+      "source": "a tagged 1,000-word section is at most 10.1k bytes plus thinking"
+    },
+    "A09-WRI.A09_FRONT_MATTER": {
+      "tokens": 4000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A10-RV.LOCAL": {
+      "tokens": 5000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A10-RV.GLOBAL": {
+      "tokens": 4000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A11-RC": {
+      "tokens": 8000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    },
+    "A12-EDI.A12_UNIT": {
+      "tokens": 8000,
+      "basis": "ASSUMED",
+      "source": "no completed call"
+    }
+  },
+  "a06_theme": {
+    "basis": "MEASURED on run 20261025-100039 (65 PER_THEME calls, 471 findings); the split of input into per-call overhead and per-finding tokens uses an ASSUMED system-prompt size",
+    "calls": 65,
+    "findings": 471,
+    "input_tokens_per_call": 20467,
+    "output_tokens_per_call": 1196,
+    "assumed_overhead_tokens_per_call": 8400,
+    "input_tokens_per_finding": 1665,
+    "output_tokens_per_finding": 165
+  }
+}

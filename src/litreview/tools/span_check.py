@@ -41,8 +41,17 @@ def numbers_match(span: str, quantities: list[dict]) -> bool:
     """Every raw value recorded for a finding must appear in its span."""
     in_span = numbers_in(span)
     for q in quantities or []:
-        for n in numbers_in(str(q.get("raw_value", ""))):
-            if n not in in_span:
+        for key in ('raw_value', 'p_value', 'n', 'variance_or_ci'):
+            for n in numbers_in(str(q.get(key) or '')):
+                if n not in in_span:return False
+        unit = q.get('raw_unit')
+        if unit and unit not in ('NOT_REPORTED','NOT_APPLICABLE'):
+            def unit_text(s):
+                return unicodedata.normalize('NFKC', s).replace('\u03bc','u')
+            u = re.sub(r'\s+', '', unit_text(unit))
+            pattern = (r'(?<![A-Za-z])' if u[:1].isalpha() else '') + r'\s*'.join(re.escape(c) for c in u)
+            pattern += r'(?![A-Za-z])' if u[-1:].isalpha() else ''
+            if not re.search(pattern, unit_text(span)):
                 return False
     return True
 
@@ -66,3 +75,52 @@ def check_findings(extraction: dict, sections: dict[str, str]) -> list[dict]:
             "premise_spans_found": all(span_found(p, full) for p in f.get("premise_spans", []) or []),
         })
     return results
+
+
+def passed(result: dict) -> bool:
+    return (all(result.get(k) is True for k in ('span_found', 'numbers_match', 'premise_spans_found'))
+            and result.get('location_matches') is not False)
+
+
+def repair_findings(extraction: dict, sections: dict[str, str]) -> dict:
+    """Restore unique literal source boundaries; never choose among numerical readings.
+
+    Expand an explicit ellipsis only if all quoted pieces occur in order in one
+    unique bounded source passage. A missing trailing value can be extended only
+    when it immediately follows the exact quote (not in a neighboring sentence).
+    The replacement is always a verbatim substring of the supplied source.
+    """
+    import copy
+    out = copy.deepcopy(extraction)
+    for f, gate in zip(out.get('findings', []), check_findings(extraction, sections)):
+        if passed(gate):continue
+        original = f.get('span', '')
+        candidates = []
+        parts = re.split(r'\s*(?:\.{3}|\u2026)\s*', original)
+        if 1 < len(parts) <= 4 and all(len(p) >= 12 for p in parts):
+            pattern = r'[\s\S]{0,1200}?'.join(re.escape(p).replace(r'\ ', r'\s+') for p in parts)
+            for section, text in sections.items():
+                for match in re.finditer(pattern, text):
+                    candidates.append((section, match.start(), match.end(), match.group()))
+        elif gate['span_found'] and not gate['numbers_match'] and not numbers_in(original):
+            qs = f.get('quantities') or []
+            if len(qs) == 1 and re.fullmatch(r'\d+(?:\.\d+)?', str(qs[0].get('raw_value', ''))):
+                value = str(qs[0]['raw_value'])
+                for section, text in sections.items():
+                    pattern = re.escape(original) + r'\s*[:=]?\s*' + re.escape(value) + r'(?![\d.])'
+                    unit = qs[0].get('raw_unit')
+                    if unit and unit not in ('NOT_REPORTED','NOT_APPLICABLE'):
+                        unit = unicodedata.normalize('NFKC', unit).replace('\u03bc','u')
+                        pattern += r'\s*' + r'\s*'.join('[u\u00b5\u03bc]' if c=='u' else re.escape(c)
+                                                        for c in re.sub(r'\s+','',unit))
+                        if unit[-1:].isalpha():pattern += r'(?![A-Za-z])'
+                    for match in re.finditer(pattern, text):
+                        candidates.append((section, match.start(), match.end(), match.group()))
+        if len(candidates) != 1:continue
+        section, start, end, replacement = candidates[0]
+        trial = {**f, 'span':replacement, 'span_location':{**(f.get('span_location') or {}), 'section':section}}
+        if not passed(check_findings({'findings':[trial]}, sections)[0]):continue
+        f.update(span=replacement, span_location=trial['span_location'])
+        f.setdefault('span_corrections', []).append({'original_span':original, 'corrected_span':replacement,
+            'section':section, 'start':start, 'end':end, 'method':'unique_literal_boundary_expansion'})
+    return out

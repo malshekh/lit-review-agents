@@ -32,6 +32,8 @@ Order of operations, each step there for a failure it prevents:
 from __future__ import annotations
 
 import json
+
+import jsonschema
 import re
 import secrets
 import time
@@ -140,10 +142,27 @@ class BatchStage:
             self._finish(outstanding.pop(0))   # settles: its actual cost replaces its reservation
 
     def _interactive(self, steps: list[str]) -> None:
+        """One call per step. A batch item that came back truncated is redone at a larger cap (the cap that
+        truncated would truncate again); one that came back complete but invalid is repaired from its saved reply
+        instead of being paid for again in full. Both notes are files, so a resume behaves the same."""
+        loops = self.run.cfg.get("loops") or {}
         for step in steps:
-            if not self._done(step):
-                self.on_output(step, self.run.agent(self.agent_id, self.payloads[step], step,
-                                                    exclude_providers=frozenset(self.exclude(step))))
+            if self._done(step):
+                continue
+            extra = {}
+            note = self.run.dir / "outputs" / f"{step}.batch.redo.json"
+            if note.exists():
+                redo = json.loads(note.read_text(encoding="utf-8"))
+                raw = self.run.dir / "outputs" / redo["raw"]
+                if redo["why"] == "TRUNCATED":
+                    extra["overrides"] = {"max_tokens": min(
+                        int(redo["max_tokens"] * float(loops.get("truncation_retry_factor", 1.5)) + 0.999),
+                        int(loops.get("max_output_tokens_ceiling", 64000)))}
+                    extra["truncation_retries"] = 0   # this call is the one larger-cap retry
+                elif redo["why"] == "INVALID" and raw.exists() and int(loops.get("max_json_repair_attempts", 1)) > 0:
+                    extra["repair_from"] = (raw.read_text(encoding="utf-8"), redo["error"])
+            self.on_output(step, self.run.agent(self.agent_id, self.payloads[step], step,
+                                                exclude_providers=frozenset(self.exclude(step)), **extra))
 
     # --- submission -------------------------------------------------------
     def _requests(self, m, ids: dict[str, str]) -> tuple[list[dict], dict]:
@@ -152,10 +171,14 @@ class BatchStage:
         reqs, chars = [], {}
         for cid, step in ids.items():
             parts = user_parts(self.payloads[step], m.cache_payload)
-            reqs.append(batch.request(m.provider, cid, system, parts, m.model, m.max_tokens, m.temperature,
+            reqs.append(batch.request(m.provider, cid, system, parts, m.model, self._cap(m, step), m.temperature,
                                       m.effort, m.cache_system, ttl))
             chars[step] = len(system) + sum(len(p["text"]) for p in parts)
         return reqs, {"chars": chars, "system_chars": len(system), "ttl": ttl}
+
+    def _cap(self, m, step: str) -> int:
+        from . import config
+        return config.level_cap(self.agent_id, self.payloads.get(step), m.max_tokens)
 
     def project(self, m, steps: list[str], shape: dict) -> dict:
         """Worst-case cost of the batch. Output: every item at the configured max_tokens, not at what the
@@ -168,17 +191,23 @@ class BatchStage:
         ratio = (sum(e["input_tokens"] + e.get("cached_input_tokens", 0) + e.get("cache_write_tokens", 0)
                      + e.get("cache_write_1h_tokens", 0) for e in seen) / sum(e["prompt_chars"] for e in seen)
                  if seen else 1 / 2.5)
-        out = m.max_tokens
+        out = max((self._cap(m, step) for step in steps), default=m.max_tokens)
         total = 0.0
         for step in steps:
             tokens = int(shape["chars"][step] * ratio * 1.1)
             sys_tokens = int(shape["system_chars"] * ratio * 1.1) if (m.provider == "anthropic" and m.cache_system) else 0
             w5, w1 = (sys_tokens, 0) if shape["ttl"] == "5m" else (0, sys_tokens)
-            total += b.cost(m.model, tokens - sys_tokens, out, 0, w5, w1, batch=True) or 0.0
+            total += b.cost(m.model, tokens - sys_tokens, self._cap(m, step), 0, w5, w1, batch=True) or 0.0
         return {"projected_usd": round(total, 4), "items": len(steps), "tokens_per_char": round(ratio, 4),
                 "output_tokens_per_item": out, "basis": "configured max_tokens per item (worst case)"}
 
     def _submit(self, m, steps: list[str]) -> dict:
+        from . import pilot_authorization as pilot
+        if pilot.enabled(self.run):
+            try:pilot.require(self.run,self.agent_id)
+            except pilot.AuthorizationRequired as exc:
+                from .orchestrator import Pause
+                raise Pause(str(exc)) from exc
         crossed = [s for s in steps if m.provider in self.exclude(s)]
         if crossed:   # routing already prevents this; checked again here because nothing after it can be undone
             raise VendorSeparationError(
@@ -190,14 +219,18 @@ class BatchStage:
         bad = [c for c in ids if not CUSTOM_ID.match(c)]
         if bad:
             raise ValueError(f"{self.agent_id}: invalid batch custom_id(s): {bad[:3]}")
+        for step in steps:   # every item is a call: (input + reserved output) / window, logged; REVIEW stops
+            self.run._context_check(self.agent_id, self.payloads[step], step, m)
         reqs, shape = self._requests(m, ids)
         data = batch.manifest(reqs)
         digest = batch.sha256(data)
         est = self.project(m, steps, shape)
         self.run._batch_gate(self.agent_id, steps, est["projected_usd"])   # raises BatchGateRefused: stop
+        self.run._spend_review(self.agent_id, f"batch {sub_id}", est["projected_usd"])   # review point: stop and ask
         b = self.run.budget
-        ok, available = b.reserve(sub_id, est["projected_usd"], self.agent_id,
-                                  note=f"{len(steps)} items on {m.model}")
+        reserve=getattr(self.run,"_reserve",None)
+        ok, available = (reserve(sub_id,est["projected_usd"],self.agent_id,f"{len(steps)} items on {m.model}",steps=steps) if reserve else
+                         b.reserve(sub_id,est["projected_usd"],self.agent_id,note=f"{len(steps)} items on {m.model}"))
         est["available_usd"] = round(available, 4)
         if not ok:
             raise ReservationRefused(
@@ -386,16 +419,24 @@ class BatchStage:
             model_record.add(resp.model, self.agent_id, run.family(), "REFUSED", run.id, step, resp.refusal_category,
                              note=f"in batch {rec['batch_id']}")
             return   # back into the pool: the next round routes to the alternate
-        if resp.stop_reason in ("max_tokens", "length"):
+        def redo(why: str, error: str = "") -> None:
+            # keep the paid reply under its own name: the interactive call writes raw0 again
+            saved = run.dir / "outputs" / f"{step}.batch.raw.txt"
+            saved.write_text(resp.text, encoding="utf-8")
+            (run.dir / "outputs" / f"{step}.batch.redo.json").write_text(json.dumps(
+                {"why": why, "raw": saved.name, "error": error, "batch_id": rec["batch_id"],
+                 "max_tokens": self._cap(run.route(self.agent_id, frozenset(self.exclude(step))), step),
+                 "output_tokens": resp.output_tokens}, indent=2), encoding="utf-8")
             counts["repair"] += 1
             repair.append(step)
+        if resp.stop_reason in ("max_tokens", "length"):
+            redo("TRUNCATED")
             return
         try:
             out = parse_json(resp.text)
             validate(self.agent_id, out)
-        except Exception:  # noqa: BLE001 — JSON or schema failure: the interactive path repairs it
-            counts["repair"] += 1
-            repair.append(step)
+        except (json.JSONDecodeError, jsonschema.ValidationError) as exc:   # repaired from the saved reply
+            redo("INVALID", str(exc)[:2000])
             return
         out_file = run.dir / "outputs" / f"{step}.json"
         out_file.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")

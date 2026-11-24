@@ -1,0 +1,65 @@
+{
+  "outline_version": 1,
+  "working_title": "REPLACE: working title of the review",
+  "review_question": "REPLACE: the question the review answers?",
+  "sections": [
+    {
+      "section_id": "S1",
+      "heading": "Introduction",
+      "questions": [
+        "REPLACE: what is the clinical problem and why does it remain unsolved?",
+        "REPLACE: what is the rationale for the intervention?"
+      ],
+      "intended_contribution": "REPLACE: what this section adds for the reader.",
+      "word_budget": 400,
+      "scope": {
+        "includes": [
+          "REPLACE"
+        ],
+        "excludes": [
+          "REPLACE"
+        ]
+      }
+    },
+    {
+      "section_id": "S2",
+      "heading": "REPLACE: topic of the first main section",
+      "questions": [
+        "REPLACE: a question the evidence may answer either way?"
+      ],
+      "intended_contribution": "REPLACE: what this section adds for the reader.",
+      "word_budget": 800,
+      "scope": {
+        "includes": [],
+        "excludes": []
+      }
+    },
+    {
+      "section_id": "S2.1",
+      "parent_section_id": "S2",
+      "heading": "REPLACE: a subsection",
+      "questions": [
+        "REPLACE: a narrower question?"
+      ],
+      "intended_contribution": "REPLACE: what this section adds for the reader.",
+      "word_budget": 400,
+      "scope": {
+        "includes": [],
+        "excludes": []
+      }
+    },
+    {
+      "section_id": "S3",
+      "heading": "Open questions",
+      "questions": [
+        "REPLACE: what can this corpus not answer?"
+      ],
+      "intended_contribution": "REPLACE: what this section adds for the reader.",
+      "word_budget": 300,
+      "scope": {
+        "includes": [],
+        "excludes": []
+      }
+    }
+  ]
+}

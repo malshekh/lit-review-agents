@@ -11,7 +11,7 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / 'src'), str(ROOT / 'tests')]
 from dotenv import load_dotenv
 from a07_capacity_simulation import workload, simulate

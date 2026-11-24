@@ -1,0 +1,187 @@
+{
+  "label": "UNVALIDATED: every projection here beyond 28 papers is unvalidated until a larger cohort has run",
+  "method": "calibrated planning forecast (src/litreview/tools/forecast.py); measured inputs and stated assumptions as documented there and in pipeline.yaml -> forecast; not a bill",
+  "spent_usd": 0.0,
+  "outstanding_reservations_usd": 0.0,
+  "at_120_papers": {
+    "papers": 120,
+    "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+    "full_text": 19,
+    "abstract": 101,
+    "core_papers_assumed": 48,
+    "findings": 1581,
+    "scenarios": {
+      "baseline": {
+        "A02-A04 (pre-CP2)": 4.0,
+        "A05+A06 per paper": 18.66,
+        "A06 instability repeats": 2.9,
+        "A06 theme pass": 14.96,
+        "A07 synthesis": 35.9,
+        "A08 outline": 1.25,
+        "A09 writing": 23.64,
+        "A10 verification": 41.49,
+        "A11 critique": 0.85,
+        "A12 editing": 2.78,
+        "failed and redone calls (A07-A12)": 5.3,
+        "total": 151.72
+      },
+      "low": {
+        "A02-A04 (pre-CP2)": 2.07,
+        "A05+A06 per paper": 18.66,
+        "A06 instability repeats": 2.9,
+        "A06 theme pass": 13.98,
+        "A07 synthesis": 28.42,
+        "A08 outline": 0.55,
+        "A09 writing": 15.42,
+        "A10 verification": 25.39,
+        "A11 critique": 0.71,
+        "A12 editing": 1.73,
+        "failed and redone calls (A07-A12)": 0.0,
+        "total": 109.84
+      },
+      "high": {
+        "A02-A04 (pre-CP2)": 6.0,
+        "A05+A06 per paper": 28.93,
+        "A06 instability repeats": 2.9,
+        "A06 theme pass": 16.92,
+        "A07 synthesis": 50.84,
+        "A08 outline": 1.36,
+        "A09 writing": 33.05,
+        "A10 verification": 77.98,
+        "A11 critique": 1.0,
+        "A12 editing": 3.06,
+        "failed and redone calls (A07-A12)": 16.73,
+        "total": 238.77
+      },
+      "adverse": {
+        "A02-A04 (pre-CP2)": 8.0,
+        "A05+A06 per paper": 56.46,
+        "A06 instability repeats": 9.03,
+        "A06 theme pass": 18.87,
+        "A07 synthesis": 159.32,
+        "A08 outline": 1.49,
+        "A09 writing": 85.16,
+        "A10 verification": 389.69,
+        "A11 critique": 1.19,
+        "A12 editing": 3.51,
+        "failed and redone calls (A07-A12)": 96.06,
+        "total": 828.79
+      }
+    },
+    "a06_theme_calls": 9,
+    "a06_theme_warnings": [
+      "each theme call is about 306,885 input tokens, over the 272,000-token long-context threshold: priced at the long rates",
+      "each theme call needs about 28,985 output tokens, over the A06 cap of 24,000: it would truncate. Page the theme pass (validation.theme_findings_per_call) before a run of this size"
+    ],
+    "assumed_output_cells": [
+      "A07-SYN.FINAL",
+      "A07-SYN.GROUP",
+      "A07-SYN.RECONCILE",
+      "A08-OL",
+      "A09-WRI.A09_FRONT_MATTER",
+      "A09-WRI.A09_SECTION",
+      "A10-RV.GLOBAL",
+      "A10-RV.LOCAL",
+      "A11-RC",
+      "A12-EDI.A12_UNIT"
+    ],
+    "baseline_with_margin": 197.24,
+    "uncertainty_margin": 0.3,
+    "bridge_basis": "REQUEST_BOUND"
+  },
+  "by_paper_count": {
+    "20": {
+      "findings": 261,
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "baseline": 54.18,
+      "low": 35.66,
+      "high": 97.79,
+      "adverse": 435.97,
+      "baseline_with_margin": 70.43
+    },
+    "28": {
+      "findings": 362,
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "baseline": 61.27,
+      "low": 40.9,
+      "high": 108.42,
+      "adverse": 468.06,
+      "baseline_with_margin": 79.65
+    },
+    "40": {
+      "findings": 522,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 69.98,
+      "low": 47.75,
+      "high": 121.08,
+      "adverse": 503.52,
+      "baseline_with_margin": 90.97
+    },
+    "50": {
+      "findings": 660,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 78.85,
+      "low": 54.47,
+      "high": 134.18,
+      "adverse": 542.08,
+      "baseline_with_margin": 102.5
+    },
+    "60": {
+      "findings": 783,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 85.86,
+      "low": 59.97,
+      "high": 144.34,
+      "adverse": 570.36,
+      "baseline_with_margin": 111.62
+    },
+    "70": {
+      "findings": 921,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 94.95,
+      "low": 66.82,
+      "high": 157.82,
+      "adverse": 610.53,
+      "baseline_with_margin": 123.44
+    },
+    "80": {
+      "findings": 1059,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 102.74,
+      "low": 72.97,
+      "high": 169.06,
+      "adverse": 641.84,
+      "baseline_with_margin": 133.56
+    },
+    "100": {
+      "findings": 1320,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 119.14,
+      "low": 85.58,
+      "high": 193.07,
+      "adverse": 711.19,
+      "baseline_with_margin": 154.88
+    },
+    "120": {
+      "findings": 1581,
+      "validation": "UNVALIDATED: beyond the largest cohort run (28 papers, 471 findings); not validated until a larger cohort has run",
+      "baseline": 142.58,
+      "low": 104.89,
+      "high": 224.75,
+      "adverse": 789.62,
+      "baseline_with_margin": 185.35
+    }
+  },
+  "largest_paper_count_fitting": {
+    "baseline + margin <= $150": 80,
+    "baseline <= $150": 120,
+    "adverse <= $150": null,
+    "baseline + margin <= $200": 120,
+    "baseline <= $200": 120,
+    "adverse <= $200": null
+  },
+  "exposures_not_added": {
+    "A05 Opus 5 fallback after a refusal": "about 2.5x A05's share; requires `litreview approve-alternate`",
+    "unbounded failures": "a failed paid call supersedes the projection; resuming needs a new one"
+  }
+}

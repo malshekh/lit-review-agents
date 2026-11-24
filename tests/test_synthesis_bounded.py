@@ -55,7 +55,7 @@ class FixtureModel:
         self.calls.append((mode, copy.deepcopy(payload), turn))
         out = header(mode)
         if mode == "PLAN":
-            return {**out, "theme_change_proposals": [], "scope_drift": [], "fivew1h": []}
+            return {**out, "theme_change_proposals": [], "scope_drift": [], "unresolved_questions": []}
         if mode == "GROUP":
             ids = payload["group"]["finding_ids"]
             usable = [f for f in ids if status_of(self.r.findings[f]) == "SUPPORTING"]

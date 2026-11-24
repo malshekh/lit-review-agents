@@ -1,0 +1,14 @@
+[
+  {
+    "agent": "A09-WRI",
+    "model": "claude-opus-5",
+    "provider_input_tokens": 1122050,
+    "output_allowance": 64000
+  },
+  {
+    "agent": "A12-EDI",
+    "model": "claude-sonnet-5-5",
+    "provider_input_tokens": 1148533,
+    "output_allowance": 64000
+  }
+]

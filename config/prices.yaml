@@ -18,42 +18,66 @@
 #   <model>-batch      a separate entry with the same fields: the Batch API rates for that model (used for
 #                      calls submitted through a batch). A model without one is billed at its standard
 #                      rates in a batch (an overstatement, never an understatement).
+#   source, checked    REQUIRED per model: the page the rates were read from and the date they were read.
+#                      A model whose `checked` date is older than run.price_max_age_days (30) is refused
+#                      before any call and listed by `litreview check`. Re-read the page, then update the date.
+# This file is the only price table: no rate is written anywhere else in the code, tests excepted.
 # Only rates read from a provider's pricing page go here; a missing rate is left blank, never estimated.
 # Anthropic batch cache rates are the page's stated rule applied to its batch prices ("These multipliers
 # stack with other pricing modifiers, including the Batch API discount", pricing page, 2026-10-27):
 # reads 0.05x (Opus 5.5, Sonnet 5.5) or 0.1x (others), 5-minute writes 1.25x, 1-hour writes 2x.
 
 # --- Anthropic ---------------------------------------------------------
-# Cache reads: 0.05x input on Opus 5.5 and Sonnet 5.5, 0.1x on the others (pricing page, 2026-10-25).
-claude-opus-5-5:   { input: 4.00, output: 20.00, cached_input: 0.20, cache_write: 5.00, cache_write_1h: 8.00 }
-claude-sonnet-5-5: { input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50, cache_write_1h: 4.00 }
-claude-haiku-5-5:  { input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125, cache_write_1h: 0.20,
+# Read 2026-11-23 from the pricing page: model table, batch table, and the cache rule ("These multipliers
+# stack with other pricing modifiers, including the Batch API discount"). Cache reads: 0.05x input on
+# Opus 5.5 and Sonnet 5.5, 0.1x on the others; 5-minute writes 1.25x; 1-hour writes 2x.
+_anthropic: &anthropic { source: "https://platform.claude.com/docs/en/about-claude/pricing", checked: "2026-11-23" }
+claude-opus-5-5:   { <<: *anthropic, input: 4.00, output: 20.00, cached_input: 0.20, cache_write: 5.00, cache_write_1h: 8.00 }
+claude-sonnet-5-5: { <<: *anthropic, input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50, cache_write_1h: 4.00 }
+claude-haiku-5-5:  { <<: *anthropic, input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125, cache_write_1h: 0.20,
                      long_context_threshold: 100000, long_input: 0.50, long_output: 2.50,
                      long_cached_input: 0.05, long_cache_write: 0.625, long_cache_write_1h: 1.00 }
-claude-opus-5:     { input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 6.25, cache_write_1h: 10.00 }
-# Batch API (batch table on the pricing page, 2026-10-27): A05's model and its alternate.
-claude-sonnet-5-5-batch: { input: 1.00, output: 5.00, cached_input: 0.05, cache_write: 1.25, cache_write_1h: 2.00 }
-claude-opus-5-batch:     { input: 2.50, output: 12.50, cached_input: 0.25, cache_write: 3.125, cache_write_1h: 5.00 }
-claude-opus-4-8:   { input: 5.00, output: 25.00 }
-claude-opus-4-7:   { input: 5.00, output: 25.00 }
-claude-sonnet-5:   { input: 2.00, output: 10.00 }
-claude-sonnet-4-6: { input: 3.00, output: 15.00 }
+claude-opus-5:     { <<: *anthropic, input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 6.25, cache_write_1h: 10.00 }
+claude-opus-5-5-batch:   { <<: *anthropic, input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50, cache_write_1h: 4.00 }
+claude-sonnet-5-5-batch: { <<: *anthropic, input: 1.00, output: 5.00, cached_input: 0.05, cache_write: 1.25, cache_write_1h: 2.00 }
+claude-opus-5-batch:     { <<: *anthropic, input: 2.50, output: 12.50, cached_input: 0.25, cache_write: 3.125, cache_write_1h: 5.00 }
+claude-haiku-5-5-batch:  { <<: *anthropic, input: 0.05, output: 0.25, cached_input: 0.005, cache_write: 0.0625, cache_write_1h: 0.10,
+                           long_context_threshold: 100000, long_input: 0.25, long_output: 1.25,
+                           long_cached_input: 0.025, long_cache_write: 0.3125, long_cache_write_1h: 0.50 }
+claude-opus-4-8:   { <<: *anthropic, input: 5.00, output: 25.00, cached_input: 0.50, cache_write: 6.25, cache_write_1h: 10.00 }
+claude-sonnet-5:   { <<: *anthropic, input: 2.00, output: 10.00, cached_input: 0.20, cache_write: 2.50, cache_write_1h: 4.00 }
 
 # --- OpenAI ------------------------------------------------------------
-# gpt-6.1-sol, pricing page 2026-10-27: "Short context: ≤272K input tokens. Long context: >272K input
-# tokens." cache_write is the page's "30m write" rate (the pipeline never requests the 12h cache, $5.00 /
-# $10.00 long). Other GPT-6 models: long-context rates not yet recorded here.
-gpt-6.1-sol:       { input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50,
+# Read 2026-11-23 from the pricing page, standard and Batch tables. "Short context: <=272K input tokens.
+# Long context: >272K input tokens." cache_write is the "30m write" rate (the pipeline never requests 12h).
+# gpt-5-mini (shutdown 2026-12-11, deprecations page) is removed; gpt-6.1-terra is its named replacement.
+_openai: &openai { source: "https://developers.openai.com/api/docs/pricing", checked: "2026-11-23" }
+gpt-6.1-sol:       { <<: *openai, input: 2.00, output: 10.00, cached_input: 0.10, cache_write: 2.50,
                      long_context_threshold: 272000, long_input: 4.00, long_output: 15.00,
                      long_cached_input: 0.20, long_cache_write: 5.00 }
-gpt-6.1-sol-batch: { input: 1.00, output: 5.00, cached_input: 0.05, cache_write: 1.25,
+gpt-6.1-sol-batch: { <<: *openai, input: 1.00, output: 5.00, cached_input: 0.05, cache_write: 1.25,
                      long_context_threshold: 272000, long_input: 2.00, long_output: 7.50,
                      long_cached_input: 0.10, long_cache_write: 2.50 }
-gpt-6-luna:        { input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125 }
-gpt-6-astra:       { input: 10.00, output: 50.00 }
-gpt-5-mini:        { input: 0.25, output: 2.00 }   # snapshot shutdown Dec 11, 2026
+gpt-6.1-terra:     { <<: *openai, input: 1.00, output: 5.00, cached_input: 0.05, cache_write: 1.25,
+                     long_context_threshold: 272000, long_input: 2.00, long_output: 7.50,
+                     long_cached_input: 0.10, long_cache_write: 2.50 }
+gpt-6.1-terra-batch: { <<: *openai, input: 0.50, output: 2.50, cached_input: 0.025, cache_write: 0.625,
+                     long_context_threshold: 272000, long_input: 1.00, long_output: 3.75,
+                     long_cached_input: 0.05, long_cache_write: 1.25 }
+gpt-6-luna:        { <<: *openai, input: 0.10, output: 0.50, cached_input: 0.01, cache_write: 0.125,
+                     long_context_threshold: 272000, long_input: 0.20, long_output: 0.75,
+                     long_cached_input: 0.02, long_cache_write: 0.25 }
+gpt-6-luna-batch:  { <<: *openai, input: 0.05, output: 0.25, cached_input: 0.005, cache_write: 0.0625,
+                     long_context_threshold: 272000, long_input: 0.10, long_output: 0.375,
+                     long_cached_input: 0.01, long_cache_write: 0.125 }
 
 # --- Kimi (Moonshot, international) ------------------------------------
-kimi-k3.1-pro:     { input: 2.00, output: 10.00, cached_input: 0.20 }
-kimi-k3:           { input: 3.00, output: 15.00 }
-kimi-k2.6:         { input: 0.95, output: 4.00 }
+# kimi-k3.1-pro: verified by the researcher against Moonshot's official price list on 2026-11-23 (the page's
+# tables do not render for an automated read): $2 input, $10 output, $0.20 cached input, $2 five-minute cache
+# write, $4 one-hour cache write. kimi-k3 was NOT re-verified and keeps its 2026-10-16 date, so the 30-day gate
+# refuses it; no agent or alternate uses it. Batch inference on K3 models is billed at 60% of standard (page
+# text, 2026-11-23). There is deliberately NO kimi -batch row: the pipeline has no Kimi batch transport
+# (llm/batch.py: Anthropic and OpenAI only), and a -batch row would price Kimi work at a discount it cannot get.
+kimi-k3.1-pro:       { source: "https://platform.kimi.ai/docs/pricing/chat-k3", checked: "2026-11-23", verified_by: researcher,
+                       input: 2.00, output: 10.00, cached_input: 0.20, cache_write: 2.00, cache_write_1h: 4.00 }
+kimi-k3:             { source: "https://platform.kimi.ai/docs/pricing/chat-k3", checked: "2026-10-16", input: 3.00, output: 15.00 }

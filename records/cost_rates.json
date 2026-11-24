@@ -1,30 +1,40 @@
 {
- "reference_run": "20261025-100039",
- "measured_at": "2026-10-29",
- "per_paper": {
-  "ABSTRACT": {
-   "papers": 17,
-   "mean_usd": 0.429,
-   "p90_usd": 0.6314,
-   "max_usd": 0.7841,
-   "a06_p90_usd": 0.2305,
-   "findings_mean": 10.71,
-   "findings_p90": 18.4
+  "reference_run": "20261025-100039",
+  "measured_at": "2026-11-23",
+  "procedure": {
+    "reextractions_counted": false,
+    "excluded_obsolete_usd": 8.3159
   },
-  "FULL_TEXT": {
-   "papers": 11,
-   "mean_usd": 1.1463,
-   "p90_usd": 1.9877,
-   "max_usd": 2.1372,
-   "a06_p90_usd": 0.7192,
-   "findings_mean": 26.27,
-   "findings_p90": 41.0
-  }
- },
- "per_theme": {
-  "themes": 65,
-  "mean_usd": 0.0529,
-  "p90_usd": 0.0926
- },
- "themes_per_paper": 2.321
+  "per_paper": {
+    "ABSTRACT": {
+      "papers": 17,
+      "mean_usd": 0.2285,
+      "p90_usd": 0.3642,
+      "max_usd": 0.4151,
+      "a06_p90_usd": 0.1354,
+      "findings_mean": 10.71,
+      "findings_p90": 18.4
+    },
+    "FULL_TEXT": {
+      "papers": 11,
+      "mean_usd": 0.7002,
+      "p90_usd": 1.0354,
+      "max_usd": 1.2254,
+      "a06_p90_usd": 0.2688,
+      "findings_mean": 26.27,
+      "findings_p90": 41.0
+    }
+  },
+  "per_theme": {
+    "themes": 65,
+    "mean_usd": 0.0529,
+    "p90_usd": 0.0926
+  },
+  "themes_per_paper": 2.321,
+  "batch_factor": {
+    "A05-KE": 0.5,
+    "A06-SV": 0.5
+  },
+  "repeat_share": 0.643,
+  "caveat": "Re-priced 2026-11-23 from the reference run's cost log with the 19 obsolete re-extractions and the second audits that followed them left out. It is still the OLD one-call-per-paper procedure: the current code extracts and audits large papers in bounded units, and the only current-code data point (pilot R0001, a 180-finding full-text paper) cost $3.68 for A05 and $3.38 for A06. These rates are not a measurement of current code; the 30-paper calibration run replaces them."
 }

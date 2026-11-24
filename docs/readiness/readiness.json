@@ -1,0 +1,125 @@
+{
+  "checked_at": "2026-11-24T00:00:14",
+  "git_commit": "f0b74789c06c0ce7b9c58c8bc5be48dd234113ba",
+  "faults": {
+    "passed": true,
+    "summary": "66 passed in 7.55s",
+    "failures": []
+  },
+  "resume": {
+    "passed": true,
+    "summary": "18 passed in 45.41s",
+    "failures": []
+  },
+  "accounting": {
+    "passed": true,
+    "summary": "68 passed in 64.78s (0:01:04)",
+    "failures": []
+  },
+  "budget": {
+    "passed": true,
+    "summary": "15 passed in 0.94s",
+    "failures": []
+  },
+  "specification": {
+    "passed": true,
+    "summary": "40 passed in 1.31s",
+    "failures": []
+  },
+  "smoke_test": {
+    "passed": null,
+    "status": "NOT RUN: needs your approval (it makes live calls)",
+    "combinations_to_confirm": 15,
+    "worst_case_usd": 0.4888,
+    "command": "litreview smoke-test --approve-usd 1.0 --by \"<your name>\""
+  },
+  "discovery_rehearsal": {
+    "passed": true,
+    "checkpoints_approved": [
+      "CP1",
+      "CP2",
+      "CP_EARLY",
+      "CP_SYN",
+      "CP3",
+      "CP_LEDGER"
+    ],
+    "final_status": "COMPLETE",
+    "calls_by_agent": {
+      "A02-SP": 1,
+      "A03-LM": 1,
+      "A04-CQ": 3,
+      "A05-KE": 7,
+      "A06-SV": 32,
+      "A07-SYN": 14,
+      "A08-OL": 1,
+      "A09-WRI": 11,
+      "A10-RV": 12,
+      "A11-RC": 2,
+      "A12-EDI": 4
+    },
+    "checks": {
+      "reached_export": true,
+      "outline_framework": true,
+      "seven_papers_frozen": true,
+      "every_paper_retrieval_logged": true,
+      "early_check_ran": true,
+      "plan_uses_outline": true,
+      "chapter_lengths_reported": true,
+      "a10_complete": true,
+      "pilot_report_written": true
+    },
+    "replay_findings_dropped_for_schema": {
+      "R0001": 1,
+      "R0005": 2
+    },
+    "error": null
+  },
+  "rehearsal": {
+    "papers": 15,
+    "findings": 211,
+    "calls": {
+      "A08-OL": 1,
+      "A09-WRI": 13,
+      "A10-RV": 20,
+      "A11-RC": 2,
+      "A12-EDI": 4
+    },
+    "a07": {
+      "status": "COMPLETE",
+      "propositions": 40,
+      "gaps": 119,
+      "reconciliation_issues": 1,
+      "findings_unaccounted": 0,
+      "coverage_incomplete": 0
+    },
+    "a10_release": "APPROVED",
+    "a10_coverage": {
+      "occurrences_total": 193,
+      "occurrences_reviewed": 193,
+      "global_index_entries_reviewed": 371,
+      "inventory_fingerprint": "09cdccae9a4db945704c3702c5e704a561631b4a5d746fb764987c68ff8db739"
+    },
+    "ledger": {
+      "DISCUSSED": 22,
+      "GROUPED_WITH": 137,
+      "TABLE_ONLY": 0,
+      "NOT_INDIVIDUALLY_DISCUSSED": 0,
+      "elements": 159
+    },
+    "checks": {
+      "reached_export": true,
+      "every_finding_accounted": true,
+      "no_ineligible_evidence_used": true,
+      "every_written_element_rendered": true,
+      "mandatory_items_written": true,
+      "every_claim_verified": true,
+      "release_on_current_verification": true,
+      "injected_failures_resumed": true
+    },
+    "passed": true,
+    "submission_blockers_in_rehearsal": 24,
+    "table_finding": "Table: Table 1: estimated at 5.12 pages (15 rows); the journal allows 1. Shorten cells or remove rows at CP_LEDGER",
+    "note": "Scripted models: this proves the machinery, not the science. Stages before A07 (search, CP2, extraction, validation) are covered by their own tests in 'specification', 'faults' and 'resume'."
+  },
+  "ready_for_smoke_test": true
+}

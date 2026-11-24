@@ -1,0 +1,704 @@
+{
+  "source": "forecast.full_run at bfd6634 (commit-specific); baseline scenario; 120 papers (47 full text, 73 abstracts), 2,017 findings",
+  "rows": [
+    {
+      "stage": "A02-SP",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 5,
+        "label": "MEASURED",
+        "note": "reference run (28 papers); scales with the search, not the selection"
+      },
+      "input_tokens": {
+        "value": 30092,
+        "label": "MEASURED",
+        "note": "reference run on claude-opus-5, claude-opus-5-5"
+      },
+      "output_tokens": {
+        "value": 24822,
+        "label": "MEASURED",
+        "note": "reference run"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED",
+        "note": "providers bill reasoning as output; the ledger has no separate field"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED",
+        "note": "inside the A02-A04 figure"
+      },
+      "cost_usd": {
+        "value": null,
+        "label": "ASSUMED",
+        "note": "not forecast per agent: see the A02-A04 subtotal"
+      },
+      "uncertainty": "reference spend $0.7409 on other models"
+    },
+    {
+      "stage": "A03-LM",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 3,
+        "label": "MEASURED",
+        "note": "reference run (28 papers); scales with the search, not the selection"
+      },
+      "input_tokens": {
+        "value": 116528,
+        "label": "MEASURED",
+        "note": "reference run on claude-sonnet-5-5"
+      },
+      "output_tokens": {
+        "value": 72486,
+        "label": "MEASURED",
+        "note": "reference run"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED",
+        "note": "providers bill reasoning as output; the ledger has no separate field"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED",
+        "note": "inside the A02-A04 figure"
+      },
+      "cost_usd": {
+        "value": null,
+        "label": "ASSUMED",
+        "note": "not forecast per agent: see the A02-A04 subtotal"
+      },
+      "uncertainty": "reference spend $0.9579 on other models"
+    },
+    {
+      "stage": "A04-CQ",
+      "model": "claude-haiku-5-5",
+      "calls": {
+        "value": 18,
+        "label": "MEASURED",
+        "note": "reference run (28 papers); scales with the search, not the selection"
+      },
+      "input_tokens": {
+        "value": 391795,
+        "label": "MEASURED",
+        "note": "reference run on gpt-5-mini"
+      },
+      "output_tokens": {
+        "value": 135029,
+        "label": "MEASURED",
+        "note": "reference run"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED",
+        "note": "providers bill reasoning as output; the ledger has no separate field"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED",
+        "note": "inside the A02-A04 figure"
+      },
+      "cost_usd": {
+        "value": null,
+        "label": "ASSUMED",
+        "note": "not forecast per agent: see the A02-A04 subtotal"
+      },
+      "uncertainty": "reference spend $0.3680 on other models"
+    },
+    {
+      "stage": "A02-A04 subtotal",
+      "cost_usd": {
+        "value": 4.0,
+        "label": "ASSUMED",
+        "note": "pipeline.yaml forecast.baseline.pre_cp2; about twice the reference run's measured $2.07 (the low scenario) for a larger search on the current routes (A02/A03 GPT-6.1, A04 Haiku 5.5); worst case on the current routes with the reference call counts is $3.18 (pilot_projection.json)"
+      },
+      "uncertainty": "search size for 120 selected papers is unknown until A03/A04 run"
+    },
+    {
+      "stage": "A05-KE per paper",
+      "model": "claude-sonnet-5-5",
+      "calls": {
+        "value": 205.7,
+        "label": "EXTRAPOLATED",
+        "note": "reference calls per paper by level x 47 full texts and 73 abstracts"
+      },
+      "input_tokens": {
+        "value": 7029698,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per paper by level (cache reads and writes included)"
+      },
+      "output_tokens": {
+        "value": 4298814,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per paper by level"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED",
+        "note": "billed as output; not separately recorded"
+      },
+      "batch": {
+        "value": "first paper per level interactive, the rest at x0.5",
+        "label": "ASSUMED",
+        "note": "factor x0.5 MEASURED by repricing the reference calls at batch rates; that batches run at all (24-hour vendor window, throughput unmeasured) is assumed"
+      },
+      "cache": {
+        "value": "as measured interactively",
+        "label": "MEASURED",
+        "note": "reference A05 system-prompt cache reads are inside its per-paper mean; that batch and cache discounts stack is assumed"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED",
+        "note": "see the instability repeat row"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED",
+        "note": "the forecast adds no retry share to A05/A06 (the reference mean includes JSON repairs it paid for)"
+      },
+      "cost_usd": {
+        "value": 29.054039051166953,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean A05+A06 per paper (FT $1.1463, abstract $0.429), split by the measured A05-KE share"
+      },
+      "uncertainty": "28 reference papers; content mix assumed equal to the reference (11/28 full text); the reference calls include 19 re-extractions and second validations (repair loop on then, off now: loops.max_reextractions 0), so this mean overstates the current architecture"
+    },
+    {
+      "stage": "A06-SV per paper",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 205.7,
+        "label": "EXTRAPOLATED",
+        "note": "reference calls per paper by level x 47 full texts and 73 abstracts"
+      },
+      "input_tokens": {
+        "value": 6050892,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per paper by level (cache reads and writes included)"
+      },
+      "output_tokens": {
+        "value": 1604521,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per paper by level"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED",
+        "note": "billed as output; not separately recorded"
+      },
+      "batch": {
+        "value": "first paper per level interactive, the rest at x0.5",
+        "label": "ASSUMED",
+        "note": "factor x0.5 MEASURED by repricing the reference calls at batch rates; that batches run at all (24-hour vendor window, throughput unmeasured) is assumed"
+      },
+      "cache": {
+        "value": "as measured interactively",
+        "label": "ASSUMED",
+        "note": "no cache on A06"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED",
+        "note": "see the instability repeat row"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED",
+        "note": "the forecast adds no retry share to A05/A06 (the reference mean includes JSON repairs it paid for)"
+      },
+      "cost_usd": {
+        "value": 14.330160948833052,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean A05+A06 per paper (FT $1.1463, abstract $0.429), split by the measured A06-SV share"
+      },
+      "uncertainty": "28 reference papers; content mix assumed equal to the reference (11/28 full text); the reference calls include 19 re-extractions and second validations (repair loop on then, off now: loops.max_reextractions 0), so this mean overstates the current architecture"
+    },
+    {
+      "stage": "A06-SV instability repeats",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 132.0,
+        "label": "EXTRAPOLATED",
+        "note": "77 papers repeated (30 FT + 47 abstracts) x reference A06 calls per paper"
+      },
+      "input_tokens": {
+        "value": 3875539,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean (the cost uses the 90th percentile)"
+      },
+      "output_tokens": {
+        "value": 1027716,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED"
+      },
+      "batch": {
+        "value": "x0.5",
+        "label": "ASSUMED",
+        "note": "repeats batched like the first pass"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED"
+      },
+      "repeats": {
+        "value": 77,
+        "label": "EXTRAPOLATED",
+        "note": "repeat share 0.643 MEASURED (papers with a blocked finding in the reference run); procedure unchanged, disagreement measured only"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED"
+      },
+      "cost_usd": {
+        "value": 16.204749999999997,
+        "label": "EXTRAPOLATED",
+        "note": "reference 90th-percentile A06 cost per paper by level x repeated papers x batch factor"
+      },
+      "uncertainty": "repeat share from 18 of 28 papers; a larger corpus may block a different share"
+    },
+    {
+      "stage": "A06-SV per theme",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 279,
+        "label": "EXTRAPOLATED",
+        "note": "2.321 themes per paper x 120: the reference run's 65 free-text themes. NOT the current architecture: one call per primary theme (5-8)"
+      },
+      "input_tokens": {
+        "value": 5710327,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per theme call"
+      },
+      "output_tokens": {
+        "value": 333954,
+        "label": "EXTRAPOLATED",
+        "note": "reference mean per theme call"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "MEASURED"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "theme calls are interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0,
+        "label": "ASSUMED"
+      },
+      "cost_usd": {
+        "value": 14.7591,
+        "label": "EXTRAPOLATED",
+        "note": "279 x reference mean $0.0529 per theme"
+      },
+      "uncertainty": "structurally wrong for the current architecture; see corrections"
+    },
+    {
+      "stage": "A07-SYN synthesis",
+      "model": "claude-opus-5",
+      "calls": {
+        "value": 138.4,
+        "label": "ASSUMED",
+        "note": "113 GROUP + 11 RECONCILE + PLAN + FINAL, GROUP/RECONCILE x(1 + 0.1) retrieval"
+      },
+      "input_tokens": {
+        "value": 5163380,
+        "label": "EXTRAPOLATED",
+        "note": "provider-counted input MEASURED at 642/1,353/1,996 findings, fitted and carried to 2,017"
+      },
+      "output_tokens": {
+        "value": 787100,
+        "label": "ASSUMED",
+        "note": "50% of each mode's output cap (ASSUMED, unmeasured)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "system prompt priced as plain input: no 1-hour write premium (x2) and no read discount (x0.1); real cost may go either way"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 2.27472011875,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 47.769122493750004,
+        "label": "EXTRAPOLATED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "the largest single stage; output share and retrieval rate unmeasured",
+      "by_mode": {
+        "PLAN": {
+          "calls": 1.0,
+          "input": 463910,
+          "output": 2000.0,
+          "usd": 2.3695
+        },
+        "GROUP": {
+          "calls": 124.3,
+          "input": 3436460.0,
+          "output": 745800.0,
+          "usd": 35.8273
+        },
+        "RECONCILE": {
+          "calls": 12.1,
+          "input": 1135939.475,
+          "output": 36300.0,
+          "usd": 6.5872
+        },
+        "FINAL": {
+          "calls": 1.0,
+          "input": 127071,
+          "output": 3000.0,
+          "usd": 0.7104
+        }
+      }
+    },
+    {
+      "stage": "A08-OL outline",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 1.0,
+        "label": "MEASURED",
+        "note": "expected 1.0 of at most 1 the loops allow (retrieval 0.25, redraft 0.2, cycles 2, revisions 1: ASSUMED)"
+      },
+      "input_tokens": {
+        "value": 279996,
+        "label": "ASSUMED",
+        "note": "byte bounds MEASURED with the production builders on the compact 120-paper fixture, / 2.1 bytes per token (ASSUMED: GPT/Kimi tokenization not counted)"
+      },
+      "output_tokens": {
+        "value": 16000,
+        "label": "ASSUMED",
+        "note": "50% of the output reserve (ASSUMED)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "no cache savings assumed (conservative)"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0679992380952381,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 1.427984,
+        "label": "ASSUMED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "one call; GPT tokenization unmeasured",
+      "long_context_calls": 1
+    },
+    {
+      "stage": "A09-WRI writing",
+      "model": "claude-opus-5",
+      "calls": {
+        "value": 28.2,
+        "label": "ASSUMED",
+        "note": "expected 28.2 of at most 110 the loops allow (retrieval 0.25, redraft 0.2, cycles 2, revisions 1: ASSUMED)"
+      },
+      "input_tokens": {
+        "value": 4453386,
+        "label": "MEASURED",
+        "note": "byte bounds MEASURED with the production builders on the compact 120-paper fixture, / 2.1 bytes per token (MEASURED 1.9-2.4 on Claude)"
+      },
+      "output_tokens": {
+        "value": 220800,
+        "label": "ASSUMED",
+        "note": "50% of the output reserve (ASSUMED)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "no cache savings assumed (conservative)"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 1.389346464285714,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 29.176275749999995,
+        "label": "ASSUMED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "retrieval and redraft frequency unmeasured",
+      "long_context_calls": 0
+    },
+    {
+      "stage": "A11-RC critique",
+      "model": "kimi-k3.1-pro",
+      "calls": {
+        "value": 2.0,
+        "label": "ASSUMED",
+        "note": "expected 2.0 of at most 2 the loops allow (retrieval 0.25, redraft 0.2, cycles 2, revisions 1: ASSUMED)"
+      },
+      "input_tokens": {
+        "value": 666752,
+        "label": "ASSUMED",
+        "note": "byte bounds MEASURED with the production builders on the compact 120-paper fixture, / 2.1 bytes per token (ASSUMED: GPT/Kimi tokenization not counted)"
+      },
+      "output_tokens": {
+        "value": 64000,
+        "label": "ASSUMED",
+        "note": "50% of the output reserve (ASSUMED)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share; Kimi: max_tokens plus a 32,000-token reasoning reserve"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "no cache savings assumed (conservative)"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.0986752380952381,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 2.07218,
+        "label": "ASSUMED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "Kimi tokenization and reasoning length unmeasured",
+      "long_context_calls": 0
+    },
+    {
+      "stage": "A12-EDI editing",
+      "model": "claude-sonnet-5-5",
+      "calls": {
+        "value": 4.2,
+        "label": "ASSUMED",
+        "note": "expected 4.2 of at most 6 the loops allow (retrieval 0.25, redraft 0.2, cycles 2, revisions 1: ASSUMED)"
+      },
+      "input_tokens": {
+        "value": 1408024,
+        "label": "MEASURED",
+        "note": "byte bounds MEASURED with the production builders on the compact 120-paper fixture, / 2.1 bytes per token (MEASURED 1.9-2.4 on Claude)"
+      },
+      "output_tokens": {
+        "value": 134400,
+        "label": "ASSUMED",
+        "note": "50% of the output reserve (ASSUMED)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "no cache savings assumed (conservative)"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 0.20800240000000003,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 4.3680504,
+        "label": "ASSUMED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "revision count unmeasured",
+      "long_context_calls": 0
+    },
+    {
+      "stage": "A10-RV verification",
+      "model": "gpt-6.1-sol",
+      "calls": {
+        "value": 193.6,
+        "label": "ASSUMED",
+        "note": "42 LOCAL x executions [1.0, 0.3, 0.6, 0.1] + 23 GLOBAL pages per execution, x(1 + 0.1) retrieval"
+      },
+      "input_tokens": {
+        "value": 19131322,
+        "label": "EXTRAPOLATED",
+        "note": "production request bounds MEASURED for a 5,000-word manuscript at 1,996 findings, / 2.1 (GPT tokenization ASSUMED)"
+      },
+      "output_tokens": {
+        "value": 878620,
+        "label": "ASSUMED",
+        "note": "50% of each output cap (ASSUMED)"
+      },
+      "reasoning_tokens": {
+        "value": "in output",
+        "label": "ASSUMED",
+        "note": "thinking/reasoning counted inside the output share"
+      },
+      "batch": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "interactive"
+      },
+      "cache": {
+        "value": "none",
+        "label": "ASSUMED",
+        "note": "no cache savings assumed; the A10 job's own result cache is reflected only through the re-verification shares"
+      },
+      "repeats": {
+        "value": 0,
+        "label": "ASSUMED"
+      },
+      "retries_usd": {
+        "value": 2.352442185238095,
+        "label": "ASSUMED",
+        "note": "5% of the stage's cost (failed calls redone); unmeasured"
+      },
+      "cost_usd": {
+        "value": 49.40128589,
+        "label": "EXTRAPOLATED",
+        "note": "stage cost plus its retry share"
+      },
+      "uncertainty": "re-verification shares and retrieval rate unmeasured; the largest uncertainty after A07"
+    }
+  ],
+  "reconciliation": {
+    "stage_figures_unrounded": {
+      "A02-A04 (pre-CP2)": 4.0,
+      "A05+A06 per paper": 43.3842,
+      "A06 instability repeats": 16.204749999999997,
+      "A06 per theme": 14.7591,
+      "A07 synthesis": 45.494402375,
+      "A10 verification": 47.0488437047619,
+      "A08 outline": 1.3599847619047618,
+      "A09 writing": 27.78692928571428,
+      "A11 critique": 1.9735047619047619,
+      "A12 editing": 4.160048000000001,
+      "failed and redone calls (A07-A12)": 6.391185644464286
+    },
+    "total_unrounded": 212.56294853375,
+    "baseline_usd": 212.56,
+    "margin": 0.3,
+    "baseline_with_margin_usd": 276.33,
+    "gap_baseline_vs_150": 62.56,
+    "gap_with_margin_vs_150": 126.33,
+    "row_costs_sum_to_total": true,
+    "each_stage_equals_forecast_full_run": true
+  },
+  "counted": {
+    "A06_instability_repeat": "yes: 77 papers, $16.20",
+    "A06_theme_pass": "yes, as 279 calls ($14.76); the current architecture makes one call per primary theme (5-8)",
+    "batch_discount": "yes: x0.5 on A05/A06 per-paper work after one interactive probe per level, and on the repeats; no batch elsewhere"
+  },
+  "label": "UNVALIDATED: 120-paper projection; not validated until a larger cohort has run"
+}

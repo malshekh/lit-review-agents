@@ -116,7 +116,7 @@ def test_global_distant_conflict_and_uncited_retrieval(tmp_path):
     j,base=job(tmp_path)
     def model(mode,payload,name):
         if mode=='GLOBAL' and not payload['retrieved_evidence']['findings']:
-            return {**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+            return {**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1'],'query':None,'source_item_ids':[],'proposition_ids':[]}]}
         out=base(mode,payload,name)
         if mode=='GLOBAL':
             out['issues']=[{'occurrence_ids':[j.occurrences[2]['occurrence_id'],j.occurrences[-1]['occurrence_id']],
@@ -181,6 +181,8 @@ def test_a11_reverifies_stale_report_before_critique(tmp_path,monkeypatch):
     run.save('manuscript_plan.json',{})
     run.save('synthesis_approved.json',{})
     run.save('rv_latest.json',{'stale':True})
+    from bridge_fixtures import bridge_stubs
+    bridge_stubs(run,monkeypatch)   # A10/A11 sequencing only; the bridge's own checks are tested in test_bridge.py
     monkeypatch.setattr(run,'_current',lambda:{'title':'New version'})
     monkeypatch.setattr(run,'_verification_current',lambda *a:False)
     monkeypatch.setattr(run,'_prose_vendors',lambda *a:frozenset({'anthropic'}))
@@ -270,7 +272,7 @@ def test_incomplete_global_and_tampered_acceptance_never_approve(tmp_path,failur
             out=base(mode,payload,name)
             if mode=='GLOBAL':
                 if failure=='missing_global':out['reviewed_index_ids']=[]
-                else:out={**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1']}]}
+                else:out={**response(mode),'status':'NEEDS_EVIDENCE','retrieval_requests':[{'finding_ids':['R0004:F1'],'query':None,'source_item_ids':[],'proposition_ids':[]}]}
             return out
         j.call=model
     with pytest.raises(JobStopped):j.run()
@@ -282,7 +284,10 @@ def test_line_verification_is_preserved_before_proof_or_scientific_hold(tmp_path
     from litreview import orchestrator as orch
     run=_run(tmp_path,monkeypatch)
     run.save('manuscript_plan.json',{})
+    from bridge_fixtures import bridge_stubs
+    bridge_stubs(run,monkeypatch)   # A10/A12 sequencing only; the bridge's own checks are tested in test_bridge.py
     monkeypatch.setattr(run,'_current',lambda:{'sections':[]})
+    monkeypatch.setattr(run,'_compliance_gate',lambda *a:None)   # journal limits are tested in test_submission_integrity.py
     line_report={'finding_severity':severity,'findings':[{'code':'EVALUATION_CORRECTION'}],
                  'verification_fingerprint':'line-version'}
     monkeypatch.setattr(run,'_maybe_verify',lambda *a,**k:line_report)

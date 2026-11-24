@@ -25,7 +25,7 @@ Evidence files under [a07_validation](a07_validation/):
 - `summary.json`: aggregate distributions and explicit other-stage cost assumptions.
 - `retrieval/`: independent two-round retrieval requests and measurements.
 
-Reproduce with `python -B tests/a07_validation_audit.py`; it makes only free count calls, but takes
+Reproduce with `python -B scripts/live/a07_validation_audit.py`; it makes only free count calls, but takes
 several minutes to rebuild mock jobs. `--recount` reuses saved requests. `--retrieval` counts the
 independent retrieval scenario. `python -B tests/a07_validation_summary.py` regenerates summaries
 without network access. Generation responses are mechanical fixtures, not scientific judgments.

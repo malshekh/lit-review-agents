@@ -69,7 +69,7 @@ def test_normalization_state_never_decides_eligibility():
                           {"finding_id": "F4", "disposition": "HUMAN_REVIEW_REQUIRED"}], [], (ent, DSF_CU, GROWTH))
         e = ev.annotate_paper(ext, val)
         assert [e[f]["status"] for f in ("F1", "F2", "F3", "F4")] == \
-            ["SUPPORTING", "NOT_ESTABLISHED", "REJECTED", "UNRESOLVED"]
+            ["SUPPORTING", "NOT_ESTABLISHED", "HELD_FOR_CORRECTION", "UNRESOLVED"]
     assert not ev.can_cite("HELD_FOR_CORRECTION") and not ev.can_cite(None)
 
 
@@ -86,7 +86,9 @@ def test_run_20261025_known_errors_stay_rejected_and_normalization_blocks_are_he
         status.update({f"{ext['record_id']}:{k}": v["status"] for k, v in ev.annotate_paper(ext, val).items()})
     assert status["R0061:F12"] == "REJECTED" and status["R0044:F21"] == "REJECTED"
     held = sorted(k for k, s in status.items() if s == "HELD_FOR_CORRECTION")
-    assert len(held) == 27 and {k.split(":")[0] for k in held} == {"R0045", "R0190", "R0238"}
+    normalization_held = [k for k in held if k.split(':')[0] in {'R0045','R0190','R0238'}]
+    assert len(normalization_held) == 27
+    assert len(held) == 36 and status['R0030:F20']=='HELD_FOR_CORRECTION'
     assert status["R0045:F34"] == "REJECTED"           # entity plus interpretation-as-result: not only normalization
 
 
@@ -289,6 +291,8 @@ def test_verify_merges_the_code_flags_whatever_a10_concludes(tmp_path, monkeypat
     run.save_state({"stage": "draft", "status": "READY", "counters": {}})
     run.save("manuscript_plan.json", {"sections": []})
     run.save("synthesis_approved.json", PKG)
+    from evidence_fixtures import seed_sources
+    seed_sources(run, FINDINGS)
     run.save("validated_findings.json", [{k: v for k, v in f.items() if k != "eligibility"} for f in FINDINGS])
     monkeypatch.setattr(run, "_deterministic_report", lambda m: {})
     run.budget.record("A09-WRI", "anthropic", "m", 10, 10, step="A09-WRI_draft1")

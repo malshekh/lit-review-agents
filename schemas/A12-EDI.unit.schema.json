@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A12-EDI output for one unit (front matter or one section) when the manuscript is edited unit by unit (prompt v0.3). title and abstract carry text for the FRONT unit and are null for a section unit; sections is empty for the FRONT unit.",
+  "type": "object",
+  "properties": {
+    "agent_id": {
+      "type": "string"
+    },
+    "prompt_version": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "COMPLETE",
+        "COMPLETE_WITH_WARNINGS",
+        "NEEDS_HUMAN_INPUT",
+        "ABSTAINED",
+        "FAILED"
+      ]
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mode": {
+      "enum": [
+        "REVISION",
+        "LINE",
+        "PROOF",
+        "INTEGRATION"
+      ]
+    },
+    "unit": {
+      "type": "string"
+    },
+    "input_manuscript_version": {
+      "type": "string"
+    },
+    "output_manuscript_version": {
+      "type": "string"
+    },
+    "title": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "abstract": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "section_id": {
+            "type": "string"
+          },
+          "heading": {
+            "type": "string"
+          },
+          "text_markdown": {
+            "type": "string"
+          },
+          "word_count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "section_id",
+          "heading",
+          "text_markdown",
+          "word_count"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "change_log": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "change_id": {
+            "type": "string"
+          },
+          "section_id": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "EDIT",
+              "KEEP",
+              "QUERY",
+              "ESCALATE"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "addresses": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tags_changed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "change_id",
+          "section_id",
+          "before",
+          "after",
+          "decision",
+          "reason",
+          "addresses",
+          "tags_changed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "kept_unchanged_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "ambiguity": {
+            "type": "string"
+          },
+          "readings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "query_id",
+          "location",
+          "ambiguity",
+          "readings"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "escalations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "enum": [
+              "PLAN_GAP",
+              "AMENDMENT_REQUIRED"
+            ]
+          },
+          "location": {
+            "type": "string"
+          },
+          "needed": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "location",
+          "needed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "consistency_register": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "concept": {
+            "type": "string"
+          },
+          "canonical_form": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "concept",
+          "canonical_form"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "agent_id",
+    "prompt_version",
+    "status",
+    "warnings",
+    "limitations",
+    "mode",
+    "unit",
+    "input_manuscript_version",
+    "output_manuscript_version",
+    "title",
+    "abstract",
+    "sections",
+    "change_log",
+    "kept_unchanged_sections",
+    "queries",
+    "escalations",
+    "consistency_register"
+  ],
+  "additionalProperties": false
+}

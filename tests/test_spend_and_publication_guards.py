@@ -56,12 +56,16 @@ def test_cp2_refuses_a_selection_projected_over_the_cap(tmp_path, monkeypatch):
     assert run.load("selected_corpus.json") is None                  # nothing proceeds
     proj = run.load("cost_projection.json")
     assert proj["verdict"] == "OVER_CAP" and proj["by_level"] == {"ABSTRACT": 0, "FULL_TEXT": 12}
-    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "WORST_CASE", "ESTIMATED_ENVELOPE"}
+    # A07 and A10 are calibrated forecasts; A08, A09, A11 and A12 come from the bridge's request builders (an
+    # estimate before any package exists)
+    assert {x["basis"] for x in proj["lines"]} == {"MEASURED_P90", "CALIBRATED_FORECAST", "ESTIMATED_ENVELOPE"}
 
 
 def test_cp2_passes_a_selection_within_the_cap_and_records_the_projection(tmp_path, monkeypatch):
     run = _cp2(tmp_path, monkeypatch, 2, pmcid=False)
-    run.budget.cap = 100.0  # exercise admission independently of the old $35 pilot cap
+    # exercise admission independently of the $35 pilot cap. $200: the section-by-section A09 line alone is about
+    # $40 for two papers at worst case (8 sections x 3 retrieval rounds x 2 drafts), set by the review's length
+    run.budget.cap = 200.0
     assert run.stage_cp2(run.state()) == "extract"
     proj = run.load("cost_projection.json")
     assert proj["verdict"] == "WITHIN_CAP" and proj["projected_total_usd"] <= proj["cap_usd"]
@@ -78,7 +82,10 @@ def test_measured_rates_come_from_the_cost_log(tmp_path):
     (tmp_path / "costs.jsonl").write_text("\n".join(json.dumps({"step": s, "cost_usd": c}) for s, c in log))
     r = cp.measured_rates(tmp_path)
     assert r["per_paper"]["ABSTRACT"]["mean_usd"] == pytest.approx(0.3)
-    assert r["per_paper"]["FULL_TEXT"]["mean_usd"] == pytest.approx(1.8)       # revalidation left out
+    # revalidation left out; and with loops.max_reextractions at 0 the re-extraction is left out as well: rates
+    # describe the procedure the code runs now, not what an older run happened to pay for
+    assert r["per_paper"]["FULL_TEXT"]["mean_usd"] == pytest.approx(1.3)
+    assert r["procedure"] == {"reextractions_counted": False, "excluded_obsolete_usd": 0.5}
     assert r["per_theme"]["mean_usd"] == pytest.approx(0.05) and r["themes_per_paper"] == 0.5
 
 

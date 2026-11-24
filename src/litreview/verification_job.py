@@ -22,6 +22,13 @@ CHECKS = ['SOURCE', 'NUMBERS_UNITS', 'MECHANISM_CAUSALITY', 'CERTAINTY', 'CHEMIC
           'MODEL_GBM', 'CLINICAL_REACH', 'COUNTER_EVIDENCE', 'ATTRIBUTION_INDEPENDENCE', 'CITATION']
 SURFACES = ('title', 'abstract', 'sections', 'introduction', 'conclusion', 'keywords',
             'figure_legends', 'table_captions', 'captions', 'legends', 'tables', 'display_items')
+# Surfaces where the journal forbids references (config/journal_scirev.yaml: an unstructured abstract with no
+# references; a one-sentence title). A scientific occurrence there needs no citation, but a VERIFIED verdict must
+# still name the evidence findings it rests on (bound through the plan's title and abstract propositions).
+NO_CITATION_SURFACES = {('manuscript', 'title'), ('manuscript', 'abstract'), ('manuscript', 'keywords')}
+# Contrary-evidence issues A10 GLOBAL raises (prompt A10, GLOBAL): kept at least at these severities.
+CONTRARY_FLOOR = {'CONTRARY_EVIDENCE_UNADDRESSED': 'BLOCKING', 'TABLE_CONCEALS_CONTRARY_EVIDENCE': 'BLOCKING',
+                  'TABLE_PROSE_INCONSISTENT': 'MAJOR', 'FORCED_EQUIVALENCE': 'MAJOR'}
 META = {'section_id', 'display_id', 'item_id', 'kind', 'type', 'origin', 'level', 'path',
         'source_proposition_ids', 'proposition_ids', 'citation_record_ids', 'warnings'}
 
@@ -89,18 +96,39 @@ def policy_hash(cfg):
 
 
 def current(report, digest, policy=None):
-    return (report.get('verification_fingerprint') == digest and not report.get('stale')
+    identity_ok = (report.get('verification_fingerprint') == digest and not report.get('stale')
             and report.get('verification_execution') == 'COMPLETE'
             and (policy is None or report.get('verification_policy_fingerprint')==policy))
+    if not identity_ok:return False
+    occurrences = report.get('occurrence_inventory', [])
+    verdicts = report.get('verdicts', [])
+    coverage = report.get('coverage', {})
+    ids = [o.get('occurrence_id') for o in occurrences]
+    reviewed = [v.get('occurrence_id') for v in verdicts]
+    global_ids = report.get('global_index_ids_reviewed', [])
+    return (bool(ids) and None not in ids and len(ids)==len(set(ids))
+            and len(reviewed)==len(ids) and set(reviewed)==set(ids)
+            and coverage.get('occurrences_total')==len(ids)
+            and coverage.get('occurrences_reviewed')==len(ids)
+            and coverage.get('inventory_fingerprint')==fingerprint(occurrences)
+            and len(global_ids)==len(set(global_ids))
+            and coverage.get('global_index_entries_reviewed')==len(global_ids)
+            and all(v.get('verdict')=='NON_SCIENTIFIC' or set(v.get('checks',[]))==set(CHECKS)
+                    for v in verdicts))
 
 
 class VerificationJob:
     def __init__(self, directory, manuscript, plan, package, registry, tables, cfg, call, count,
-                 execution_identity, cache_directory=None, prior_report=None):
+                 execution_identity, cache_directory=None, prior_report=None, contrary_register=None):
         self.dir = Path(directory)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.manuscript, self.plan, self.package, self.registry = manuscript, plan, package, registry
         self.tables, self.cfg, self.call, self.count = list(tables), cfg, call, count
+        # bridge.contrary_register: each material contrary finding's entry rides on its own GLOBAL index entry
+        self.contrary = {e['finding_id']:{k:e[k] for k in ('in_table','reasons','carried_by','written_by','sections')
+                                          if k in e} | {'challenges':[{k:c[k] for k in ('finding_id','in_table','differs',
+                                          'not_reported_for_one') if k in c} for c in e.get('challenges',[])]}
+                         for e in contrary_register or []}
         self.occurrences = inventory(manuscript, tables)
         if not self.occurrences:raise JobStopped('empty verification inventory')
         self.digest = version(manuscript, plan, package, registry, tables)
@@ -219,10 +247,21 @@ class VerificationJob:
         fids.update(x['finding_id'] for x in links)
         missing = fids - set(self.registry.findings)
         if missing:raise JobStopped('A10 binding references missing registry findings')
-        props = {i: [{k:v for k,v in p.items() if k in ('proposition_id','type','assertion','statement','evidence',
-                    'source_item_ids','established_by','constraints','scientific_limitations','reconciliation_issue_ids')}
+        # Follow the same reference chain as finding/role binding. Preserve the full
+        # proposition, including qualifications added by synthesis or human review.
+        reachable, queue = set(), list(ids)
+        while queue:
+            i = queue.pop()
+            if i in reachable:continue
+            reachable.add(i)
+            for obj in self.idx.get(i, []):
+                for key,value in obj.items():
+                    if scope._follows(key):
+                        queue.extend(x for x in (value if isinstance(value,list) else [value])
+                                     if isinstance(x,str) and x in self.idx)
+        props = {i: [dict(p)
                     for p in self.idx.get(i, []) if 'proposition_id' in p or 'statement' in p]
-                 for i in sorted(ids) if i in self.idx}
+                 for i in sorted(reachable) if i in self.idx}
         appraisals = [{**x, 'binding_id': occurrence['occurrence_id']+':A'+str(n)+':'+x['finding_id']}
                       for n,x in enumerate(links) if x.get('role') == 'SUBJECT_OF_APPRAISAL']
         bad = [x for x in links if not evidence.role_allowed(self.registry.findings.get(x['finding_id']), x.get('role'))]
@@ -262,11 +301,21 @@ class VerificationJob:
             for o in self.occurrences[start:start+size]:
                 trial=packet+[o]
                 if not self.admitted('LOCAL',self.local_payload(trial)):
-                    if not packet:raise JobStopped('single A10 occurrence exceeds admission; inspect broad claim/bindings')
+                    if not packet:raise JobStopped(self._too_large(o))
                     yield packet;packet=[o]
-                    if not self.admitted('LOCAL',self.local_payload(packet)):raise JobStopped('single A10 occurrence exceeds admission')
+                    if not self.admitted('LOCAL',self.local_payload(packet)):raise JobStopped(self._too_large(o))
                 else:packet=trial
             if packet:yield packet
+
+    def _too_large(self, occurrence):
+        """Why one occurrence cannot be verified in one request: which text, how many findings it pulls in, how big."""
+        payload = self.local_payload([occurrence])
+        b, fids = self.bound(occurrence)
+        text = str(occurrence.get('text') or '')[:160]
+        return (f"single A10 occurrence exceeds admission: {occurrence['occurrence_id']} at {'/'.join(map(str, occurrence['path']))} "
+                f"(\"{text}\") binds {len(fids)} findings from {len({self.registry.record_of.get(f) for f in fids})} papers; "
+                f"request bound {self.count(payload):,} + output {self.cap('LOCAL'):,} over the {self.cfg['context_ceiling_tokens']:,} ceiling. "
+                "A sentence citing whole papers pulls in every finding of each; cite the findings it rests on, or split it")
 
     def local(self, packet):
         payload = self.local_payload(packet)
@@ -288,7 +337,8 @@ class VerificationJob:
             if v['verdict'] != 'NON_SCIENTIFIC' and set(v['checks']) != set(CHECKS):
                 raise JobStopped('A10 incomplete scientific checks')
             occurrence = self.by_occurrence[v['occurrence_id']]
-            if v['verdict'] != 'NON_SCIENTIFIC' and not occurrence['citation_record_ids']:
+            exempt = tuple(occurrence['path'][:2]) in NO_CITATION_SURFACES and v['evidence_finding_ids']
+            if v['verdict'] != 'NON_SCIENTIFIC' and not occurrence['citation_record_ids'] and not exempt:
                 self.flag(v['occurrence_id'], 'UNCITED_SCIENTIFIC_ASSERTION', 'MAJOR', 'Supply a supporting citation or qualify/remove assertion')
             needed = [a for b in payload['occurrences'] if b['occurrence_id']==v['occurrence_id'] for a in b['appraisal_bindings']]
             checked = {a['binding_id']:a for a in v['appraisal_checks']}
@@ -318,6 +368,9 @@ class VerificationJob:
     def validate_issues(self, issues, allowed, visible):
         for i in issues:
             if i['code'] in evidence.SEVERITY_FLOOR:i['severity']=evidence.SEVERITY_FLOOR[i['code']]
+            floor=CONTRARY_FLOOR.get(i['code'])
+            if floor and {'MINOR':1,'MAJOR':2,'BLOCKING':3}[i['severity']]<{'MINOR':1,'MAJOR':2,'BLOCKING':3}[floor]:
+                i['severity']=floor
             if not i['occurrence_ids'] or set(i['occurrence_ids'])-allowed:
                 raise JobStopped('A10 issue references unseen occurrence')
             if set(i['finding_ids'])-visible:raise JobStopped('A10 issue references unseen evidence')
@@ -338,7 +391,9 @@ class VerificationJob:
             'retrieval':{'available':True,'operations':['finding_ids','query','source_item_ids','proposition_ids']}}
 
     def global_pages(self, verdicts):
-        entries = [{'id':fid,'kind':'FINDING','value':self.registry.index_line(fid)} for fid in self.registry.findings]
+        entries = [{'id':fid,'kind':'FINDING','value':self.registry.index_line(fid),
+                    **({'contrary_evidence':self.contrary[fid]} if fid in self.contrary else {})}
+                   for fid in self.registry.findings]
         entries += [{'id':p['proposition_id'],'kind':'PROPOSITION','value':compact_proposition(p)} for p in self.package.get('propositions', [])]
         entries += [{'id':'RECONCILIATION:'+str(n),'kind':'RECONCILIATION','value':p} for n,p in enumerate(self.package.get('reconciliation', []))]
         entries += [{'id':g['gap_id'],'kind':'GAP','value':{k:g[k] for k in ('gap_id','statement','source_item_ids','established_by') if k in g}} for g in self.package.get('knowledge_gaps', [])]

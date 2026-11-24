@@ -9,6 +9,10 @@ later stages elsewhere (pipeline.yaml -> routing).
 from __future__ import annotations
 
 import os
+import json
+import hashlib
+import re
+from pathlib import Path
 
 from .. import config
 from .base import LLMResponse, as_parts
@@ -20,8 +24,11 @@ def _get_client():
     global _client
     if _client is None:
         import anthropic  # imported lazily so tests run without the SDK configured
-        key_env = config.load("pipeline")["providers"]["anthropic"]["key_env"]
-        _client = anthropic.Anthropic(api_key=os.environ.get(key_env))
+        from ..preflight import require_clean_endpoints
+        require_clean_endpoints()   # never build a client that the environment could point at another vendor
+        pcfg = config.load("pipeline")["providers"]["anthropic"]
+        _client = anthropic.Anthropic(max_retries=0, api_key=os.environ.get(pcfg["key_env"]),
+                                      base_url=pcfg.get("base_url") or "https://api.anthropic.com")
     return _client
 
 
@@ -46,7 +53,8 @@ def count_tokens(system: str, user, model: str, cache_system: bool = False, cach
 
 
 def message_params(system: str, user, model: str, max_tokens: int, temperature: float,
-                   effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m") -> dict:
+                   effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m", trace: dict | None = None,
+                   response_schema: dict | None = None) -> dict:
     """The Messages request, shared by complete() and a batch item's `params` (identical by construction)."""
     pcfg = config.load("pipeline")["providers"]["anthropic"]
     kwargs: dict = {"model": model, "max_tokens": max_tokens, **request_body(system, user, cache_system, cache_ttl)}
@@ -54,20 +62,60 @@ def message_params(system: str, user, model: str, max_tokens: int, temperature: 
         kwargs["temperature"] = temperature
     if effort:
         kwargs["output_config"] = {"effort": effort}
+    if (trace or {}).get("agent") == "A07-SYN" and str((trace or {}).get("step", "")).endswith("_PLAN"):
+        opts = config.load("pipeline")["synthesis"]["plan_request"]
+        if opts.get("thinking") != {"type":"adaptive"} or opts.get("effort") != "medium":
+            raise ValueError("Controlled PLAN requires adaptive thinking, medium effort and no manual budget")
+        kwargs["thinking"] = {"type":"adaptive"}
+        kwargs["output_config"] = {"effort":"medium"}
+    if response_schema:   # structured output: shape, types, required keys and enumerations (structured.py)
+        kwargs.setdefault("output_config", {})["format"] = {"type": "json_schema", "schema": response_schema["schema"]}
     return kwargs
+
+
+def _preserve_plan_response(resp, trace):
+    from ..paths import REPO_ROOT
+    pcfg = config.load("pipeline")["providers"]["anthropic"]
+    folder = Path(pcfg.get("writing_response_audit_dir") or pcfg["plan_response_audit_dir"]).resolve()
+    if not folder.is_dir() or folder.is_relative_to(REPO_ROOT.resolve()):
+        raise ValueError("PLAN raw response requires a private audit directory outside runtime/retrieval paths")
+    names = [str(trace.get(k, "")) for k in ("run_id", "step")]
+    if any(not re.fullmatch(r"[A-Za-z0-9_-]+", name) for name in names):
+        raise ValueError("Unsafe PLAN audit identity")
+    target = folder / ("__".join(names)+"__attempt"+str(int(trace.get("attempt",0)))+".provider.json")
+    if target.exists(): raise ValueError("PLAN raw audit response already exists; refusing overwrite")
+    temporary = target.with_suffix(".pending")
+    raw = resp.model_dump(mode="json")
+    with temporary.open("x",encoding="utf-8") as stream:
+        json.dump(raw,stream,ensure_ascii=False,indent=2)
+        stream.flush();os.fsync(stream.fileno())
+    os.replace(temporary,target)
+    return str(target), {"id":raw.get("id"),"stop_reason":raw.get("stop_reason"),"usage":raw.get("usage"),
+            "content_block_types":[b.get("type") for b in raw.get("content",[])],
+            "raw_response_sha256":hashlib.sha256(target.read_bytes()).hexdigest()}
 
 
 def complete(system: str, user, model: str, max_tokens: int, temperature: float,
              provider: str = "anthropic", effort: str | None = None, cache_system: bool = False,
-             cache_ttl: str = "5m") -> LLMResponse:
+             cache_ttl: str = "5m", trace: dict | None = None, response_schema: dict | None = None) -> LLMResponse:
     """Streams the request (so large max_tokens never hits the SDK's non-streaming timeout) and
     returns the final message. Thinking counts toward max_tokens; `effort` (per agent in
     pipeline.yaml) controls how much of it is spent. Prompt caching: `cache_system` marks the system
     prompt, and user blocks with "cache": True are marked too (the prefix up to each mark is cached)."""
-    kwargs = message_params(system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl)
+    kwargs = message_params(system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl, trace,
+                            response_schema)
     with _get_client().messages.stream(**kwargs) as s:
         resp = s.get_final_message()
-    return parse_message(resp, model)
+    private_path = metadata = None
+    if ((trace or {}).get("agent") == "A07-SYN" and str((trace or {}).get("step", "")).endswith("_PLAN")) or (
+            (config.load("pipeline")["providers"]["anthropic"].get("writing_response_audit_dir")
+             or config.load("pipeline")["providers"]["anthropic"].get("plan_response_audit_dir"))
+            and (trace or {}).get("agent") in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}):
+        private_path, metadata = _preserve_plan_response(resp, trace)
+    result = parse_message(resp, model)
+    result.raw_provider_response_path = private_path
+    result.provider_response_metadata = metadata
+    return result
 
 
 def parse_message(resp, model: str) -> LLMResponse:

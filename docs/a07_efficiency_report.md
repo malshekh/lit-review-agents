@@ -47,8 +47,8 @@ packing, aliases, provenance copying and accounting.
 | `schemas/A07-SYN.bounded-group.schema.json:201` | Internal GROUP gap maximum 16; regular-packet maximum enforced in code |
 | `prompts/agents/A07-SYN_Synthesis.md:65` | Explain source-only limits, separate thematic bindings and deduplicated source format |
 | `tests/test_a07_efficiency.py` | New packing, coverage, reconciliation, bounds and resume regressions |
-| `tests/a07_validation_audit.py:39` | Optional output directory to preserve the prior audit |
-| `tests/a07_efficiency_report.py` | Reproducible before/after measurements, source equality assertions and cache-prefix calibration |
+| `scripts/live/a07_validation_audit.py:39` | Optional output directory to preserve the prior audit |
+| `scripts/live/a07_efficiency_report.py` | Reproducible before/after measurements, source equality assertions and cache-prefix calibration |
 
 The existing registry-wide independence logic, A05/A06 scientific rules, routing, A10 interface,
 checkpoint authorization, journal/commit mechanics and runtime context admission are unchanged.
@@ -172,9 +172,9 @@ structural acceptance. Do not certify production science or full-pipeline afford
 architecture work is not justified by these measurements; prioritize a representative clean fixture,
 remaining-stage cost calibration and the authorized semantic pilot before paid scale-up.
 
-Reproduce baseline capture/counts with `python -B tests/a07_validation_audit.py --output-dir
+Reproduce baseline capture/counts with `python -B scripts/live/a07_validation_audit.py --output-dir
 docs/a07_efficiency`; `--recount` reuses exact requests; `--retrieval` exercises retrieval. Run
-`python -B tests/a07_efficiency_report.py` for the comparison. `--count-prefix` makes only two free
+`python -B scripts/live/a07_efficiency_report.py` for the comparison. `--count-prefix` makes only two free
 input-count probes. Artifacts are in [a07_efficiency](a07_efficiency/), including exact compressed
 requests, provider counts, per-group distributions, cache calibration and scientific equality checks.
 Prior audit artifacts and all historical runs were left untouched.
