@@ -246,3 +246,12 @@ def test_functional_planner_is_read_only_and_reports_new_mode_separately(tmp_pat
     assert proposal['functional_worst_case_usd']==pytest.approx(0.594)
     assert proposal['provider_strict_schema_submitted'] is False and proposal['paid_dispatch_authorized'] is False
     assert b.reservations_path.read_bytes()==before and not b.entries()
+
+
+def test_expectation_failure_is_not_accepted_and_does_not_erase_saved_science():
+    ext=functional_record();ext['contexts'][0]['fields']['comparator']='NOT_APPLICABLE'
+    before=copy.deepcopy(ext)
+    with pytest.raises(jsonschema.ValidationError):a05_functional.require_expected(ext,a05_functional.fixture()['expected'])
+    assert ext==before and len(ext['findings'])==3
+    # Independent handoff itself requires a valid canonical extraction; expectation mismatch does not mutate it.
+    base.validate('A05-KE',ext)

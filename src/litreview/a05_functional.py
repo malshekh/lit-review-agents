@@ -202,11 +202,24 @@ def execute(parent_run,approve_usd,by,decision):
         out_file=work.dir/'outputs'/f'{step}.json'
         if out_file.exists():ext=extraction_mode.accept(out_file.read_text(encoding='utf-8'),payload)
         else:ext=work.agent('A05-KE',payload,step)
-        require_expected(ext,source['expected'])
-        handoff(work,ext,source)
+        # A source-expectation mismatch is a functional failure, not a locally invalid extraction.
+        # Keep it failed while collecting the independently authorized scientific audit from the saved output.
+        expectation_assessment=[]
+        for expected in source['expected']['requirements']:
+            try:
+                require_expected(ext,{'min_findings':source['expected']['min_findings'],'requirements':[expected]})
+                expectation_assessment.append({'expected':expected,'matched':True})
+            except jsonschema.ValidationError as exc:
+                expectation_assessment.append({'expected':expected,'matched':False,'problem':exc.message})
+        validation_problem=None
+        try:handoff(work,ext,source)
+        except ValueError as exc:validation_problem=str(exc)
+
         artifacts={p.relative_to(parent_run.dir).as_posix():hashlib.sha256(p.read_bytes()).hexdigest()
                    for folder in ('outputs','data/a06_inputs','data/validations') for p in (work.dir/folder).glob('*') if p.is_file()}
-        result={'accepted':True,'fingerprint':fingerprint(),'identity':check_identity(),'artifacts':artifacts,
+        result={'accepted':all(x['matched'] for x in expectation_assessment) and validation_problem is None,
+                'expectation_assessment':expectation_assessment,'independent_validation_problem':validation_problem,
+                'fingerprint':fingerprint(),'identity':check_identity(),'artifacts':artifacts,
                 'scientific_checkpoint_approved':False,'full_text_extraction_tested':False,
                 'costs_usd':{a:sum(e.get('cost_usd') or 0 for e in parent_run.budget.entries() if e.get('agent')==a and 'FUNCTIONAL_SOURCE_1' in e.get('step',''))
                              for a in ('A05-KE','A06-SV')}}

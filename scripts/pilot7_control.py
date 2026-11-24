@@ -100,7 +100,7 @@ def main():
         from litreview import a05_functional
         result=a05_functional.execute(run,check_auth['functional_cap_usd'],check_auth['approved_by'],check_auth)
         print(json.dumps(result,indent=2))
-        return 0
+        return 0 if result['accepted'] else 2
     if args.action=='smoke':
         structured.recover_smoke_receipts(run.budget)
         from litreview.a05_functional import smoke_spent as combined_smoke_spent
