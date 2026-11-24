@@ -43,3 +43,6 @@ Scope has not started and CP1 is not ready. No scientific checkpoint was approve
 ## Verification
 
 The full offline suite passed **1,121 tests in 194.49 seconds**. Dedicated ordinary-mode tests include both interactive and batch acceptance, raw/error retention, mode-aware reuse and the real A06 handoff with scripted independent responses. After final dispatch-bound refinements and removal of the obsolete strict-wire prompt prose, **141 focused checks passed**. All tests block network connections. No live model quality or full-text extraction success is claimed.
+
+
+Live continuation results and the separately revised future cost forecast are recorded in [FUNCTIONAL_RESULT.md](../openai_value_type_audit/FUNCTIONAL_RESULT.md) and [the OpenAI audit](../openai_value_type_audit/REPORT.md). The original prepared cost and fingerprint above are historical approvals, not authorization for a new test under changed schema hashes or cost assumptions.

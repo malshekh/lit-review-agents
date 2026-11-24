@@ -243,7 +243,7 @@ def test_functional_planner_is_read_only_and_reports_new_mode_separately(tmp_pat
     before=b.reservations_path.read_bytes()
     monkeypatch.setattr(structured,'RECORD',tmp_path/'structured_output.json')
     proposal=a05_functional.plan(b)
-    assert proposal['functional_worst_case_usd']==pytest.approx(0.594)
+    assert proposal['functional_worst_case_usd']==pytest.approx(0.658)  # Conservative implicit OpenAI cache-write pricing.
     assert proposal['provider_strict_schema_submitted'] is False and proposal['paid_dispatch_authorized'] is False
     assert b.reservations_path.read_bytes()==before and not b.entries()
 

@@ -1,0 +1,357 @@
+[
+  {
+    "schema_file": "A02-SP.schema.json",
+    "old_submitted_sha256": "d76487961257884d9e44a87211e42cb2091590343f9fa32743d8e0c37390c269",
+    "missing_declarations": [
+      {
+        "path": "$.status",
+        "kind": "enum",
+        "values": [
+          "COMPLETE",
+          "COMPLETE_WITH_WARNINGS",
+          "NEEDS_HUMAN_INPUT",
+          "ABSTAINED",
+          "FAILED"
+        ]
+      },
+      {
+        "path": "$.spec_state",
+        "kind": "enum",
+        "values": [
+          "READY_FOR_CHECKPOINT",
+          "READY_WITH_ASSUMPTIONS",
+          "NEEDS_HUMAN_INPUT",
+          "OUT_OF_SCOPE"
+        ]
+      },
+      {
+        "path": "$.readiness.topic_boundaries",
+        "kind": "enum",
+        "values": [
+          "CONFIRMED",
+          "PARTIAL",
+          "UNRESOLVED"
+        ]
+      },
+      {
+        "path": "$.readiness.central_question",
+        "kind": "enum",
+        "values": [
+          "CONFIRMED",
+          "PARTIAL",
+          "UNRESOLVED"
+        ]
+      },
+      {
+        "path": "$.readiness.audience",
+        "kind": "enum",
+        "values": [
+          "CONFIRMED",
+          "PARTIAL",
+          "UNRESOLVED"
+        ]
+      },
+      {
+        "path": "$.readiness.competing_positions",
+        "kind": "enum",
+        "values": [
+          "CONFIRMED",
+          "PARTIAL",
+          "UNRESOLVED"
+        ]
+      }
+    ]
+  },
+  {
+    "schema_file": "A03-LM.schema.json",
+    "old_submitted_sha256": "0f43e2b45387073914ab0d4b3a352664c3fa2891d83f8a3891dc63955989e9f9",
+    "missing_declarations": [
+      {
+        "path": "$.status",
+        "kind": "enum",
+        "values": [
+          "COMPLETE",
+          "COMPLETE_WITH_WARNINGS",
+          "NEEDS_HUMAN_INPUT",
+          "ABSTAINED",
+          "FAILED"
+        ]
+      },
+      {
+        "path": "$.mode",
+        "kind": "enum",
+        "values": [
+          "PLAN",
+          "REPAIR"
+        ]
+      },
+      {
+        "path": "$.concept_blocks[].terms[].relation",
+        "kind": "enum",
+        "values": [
+          "PREFERRED",
+          "SYNONYM",
+          "ABBREVIATION",
+          "RELATED",
+          "CONTROLLED_VOCAB"
+        ]
+      },
+      {
+        "path": "$.concept_blocks[].terms[].origin",
+        "kind": "enum",
+        "values": [
+          "FROM_SPEC",
+          "MODEL_SUGGESTED"
+        ]
+      },
+      {
+        "path": "$.query_families[].purpose",
+        "kind": "enum",
+        "values": [
+          "CORE_TOPIC",
+          "THEME",
+          "CONTRARY_EVIDENCE",
+          "REVIEW_CHANNEL",
+          "RECENT_UPDATE",
+          "KNOWN_ITEM"
+        ]
+      },
+      {
+        "path": "$.query_families[].context_blocks_applied[].dimension",
+        "kind": "enum",
+        "values": [
+          "ORGANISM",
+          "STUDY_SYSTEM",
+          "ENTITY_TYPE"
+        ]
+      },
+      {
+        "path": "$.repairs[].diagnosis",
+        "kind": "enum",
+        "values": [
+          "QUERY_REPAIRED",
+          "QUERY_OVERCONSTRAINED",
+          "NO_RESULTS_CONFIRMED",
+          "SEARCH_FAILED"
+        ]
+      }
+    ]
+  },
+  {
+    "schema_file": "A06-SV.schema.json",
+    "old_submitted_sha256": "157cbeb66719080072638fdd497a2d4f42ee6c1897a1f10c00271e84ca1389b6",
+    "missing_declarations": [
+      {
+        "path": "$.status",
+        "kind": "enum",
+        "values": [
+          "COMPLETE",
+          "COMPLETE_WITH_WARNINGS",
+          "NEEDS_HUMAN_INPUT",
+          "ABSTAINED",
+          "FAILED"
+        ]
+      },
+      {
+        "path": "$.mode",
+        "kind": "enum",
+        "values": [
+          "PER_PAPER",
+          "PER_THEME"
+        ]
+      },
+      {
+        "path": "$.validations[].gate1",
+        "kind": "enum",
+        "values": [
+          "PASSED",
+          "FAILED",
+          "UNRESOLVED_SOURCE_ACCESS"
+        ]
+      },
+      {
+        "path": "$.validations[].disposition",
+        "kind": "enum",
+        "values": [
+          "SUPPORTED",
+          "SUPPORTED_WITH_CONSTRAINTS",
+          "SUPPORTED_FOR_OBSERVATION",
+          "PARTIALLY_SUPPORTED",
+          "DOES_NOT_ESTABLISH",
+          "BLOCKED_PROVENANCE",
+          "BLOCKED_ALIGNMENT",
+          "HUMAN_REVIEW_REQUIRED",
+          "UNRESOLVED_SOURCE_ACCESS"
+        ]
+      },
+      {
+        "path": "$.defect_reports[].severity",
+        "kind": "enum",
+        "values": [
+          "CRITICAL",
+          "MAJOR",
+          "MINOR"
+        ]
+      },
+      {
+        "path": "$.defect_reports[].cause",
+        "kind": "enum",
+        "values": [
+          "EXTRACTION",
+          "NORMALIZATION",
+          "SOURCE"
+        ]
+      },
+      {
+        "path": "$.conflicts[].type",
+        "kind": "enum",
+        "values": [
+          "DIRECT_CONTRADICTION",
+          "CONTEXT_DEPENDENT",
+          "METHODOLOGICAL",
+          "SCOPE"
+        ]
+      },
+      {
+        "path": "$.cross_packet_candidates[].kind",
+        "kind": "enum",
+        "values": [
+          "POSSIBLE_CONFLICT",
+          "POSSIBLE_SAME_STUDY",
+          "QUALIFIES"
+        ]
+      }
+    ]
+  },
+  {
+    "schema_file": "A08-OL.schema.json",
+    "old_submitted_sha256": "6cf8656f20883e59a2f50fedf8410e90fac117d934728039c783c511a34c39c4",
+    "missing_declarations": [
+      {
+        "path": "$.status",
+        "kind": "enum",
+        "values": [
+          "COMPLETE",
+          "COMPLETE_WITH_WARNINGS",
+          "NEEDS_HUMAN_INPUT",
+          "ABSTAINED",
+          "FAILED"
+        ]
+      },
+      {
+        "path": "$.sections[].heading_kind",
+        "kind": "enum",
+        "values": [
+          "DESCRIPTIVE",
+          "CLAIM_BEARING",
+          "REPORTING_ONLY",
+          "RELATIONSHIP_UNRESOLVED"
+        ]
+      },
+      {
+        "path": "$.sections[].ordered_items[].item_type",
+        "kind": "enum",
+        "values": [
+          "PROPOSITION",
+          "GAP",
+          "AUTHOR_INTERPRETATION"
+        ]
+      },
+      {
+        "path": "$.allocation_ledger[].outcome",
+        "kind": "enum",
+        "values": [
+          "DISCUSSED",
+          "GROUPED_WITH",
+          "TABLE_ONLY",
+          "NOT_INDIVIDUALLY_DISCUSSED"
+        ]
+      },
+      {
+        "path": "$.display_items[].display_id",
+        "kind": "const",
+        "values": [
+          "T1"
+        ]
+      },
+      {
+        "path": "$.display_items[].type",
+        "kind": "const",
+        "values": [
+          "TABLE_COMPARISON"
+        ]
+      }
+    ]
+  },
+  {
+    "schema_file": "A10-RV.bounded.schema.json",
+    "old_submitted_sha256": "d6fe749cf93b4826c163ed55c74d35b2418a78dd97470b7ed48607b7c8b80a9d",
+    "missing_declarations": [
+      {
+        "path": "$.agent_id",
+        "kind": "const",
+        "values": [
+          "A10-RV"
+        ]
+      },
+      {
+        "path": "$.prompt_version",
+        "kind": "const",
+        "values": [
+          "2.0"
+        ]
+      },
+      {
+        "path": "$.mode",
+        "kind": "enum",
+        "values": [
+          "LOCAL",
+          "GLOBAL"
+        ]
+      },
+      {
+        "path": "$.status",
+        "kind": "enum",
+        "values": [
+          "COMPLETE",
+          "NEEDS_EVIDENCE"
+        ]
+      },
+      {
+        "path": "$.verdicts[].verdict",
+        "kind": "enum",
+        "values": [
+          "VERIFIED",
+          "DEFECT",
+          "UNRESOLVED",
+          "NON_SCIENTIFIC"
+        ]
+      },
+      {
+        "path": "$.verdicts[].checks[]",
+        "kind": "enum",
+        "values": [
+          "SOURCE",
+          "NUMBERS_UNITS",
+          "MECHANISM_CAUSALITY",
+          "CERTAINTY",
+          "CHEMICAL_IDENTITY",
+          "MODEL_GBM",
+          "CLINICAL_REACH",
+          "COUNTER_EVIDENCE",
+          "ATTRIBUTION_INDEPENDENCE",
+          "CITATION"
+        ]
+      },
+      {
+        "path": "$.issues[].severity",
+        "kind": "enum",
+        "values": [
+          "MINOR",
+          "MAJOR",
+          "BLOCKING"
+        ]
+      }
+    ]
+  }
+]

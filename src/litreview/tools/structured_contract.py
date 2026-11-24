@@ -56,6 +56,8 @@ def problems(schema: dict, provider: str) -> list[str]:
             errors.append(path+': unsupported keyword '+key+' for '+provider)
         if path=='$' and node.get('type')!='object' and '$ref' not in node:
             errors.append(path+': root must be an object')
+        if provider=='openai' and ('const' in node or 'enum' in node) and 'type' not in node:
+            errors.append(path+': openai const/enum requires an explicit type declaration')
         props=node.get('properties',{})
         known=declared|set(props)
         missing=set(node.get('required',[]))-known

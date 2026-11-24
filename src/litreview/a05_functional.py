@@ -94,7 +94,7 @@ def plan(budget):
     actual=len(prompt.encode())+sum(len(x['text'].encode()) for x in user_parts(payload,m.cache_payload))
     if actual>A05_INPUT_BYTES:raise ValueError('Functional A05 input exceeds its fixed bound')
     # Input byte limits are enforced before each send, including a format repair. One byte/token is conservative.
-    costs={a:budget.cost(config.agent_model(a).model,inp,out)*2 for a,inp,out in
+    costs={a:structured.smoke_worst(budget,config.agent_model(a).provider,config.agent_model(a).model,inp,out)*2 for a,inp,out in
            [('A05-KE',A05_INPUT_BYTES,A05_OUTPUT_TOKENS),('A06-SV',A06_INPUT_BYTES,A06_OUTPUT_TOKENS)]}
     strict_usd,todo=structured.smoke_estimate(budget)
     from . import smoke_validation
@@ -148,7 +148,7 @@ def dispatch_guard(budget,agent,step):
         key='functional-'+hashlib.sha256((fingerprint()+step+str(attempt)).encode()).hexdigest()[:24]
         if key in budget.reservations():raise ValueError('Unsettled functional dispatch; reconcile before any retry')
         if any(e.get('reservation_key')==key for e in budget.entries()):raise ValueError('Functional attempt already paid; recover its receipt or request a new reviewed attempt')
-        worst=budget.cost(model.model,n,model.max_tokens)
+        worst=structured.smoke_worst(budget,model.provider,model.model,n,model.max_tokens)
         if smoke_spent(budget)+budget.reserved()+worst>1:raise BudgetExceeded('Combined smoke and functional allowance exceeded')
         ok,_=budget.reserve(key,worst,agent,'Bounded A05 mode functional check; unknown billing retains hold')
         if not ok:raise BudgetExceeded('Functional check does not fit combined pilot cap')

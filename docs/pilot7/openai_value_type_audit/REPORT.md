@@ -1,0 +1,23 @@
+# OpenAI submitted-value type audit and A08 fix (offline)
+
+The rejected A08 request contained two string constants without explicit type declarations: `display_items[].display_id` fixed to `T1`, and its sibling `type` fixed to `TABLE_COMPARISON`. Both canonical A08 definitions now explicitly include `"type": "string"`, preserving those exact fixed values.
+
+The audit inspected the actual schema emitted in `chat_params(...).response_format.json_schema.schema`, not only the canonical JSON files. All five configured OpenAI schema combinations were traversed recursively, including nested properties, array items, definitions, references and composition branches. Before the fix there were **34 string const/enum nodes without type declarations**: A02 6, A03 7, A06 8, A08 6 and A10 bounded 7. See `before.json` for every path and exact allowed value.
+
+For OpenAI only, the provider transformation now declares `type: string` when a previously untyped const or nonempty enum already permits only strings. This is an equivalent constraint: no string is added or removed, and no mixed-type or unknown shape is inferred. Anthropic transformations are unchanged. The provider compatibility audit refuses an untyped const/enum in the submitted OpenAI schema before dispatch. The two A08 source constants are explicitly authored, not dependent on this completion.
+
+The exact rejected submitted A08 schema is preserved in `tests/fixtures/rejected_a08_openai.schema.json`. Regressions demonstrate that both missing constants are detected; both fixed values remain unchanged; strings, nulls, booleans, numbers, arrays and objects have identical allowed/disallowed results under the completed const/enum constraints; actual OpenAI request bodies use strict mode and contain no untyped const/enum; nested references, definitions, items and branches are inspected. All 34 omissions are absent from the corrected emitted schemas.
+
+No corrected strict-schema check has been sent. The independent functional runtime deliberately retains the original approved A06 submitted hash `157cbeb66719080072638fdd497a2d4f42ee6c1897a1f10c00271e84ca1389b6` and prepared functional fingerprint `076cd17577f92a2b65429e62f368874a08da3030484ac5c517afca77e6c21e97`. Thus it can reuse the actual successful A06 receipt without pretending that it certifies the new typed wire schema. The offline repair is separate from the live functional task.
+
+After this offline repair, **seven prior strict successes remain exact matches**: current A04, all four bounded A07 variants and both A09 variants. A02, A03 and A06 now have changed submitted hashes and need new strict checks if the researcher later authorizes use of the corrected schemas. Those receipts are preserved, not overwritten. Along with A08, A10 and both A12 variants, **seven strict checks remain**. Their revised worst-case cost is **$0.180645** at the existing 1,500-token smoke cap. See `after.json` for before/after hashes and exact reusable combinations.
+
+Further paid strict checks and scope remain paused. The only authorized paid operation in this continuation is the already prepared A05-A06 functional check, including its bounded repairs, up to $0.594. All five pre-existing holds remain unresolved; no billing amount is assumed zero.
+
+Official reference consulted: [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs). The examples explicitly declare value types alongside allowed values; the saved provider HTTP 400 establishes the specific A08 rejection independently of the documentation.
+
+
+The live A06 response reported 9,587 implicit cache-write tokens even though explicit cache markers were disabled. The functional ledger already priced and recorded them correctly; A06 cost $0.0431735. Future smoke receipts now retain all cache-token classes, recovery accounts them once, and reservation/forecast input is conservatively priced at the maximum ordinary/read/write input rate. The strict-check forecast above includes this correction. It does not authorize those checks. A future repetition of the whole functional task, including both permitted repairs at every input bound, now reforecasts at $0.658 rather than the historical prepared $0.594. The completed task actually cost $0.1055055, below its original approval. The historical approved plan and live runtime are unchanged; the new cost-bound mismatch blocks any automatic repeat under that old approval.
+
+
+Final verification: **1,137 offline tests passed in 202.98 seconds**. Focused rejected-schema, request-body, value-set equivalence, recursive audit and cache-accounting regressions also passed. Tests blocked network connections; no corrected strict schema was dispatched.

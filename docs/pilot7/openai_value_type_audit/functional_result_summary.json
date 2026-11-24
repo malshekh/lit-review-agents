@@ -1,0 +1,112 @@
+{
+  "status": "FUNCTIONAL_COMPLETED_EXPECTATION_MISMATCH",
+  "run_id": "20261123-214928",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v26-pilot7-functional-only-50usd",
+  "commit": "7da52ebd2db6d05c4bd387e389edf843b9a04830",
+  "manifest_sha256": "3315560c9d4977ce631a65db59f049d53e6f69b49530c6455151d0cefaeeca09",
+  "approved_fingerprint": "076cd17577f92a2b65429e62f368874a08da3030484ac5c517afca77e6c21e97",
+  "functional_accepted": false,
+  "a06_independent_audit_completed": true,
+  "findings": [
+    {
+      "finding_id": "F1",
+      "subject_entity_id": "E1",
+      "predicate": "DETECTED_IN",
+      "object_entity_id": "E2",
+      "polarity": "POSITIVE",
+      "context_id": "C1",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "source_quote_artifact": "functional_checks/a05_canonical_json/work/outputs/A05-KE_FUNCTIONAL_SOURCE_1.json",
+      "a06_disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "a06_constraints": [
+        "Supported as an abstract-reported detection in the sampled plasma, not as independently verified analytical performance.",
+        "Detection frequency, concentration and sampling times are not stated in the supplied abstract.",
+        "Detection does not establish biological activity; the source describes the compound as the proposed active metabolite."
+      ],
+      "quantities": []
+    },
+    {
+      "finding_id": "F2",
+      "subject_entity_id": "E1",
+      "predicate": "DETECTED_IN",
+      "object_entity_id": "E3",
+      "polarity": "NULL",
+      "context_id": "C1",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "source_quote_artifact": "functional_checks/a05_canonical_json/work/outputs/A05-KE_FUNCTIONAL_SOURCE_1.json",
+      "a06_disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "a06_constraints": [
+        "Supported as abstract-reported non-detection in the sampled tumors under the study's analytical and sampling conditions.",
+        "The detection limit, sampling times and number of tumor samples are not stated in the supplied abstract.",
+        "Non-detection does not establish absence from tumors, failure of tumor penetration or lack of biological activity."
+      ],
+      "quantities": []
+    },
+    {
+      "finding_id": "F3",
+      "subject_entity_id": "E4",
+      "predicate": "MAXIMUM_TOLERATED_DOSE",
+      "object_entity_id": null,
+      "polarity": "POSITIVE",
+      "context_id": "C2",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "source_quote_artifact": "functional_checks/a05_canonical_json/work/outputs/A05-KE_FUNCTIONAL_SOURCE_1.json",
+      "a06_disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "a06_constraints": [
+        "Supported as the abstract-reported maximum tolerated dose of DSF with RT and TMZ: 375 mg/d.",
+        "The dose applies to the studied combination regimen and population, whose detailed schedule and characteristics are not stated in the supplied abstract.",
+        "The basis for the MTD determination cannot be assessed from the supplied sentences.",
+        "This value does not establish an MTD for DSF alone, general safety or a recommended treatment dose."
+      ],
+      "quantities": [
+        {
+          "measured_property": "maximum tolerated dose of DSF with RT and TMZ",
+          "raw_value": "375",
+          "raw_unit": "mg/d",
+          "value_type": "DOSE",
+          "variance_or_ci": null,
+          "p_value": null,
+          "n": null,
+          "converted": null
+        }
+      ]
+    }
+  ],
+  "expected_scientific_facts_omitted": [],
+  "automated_expectation_mismatches": [
+    "F1 and F2 share matrix plasma and tumors rather than separate per-finding matrix strings",
+    "C1 comparator NOT_APPLICABLE rather than expected NONE_REPORTED",
+    "F2 polarity NULL rather than expected NEGATIVE"
+  ],
+  "interpretation_note": "All three expected facts are present. The automated expectation gate remains failed; A06 supports the claims with constraints. These findings do not imply numerical concentration estimates or absence from tumors.",
+  "costs_usd": {
+    "A05-KE": 0.062332,
+    "A06-SV": 0.0431735
+  },
+  "functional_actual_usd": 0.1055055,
+  "functional_authorized_ceiling_usd": 0.594,
+  "recorded_run_spend_usd": 0.1762446,
+  "outstanding_holds_usd": 0.124671,
+  "combined_smoke_exposure_usd": 0.3009156,
+  "smoke_room_usd": 0.6990844,
+  "new_unresolved_holds": 0,
+  "original_smoke_receipts_preserved": 25,
+  "further_strict_checks": "PAUSED",
+  "scope": "PAUSED",
+  "CP1_ready": false,
+  "scientific_approvals_added": 0,
+  "test_source_outside_discovery_corpus": true,
+  "full_text_extraction": "UNTESTED"
+}

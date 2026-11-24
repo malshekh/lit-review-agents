@@ -94,6 +94,11 @@ def for_structured_output(schema: dict, provider: str = "anthropic") -> tuple[di
                     out[k] = kept
             else:
                 out[k] = strip(v, f"{path}.{k}") if isinstance(v, (dict, list)) else v
+        # OpenAI requires an explicit type for fixed string values. This is value-set preserving:
+        # const/enum already restricts every allowed value to a string. Never infer mixed/unknown shapes.
+        if provider == "openai" and "type" not in out and ("const" in out or "enum" in out):
+            values=[out["const"]] if "const" in out else out["enum"]
+            if values and all(isinstance(value,str) for value in values):out["type"]="string"
         # Anthropic rejects enum + a list-valued type, even for a valid nullable string enum.
         # Encode exactly the same allowed values as typed branches; do not relax or drop an enum.
         if provider == "anthropic" and isinstance(out.get("type"), list) and "enum" in out:
