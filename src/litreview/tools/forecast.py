@@ -174,22 +174,25 @@ def a10(F: int, cfg: dict, budget, route, s: dict, bytes_per_token: float | None
     return usd, calls
 
 
-def calibrated_line(stage: str, F: int, cfg: dict, budget, route, done_share: float = 0.0) -> dict:
+def calibrated_line(stage: str, F: int, cfg: dict, budget, route, done_share: float = 0.0,
+                    words: int | None = None) -> dict:
     """The runtime projection line for A07 or A10: calibrated baseline plus the uncertainty margin as `usd`;
     every scenario; the strict adverse figure; calls = the most the configured loops allow."""
     fc = cfg.get("forecast") or {}
     scen = fc.get("scenarios") or {}
     margin = float(fc.get("uncertainty_margin", 0.30))
     fn = a07 if stage == "A07-SYN" else a10
-    figures = {name: fn(F, cfg, budget, route, s)[0] for name, s in scen.items()}
+    kw = {"words": words} if stage != "A07-SYN" and words else {}
+    figures = {name: fn(F, cfg, budget, route, s, **kw)[0] for name, s in scen.items()}
     if stage == "A07-SYN":
         adverse, calls = a07(F, cfg, budget, route, None)
     else:
-        adverse, calls = a10(F, cfg, budget, route, scen["adverse"], bytes_per_token=1.8)
+        adverse, calls = a10(F, cfg, budget, route, scen["adverse"], bytes_per_token=1.8, **kw)
     left = 1.0 - done_share
     baseline = figures.get("baseline", adverse) * left
     source = ("provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency)"
-              if stage == "A07-SYN" else "production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10)")
+              if stage == "A07-SYN" else "production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10)"
+              + (f", scaled to the outline's {words:,} words" if kw else ""))
     return {"stage": stage, "basis": "CALIBRATED_FORECAST", "validation": validation(findings=F),
             "calls": max(0, round(calls * left)),
             "usd": round(baseline * (1 + margin), 4), "baseline_usd": round(baseline, 4), "uncertainty_margin": margin,

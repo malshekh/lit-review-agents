@@ -301,11 +301,21 @@ class VerificationJob:
             for o in self.occurrences[start:start+size]:
                 trial=packet+[o]
                 if not self.admitted('LOCAL',self.local_payload(trial)):
-                    if not packet:raise JobStopped('single A10 occurrence exceeds admission; inspect broad claim/bindings')
+                    if not packet:raise JobStopped(self._too_large(o))
                     yield packet;packet=[o]
-                    if not self.admitted('LOCAL',self.local_payload(packet)):raise JobStopped('single A10 occurrence exceeds admission')
+                    if not self.admitted('LOCAL',self.local_payload(packet)):raise JobStopped(self._too_large(o))
                 else:packet=trial
             if packet:yield packet
+
+    def _too_large(self, occurrence):
+        """Why one occurrence cannot be verified in one request: which text, how many findings it pulls in, how big."""
+        payload = self.local_payload([occurrence])
+        b, fids = self.bound(occurrence)
+        text = str(occurrence.get('text') or '')[:160]
+        return (f"single A10 occurrence exceeds admission: {occurrence['occurrence_id']} at {'/'.join(map(str, occurrence['path']))} "
+                f"(\"{text}\") binds {len(fids)} findings from {len({self.registry.record_of.get(f) for f in fids})} papers; "
+                f"request bound {self.count(payload):,} + output {self.cap('LOCAL'):,} over the {self.cfg['context_ceiling_tokens']:,} ceiling. "
+                "A sentence citing whole papers pulls in every finding of each; cite the findings it rests on, or split it")
 
     def local(self, packet):
         payload = self.local_payload(packet)

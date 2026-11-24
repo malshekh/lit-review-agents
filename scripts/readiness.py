@@ -122,6 +122,22 @@ def main(argv: list[str] | None = None) -> int:
                             "combinations_to_confirm": len(todo), "worst_case_usd": round(usd, 4),
                             "command": f"litreview smoke-test --approve-usd {max(1.0, round(usd * 1.5, 2))} --by \"<your name>\""}
     print(f"{'smoke_test':14s} NOT RUN  {len(todo)} combinations, worst case ${usd:.2f}; needs your approval")
+    import subprocess as sp
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    d = sp.run([sys.executable, "-B", str(ROOT / "scripts" / "rehearse_pilot7.py")], cwd=ROOT, env=env, capture_output=True, text=True,
+               encoding="utf-8")
+    tail = d.stdout[d.stdout.rfind("
+{"):] if "
+{" in d.stdout else "{}"
+    try:
+        discovery = json.loads(tail)
+    except ValueError:
+        discovery = {"passed": False, "error": (d.stderr or d.stdout)[-800:]}
+    result["discovery_rehearsal"] = {"passed": d.returncode == 0 and discovery.get("passed") is True,
+                                     **{k: discovery.get(k) for k in ("checkpoints_approved", "final_status", "calls_by_agent",
+                                                                      "checks", "replay_findings_dropped_for_schema", "error")}}
+    print(f"{'discovery':14s} {'PASS' if result['discovery_rehearsal']['passed'] else 'FAIL'}  pilot7 route scope -> export, "
+          f"checkpoints {discovery.get('checkpoints_approved')}")
     result["rehearsal"] = rehearsal(15)
     print(f"{'rehearsal':14s} {'PASS' if result['rehearsal']['passed'] else 'FAIL'}  15 papers, "
           f"{result['rehearsal']['findings']} findings, A10 {result['rehearsal']['a10_release']}, checks {result['rehearsal']['checks']}")

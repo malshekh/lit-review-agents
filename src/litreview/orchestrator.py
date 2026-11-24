@@ -1245,7 +1245,11 @@ class Run:
         settings = config.run_settings(self.state().get("profile"))
         if settings.get("stage_caps_usd") != "derived":
             return
-        stage_usd = {x["stage"]: x["usd"] for x in proj.get("lines", []) if x.get("stage") in self.cfg["agents"]}
+        stage_usd: dict[str, float] = {}
+        for x in proj.get("lines", []):   # per-paper lines are named by work, not agent: map them to their stage
+            agent = x.get("stage") if x.get("stage") in self.cfg["agents"] else                 "A05-KE" if str(x.get("stage", "")).startswith(("A05", "A06")) else None
+            if agent and x.get("usd") is not None:
+                stage_usd[agent] = stage_usd.get(agent, 0.0) + float(x["usd"])
         spent = {}
         for e in self.budget.entries():   # stages already paid for keep at least what they spent
             spent[e["agent"]] = spent.get(e["agent"], 0.0) + (e["cost_usd"] or 0.0)

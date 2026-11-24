@@ -29,9 +29,9 @@ profiles:
     stage_caps_usd: derived
     recovery_allowance: 0.15
   pilot7:        # paid end-to-end pilot: the pipeline finds its own 7 papers from the outline (docs/pilot7)
-    target_usd: 30.0
-    spend_cap_usd: 40.0
-    spend_review_points_usd: [20.0, 30.0]
+    target_usd: 48.0                   # the CP2 projection for 7 papers and 1,600 words, margin included ($47.79 in rehearsal)
+    spend_cap_usd: 65.0                # its stage sub-caps with 25% recovery ($60.67) + smoke test $1.00; never moves in a run
+    spend_review_points_usd: [25.0, 48.0]
     stage_caps_usd: derived
     recovery_allowance: 0.25
     smoke_test_allowance_usd: 1.0
@@ -250,7 +250,10 @@ validation:
   truncation_retries: 1
   instability_test: true
 scientific_verification:
-  context_ceiling_tokens: 240000
+  # Checked against the UTF-8 byte bound of the request, which overstates tokens about 2.3x. 400,000 bytes is about
+  # 175,000 tokens: inside GPT-6.1's 1,050,000-token window and under its 272,000-token long-context price tier.
+  # It was 240,000; the pilot rehearsal found one grouped sentence over two full-text papers at 247,537 (2026-11-23).
+  context_ceiling_tokens: 400000
   max_occurrences_per_packet: 12
   max_global_entries_per_page: 128
   output_limits:

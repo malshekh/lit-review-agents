@@ -44,7 +44,7 @@ def run(tmp_path, monkeypatch):
 
 
 def test_a_discovery_run_has_the_outline_no_corpus_and_its_profile(run):
-    assert run.cfg["run_spec"]["max_papers"] == 7 and run.budget.cap == 40.0
+    assert run.cfg["run_spec"]["max_papers"] == 7 and run.budget.cap == 65.0
     spec = json.loads((run.dir / "input" / "run_spec.json").read_text())
     assert spec["mode"] == "DISCOVERY" and spec["max_papers"] == 7
     assert run_spec.load(run.dir) == (OUTLINE, None)
@@ -177,3 +177,16 @@ def test_chapter_lengths_are_measured_against_the_outline():
     rep = run_spec.chapter_word_report(OUTLINE, sections, compliance.word_count)
     assert rep[0]["written"] == 800 and rep[0]["within_tolerance"]
     assert rep[1]["written"] == 300 and not rep[1]["within_tolerance"] and rep[1]["by_subsection"]["S2.1"] == 300
+
+
+def test_cp2_projection_prices_verification_for_the_outline_and_caps_every_stage(run, monkeypatch):
+    """Found by the rehearsal: A10 was priced for a 5,000-word manuscript, and the per-paper lines (named by work, not
+    by agent) left extraction and validation without a sub-cap."""
+    from litreview.tools import cost_projection
+    sel = [{"record_id": f"R{i:04d}", "pmcid": f"PMC{i}" if i < 7 else None} for i in range(1, 8)]
+    proj = cost_projection.for_selection(cost_projection.load_rates(), sel, run.dir, run.budget, run.route, run.cfg)
+    a10 = next(x for x in proj["lines"] if x["stage"] == "A10-RV")
+    assert "scaled to the outline's 1,600 words" in a10["detail"] and a10["usd"] < 20
+    run._derive_stage_caps(proj)
+    caps = run.load("stage_caps.json")["caps_usd"]
+    assert "A05-A06" in caps and caps["A05-A06"] > 0

@@ -149,7 +149,8 @@ def _worst(budget, route, agent: str, calls: int, input_tokens: int, cache_write
                       f"+ {m.max_tokens:,} output at max_tokens) on {m.model}"}
 
 
-def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inputs: dict | None = None) -> list[dict]:
+def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inputs: dict | None = None,
+               words: int | None = None) -> list[dict]:
     """A07 to A12 for a corpus of n_findings validated findings: each line's `usd` is the calibrated baseline plus
     the forecast's uncertainty margin (pipeline.yaml -> forecast), with `adverse_usd` and every scenario alongside;
     `calls` is the most the configured loops allow. Spend beyond a line supersedes the projection before the next
@@ -161,7 +162,7 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inp
     expected = 2 + A07_GROUP_CALLS(n_findings) + math.ceil(A07_PROPOSITIONS_PER_FINDING * n_findings
                                                             / int(syn.get("reconcile_page_size", 32)))
     a07 = calibrated_line("A07-SYN", n_findings, cfg, budget, route, done_share=min(1.0, a07_done / expected))
-    a10 = calibrated_line("A10-RV", n_findings, cfg, budget, route)
+    a10 = calibrated_line("A10-RV", n_findings, cfg, budget, route, words=words)
     # A08, A09, A11 and A12 from the bridge's bounded request builders (downstream_projection.py)
     from .downstream_projection import lines as bridge_lines
     a08, a09, a11, a12 = bridge_lines(budget, route, cfg, n_findings, inputs)
@@ -207,6 +208,13 @@ def _batched(units: list[float], factor: float) -> float:
     return (units[0] + sum(units[1:]) * factor) if units else 0.0
 
 
+def _outline_words(run_dir) -> int | None:
+    """The manuscript length the researcher's outline asks for, when the run has one (verification scales with it)."""
+    from .. import run_spec
+    outline, _ = run_spec.load(Path(run_dir))
+    return run_spec.total_words(outline) if outline else None
+
+
 def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, route, cfg: dict) -> dict:
     """Projection for a CP2 selection: measured per-paper and per-theme rates, worst-case downstream."""
     lines, n_findings, by_level = [], 0, {"ABSTRACT": 0, "FULL_TEXT": 0}
@@ -235,7 +243,7 @@ def for_selection(rates: dict, selection: list[dict], run_dir: Path, budget, rou
                   "usd": round(themes * rates["per_theme"]["p90_usd"], 4),
                   "detail": f"{themes} themes ({rates['themes_per_paper']} per paper measured) x "
                             f"${rates['per_theme']['p90_usd']:.4f}"})
-    lines += downstream(budget, route, cfg, n_findings)
+    lines += downstream(budget, route, cfg, n_findings, words=_outline_words(run_dir))
     return _total(lines, budget, {"papers": len(selection), "by_level": by_level, "findings_assumed": n_findings})
 
 
@@ -319,7 +327,8 @@ def remaining_for_run(run, rates: dict | None = None, in_flight: frozenset = fro
         done = len(Ledger(jobs[-1]).state()["committed"]) if jobs else 0
     # every downstream agent whose last stage is still ahead (A10 verifies through finalize)
     lines += [x for x in downstream(run.budget, run.route, run.cfg, n_findings, a07_done=done,
-                                    inputs=_bridge_inputs(run) if at > STAGES.index("cp3") else None)
+                                    inputs=_bridge_inputs(run) if at > STAGES.index("cp3") else None,
+                                    words=_outline_words(run.dir))
               if STAGES.index(AGENT_LAST_STAGE[x["stage"]]) >= at]
     return _total(lines, run.budget, {"stage": stage, "findings": n_findings})
 
