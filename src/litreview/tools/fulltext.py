@@ -92,24 +92,48 @@ def verify_cached_source(record, sections, source):
         raise FullTextUnavailable("Cached source body/section mapping mismatch")
 
 
-IDCONV = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
+EPMC_SEARCH = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
+# NCBI's ID converter moved (the old /pmc/utils/idconv/v1.0/ address answers 301) and the new one refused this client
+# with HTTP 403 on 2026-11-23, so it is only a fallback. Only `tool` is sent: no personal address leaves the machine.
+IDCONV = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/"
+HEADERS = {"User-Agent": "litreview/0.1", "Accept": "application/json"}
 
 
 def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[str | None, str]:
-    """(PMCID or None, why) from NCBI's ID converter, by PMID, else DOI. An error is reported, never raised: a
-    missing open-access copy is a retrieval limitation, not a failure of the run."""
-    ident = str(pmid or "").strip() or str(doi or "").strip()
-    if not ident:
+    """(PMCID or None, why). Europe PMC first (the service the full text is fetched from), by PMID, else DOI; then NCBI's
+    ID converter. An error is reported, never raised: a missing open-access copy is a retrieval limitation, not a
+    failure of the run."""
+    pmid, doi = str(pmid or "").strip(), str(doi or "").strip()
+    if not pmid and not doi:
         return None, "no PMID or DOI to look up"
+    query = f"EXT_ID:{pmid} AND SRC:MED" if pmid else f'DOI:"{doi}"'
+    reasons = []
     try:
-        r = requests.get(IDCONV, params={"ids": ident, "format": "json", "tool": "litreview"}, timeout=timeout)
-        if r.status_code != 200:
-            return None, f"ID converter HTTP {r.status_code}"
-        recs = r.json().get("records") or []
+        r = requests.get(EPMC_SEARCH, params={"query": query, "format": "json", "resultType": "lite", "pageSize": 5},
+                         timeout=timeout, headers=HEADERS)
+        if r.status_code == 200:
+            hits = (r.json().get("resultList") or {}).get("result") or []
+            pmcid = next((h.get("pmcid") for h in hits if h.get("pmcid")), None)
+            if pmcid:
+                return pmcid, "found (Europe PMC)"
+            reasons.append("Europe PMC lists no PMC copy" if hits else "Europe PMC has no record")
+        else:
+            reasons.append(f"Europe PMC HTTP {r.status_code}")
     except (requests.RequestException, ValueError) as exc:
-        return None, f"ID converter unavailable: {type(exc).__name__}"
-    pmcid = next((x.get("pmcid") for x in recs if x.get("pmcid")), None)
-    return (pmcid, "found") if pmcid else (None, "no PMC copy listed for this identifier")
+        reasons.append(f"Europe PMC unavailable: {type(exc).__name__}")
+    try:
+        r = requests.get(IDCONV, params={"ids": pmid or doi, "format": "json", "tool": "litreview"}, timeout=timeout,
+                         headers=HEADERS)
+        if r.status_code == 200:
+            pmcid = next((x.get("pmcid") for x in r.json().get("records") or [] if x.get("pmcid")), None)
+            if pmcid:
+                return pmcid, "found (NCBI ID converter)"
+            reasons.append("NCBI lists no PMC copy")
+        else:
+            reasons.append(f"NCBI ID converter HTTP {r.status_code}")
+    except (requests.RequestException, ValueError) as exc:
+        reasons.append(f"NCBI ID converter unavailable: {type(exc).__name__}")
+    return None, "; ".join(reasons)
 
 
 def fetch_verified_sections(record, timeout=60):

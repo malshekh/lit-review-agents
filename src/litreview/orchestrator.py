@@ -1336,7 +1336,7 @@ class Run:
             pmcid = rec.get("pmcid")
             if not pmcid:
                 pmcid, why = find_pmcid(rec.get("pmid"), rec.get("doi"))
-                entry["attempts"].append({"source": "NCBI ID converter", "outcome": "FOUND" if pmcid else "NOT_FOUND",
+                entry["attempts"].append({"source": "PMC identifier lookup", "outcome": "FOUND" if pmcid else "NOT_FOUND",
                                           "detail": pmcid or why})
             if pmcid:
                 try:

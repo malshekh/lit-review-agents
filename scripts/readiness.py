@@ -126,9 +126,8 @@ def main(argv: list[str] | None = None) -> int:
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     d = sp.run([sys.executable, "-B", str(ROOT / "scripts" / "rehearse_pilot7.py")], cwd=ROOT, env=env, capture_output=True, text=True,
                encoding="utf-8")
-    tail = d.stdout[d.stdout.rfind("
-{"):] if "
-{" in d.stdout else "{}"
+    marker = "\n{"   # the rehearsal's JSON summary is the last object it prints
+    tail = d.stdout[d.stdout.rfind(marker) + 1:] if marker in d.stdout else "{}"
     try:
         discovery = json.loads(tail)
     except ValueError:

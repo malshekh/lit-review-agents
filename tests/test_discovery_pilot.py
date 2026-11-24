@@ -190,3 +190,23 @@ def test_cp2_projection_prices_verification_for_the_outline_and_caps_every_stage
     run._derive_stage_caps(proj)
     caps = run.load("stage_caps.json")["caps_usd"]
     assert "A05-A06" in caps and caps["A05-A06"] > 0
+
+
+def test_pmcid_lookup_uses_europe_pmc_then_ncbi_and_reports_why_not(monkeypatch):
+    from conftest import FakeResp
+    from litreview.tools import fulltext
+    import requests
+    calls = []
+
+    def get(url, params=None, timeout=None, headers=None):
+        calls.append(url)
+        assert headers["User-Agent"] == "litreview/0.1" and "email" not in (params or {})
+        if "europepmc" in url:
+            pmcid = "PMC8508702" if "34638842" in params["query"] else None
+            return FakeResp({"resultList": {"result": [{"pmid": "x", "pmcid": pmcid}]}})
+        return FakeResp(None, 403)
+    monkeypatch.setattr(requests, "get", get)
+    assert fulltext.find_pmcid("34638842", None) == ("PMC8508702", "found (Europe PMC)") and len(calls) == 1
+    pmcid, why = fulltext.find_pmcid("27006494", None)
+    assert pmcid is None and why == "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403"
+    assert fulltext.find_pmcid(None, None) == (None, "no PMID or DOI to look up")

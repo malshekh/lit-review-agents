@@ -1,29 +1,29 @@
 {
-  "checked_at": "2026-11-23T17:45:15",
-  "git_commit": "2da1a5e54ac04ba480e1ccbe08959ebe5cb33b83",
+  "checked_at": "2026-11-23T19:13:48",
+  "git_commit": "c440d461599e354a77c0bc968d80ac9bfc9a5a7d",
   "faults": {
     "passed": true,
-    "summary": "66 passed in 7.63s",
+    "summary": "66 passed in 7.43s",
     "failures": []
   },
   "resume": {
     "passed": true,
-    "summary": "18 passed in 44.92s",
+    "summary": "18 passed in 44.11s",
     "failures": []
   },
   "accounting": {
     "passed": true,
-    "summary": "68 passed in 65.57s (0:01:05)",
+    "summary": "68 passed in 67.86s (0:01:07)",
     "failures": []
   },
   "budget": {
     "passed": true,
-    "summary": "15 passed in 1.22s",
+    "summary": "15 passed in 1.32s",
     "failures": []
   },
   "specification": {
     "passed": true,
-    "summary": "40 passed in 1.49s",
+    "summary": "40 passed in 1.46s",
     "failures": []
   },
   "smoke_test": {
@@ -33,13 +33,54 @@
     "worst_case_usd": 0.4391,
     "command": "litreview smoke-test --approve-usd 1.0 --by \"<your name>\""
   },
+  "discovery_rehearsal": {
+    "passed": true,
+    "checkpoints_approved": [
+      "CP1",
+      "CP2",
+      "CP_EARLY",
+      "CP_SYN",
+      "CP3",
+      "CP_LEDGER"
+    ],
+    "final_status": "COMPLETE",
+    "calls_by_agent": {
+      "A02-SP": 1,
+      "A03-LM": 1,
+      "A04-CQ": 3,
+      "A05-KE": 7,
+      "A06-SV": 32,
+      "A07-SYN": 14,
+      "A08-OL": 1,
+      "A09-WRI": 11,
+      "A10-RV": 12,
+      "A11-RC": 2,
+      "A12-EDI": 4
+    },
+    "checks": {
+      "reached_export": true,
+      "outline_framework": true,
+      "seven_papers_frozen": true,
+      "every_paper_retrieval_logged": true,
+      "early_check_ran": true,
+      "plan_uses_outline": true,
+      "chapter_lengths_reported": true,
+      "a10_complete": true,
+      "pilot_report_written": true
+    },
+    "replay_findings_dropped_for_schema": {
+      "R0001": 1,
+      "R0005": 2
+    },
+    "error": null
+  },
   "rehearsal": {
     "papers": 15,
     "findings": 211,
     "calls": {
       "A08-OL": 1,
       "A09-WRI": 13,
-      "A10-RV": 24,
+      "A10-RV": 20,
       "A11-RC": 2,
       "A12-EDI": 4
     },
