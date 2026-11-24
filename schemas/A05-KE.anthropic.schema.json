@@ -84,22 +84,31 @@
           }
         },
         "human_design": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
         },
         "trial_phase": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
         },
         "registration_id": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "maxItems": 1,
+          "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
         },
         "funding_and_conflicts": {
           "type": "string"
@@ -125,22 +134,31 @@
             "type": "string"
           },
           "molecule_species": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "measured_at": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "identity_relation": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "status_source": {
             "type": "string"
@@ -549,16 +567,22 @@
             ]
           },
           "predicate_detail": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "object_entity_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "polarity": {
             "type": "string",
@@ -630,10 +654,13 @@
             }
           },
           "bridge": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "quantities": {
             "type": "array",
@@ -657,22 +684,31 @@
                   "minLength": 1
                 },
                 "variance_or_ci": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 0,
+                  "maxItems": 1,
+                  "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
                 },
                 "p_value": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 0,
+                  "maxItems": 1,
+                  "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
                 },
                 "n": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 0,
+                  "maxItems": 1,
+                  "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
                 },
                 "converted": {
                   "anyOf": [
@@ -719,10 +755,13 @@
             "type": "boolean"
           },
           "attributed_to": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "subthemes": {
             "type": "array",
@@ -734,16 +773,22 @@
             "type": "boolean"
           },
           "emerging_note": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           },
           "knowledge_assist": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 0,
+            "maxItems": 1,
+            "description": "Nullable string transport: [] means canonical null; [text] preserves the exact reported string. Never invent a value."
           }
         },
         "required": [
@@ -772,62 +817,7 @@
           "emerging_note",
           "knowledge_assist"
         ],
-        "additionalProperties": false,
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "predicate": {
-                  "const": "OTHER_SPECIFIED"
-                }
-              },
-              "required": [
-                "predicate"
-              ]
-            },
-            "then": {
-              "required": [
-                "predicate_detail"
-              ],
-              "properties": {
-                "predicate_detail": {
-                  "type": "string",
-                  "minLength": 3
-                }
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "predicate": {
-                  "not": {
-                    "enum": [
-                      "HALF_LIFE",
-                      "MAXIMUM_TOLERATED_DOSE",
-                      "OBSERVED_OUTCOME",
-                      "TOLERATED"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "predicate"
-              ]
-            },
-            "then": {
-              "required": [
-                "object_entity_id"
-              ],
-              "properties": {
-                "object_entity_id": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
-          }
-        ]
+        "additionalProperties": false
       }
     },
     "author_stated_limitations": {

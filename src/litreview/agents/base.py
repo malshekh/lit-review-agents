@@ -383,6 +383,11 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             break
         try:
             output = parse_json(resp.text)
+            if agent_id == "A05-KE" and call_model.provider == "anthropic" and _provider_response_schema(agent_id, schema_file, call_model.provider, call_model.model):
+                from ..tools.extraction_transport import decode
+                output, decoded_paths = decode(output)
+                provenance.tool_run("a05_nullable_transport", step, {"decoded_paths": decoded_paths,
+                    "raw_response": f"outputs/{step}.raw{attempt}.txt", "scientific_values_changed": False})
             validate(agent_id, output, schema_file)
         except (json.JSONDecodeError, jsonschema.ValidationError) as exc:
             last_error = str(exc)[:2000]
