@@ -4,7 +4,7 @@ from build_pilot7_cp3_runtime import DEST as OLD
 from build_pilot7_cp_syn_runtime import RUN,seal
 from build_pilot7_readiness_runtime import REPO,git
 
-DEST=OLD.with_name('execution-20261125-v38-pilot7-a07-group-import-50usd')
+DEST=OLD.with_name('execution-20261125-v38b-pilot7-a07-group-import-50usd')
 PIN='b1fb02a129eb50f2322792cef0000b0d63335fb479a4ec760f78b72936d0d23b'
 if __name__=='__main__':
     assert sys.dont_write_bytecode and not git('status','--porcelain').strip() and not DEST.exists()
@@ -27,4 +27,4 @@ if __name__=='__main__':
     assert len(json.loads((run/'reservations.json').read_bytes()))==5
     assert (run/'data/researcher_decisions/T8_closed.json').is_file()
     before={p.relative_to(run).as_posix():sha(p) for p in run.rglob('*') if p.is_file()}
-    seal(OLD,DEST,manifest,before,PIN,'v37','v38',Path(__file__),'CP3')
+    seal(OLD,DEST,manifest,before,PIN,'v37','v38b',Path(__file__),'CP3')
