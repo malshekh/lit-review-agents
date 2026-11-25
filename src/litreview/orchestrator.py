@@ -2726,6 +2726,12 @@ class Run:
                 plan = job._committed("PLAN")
                 payload = {**payload, "cp_syn_researcher_decision": decision,
                            "reviewed_organization_proposals": plan["theme_change_proposals"]}
+            if mode == "GROUP":
+                payload = {**payload, "coverage_instruction": (
+                    "For satisfies use exact IDs from group.manifest_item_ids only. Assign each fulfilled "
+                    "obligation once to the proposition or gap that fulfills it. Leave satisfies empty "
+                    "elsewhere. Use source_item_ids for source links. A paper with usable evidence needs "
+                    "a proposition citing its eligible finding. Keep unknown study independence explicit.")}
             tokens, limit, usd = self._a07_quote(mode, payload, count)
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")

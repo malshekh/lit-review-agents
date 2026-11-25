@@ -5,6 +5,7 @@ Scientific contradictions remain explicit limitations; unsupported interpretatio
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -85,18 +86,26 @@ class RegistrySynthesisJob(SynthesisJob):
         out = super()._committed(turn)
         if out is not None:
             marker = self._marker(turn)
+            if marker and turn.startswith("GROUP_") and marker["event"] == "TURN_IMPORTED_REPAIR":
+                proof = marker.get("import_record", {})
+                if (fingerprint(proof) != marker.get("import_record_sha256") or proof.get("fingerprint") != self.identity
+                        or proof.get("registry") != self.registry.digest or proof.get("group") != turn[6:]
+                        or proof.get("run_id") != self.dir.parent.parent.name or proof.get("job") != self.dir.name):
+                    raise JobStopped("GROUP recovery provenance mismatch")
             if not marker or fingerprint(out) != marker["output_sha256"]:
                 raise JobStopped(f"accepted turn hash mismatch: {turn}")
         return out
 
-    def _commit(self, turn, output, staged):
+    def _commit(self, turn, output, staged, import_record=None):
         # One commit event carries all effects. No orphaned staging effects can be replayed twice.
         path = self._turn_file(turn)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(canonical(output), encoding="utf-8")
         os.replace(tmp, path)
-        self.ledger.append({"event": "TURN_ACCEPTED", "turn": turn, "model": self.served_by(),
-                            "output_sha256": fingerprint(output), **staged})
+        origin = ({"event": "TURN_IMPORTED_REPAIR", "model": "researcher-approved offline recovery",
+                   "import_record": import_record, "import_record_sha256": fingerprint(import_record)}
+                  if import_record is not None else {"event": "TURN_ACCEPTED", "model": self.served_by()})
+        self.ledger.append({**origin, "turn": turn, "output_sha256": fingerprint(output), **staged})
 
     @staticmethod
     def empty():
@@ -283,6 +292,39 @@ class RegistrySynthesisJob(SynthesisJob):
         if self._committed(turn):
             return
         out, retrieved = self._with_retrieval("GROUP", turn, self.registry.packet_payload(packet))
+        self._accept_group(packet, out, retrieved)
+
+    def import_group(self, group_id, candidate_bytes, approval):
+        """Import one explicitly reviewed packet through the same checks as its first reading."""
+        run = self.dir.parent.parent
+        turn = "GROUP_" + group_id
+        candidate_hash = hashlib.sha256(candidate_bytes).hexdigest()
+        plan = self._committed("PLAN")
+        if (not plan or approval["run_id"] != run.name or approval["job"] != self.dir.name
+                or approval["group"] != group_id or approval["candidate_sha256"] != candidate_hash
+                or approval["fingerprint"] != self.identity or approval["registry"] != self.registry.digest
+                or approval["plan_sha256"] != fingerprint(plan)):
+            raise JobStopped("GROUP import identity mismatch")
+        checkpoint = (run / "checkpoints/CP_SYN_approved.json").read_bytes()
+        decision = json.loads(checkpoint)
+        if (hashlib.sha256(checkpoint).hexdigest() != approval["cp_syn_approved_sha256"]
+                or decision["fingerprint"] != self.identity or not decision["approve_alignment"]
+                or not decision["keep_approved_framework"]):
+            raise JobStopped("GROUP import requires the bound CP_SYN approval")
+        packet = next((p for p in self.packets if p["group_id"] == group_id), None)
+        if packet is None or packet not in plan["groups"]:
+            raise JobStopped("GROUP import packet absent from approved plan")
+        committed = self._committed(turn)
+        if committed is not None:
+            if self._marker(turn).get("import_record") != approval:
+                raise JobStopped("GROUP already committed under a different identity")
+            return
+        out = json.loads(candidate_bytes)
+        self.validate_output("GROUP", out)
+        self._accept_group(packet, out, set(), import_record=approval)
+
+    def _accept_group(self, packet, out, retrieved, import_record=None):
+        turn = "GROUP_" + packet["group_id"]
         gap_limit = 16 if packet.get("source_only") else 8
         if len(out["knowledge_gaps"]) > gap_limit:
             raise JobStopped("packet knowledge-gap output bound exceeded")
@@ -317,7 +359,7 @@ class RegistrySynthesisJob(SynthesisJob):
             if not any(f == fid for f, _ in staged["finding_uses"]):
                 staged["finding_uses"].append((fid, "GAP"))
         self._commit(turn, {**out, "propositions": props, "knowledge_gaps": gaps,
-                            "_group_id": packet["group_id"]}, staged)
+                            "_group_id": packet["group_id"]}, staged, import_record=import_record)
 
     def _all_props(self):
         return [p for t in self.ledger.state()["committed"] if t.startswith("GROUP_") and "_LOOKUP" not in t
