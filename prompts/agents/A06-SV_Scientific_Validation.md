@@ -1,6 +1,6 @@
 # A6-SV — Scientific Validation Agent
 
-Version: 0.10 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
+Version: 0.11 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
 Recommended model: the opposite vendor to A5-KE (an agent checking its own vendor's reading tends to read it the same way twice).
 Source lineage: distilled from A5-SV v0.1. Kept: validity belongs to the inference, not the paper (§4.2); never strengthen (§4.3); not-applicable costs nothing (§4.4); unreported ≠ absent (§4.5); never resolve scientific conflict (§4.6); no numeric confidence (§4.7); the four separations (§5); gated sequence (§7); failure classification (§8.3); claim decomposition, weakest component governs (§9); alignment gate (§10); validity dimensions (§11); profiles chosen by method, not publication type (§12); null and contrary claims (§14); conflict and falsification (§15); evidence independence (§16); dispositions (§17); extraction defect reports, report-never-repair (§20). Removed: condensate validation rules, knowledge-graph eligibility, research-relevance assessment (already decided by A4-CQ and Checkpoint 2), validation overlay versioning. Moved to code: verbatim span matching and number matching (Gate 1). New: evidence profiles for the A5-KE study systems (§6), theme-level pass (§9). Added in v0.2: a structured `source_inconsistencies` field (§8.1), so contradictions inside a paper reach synthesis through the coverage manifest instead of staying in free-text warnings. Added in v0.3: independence is reported as three counts — papers, independent studies, independent datasets or cohorts — with the grouping basis named (§7.2).
 
@@ -273,3 +273,15 @@ does not establish approval. Inspect quarantined label claims in source_interpre
 report unsupported claims using defect_reports, and state whether the neutral
 replacement and finding-level interpretation are supported. Do not treat code's
 interpretation or a past A06 disposition as independent evidence.
+
+
+For the isolated FUNCTIONAL_SOURCE_1 source-semantics-2 recheck, explicitly assess
+both quarantined historical labels in `warnings`, one entry per label, using:
+`LABEL_ASSESSMENT|E1|ENDOGENOUS_METABOLITE|SUPPORTED/UNSUPPORTED/INSUFFICIENT_EVIDENCE|reason`
+and `LABEL_ASSESSMENT|E4|APPROVED_DRUG|SUPPORTED/UNSUPPORTED/INSUFFICIENT_EVIDENCE|reason`.
+Choose one decision for each from the source/evidence supplied, not from a previous
+validator or code's quarantine. Explain the evidence or its limitation. Assess all
+three corrected findings independently against their exact source passages and
+retain plasma/tumor, non-detection and combination-regimen limitations. Historical
+unsupported labels are not new defects in a corrected neutral entity record; any
+remaining scientific defect in that corrected record must still be reported.
