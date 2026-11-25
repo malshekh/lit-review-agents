@@ -1,6 +1,6 @@
 # A3-LM — Literature Mining Agent
 
-Version: 0.6 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
+Version: 0.7 (draft) · Role: STAGE · Follows: Checkpoint 1 · Precedes: A4-CQ
 Source lineage: distilled from A2-LM v0.1 (access-contract version, incl. Appendix H). Kept: governing rule, retrieval/judgement boundary, concept blocks with verified vs. model-suggested terms, query families instead of one intersection, mandatory contrary-evidence families, precision controls, zero-result diagnosis, review channel, citation count ≠ quality. Removed: mechanistic link tags, drug/target/condensate concept blocks, LLPS terminology safeguards, source registry and access-state machinery, A3-CQ delegation loop, task-scoped appendices. Restored from A2-LM §7 in v0.2: an explicit database registry and source routing (now in `config/sources.yaml`). Added in v0.2: study-context blocks (organism, study system, entity type). Changed in v0.3: required sources are named (PubMed, Europe PMC and OpenAlex on every core and contrary family; Semantic Scholar recommendations on at least one family), and §4.4 gives a tested syntax example per source — a test run had compiled no OpenAlex queries and one Semantic Scholar query. Moved to code: API calls, pagination, rate limits, deduplication, retraction checks, citation expansion.
 
 Read together with `prompts/shared/core_rules.md`.
@@ -197,3 +197,17 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 ## Authoritative corpus-mode exception
 
 The input `corpus_policy` is deterministic run authority, confirmed at CP1. In FIXED_CORPUS mode, use only KNOWN_ITEM identifier queries for its papers and authorized access levels. Generic requirements for CORE_TOPIC/CONTRARY_EVIDENCE discovery, OpenAlex discovery, Semantic Scholar recommendations and citation expansion do not apply. Do not ask the researcher to reconfirm those already-decided permissions. Preserve genuine unresolved identity/access questions with NEEDS_HUMAN_INPUT; do not infer inaccessible findings or add publications. In explicitly authorized OPEN_CORPUS mode, the normal discovery requirements remain applicable.
+
+
+## Approved CP1 scope guide
+When approved_scope_guide is supplied, it is researcher authority. Use both sensor
+design and sensor interpretation eligibility routes and all eight original theme
+questions. Give each S1.1-S2.4 question its own query family with section_ids; add
+contrary/method/context channels as needed. Combine a sensing modality/concept,
+computational task and question-specific target; alternative terms are not a
+mandatory intersection and AI need not appear. For S2.2 couple carrier/release
+with actual measurement; for S2.3 couple sensor readout with time/sampling.
+Do not start from named candidate publications or seed papers. Budget the sum of
+returned records across compiled sources within max_records_total, while searching
+each question. Record translation limitations and actual search date; do not
+infer a field-wide evidence gap from a narrow search or missing access.

@@ -336,7 +336,7 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
                                        **({"generation_mode":identity()["generation_mode"]} if active(agent_id) else {})})
             except Exception as exc:  # noqa: BLE001 — provider SDKs raise unrelated families; all end the call with a status
                 provenance.agent_call(agent_id, step, call_model.model, version, "", "FAILED")
-                keep_unknown_billing=active(agent_id) or "FUNCTIONAL_SOURCE_1" in step
+                keep_unknown_billing=active(agent_id) or "FUNCTIONAL_SOURCE_1" in step or getattr(budget, "profile", None)=="pilot7"
                 if keep_unknown_billing:
                     from ..structured import _error_text
                     (out_dir/f"{step}.error{attempt}.json").write_text(json.dumps({

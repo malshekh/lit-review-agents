@@ -420,9 +420,18 @@ class Run:
               reservation_key: str | None = None, repair_limit: int | None = None,
               truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
         from . import a06_batches, decisions
+        from .approved_scope import enrich, save_delivery
+        if getattr(self.budget, 'profile', None) == 'pilot7':
+            from .paths import REPO_ROOT
+            from .retained_hold import blocking_holds
+            hold_auth = REPO_ROOT/'pilot_retained_hold_authorization.json'
+            if hold_auth.exists() and blocking_holds(self.budget, hold_auth):
+                raise Pause('New unresolved dispatch; preserve its hold and reconcile before continuing')
+        payload = enrich(self, agent_id, payload)
         if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
             payload = {**payload, "source_access": payload.get("source_access", self.load("source_access.json", {}))}
         payload = decisions.attach(self.dir, agent_id, payload)   # applied decisions travel in the request identity
+        save_delivery(self, agent_id, step, payload)
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
             except ValueError as exc:raise Pause("A06 batch validation rejected: " + str(exc)) from exc
@@ -861,6 +870,9 @@ class Run:
             self.pause_for_checkpoint("CP1")
         spec = self.load("spec.json")
         spec["researcher_decision"] = decision
+        if decision.get('scope_guide'):
+            spec['approved_scope_guide'] = decision['scope_guide']
+            spec['central_question'] = decision['scope_guide']['organizing_question']
         if decision.get("edited_selection_criteria"):
             spec["selection_criteria"] = decision["edited_selection_criteria"]
         proposed = decision.get("edited_theme_framework") or spec.get("theme_framework")
@@ -946,6 +958,7 @@ class Run:
         self.save("search_plan.json", plan)
         self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
+        all_results = list(results)
         seeds = spec.get("search_seeds", {}).get("seed_papers", [])
         for i in range(int(self.cfg["loops"]["max_search_repairs"])):
             report = self._execution_report(plan, results, seeds)
@@ -959,12 +972,15 @@ class Run:
             self.save("search_plan.json", plan)
             self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)
+            all_results.extend(results)
+        # Repairs do not discard independently retrieved records or query yields.
+        all_results = list({(r['source'], r['family_id'], r['query']): r for r in all_results}.values())
         self.save("search_plan.json", plan)
         all_records = [Record(**{k: v for k, v in r.items() if k in Record.__dataclass_fields__})
-                       for res in results for r in res["records"]]
+                       for res in all_results for r in res["records"]]
         records, stats = deduplicate(all_records)
         self.save("records.json", records)
-        self.save("search_log.json", [{k: v for k, v in r.items() if k != "records"} for r in results])
+        self.save("search_log.json", [{k: v for k, v in r.items() if k != "records"} for r in all_results])
         self.prov.tool_run("search+dedup", "search", stats)
         return "qualify"
 
@@ -983,17 +999,25 @@ class Run:
             for src in fam.get("sources", []):
                 if src not in sources or src not in queries:
                     continue
-                res = search(src, queries[src], fam["family_id"],
-                             min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"]))
+                maximum = min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"])
+                cache_key = hashlib.sha256(json.dumps([src, queries[src], fam["family_id"], maximum]).encode()).hexdigest()
+                cached = self.load(f'search_results/{cache_key}.json')
+                if cached is not None:
+                    out.append(cached)
+                    continue
+                res = search(src, queries[src], fam["family_id"], maximum)
                 try:
                     corpus_policy.require_records(self, [r.to_dict() for r in res.records])
                 except ValueError as exc:
                     self.save("retrieval_boundary_error.json", {"source": src, "family_id": fam["family_id"],
                         "unexpected_pmids": [r.pmid for r in res.records if str(r.pmid) not in corpus_policy.fixed(self)]})
                     raise Pause(str(exc)) from exc
-                out.append({"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
-                            "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
-                            "error": res.error, "records": [r.to_dict() for r in res.records]})
+                entry = {"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
+                         "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
+                         "section_ids": fam.get('section_ids', []), "searched_at": time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+                         "error": res.error, "records": [r.to_dict() for r in res.records]}
+                self.save(f'search_results/{cache_key}.json', entry)
+                out.append(entry)
         return out
 
     @staticmethod
@@ -1065,7 +1089,10 @@ class Run:
         identities = corpus_policy.registry(records, corpus_policy.fixed(self))
         prior_registry = self.load("corpus_membership.json")
         if prior_registry is not None and prior_registry != identities:
-            raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+            from .approved_scope import registry_extension
+            if corpus_policy.fixed(self) or not registry_extension(prior_registry, identities):
+                raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+            self.save("corpus_membership.json", identities)
         if prior_registry is None:
             self.save("corpus_membership.json", identities)
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
@@ -1112,6 +1139,8 @@ class Run:
                         self.save("screening_review.json", reviews)
                     quals[r["record_id"]]["in_fixed_corpus"] = True
                     quals[r["record_id"]]["membership_source"] = "PERSISTED_RUN_POLICY"
+            from .approved_scope import extend_screened_themes
+            extend_screened_themes(self, quals, fw)
             self.save("qualifications.json", list(quals.values()))
             self._agent_human_review("A04-CQ", bid, reviews[bid])
         # Level 2: full text for records the agent could not decide from the abstract
@@ -1141,7 +1170,7 @@ class Run:
                 continue
             out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": f"FT-{rid}", "records": [
                 {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}],
-                "identifier_registry": identities}, step=f"A04-CQ_FT_{rid}")
+                "identifier_registry": identities, **self._outline_input()}, step=f"A04-CQ_FT_{rid}")
             bid = f"FT-{rid}"
             reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
             reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_FT_{rid}", input_record_ids=[rid])
@@ -1158,8 +1187,12 @@ class Run:
                     reviews[bid]["membership_claim_conflicts"] = [{"record_id": rid, "canonical_membership": True, "model_claim": False}]
                     self.save("screening_review.json", reviews)
                 quals[rid].update(in_fixed_corpus=True, membership_source="PERSISTED_RUN_POLICY")
+            from .approved_scope import extend_screened_themes
+            extend_screened_themes(self, quals, fw)
             self.save("qualifications.json", list(quals.values()))
             self._agent_human_review("A04-CQ", bid, reviews[bid])
+        from .approved_scope import extend_screened_themes
+        extend_screened_themes(self, quals, fw)
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
 
@@ -1369,7 +1402,8 @@ class Run:
         """{"researcher_outline": ...} for the agents before A08, in an outlined run; {} otherwise."""
         from . import run_spec
         outline, _ = run_spec.load(self.dir)
-        return {"researcher_outline": run_spec.outline_brief(outline)} if outline else {}
+        from .approved_scope import enrich
+        return enrich(self, 'A03-LM', {"researcher_outline": run_spec.outline_brief(outline)}) if outline else {}
 
     def _propose_selection(self, quals: list[dict]) -> None:
         """A discovery run: propose the corpus from the screening results and pre-mark it in CP2_records.csv. Only
@@ -2819,7 +2853,9 @@ class Run:
             from . import run_spec
             outline, _ = run_spec.load(self.dir)
             if outline:
-                extra, coverage = run_spec.plan_problems(plan, outline)
+                from .approved_scope import writing_outline, heading_problems
+                extra, coverage = run_spec.plan_problems(plan, writing_outline(self, outline))
+                extra += heading_problems(self, plan)
                 problems = problems + extra
                 queue = run_spec.unmapped(ledger)
                 self.save("unmapped_evidence.json", {"status": "NEEDS_RESEARCHER_REVIEW" if queue else "EMPTY",
@@ -3092,9 +3128,11 @@ class Run:
         payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
         outline, _ = run_spec.load(self.dir)
         if outline:
-            payload["researcher_outline"] = outline
+            from .approved_scope import writing_outline
+            payload["researcher_outline"] = writing_outline(self, outline)
             payload["source_access"] = self.load("source_access.json", {})
-        return payload
+        from .approved_scope import enrich
+        return enrich(self, 'A08-OL', payload)
 
     def _sample_mode(self) -> bool:
         return False
@@ -3127,6 +3165,8 @@ class Run:
         threshold, the projection line, the runtime gate and the cap (an existing reservation, held for the call).
         Raises AdmissionRefused when the request does not fit; the caller subdivides by its fixed rule or stops."""
         from . import admission
+        from .approved_scope import enrich
+        payload = enrich(self, agent_id, payload)
         from .synthesis_registry import fingerprint
         m = self.route(agent_id, exclude)
         overrides = {}
@@ -3713,6 +3753,9 @@ class Run:
              for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
         from . import run_spec
         outline_now, _ = run_spec.load(self.dir)
+        if outline_now:
+            from .approved_scope import writing_outline
+            outline_now = writing_outline(self, outline_now)
         lengths = (run_spec.chapter_word_report(outline_now, m["sections"], compliance.word_count,
                                                 float((self.cfg.get("run_spec") or {}).get("chapter_tolerance", 0.15)))
                    if outline_now else [])
