@@ -75,3 +75,48 @@ def test_invalid_completion_chain_refused(replay,change):
         save()
     with pytest.raises(IntegrityError):verify(root,manifest)
 
+
+@pytest.mark.parametrize('damage', [None, 'raw', 'receipt', 'duplicate', 'charge', 'manifest'])
+def test_batch_receipt_across_restart(replay, damage):
+    root, manifest, rows, _, telemetry = replay
+    event = dict(rows[-1]['event'], step='A06-SV_R0058_repeat')
+    run = root/'runs'/event['run_id']
+    batch_id, custom, submission = 'batch-example', 'repeat-example', 'submission-example'
+    stage, model = event['agent'], event['model']
+    metadata = dict(run_id=run.name, stage=stage, submission_id=submission)
+    endpoint = '/v1/chat/completions'
+    folder = run/'data/batches/provider_evidence'/batch_id
+    sent = dict(custom_id=custom, body={'model':model}, method='POST', url=endpoint)
+    write_rows(folder/'submitted.jsonl', [sent])
+    local = run/'data/batches/manifests'/f'{submission}.jsonl'
+    write_rows(local, [sent])
+    metadata['manifest_sha256'] = hashlib.sha256(local.read_bytes()).hexdigest()
+    body = dict(id='chat-1', created=10, object='chat.completion', model=model,
+                choices=[dict(index=0, finish_reason='stop', message=dict(role='assistant', content='response'))],
+                usage=dict(prompt_tokens=50, completion_tokens=10, total_tokens=60))
+    reply = dict(id='batch-item', custom_id=custom, error=None,
+                 response=dict(request_id='request-1', status_code=200, body=body))
+    write_rows(folder/'responses.jsonl', [reply,reply] if damage=='duplicate' else [reply])
+    job = dict(id=batch_id, input_file_id='input-1', output_file_id='output-1', status='completed',
+               endpoint=endpoint, metadata=metadata)
+    (folder/'job.json').write_text(json.dumps(job))
+    record = dict(steps=[event['step']], status='INGESTED', batch_id=batch_id, submission_id=submission,
+                  input_file_id='input-1', custom_ids={custom:event['step']}, fingerprint=metadata,
+                  provider='openai', model=model, ingested=[event['step']])
+    (run/'data/batches'/f'{stage}.json').write_text(json.dumps([record]))
+    proof = {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in folder.iterdir()}
+    manifest['mutable_telemetry']['standard_completions']['batch_receipts'] = {batch_id:proof}
+    charge = dict(rows[-1]['charge'], step=event['step'], batch_id=batch_id, input_tokens=50, output_tokens=10,
+                  cached_input_tokens=0, cache_write_tokens=0, cache_write_1h_tokens=0)
+    charge.pop('reservation_key',None)
+    if damage=='charge':charge['output_tokens']+=1
+    write_rows(run/'costs.jsonl',[r['charge'] for r in rows]+[charge])
+    (run/'outputs'/f"{event['step']}.raw0.txt").write_text('changed' if damage=='raw' else 'response')
+    with telemetry.open('ab') as file:file.write(json.dumps(event).encode()+b'\n')
+    if damage=='receipt':(folder/'responses.jsonl').write_bytes(b'')
+    if damage=='manifest':local.write_bytes(b'')
+    if damage:
+        with pytest.raises(IntegrityError):verify(root,manifest)
+    else:
+        for _ in range(2):assert verify(root,manifest)['telemetry_appends_verified']==5
+

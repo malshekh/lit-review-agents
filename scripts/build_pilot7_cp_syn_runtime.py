@@ -41,6 +41,14 @@ def main():
     evidence=json.loads((src/'checkpoints/CP_EARLY_continuation_integrity_stop.json').read_bytes())
     assert evidence['ledger_sha256']==before['costs.jsonl'] and evidence['holds_sha256']==before['reservations.json']
     assert before.get('checkpoints/CP2_approved.json') and not before.get('checkpoints/CP_SYN_approved.json')
+    seal(OLD, DEST, manifest, before, SOURCE_PIN, 'v33', 'v34', Path(__file__))
+
+
+def seal(OLD, DEST, manifest, before, SOURCE_PIN, previous_version, version, builder):
+    from build_pilot7_readiness_runtime import REPO, git, write
+    from build_runtime import FROM_GIT, FROM_RUNTIME
+    from litreview.runtime_integrity import sha, verify
+    src = OLD/'runs'/RUN
     commit = git('rev-parse','HEAD').decode().strip()
     DEST.mkdir()
     with tarfile.open(fileobj=io.BytesIO(git('archive','--format=tar',commit,*FROM_GIT))) as archive:
@@ -52,7 +60,7 @@ def main():
         if a.is_dir():shutil.copytree(a,b)
         else:shutil.copy2(a,b)
     shutil.copy2(DEST/'scripts/runtime_bootstrap.py',DEST/'bootstrap.py')
-    new={'runtime_version':DEST.name,'git_commit':commit,'runtime_builder_sha256':sha(Path(__file__)),
+    new={'runtime_version':DEST.name,'git_commit':commit,'runtime_builder_sha256':sha(builder),
          'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,'stop_at':'CP_SYN',
          'built_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
          'mutable_telemetry':manifest['mutable_telemetry'],
@@ -63,12 +71,12 @@ def main():
     target=DEST/'runs'/RUN
     shutil.copytree(src,target)
     assert all(sha(target/k)==h and sha(src/k)==h for k,h in before.items())
-    shutil.copy2(target/'input/runtime_pin.json',target/'input/runtime_pin.v33.json')
+    shutil.copy2(target/'input/runtime_pin.json',target/f'input/runtime_pin.{previous_version}.json')
     write(target/'input/runtime_pin.json',{'reviewed_commit':commit,'run_id':RUN,'runtime':str(DEST),'manifest_sha256':pin})
-    write(target/'migration/v34_continuation.json',{'source_manifest_sha256':SOURCE_PIN,'manifest_sha256':pin,
-          'original_run_files_sha256':before,'new_paid_calls_at_migration':0,'original_telemetry_sha256':POLICY['inherited_sha256']})
+    write(target/f'migration/{version}_continuation.json',{'source_manifest_sha256':SOURCE_PIN,'manifest_sha256':pin,
+          'original_run_files_sha256':before,'new_paid_calls_at_migration':0,'original_telemetry_sha256':sha(OLD/'records/model_record.jsonl')})
     result={'commit':commit,'runtime':str(DEST),'manifest_sha256':pin,'run_id':RUN,**verify(DEST,new)}
-    write(REPO/'runs/v34_runtime_pin.json',result)
+    write(REPO/f'runs/{version}_runtime_pin.json',result)
     print(json.dumps(result))
 
 

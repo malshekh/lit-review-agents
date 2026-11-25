@@ -25,6 +25,59 @@ def _only(rows, description):
     return rows[0]
 
 
+def _batch_completion(run, event, route, charge, proof):
+    from .llm.openai_compatible import parse_completion
+
+    batch_id = charge["batch_id"]
+    step = event["step"]
+    # Provider bytes were retained by a read-only download and hashed at sealing.
+    folder = run / "data" / "batches" / "provider_evidence" / batch_id
+    if not folder.resolve().is_relative_to(run.resolve()):
+        raise IntegrityError("Batch receipt path escaped run")
+    for name in ("job.json", "submitted.jsonl", "responses.jsonl"):
+        if sha(folder / name) != proof[name]:
+            raise IntegrityError("Provider batch evidence changed")
+    job = json.loads((folder / "job.json").read_bytes())
+    batch_log = json.loads((run / "data/batches" / (event["agent"] + ".json")).read_bytes())
+    record = _only([r for r in batch_log if r.get("batch_id") == batch_id], "batch dispatch")
+    custom = _only([k for k,v in record["custom_ids"].items() if v == step], "batch item")
+    if (job["status"] != "completed" or not job["output_file_id"] or job["endpoint"] != "/v1/chat/completions"
+            or record["status"] != "INGESTED" or step not in record["steps"]
+            or job["metadata"]["run_id"] != event["run_id"] or job["metadata"]["stage"] != event["agent"]
+            or job["metadata"]["submission_id"] != record["submission_id"]
+            or sha(run / "data/batches/manifests" / (record["submission_id"] + ".jsonl")) != proof["submitted.jsonl"]
+            or job["id"] != batch_id or job["input_file_id"] != record["input_file_id"]
+            or job["metadata"]["manifest_sha256"] != proof["submitted.jsonl"]
+            or record["fingerprint"]["manifest_sha256"] != proof["submitted.jsonl"]
+            or record["fingerprint"]["run_id"] != event["run_id"] or record["provider"] != route["provider"]
+            or record["model"] != route["model"] or step not in record["ingested"]):
+        raise IntegrityError("Provider batch identity mismatch")
+    def items(name):
+        return [json.loads(line) for line in (folder / name).read_bytes().splitlines() if line.strip()]
+    sent = _only([r for r in items("submitted.jsonl") if r["custom_id"] == custom], "submitted batch item")
+    replies = items("responses.jsonl")
+    for key in ("custom_id", "id"):
+        if len({r[key] for r in replies}) != len(replies):
+            raise IntegrityError("Duplicate batch provider identity")
+    if len({r["response"]["request_id"] for r in replies}) != len(replies):
+        raise IntegrityError("Duplicate provider request receipt")
+    reply = _only([r for r in replies if r["custom_id"] == custom], "batch response")
+    result = reply["response"]
+    if (sent["url"] != job["endpoint"] or sent["method"] != "POST"
+            or result["body"]["model"] != route["model"] and not re.fullmatch(re.escape(route["model"]) + r"-\d{4}-\d{2}-\d{2}", result["body"]["model"])
+            or sent["body"]["model"] != route["model"] or not result["request_id"] or result["status_code"] != 200
+            or reply.get("error") or charge["model"] != route["model"] or charge["provider"] != route["provider"]):
+        raise IntegrityError("Batch response/charge identity mismatch")
+    parsed = parse_completion(result["body"], route["provider"], route["model"])
+    if (parsed.stop_reason != "stop" or parsed.refusal_category or not parsed.text
+            or (run / "outputs" / (step + ".raw0.txt")).read_text(encoding="utf-8") != parsed.text.replace("\r\n","\n")
+            or any(getattr(parsed,k) != charge[k] for k in ("input_tokens", "output_tokens", "cached_input_tokens",
+                                                            "cache_write_tokens", "cache_write_1h_tokens"))
+            or not math.isfinite(charge["cost_usd"]) or charge["cost_usd"] < 0
+            or not math.isclose(sum(charge["cost_parts_usd"].values()),charge["cost_usd"],abs_tol=0.000003)):
+        raise IntegrityError("Batch response and ledger charge differ")
+
+
 def _standard_completion(run, event, policy, charges, jobs, seen):
     step = event["step"]
     agent = event["agent"]
@@ -34,6 +87,15 @@ def _standard_completion(run, event, policy, charges, jobs, seen):
             or not re.fullmatch(route["step_pattern"], step) or step in seen):
         raise IntegrityError("Duplicate or unauthorized completion")
     events = [row for row in jobs if row["step"] == step]
+    if not events:
+        charge = _only([row for row in charges if row.get("batch_id") and row["agent"] == agent
+                        and row["step"] == step], "charged batch completion")
+        proof = policy.get("batch_receipts", {}).get(charge["batch_id"])
+        if not proof:
+            raise IntegrityError("No sealed provider evidence for batch")
+        _batch_completion(run, event, route, charge, proof)
+        seen.add(step)
+        return
     committed = _only([row for row in events if row["state"] == "COMMITTED"], "committed attempt")
     attempt = committed["attempt"]
     if type(attempt) is not int or attempt < 0:

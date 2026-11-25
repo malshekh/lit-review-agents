@@ -2436,11 +2436,15 @@ class Run:
                       and elig[fid]['status'] not in ('QUARANTINED','REJECTED','HELD_FOR_CORRECTION')):
                     elig[fid] = {'status':'REVALIDATION_REQUIRED', 'disposition':val.get(fid, {}).get('disposition'),
                                  'reason':'source or extracted finding changed after validation'}
+            recovery_path = f"offline_recovery/{rid}/audit.json"
+            recovered = self.load(recovery_path, {}).get("after_recovery", {}).get("source_derived_additions", [])
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
                 out.append({"finding_id": f"{rid}:{f['finding_id']}", "record_id": rid,
                             **self._finding_themes(f, rec),
+                            **({"source_recovery": {"audit": recovery_path, "basis": f.get("warrant_note")}}
+                               if f["finding_id"] in recovered else {}),
                             # the handoff contract (handoff.py): relation, direction, hedging, attribution
                             **handoff.project(f, v, ext.get("prompt_version")),
                             "source_interpretation": semantic_audit['findings'].get(f['finding_id'], {}),
