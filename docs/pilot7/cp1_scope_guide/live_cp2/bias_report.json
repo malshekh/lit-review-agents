@@ -1,0 +1,30 @@
+{
+  "exclusion_rate_by_query_purpose": {
+    "THEME": {
+      "received": 91,
+      "excluded": 13,
+      "exclusion_rate": 0.143
+    },
+    "CONTRARY_EVIDENCE": {
+      "received": 71,
+      "excluded": 11,
+      "exclusion_rate": 0.155
+    },
+    "CITATION_EXPANSION": {
+      "received": 40,
+      "excluded": 20,
+      "exclusion_rate": 0.5
+    }
+  },
+  "excluded_seed_records": [],
+  "qualified_per_theme": {
+    "T1": 17,
+    "T2": 41,
+    "T3": 55,
+    "T4": 53,
+    "T5": 15,
+    "T8": 7,
+    "T7": 3
+  },
+  "note": "A markedly higher exclusion rate for CONTRARY_EVIDENCE, or any excluded seed, suggests a screening or criteria problem."
+}

@@ -43,7 +43,7 @@ prior sealed runtimes and migrated receipts for audit.
 
 ## One-record continuation
 
-Eleven four-record batches (B003?B013) completed and committed 44 decisions.
+Eleven four-record batches (B003-B013) completed and committed 44 decisions.
 B014 reached the unchanged 16,000-token cap with partial text; its $0.0123253
 charge is accounted and no partial decisions are accepted. Total recorded
 spending is $1.0044494; all five existing holds remain $0.124671.
@@ -51,4 +51,5 @@ V32 keeps every receipt, decision, failure and CP1 approval, and lowers the
 effective screening batch size to one. No model, provider contract, token cap,
 financial limit or checkpoint is relaxed. Only unfinished records are dispatched
 under new counter identities; paid extraction remains blocked by CP2.
-`nV32 offline regressions: 67 passed (scope delivery, effective profiles, CP2 integrity and architecture); last full suite: 1,160 passed. No application logic or contracts changed in this continuation.
+
+V32 offline regressions: 67 passed (scope delivery, effective profiles, CP2 integrity and architecture); last full suite: 1,160 passed. No application logic or contracts changed in this continuation.

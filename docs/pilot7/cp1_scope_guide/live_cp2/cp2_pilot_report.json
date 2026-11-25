@@ -1,0 +1,1571 @@
+{
+  "run_id": "20261123-214928",
+  "status": "CP2_PROVISIONAL_NOT_FROZEN",
+  "proposed_papers": [
+    {
+      "record_id": "R0058",
+      "citation": {
+        "title": "Impact of dataset partitioning on the reliability of SERS-machine learning models for antimicrobial resistance classification.",
+        "authors": [
+          "Al-Shaebi Z",
+          "Akdeniz M",
+          "Yerlitas Tastan SI",
+          "Sagiroğlu P",
+          "Atalay MA",
+          "Erturk Zararsiz G",
+          "Zararsiz G",
+          "Aydin O"
+        ],
+        "year": 2026,
+        "venue": "Anal Chim Acta",
+        "doi": "10.1016/j.aca.2026.346185",
+        "pmid": "42838683"
+      },
+      "themes": [
+        "T3",
+        "T4"
+      ],
+      "subsections": [
+        "Evaluating accuracy, uncertainty and generalization",
+        "Learning from signals and fingerprints"
+      ],
+      "selection_reason": "contrary evidence; screened CORE; covers T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Abstract-only. Benchmarks data-partitioning strategies for SERS-ML classification of clinical S. aureus isolates; asks whether spectrum-level versus isolate- or subject-level splits change accuracy estimates. Non-drug, non-cancer system admitted only as methodological evidence for the Chapter 1 evaluation-unit question; not evidence for anticancer-drug exposure.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T4\",\"T3\"],\"target\":\"antimicrobial resistance phenotype of Staphylococcus aureus isolates (MRSA, ERSA, SSA)\",\"matrix\":\"clinical bacterial isolates; specimen preparation NOT_REPORTED in abstract\",\"inferred_output\":\"resistance phenotype class from SERS spectra\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"five ML models and three feature selection or dimensionality-reduction methods compared; conventional non-ML baseline not stated in abstract\",\"independent_unit\":\"isolate- or subject-level partitioning proposed as more realistic; spectrum-level splits treated as non-independent; held-out unit per strategy NOT_REPORTED in abstract\",\"contrary_summary\":\"Spectrum-level splits consistently overestimated accuracy; model performance depended more on partitioning strategy than on algorithm choice\"}",
+      "screening_details": {
+        "rationale": "Abstract-only. Benchmarks data-partitioning strategies for SERS-ML classification of clinical S. aureus isolates; asks whether spectrum-level versus isolate- or subject-level splits change accuracy estimates. Non-drug, non-cancer system admitted only as methodological evidence for the Chapter 1 evaluation-unit question; not evidence for anticancer-drug exposure.",
+        "eligibility_route": "SENSOR_INTERPRETATION",
+        "evidence_role": "METHODOLOGICAL",
+        "informs_themes": [
+          "T4",
+          "T3"
+        ],
+        "target": "antimicrobial resistance phenotype of Staphylococcus aureus isolates (MRSA, ERSA, SSA)",
+        "matrix": "clinical bacterial isolates; specimen preparation NOT_REPORTED in abstract",
+        "inferred_output": "resistance phenotype class from SERS spectra",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": "five ML models and three feature selection or dimensionality-reduction methods compared; conventional non-ML baseline not stated in abstract",
+        "independent_unit": "isolate- or subject-level partitioning proposed as more realistic; spectrum-level splits treated as non-independent; held-out unit per strategy NOT_REPORTED in abstract",
+        "contrary_summary": "Spectrum-level splits consistently overestimated accuracy; model performance depended more on partitioning strategy than on algorithm choice"
+      },
+      "actual_access": {
+        "record_id": "R0058",
+        "pmid": "42838683",
+        "doi": "10.1016/j.aca.2026.346185",
+        "attempts": [
+          {
+            "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+            "outcome": "NOT_LISTED",
+            "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+            "at": "2026-11-24T23:51:11"
+          }
+        ],
+        "category": "NO_PMC_COPY_FOUND",
+        "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+        "level_read": "ABSTRACT",
+        "level_for_budget": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": true,
+      "preprint": false
+    },
+    {
+      "record_id": "R0116",
+      "citation": {
+        "title": "Optics miniaturization strategy for demanding Raman spectroscopy applications.",
+        "authors": [
+          "Ilchenko O",
+          "Pilhun Y",
+          "Kutsyk A",
+          "Slobodianiuk D",
+          "Goksel Y",
+          "Dumont E",
+          "Vaut L",
+          "Mazzoni C",
+          "Morelli L",
+          "Boisen S",
+          "Stergiou K",
+          "Aulin Y",
+          "Rindzevicius T",
+          "Andersen TE",
+          "Lassen M",
+          "Mundhada H",
+          "Jendresen CB",
+          "Philipsen PA",
+          "Hædersdal M",
+          "Boisen A"
+        ],
+        "year": 2024,
+        "venue": "Nat Commun",
+        "doi": "10.1038/s41467-024-47044-7",
+        "pmid": "38589380"
+      },
+      "themes": [
+        "T2",
+        "T3",
+        "T4",
+        "T5"
+      ],
+      "subsections": [
+        "Drug identity and concentration",
+        "Evaluating accuracy, uncertainty and generalization",
+        "Learning from signals and fingerprints"
+      ],
+      "selection_reason": "adds uncovered subsections; screened CORE; covers T2 (S1.2), T3 (S1.3), T4 (S1.4), T5 (S2.1); screening reason: {\"rationale\":\"Full-text primary article on a miniaturized Raman spectrometer with a built-in reference channel. Its SERS application quantifies methotrexate in PBS (0-75 uM) with PLS calibration, a direct measurement of an anticancer drug. Methodological content (wavenumber and intensity calibration, fluorescence removal, bacterial ML identification) also answers Chapter 1 questions.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"DIRECT_ONCOLOGY_EXPOSURE\",\"informs_themes\":[\"T2\",\"T3\",\"T4\",\"T5\"],\"target\":\"methotrexate by SERS mapping; methanol, pHCA, glucose, serine and MgSO4/Na2HPO4 (non-oncology); bacterial species\",\"matrix\":\"PBS for MTX standards (mixed with methanol per Methods); water-ethanol and vodka solutions; whiskey through glass bottle; E. coli supernatant; in vivo human skin; bacterial isolates on CaF2\",\"inferred_output\":\"numerical concentration (MTX, PLS); numerical concentration (non-oncology analytes); identity (bacterial species by ML classification)\",\"target_reference\":\"NOT_REPORTED for MTX; HPLC for pHCA and glucose in fermentation supernatant only\",\"analytical_reference\":\"HPLC (non-oncology analytes); prior NPAS/SERS MTX study cited for LoD comparison only\",\"ai_baseline\":\"PLS calibration; no non-PLS baseline reported for MTX; ML classifier on Raman maps for bacteria compared with a prior research-grade study\",\"independent_unit\":\"NOT_REPORTED for MTX; 24 SERS chips used; bacteria: four Raman maps per isolate (three with bacteria, one background); held-out split unit not stated\",\"contrary_summary\":\"No finding identified that challenges the outline. Authors note limits: low-frequency Raman below 400 cm-1 not accessible, exposures longer than a few seconds blur spectra, dark noise of non-cooled sensor. Serine quantification in fluorescent supernatant checked against HPLC only; MgSO4/Na2HPO4 not validated by another technique.\"}",
+      "screening_details": {
+        "rationale": "Full-text primary article on a miniaturized Raman spectrometer with a built-in reference channel. Its SERS application quantifies methotrexate in PBS (0-75 uM) with PLS calibration, a direct measurement of an anticancer drug. Methodological content (wavenumber and intensity calibration, fluorescence removal, bacterial ML identification) also answers Chapter 1 questions.",
+        "eligibility_route": "SENSOR_INTERPRETATION",
+        "evidence_role": "DIRECT_ONCOLOGY_EXPOSURE",
+        "informs_themes": [
+          "T2",
+          "T3",
+          "T4",
+          "T5"
+        ],
+        "target": "methotrexate by SERS mapping; methanol, pHCA, glucose, serine and MgSO4/Na2HPO4 (non-oncology); bacterial species",
+        "matrix": "PBS for MTX standards (mixed with methanol per Methods); water-ethanol and vodka solutions; whiskey through glass bottle; E. coli supernatant; in vivo human skin; bacterial isolates on CaF2",
+        "inferred_output": "numerical concentration (MTX, PLS); numerical concentration (non-oncology analytes); identity (bacterial species by ML classification)",
+        "target_reference": "NOT_REPORTED for MTX; HPLC for pHCA and glucose in fermentation supernatant only",
+        "analytical_reference": "HPLC (non-oncology analytes); prior NPAS/SERS MTX study cited for LoD comparison only",
+        "ai_baseline": "PLS calibration; no non-PLS baseline reported for MTX; ML classifier on Raman maps for bacteria compared with a prior research-grade study",
+        "independent_unit": "NOT_REPORTED for MTX; 24 SERS chips used; bacteria: four Raman maps per isolate (three with bacteria, one background); held-out split unit not stated",
+        "contrary_summary": "No finding identified that challenges the outline. Authors note limits: low-frequency Raman below 400 cm-1 not accessible, exposures longer than a few seconds blur spectra, dark noise of non-cooled sensor. Serine quantification in fluorescent supernatant checked against HPLC only; MgSO4/Na2HPO4 not validated by another technique."
+      },
+      "actual_access": {
+        "record_id": "R0116",
+        "pmid": "38589380",
+        "doi": "10.1038/s41467-024-47044-7",
+        "attempts": [
+          {
+            "route": "PMC open-access XML via Europe PMC",
+            "outcome": "RETRIEVED_VERIFIED",
+            "detail": "PMC11001912",
+            "xml_sha256": "077439c2b4480e5f2704f2a87c28ea4c0aba1bff3a8991b780d366ef3ea36f91",
+            "identifiers_confirmed": [
+              "pmid",
+              "doi"
+            ],
+            "at": "2026-11-24T23:51:13"
+          }
+        ],
+        "category": "FULL_TEXT_RETRIEVED",
+        "meaning": "an open-access copy in PMC was found and its identity verified",
+        "level_read": "FULL_TEXT",
+        "level_for_budget": "FULL_TEXT",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": false,
+      "preprint": false
+    },
+    {
+      "record_id": "R0004",
+      "citation": {
+        "title": "Machine Learning–Driven Inverse Design of Gradient Porous Elastomers for High-Performance Flexible Pressure Sensors",
+        "authors": [
+          "Xue Y",
+          "He J",
+          "Li J",
+          "Song N",
+          "Yin S",
+          "Liang M"
+        ],
+        "year": 2026,
+        "venue": "",
+        "doi": "10.21203/rs.3.rs-11186204/v1",
+        "pmid": null
+      },
+      "themes": [
+        "T1"
+      ],
+      "subsections": [
+        "Designing sensors and probes"
+      ],
+      "selection_reason": "adds uncovered subsections; screened SUPPORTING; covers T1 (S1.1); screening reason: {\"rationale\":\"Preprint reporting a finite element simulation with a machine learning surrogate for inverse design of gradient porous dielectric structure in a flexible thin-film pressure sensor, with fabrication and experimental validation of the optimized parameters stated in the abstract; not nanobiosensing and not biological; eligible as methodological design evidence for T1 only, with PREPRINT flag\",\"eligibility_route\":\"SENSOR_DESIGN\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T1\"],\"target\":\"pressure\",\"matrix\":null,\"inferred_output\":\"optimized structural parameters from surrogate model; pressure-capacitance response prediction\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":null,\"independent_unit\":null,\"contrary_summary\":null}",
+      "screening_details": {
+        "rationale": "Preprint reporting a finite element simulation with a machine learning surrogate for inverse design of gradient porous dielectric structure in a flexible thin-film pressure sensor, with fabrication and experimental validation of the optimized parameters stated in the abstract; not nanobiosensing and not biological; eligible as methodological design evidence for T1 only, with PREPRINT flag",
+        "eligibility_route": "SENSOR_DESIGN",
+        "evidence_role": "METHODOLOGICAL",
+        "informs_themes": [
+          "T1"
+        ],
+        "target": "pressure",
+        "matrix": null,
+        "inferred_output": "optimized structural parameters from surrogate model; pressure-capacitance response prediction",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": null,
+        "independent_unit": null,
+        "contrary_summary": null
+      },
+      "actual_access": {
+        "record_id": "R0004",
+        "pmid": null,
+        "doi": "10.21203/rs.3.rs-11186204/v1",
+        "attempts": [
+          {
+            "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+            "outcome": "NOT_LISTED",
+            "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+            "at": "2026-11-24T23:51:13"
+          }
+        ],
+        "category": "NO_PMC_COPY_FOUND",
+        "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+        "level_read": "ABSTRACT",
+        "level_for_budget": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": false,
+      "preprint": true
+    },
+    {
+      "record_id": "R0090",
+      "citation": {
+        "title": "3D Printed Microfluidic Device for Magnetic Trapping and SERS Quantitative Evaluation of Environmental and Biomedical Analytes.",
+        "authors": [
+          "Litti L",
+          "Trivini S",
+          "Ferraro D",
+          "Reguera J"
+        ],
+        "year": 2021,
+        "venue": "ACS Appl Mater Interfaces",
+        "doi": "10.1021/acsami.1c09771",
+        "pmid": "34256559"
+      },
+      "themes": [
+        "T3",
+        "T4",
+        "T5",
+        "T8"
+      ],
+      "subsections": [
+        "Drug identity and concentration",
+        "Evaluating accuracy, uncertainty and generalization",
+        "Exposure trajectories and limitations",
+        "Learning from signals and fingerprints"
+      ],
+      "selection_reason": "adds uncovered subsections; screened SUPPORTING; covers T3 (S1.3), T4 (S1.4), T5 (S2.1), T8 (S2.4); screening reason: {\"rationale\":\"Erlotinib, a clinically used anticancer drug, is quantified by a SERS-microfluidic competitive assay (PFR reporter on azide-functionalized Janus Fe3O4/Au nanostars) with PLS regression on measured spectra. Calibration is reported in water and in ethanol-deproteinized spiked human plasma (LOD_pu 0.54 uM in water, 0.69 uM in plasma). The authors' claim of a first erlotinib SERS quantification in plasma is not independently verified.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"DIRECT_ONCOLOGY_EXPOSURE\",\"informs_themes\":[\"T3\",\"T4\",\"T5\",\"T8\"],\"target\":\"erlotinib (anticancer drug); flumioxazin, crystal violet and p-mercaptobenzoic acid also measured but are non-oncology\",\"matrix\":\"spiked human plasma (K2 EDTA) after ethanol protein precipitation and dilution; also aqueous solution\",\"inferred_output\":\"numerical concentration (PLS-predicted, pseudo-univariate calibration) in spiked samples; no post-administration specimens reported\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"Monovariate band-integral calibrations are reported for CV and MBA only; no simpler baseline for erlotinib is reported\",\"independent_unit\":\"NOT_REPORTED: number of independent plasma specimens not stated; 45-spectrum maps averaged per spot are not independent specimens; cross-validation split unit not stated\",\"contrary_summary\":\"CV SERS signal not detected in the device after magnetic accumulation (desorption during washing); plasma signals weaker and LOD higher than in water, attributed by the authors to dilution and protein corona; no post-dose testing; false-positive risk from acetylene-containing compounds acknowledged for flumioxazin and erlotinib\"}",
+      "screening_details": {
+        "rationale": "Erlotinib, a clinically used anticancer drug, is quantified by a SERS-microfluidic competitive assay (PFR reporter on azide-functionalized Janus Fe3O4/Au nanostars) with PLS regression on measured spectra. Calibration is reported in water and in ethanol-deproteinized spiked human plasma (LOD_pu 0.54 uM in water, 0.69 uM in plasma). The authors' claim of a first erlotinib SERS quantification in plasma is not independently verified.",
+        "eligibility_route": "SENSOR_INTERPRETATION",
+        "evidence_role": "DIRECT_ONCOLOGY_EXPOSURE",
+        "informs_themes": [
+          "T3",
+          "T4",
+          "T5",
+          "T8"
+        ],
+        "target": "erlotinib (anticancer drug); flumioxazin, crystal violet and p-mercaptobenzoic acid also measured but are non-oncology",
+        "matrix": "spiked human plasma (K2 EDTA) after ethanol protein precipitation and dilution; also aqueous solution",
+        "inferred_output": "numerical concentration (PLS-predicted, pseudo-univariate calibration) in spiked samples; no post-administration specimens reported",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": "Monovariate band-integral calibrations are reported for CV and MBA only; no simpler baseline for erlotinib is reported",
+        "independent_unit": "NOT_REPORTED: number of independent plasma specimens not stated; 45-spectrum maps averaged per spot are not independent specimens; cross-validation split unit not stated",
+        "contrary_summary": "CV SERS signal not detected in the device after magnetic accumulation (desorption during washing); plasma signals weaker and LOD higher than in water, attributed by the authors to dilution and protein corona; no post-dose testing; false-positive risk from acetylene-containing compounds acknowledged for flumioxazin and erlotinib"
+      },
+      "actual_access": {
+        "record_id": "R0090",
+        "pmid": "34256559",
+        "doi": "10.1021/acsami.1c09771",
+        "attempts": [
+          {
+            "route": "PMC open-access XML via Europe PMC",
+            "outcome": "RETRIEVED_VERIFIED",
+            "detail": "PMC8397251",
+            "xml_sha256": "aaa7162db559e9015ab9959d21a9efb305835c449983ed5a8ac481cf97ff55b1",
+            "identifiers_confirmed": [
+              "pmid",
+              "doi"
+            ],
+            "at": "2026-11-24T23:51:42"
+          }
+        ],
+        "category": "FULL_TEXT_RETRIEVED",
+        "meaning": "an open-access copy in PMC was found and its identity verified",
+        "level_read": "FULL_TEXT",
+        "level_for_budget": "FULL_TEXT",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": false,
+      "preprint": false
+    },
+    {
+      "record_id": "R0131",
+      "citation": {
+        "title": "Electrochemical Aptamer-Based Sensors for In Vivo Pharmacokinetic Monitoring of Anthracycline Chemotherapeutics: Mechanisms, Stability, and the Clinical Translation Landscape",
+        "authors": [
+          "Zhang H",
+          "Wang H",
+          "Luo W",
+          "Liu T"
+        ],
+        "year": 2026,
+        "venue": "",
+        "doi": "10.20944/preprints202606.0143.v1",
+        "pmid": null
+      },
+      "themes": [
+        "T1",
+        "T5",
+        "T7",
+        "T8"
+      ],
+      "subsections": [
+        "Designing sensors and probes",
+        "Drug identity and concentration",
+        "Exposure trajectories and limitations"
+      ],
+      "selection_reason": "adds uncovered subsections; screened CONTEXT; covers T1 (S1.1), T5 (S2.1), T7 (S2.3), T8 (S2.4); screening reason: {\"rationale\":\"Preprint abstract describes a review-type synthesis of electrochemical aptamer-based sensors for in vivo anthracycline pharmacokinetic monitoring, including rodent dual-compartment monitoring and drift countermeasures. AI appears only as one listed advance (AI-guided aptamer design) with no method, output or evaluation stated in the abstract. Qualifies as CONTEXT because it is a secondary synthesis and the abstract does not establish a learned model acting on measured sensor responses. Eligible on topic (anthracycline measurement, nanoscale recognition element, temporal exposure).\",\"eligibility_route\":\"NOT_ESTABLISHED_FROM_ABSTRACT\",\"evidence_role\":\"BENCHMARK_CONTEXT\",\"informs_themes\":[\"T1\",\"T5\",\"T7\",\"T8\"],\"target\":\"anthracyclines (doxorubicin, daunorubicin)\",\"matrix\":\"live rodent plasma and interstitial fluid (per abstract)\",\"inferred_output\":\"continuous or near-continuous readout\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":null,\"independent_unit\":null,\"contrary_summary\":null}",
+      "screening_details": {
+        "rationale": "Preprint abstract describes a review-type synthesis of electrochemical aptamer-based sensors for in vivo anthracycline pharmacokinetic monitoring, including rodent dual-compartment monitoring and drift countermeasures. AI appears only as one listed advance (AI-guided aptamer design) with no method, output or evaluation stated in the abstract. Qualifies as CONTEXT because it is a secondary synthesis and the abstract does not establish a learned model acting on measured sensor responses. Eligible on topic (anthracycline measurement, nanoscale recognition element, temporal exposure).",
+        "eligibility_route": "NOT_ESTABLISHED_FROM_ABSTRACT",
+        "evidence_role": "BENCHMARK_CONTEXT",
+        "informs_themes": [
+          "T1",
+          "T5",
+          "T7",
+          "T8"
+        ],
+        "target": "anthracyclines (doxorubicin, daunorubicin)",
+        "matrix": "live rodent plasma and interstitial fluid (per abstract)",
+        "inferred_output": "continuous or near-continuous readout",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": null,
+        "independent_unit": null,
+        "contrary_summary": null
+      },
+      "actual_access": {
+        "record_id": "R0131",
+        "pmid": null,
+        "doi": "10.20944/preprints202606.0143.v1",
+        "attempts": [
+          {
+            "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+            "outcome": "NOT_LISTED",
+            "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+            "at": "2026-11-24T23:51:48"
+          }
+        ],
+        "category": "NO_PMC_COPY_FOUND",
+        "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+        "level_read": "ABSTRACT",
+        "level_for_budget": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": false,
+      "preprint": true
+    },
+    {
+      "record_id": "R0032",
+      "citation": {
+        "title": "An intelligent fluorescent immunochromatographic platform coupled with machine learning for sensitive quantification of blood p-Tau181.",
+        "authors": [
+          "Lai J",
+          "Zhou Z",
+          "Zhou Z",
+          "Zhu Y",
+          "Ji Y",
+          "Liu Y",
+          "Xu T",
+          "Liu C"
+        ],
+        "year": 2027,
+        "venue": "Anal Chim Acta",
+        "doi": "10.1016/j.aca.2026.346514",
+        "pmid": "43072943"
+      },
+      "themes": [
+        "T3",
+        "T4"
+      ],
+      "subsections": [
+        "Evaluating accuracy, uncertainty and generalization",
+        "Learning from signals and fingerprints"
+      ],
+      "selection_reason": "strongest remaining; screened SUPPORTING; covers T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Fluorescent lateral-flow platform using gold nanocluster reporters and an inner-filter-effect signal, with KNN classification and Gaussian process regression on the fluorescence signal to discriminate and quantify blood p-Tau181; non-oncology biomarker included only as a non-drug method example for the signal-task and evaluation questions; abstract only\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"BENCHMARK_CONTEXT\",\"informs_themes\":[\"T3\",\"T4\"],\"target\":\"phosphorylated tau 181 (p-Tau181)\",\"matrix\":\"PBS buffer; human serum; preliminary plasma (as stated in abstract)\",\"inferred_output\":\"concentration category classification (KNN) and numerical concentration prediction (GPR)\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"not stated in abstract\",\"independent_unit\":null,\"contrary_summary\":\"none identified in abstract; specificity against non-phosphorylated and other phosphorylated tau isoforms is reported as positive\"}",
+      "screening_details": {
+        "rationale": "Fluorescent lateral-flow platform using gold nanocluster reporters and an inner-filter-effect signal, with KNN classification and Gaussian process regression on the fluorescence signal to discriminate and quantify blood p-Tau181; non-oncology biomarker included only as a non-drug method example for the signal-task and evaluation questions; abstract only",
+        "eligibility_route": "SENSOR_INTERPRETATION",
+        "evidence_role": "BENCHMARK_CONTEXT",
+        "informs_themes": [
+          "T3",
+          "T4"
+        ],
+        "target": "phosphorylated tau 181 (p-Tau181)",
+        "matrix": "PBS buffer; human serum; preliminary plasma (as stated in abstract)",
+        "inferred_output": "concentration category classification (KNN) and numerical concentration prediction (GPR)",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": "not stated in abstract",
+        "independent_unit": null,
+        "contrary_summary": "none identified in abstract; specificity against non-phosphorylated and other phosphorylated tau isoforms is reported as positive"
+      },
+      "actual_access": {
+        "record_id": "R0032",
+        "pmid": "43072943",
+        "doi": "10.1016/j.aca.2026.346514",
+        "attempts": [
+          {
+            "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+            "outcome": "NOT_LISTED",
+            "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+            "at": "2026-11-24T23:52:05"
+          }
+        ],
+        "category": "NO_PMC_COPY_FOUND",
+        "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+        "level_read": "ABSTRACT",
+        "level_for_budget": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": null,
+      "preprint": false
+    },
+    {
+      "record_id": "R0060",
+      "citation": {
+        "title": "Machine learning enabled surface-enhanced Raman spectroscopy quantitative analysis for food safety monitoring.",
+        "authors": [
+          "Zhao Z",
+          "Yang Q",
+          "Yang J",
+          "Li J",
+          "Liu P"
+        ],
+        "year": 2027,
+        "venue": "Spectrochim Acta A Mol Biomol Spectrosc",
+        "doi": "10.1016/j.saa.2026.128494",
+        "pmid": "42526412"
+      },
+      "themes": [
+        "T2",
+        "T3",
+        "T4"
+      ],
+      "subsections": [
+        "Evaluating accuracy, uncertainty and generalization",
+        "Learning from signals and fingerprints"
+      ],
+      "selection_reason": "strongest remaining; screened SUPPORTING; covers T2 (S1.2), T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Abstract reports SERS on silver nanocubes quantifying crystal violet in fish matrices using PLS, SVM and RF regression on measured spectra: a nanoscale signal-generating component with a learned model estimating a numerical concentration. Non-oncology, non-drug food-safety analyte; retained as methodological evidence for T2/T3/T4 questions only, with application scope labelled. Abstract-only access.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T2\",\"T3\",\"T4\"],\"target\":\"crystal violet residues (prohibited dye; not an anticancer drug)\",\"matrix\":\"fish matrices (specific tissue not stated in abstract)\",\"inferred_output\":\"numerical concentration estimation (ppm)\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"PLS regression (linear chemometric) and SVM regression compared with RF; PLS R2 0.9529 reported\",\"independent_unit\":null,\"contrary_summary\":\"Abstract reports PLS limited by linear assumptions and overfitting, and SVM robust mainly at lower concentrations with noise; RF test-set R2 0.9926 and MAE 0.0046 ppm reported. No null or negative result about the RF approach is stated in the abstract.\"}",
+      "screening_details": {
+        "rationale": "Abstract reports SERS on silver nanocubes quantifying crystal violet in fish matrices using PLS, SVM and RF regression on measured spectra: a nanoscale signal-generating component with a learned model estimating a numerical concentration. Non-oncology, non-drug food-safety analyte; retained as methodological evidence for T2/T3/T4 questions only, with application scope labelled. Abstract-only access.",
+        "eligibility_route": "SENSOR_INTERPRETATION",
+        "evidence_role": "METHODOLOGICAL",
+        "informs_themes": [
+          "T2",
+          "T3",
+          "T4"
+        ],
+        "target": "crystal violet residues (prohibited dye; not an anticancer drug)",
+        "matrix": "fish matrices (specific tissue not stated in abstract)",
+        "inferred_output": "numerical concentration estimation (ppm)",
+        "target_reference": null,
+        "analytical_reference": null,
+        "ai_baseline": "PLS regression (linear chemometric) and SVM regression compared with RF; PLS R2 0.9529 reported",
+        "independent_unit": null,
+        "contrary_summary": "Abstract reports PLS limited by linear assumptions and overfitting, and SVM robust mainly at lower concentrations with noise; RF test-set R2 0.9926 and MAE 0.0046 ppm reported. No null or negative result about the RF approach is stated in the abstract."
+      },
+      "actual_access": {
+        "record_id": "R0060",
+        "pmid": "42526412",
+        "doi": "10.1016/j.saa.2026.128494",
+        "attempts": [
+          {
+            "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+            "outcome": "NOT_LISTED",
+            "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+            "at": "2026-11-24T23:52:30"
+          }
+        ],
+        "category": "NO_PMC_COPY_FOUND",
+        "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+        "level_read": "ABSTRACT",
+        "level_for_budget": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false,
+        "routes_not_attempted": [
+          "publisher website",
+          "Unpaywall and other open-access aggregators",
+          "institutional and subject repositories",
+          "preprint servers",
+          "author copies",
+          "subscription access"
+        ],
+        "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+      },
+      "is_contrary_evidence": false,
+      "preprint": false
+    }
+  ],
+  "uncovered_themes": [
+    "T6"
+  ],
+  "eligible_not_selected_pilot_limit": [
+    "R0001",
+    "R0003",
+    "R0005",
+    "R0006",
+    "R0009",
+    "R0011",
+    "R0012",
+    "R0013",
+    "R0016",
+    "R0017",
+    "R0018",
+    "R0020",
+    "R0021",
+    "R0022",
+    "R0025",
+    "R0026",
+    "R0031",
+    "R0034",
+    "R0035",
+    "R0036",
+    "R0039",
+    "R0043",
+    "R0044",
+    "R0045",
+    "R0046",
+    "R0048",
+    "R0049",
+    "R0051",
+    "R0053",
+    "R0054",
+    "R0055",
+    "R0056",
+    "R0057",
+    "R0059",
+    "R0061",
+    "R0062",
+    "R0063",
+    "R0064",
+    "R0066",
+    "R0067",
+    "R0072",
+    "R0074",
+    "R0076",
+    "R0078",
+    "R0080",
+    "R0081",
+    "R0082",
+    "R0085",
+    "R0087",
+    "R0108",
+    "R0110",
+    "R0111",
+    "R0115",
+    "R0117",
+    "R0118",
+    "R0122",
+    "R0125",
+    "R0126",
+    "R0130",
+    "R0133",
+    "R0134",
+    "R0135",
+    "R0137",
+    "R0144",
+    "R0145",
+    "R0148",
+    "R0151",
+    "R0154",
+    "R0158",
+    "R0165",
+    "R0166",
+    "R0172",
+    "R0175",
+    "R0177"
+  ],
+  "other_eligible_not_proposed": [],
+  "scientifically_excluded": [
+    "R0002",
+    "R0008",
+    "R0010",
+    "R0014",
+    "R0015",
+    "R0029",
+    "R0030",
+    "R0069",
+    "R0092",
+    "R0094",
+    "R0095",
+    "R0097",
+    "R0100",
+    "R0101",
+    "R0102",
+    "R0103",
+    "R0104",
+    "R0119",
+    "R0120",
+    "R0124",
+    "R0127",
+    "R0128",
+    "R0132",
+    "R0139",
+    "R0141",
+    "R0142",
+    "R0143",
+    "R0146",
+    "R0147",
+    "R0149",
+    "R0150",
+    "R0152",
+    "R0153",
+    "R0155",
+    "R0157",
+    "R0159",
+    "R0161",
+    "R0162",
+    "R0164",
+    "R0169",
+    "R0170",
+    "R0176",
+    "R0179",
+    "R0180"
+  ],
+  "duplicate_or_version_screening_exclusions": [],
+  "unresolved_screening": [
+    "R0007",
+    "R0019",
+    "R0023",
+    "R0024",
+    "R0027",
+    "R0028",
+    "R0033",
+    "R0037",
+    "R0038",
+    "R0040",
+    "R0041",
+    "R0042",
+    "R0047",
+    "R0050",
+    "R0052",
+    "R0065",
+    "R0068",
+    "R0070",
+    "R0071",
+    "R0073",
+    "R0075",
+    "R0077",
+    "R0079",
+    "R0083",
+    "R0084",
+    "R0086",
+    "R0088",
+    "R0089",
+    "R0091",
+    "R0093",
+    "R0096",
+    "R0098",
+    "R0099",
+    "R0105",
+    "R0106",
+    "R0107",
+    "R0109",
+    "R0112",
+    "R0113",
+    "R0114",
+    "R0121",
+    "R0123",
+    "R0129",
+    "R0136",
+    "R0138",
+    "R0140",
+    "R0156",
+    "R0160",
+    "R0163",
+    "R0167",
+    "R0168",
+    "R0171",
+    "R0173",
+    "R0174",
+    "R0178"
+  ],
+  "eligible_contrary": [
+    "R0016",
+    "R0058",
+    "R0063"
+  ],
+  "query_yield_by_theme": [
+    {
+      "family_id": "S1.1_QF_S1_1_THEME",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "pubmed",
+      "query": "(sensor*[tiab] OR nanosensor*[tiab] OR biosensor*[tiab]) AND (\"machine learning\"[tiab] OR \"Bayesian optimization\"[tiab] OR \"inverse design\"[tiab]) AND (design*[tiab] OR optim*[tiab] OR fabricat*[tiab])",
+      "hit_count": 4517,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:09:40-0500"
+    },
+    {
+      "family_id": "S1.1_QF_S1_1_THEME",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:sensor* OR ABSTRACT:sensor* OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:biosensor* OR ABSTRACT:biosensor*) AND (TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"Bayesian optimization\" OR ABSTRACT:\"Bayesian optimization\" OR TITLE:\"inverse design\" OR ABSTRACT:\"inverse design\") AND (TITLE:design* OR ABSTRACT:design* OR TITLE:optim* OR ABSTRACT:optim* OR TITLE:fabricat* OR ABSTRACT:fabricat*)",
+      "hit_count": 4745,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:09:56-0500"
+    },
+    {
+      "family_id": "S1.1_QF_S1_1_THEME",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((sensor OR nanosensor OR biosensor) AND (\"machine learning\" OR \"Bayesian optimization\" OR \"inverse design\") AND (design OR optimization OR fabrication))",
+      "hit_count": 32572,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:09:57-0500"
+    },
+    {
+      "family_id": "S1.1_QF_S1_1_CONTRARY",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "pubmed",
+      "query": "(sensor*[tiab] OR nanosensor*[tiab] OR biosensor*[tiab]) AND (\"machine learning\"[tiab] OR \"Bayesian optimization\"[tiab] OR \"inverse design\"[tiab]) AND (design*[tiab] OR optim*[tiab] OR fabricat*[tiab]) AND (fail*[tiab] OR reproducib*[tiab] OR baseline*[tiab])",
+      "hit_count": 495,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:09:57-0500"
+    },
+    {
+      "family_id": "S1.1_QF_S1_1_CONTRARY",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:sensor* OR ABSTRACT:sensor* OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:biosensor* OR ABSTRACT:biosensor*) AND (TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"Bayesian optimization\" OR ABSTRACT:\"Bayesian optimization\" OR TITLE:\"inverse design\" OR ABSTRACT:\"inverse design\") AND (TITLE:design* OR ABSTRACT:design* OR TITLE:optim* OR ABSTRACT:optim* OR TITLE:fabricat* OR ABSTRACT:fabricat*) AND (TITLE:fail* OR ABSTRACT:fail* OR TITLE:reproducib* OR ABSTRACT:reproducib* OR TITLE:baseline* OR ABSTRACT:baseline*)",
+      "hit_count": 557,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:22-0500"
+    },
+    {
+      "family_id": "S1.1_QF_S1_1_CONTRARY",
+      "section_ids": [
+        "S1.1"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((sensor OR nanosensor OR biosensor) AND (\"machine learning\" OR \"Bayesian optimization\" OR \"inverse design\") AND (design OR optimization OR fabrication) AND (failure OR reproducibility OR baseline))",
+      "hit_count": 4193,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:23-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_THEME",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR SERS[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR \"pattern recognition\"[tiab]) AND (fingerprint*[tiab] OR analyte*[tiab] OR sample*[tiab])",
+      "hit_count": 1136,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:24-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_THEME",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\" OR TITLE_ABS:SERS) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:\"pattern recognition\") AND (TITLE_ABS:fingerprint* OR TITLE_ABS:analyte* OR TITLE_ABS:sample*)",
+      "hit_count": 1125,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:49-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_THEME",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR SERS) AND (\"machine learning\" OR chemometrics OR \"pattern recognition\") AND (fingerprint OR fingerprints OR analyte OR analytes OR sample OR samples))",
+      "hit_count": 2584,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:50-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_THEME",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "semanticscholar",
+      "query": "(nanosensor* | \"sensor array\" | \"sensor arrays\" | SERS) + (\"machine learning\" | chemometric* | \"pattern recognition\") + (fingerprint* | analyte* | sample*)",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: 429 Client Error:  for url: https://api.semanticscholar.org/graph/v1/paper/search/bulk?query=%28nanosensor%2A+%7C+%22sensor+array%22+%7C+%22sensor+arrays%22+%7C+SERS%29+%2B+%28%22machine+learning%22+%7C+chemometric%2A+%7C+%22pattern+recognition%22%29+%2B+%28fingerprint%2A+%7C+analyte%2A+%7C+sample%2A%29&fields=paperId%2Ctitle%2Cabstract%2Cauthors%2Cyear%2Cvenue%2CpublicationTypes%2CexternalIds%2CisOpenAccess",
+      "searched_at": "2026-11-24T22:10:57-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_CONTRARY",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR SERS[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR \"pattern recognition\"[tiab]) AND (fingerprint*[tiab] OR analyte*[tiab] OR sample*[tiab]) AND (calibration[tiab] OR interferen*[tiab] OR confound*[tiab])",
+      "hit_count": 164,
+      "returned": 2,
+      "error": null,
+      "searched_at": "2026-11-24T22:10:58-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_CONTRARY",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\" OR TITLE_ABS:SERS) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:\"pattern recognition\") AND (TITLE_ABS:fingerprint* OR TITLE_ABS:analyte* OR TITLE_ABS:sample*) AND (TITLE_ABS:calibration OR TITLE_ABS:interferen* OR TITLE_ABS:confound*)",
+      "hit_count": 154,
+      "returned": 2,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:09-0500"
+    },
+    {
+      "family_id": "S1.2_QF_S1_2_CONTRARY",
+      "section_ids": [
+        "S1.2"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR SERS) AND (\"machine learning\" OR chemometrics OR \"pattern recognition\") AND (fingerprint OR fingerprints OR analyte OR analytes OR sample OR samples) AND (calibration OR interference OR confounding))",
+      "hit_count": 331,
+      "returned": 2,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:10-0500"
+    },
+    {
+      "family_id": "S1.3_QF_S1_3",
+      "section_ids": [
+        "S1.3"
+      ],
+      "source": "pubmed",
+      "query": "(Raman[tiab] OR fluorescen*[tiab] OR electrochemical[tiab] OR nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR nanoparticle*[tiab]) AND (chemometric*[tiab] OR \"machine learning\"[tiab] OR \"pattern recognition\"[tiab]) AND (classif*[tiab] OR regress*[tiab] OR \"drift correction\"[tiab])",
+      "hit_count": 3645,
+      "returned": 6,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:11-0500"
+    },
+    {
+      "family_id": "S1.3_QF_S1_3",
+      "section_ids": [
+        "S1.3"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:Raman OR ABSTRACT:Raman OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:\"sensor array\" OR ABSTRACT:\"sensor array\" OR TITLE:\"sensor arrays\" OR ABSTRACT:\"sensor arrays\" OR TITLE:nanoparticle* OR ABSTRACT:nanoparticle*) AND (TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"pattern recognition\" OR ABSTRACT:\"pattern recognition\") AND (TITLE:classif* OR ABSTRACT:classif* OR TITLE:regress* OR ABSTRACT:regress* OR TITLE:\"drift correction\" OR ABSTRACT:\"drift correction\")",
+      "hit_count": 3692,
+      "returned": 6,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:33-0500"
+    },
+    {
+      "family_id": "S1.3_QF_S1_3",
+      "section_ids": [
+        "S1.3"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((Raman OR fluorescence OR electrochemical OR nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR nanoparticle OR nanoparticles) AND (chemometrics OR \"machine learning\" OR \"pattern recognition\") AND (classification OR regression OR \"drift correction\"))",
+      "hit_count": 8083,
+      "returned": 6,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:34-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_THEME",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR SERS[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab]) AND (\"machine learning\"[tiab] OR chemometrics[tiab] OR optimization[tiab]) AND (validation[tiab] OR accuracy[tiab] OR generalization[tiab])",
+      "hit_count": 931,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:11:35-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_THEME",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\") AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometrics OR TITLE_ABS:optimization) AND (TITLE_ABS:validation OR TITLE_ABS:accuracy OR TITLE_ABS:generalization)",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)",
+      "searched_at": "2026-11-24T22:12:06-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_THEME",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR nanosensors OR SERS OR \"sensor array\" OR \"sensor arrays\") AND (\"machine learning\" OR chemometrics OR optimization) AND (validation OR accuracy OR generalization))",
+      "hit_count": 5224,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:07-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_CONTRARY",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR SERS[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab]) AND (\"machine learning\"[tiab] OR chemometrics[tiab] OR optimization[tiab]) AND (\"data leakage\"[tiab] OR overfitting[tiab] OR \"batch effects\"[tiab])",
+      "hit_count": 22,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:07-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_CONTRARY",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\") AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometrics OR TITLE_ABS:optimization) AND (TITLE_ABS:\"data leakage\" OR TITLE_ABS:overfitting OR TITLE_ABS:\"batch effects\")",
+      "hit_count": 22,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:14-0500"
+    },
+    {
+      "family_id": "S1.4_QF_S1_4_CONTRARY",
+      "section_ids": [
+        "S1.4"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR nanosensors OR SERS OR \"sensor array\" OR \"sensor arrays\") AND (\"machine learning\" OR chemometrics OR optimization) AND (\"data leakage\" OR overfitting OR \"batch effects\"))",
+      "hit_count": 99,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:15-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_01",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR SERS[tiab] OR electrochemical[tiab]) AND (chemometric*[tiab] OR regression[tiab] OR optimiz*[tiab] OR optimis*[tiab]) AND (anticancer[tiab] OR antineoplastic*[tiab] OR doxorubicin[tiab])",
+      "hit_count": 145,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:15-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_01",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:electrochemical) AND (TITLE_ABS:chemometric* OR TITLE_ABS:regression OR TITLE_ABS:optimiz* OR TITLE_ABS:optimis*) AND (TITLE_ABS:anticancer OR TITLE_ABS:antineoplastic* OR TITLE_ABS:doxorubicin)",
+      "hit_count": 128,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:21-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_01",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor* OR SERS OR electrochemical) AND (chemometric* OR regression OR optimiz* OR optimis*) AND (anticancer OR antineoplastic* OR doxorubicin))",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: 400 Client Error: Bad Request for url: https://api.openalex.org/works?filter=title_and_abstract.search%3A%28%28nanosensor%2A+OR+SERS+OR+electrochemical%29+AND+%28chemometric%2A+OR+regression+OR+optimiz%2A+OR+optimis%2A%29+AND+%28anticancer+OR+antineoplastic%2A+OR+doxorubicin%29%29&per-page=100&cursor=%2A",
+      "searched_at": "2026-11-24T22:12:21-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_02",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR SERS[tiab] OR electrochemical[tiab]) AND (chemometric*[tiab] OR regression[tiab] OR optimiz*[tiab] OR optimis*[tiab]) AND (anticancer[tiab] OR antineoplastic*[tiab] OR doxorubicin[tiab]) AND (interference[tiab] OR \"matrix effect\"[tiab] OR \"matrix effects\"[tiab] OR calibration[tiab])",
+      "hit_count": 15,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:22-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_02",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:electrochemical) AND (TITLE_ABS:chemometric* OR TITLE_ABS:regression OR TITLE_ABS:optimiz* OR TITLE_ABS:optimis*) AND (TITLE_ABS:anticancer OR TITLE_ABS:antineoplastic* OR TITLE_ABS:doxorubicin) AND (TITLE_ABS:interference OR TITLE_ABS:\"matrix effect\" OR TITLE_ABS:\"matrix effects\" OR TITLE_ABS:calibration OR METHODS:interference OR METHODS:\"matrix effects\")",
+      "hit_count": 18,
+      "returned": 9,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:37-0500"
+    },
+    {
+      "family_id": "S2.1_QF_S21_02",
+      "section_ids": [
+        "S2.1"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor* OR SERS OR electrochemical) AND (chemometric* OR regression OR optimiz* OR optimis*) AND (anticancer OR antineoplastic* OR doxorubicin) AND (interference OR \"matrix effect\" OR \"matrix effects\" OR calibration))",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: 400 Client Error: Bad Request for url: https://api.openalex.org/works?filter=title_and_abstract.search%3A%28%28nanosensor%2A+OR+SERS+OR+electrochemical%29+AND+%28chemometric%2A+OR+regression+OR+optimiz%2A+OR+optimis%2A%29+AND+%28anticancer+OR+antineoplastic%2A+OR+doxorubicin%29+AND+%28interference+OR+%22matrix+effect%22+OR+%22matrix+effects%22+OR+calibration%29%29&per-page=100&cursor=%2A",
+      "searched_at": "2026-11-24T22:12:37-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_THEME",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "pubmed",
+      "query": "(nanocarrier*[tiab] OR nanomedicine*[tiab] OR \"drug release\"[tiab]) AND (sensor*[tiab] OR fluorescence[tiab] OR Raman[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR optimization[tiab])",
+      "hit_count": 175,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:38-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_THEME",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanocarrier* OR TITLE_ABS:nanomedicine* OR TITLE_ABS:\"drug release\") AND (TITLE_ABS:sensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:Raman) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:optimization)",
+      "hit_count": 169,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:58-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_THEME",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanocarrier OR nanomedicine OR \"drug release\") AND (sensor OR fluorescence OR Raman) AND (\"machine learning\" OR chemometrics OR optimization))",
+      "hit_count": 1013,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:59-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_CONTRARY",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "pubmed",
+      "query": "(nanocarrier*[tiab] OR nanomedicine*[tiab] OR \"drug release\"[tiab]) AND (sensor*[tiab] OR fluorescence[tiab] OR Raman[tiab]) AND (interference[tiab] OR validation[tiab] OR specificity[tiab])",
+      "hit_count": 402,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:12:59-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_CONTRARY",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanocarrier* OR TITLE_ABS:nanomedicine* OR TITLE_ABS:\"drug release\") AND (TITLE_ABS:sensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:Raman) AND (TITLE_ABS:interference OR TITLE_ABS:validation OR TITLE_ABS:specificity)",
+      "hit_count": 355,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:13:24-0500"
+    },
+    {
+      "family_id": "S2.2_QF_S22_CONTRARY",
+      "section_ids": [
+        "S2.2"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanocarrier OR nanomedicine OR \"drug release\") AND (sensor OR fluorescence OR Raman) AND (interference OR validation OR specificity))",
+      "hit_count": 2560,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:13:25-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR fluorescence[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (\"serial sampling\"[tiab] OR \"continuous monitoring\"[tiab]) AND (\"anticancer drug\"[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab])",
+      "hit_count": 0,
+      "returned": 0,
+      "error": null,
+      "searched_at": "2026-11-24T22:13:26-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:electrochemical) AND (TITLE_ABS:regression OR TITLE_ABS:calibration OR TITLE_ABS:pharmacokinetic*) AND (TITLE_ABS:\"serial sampling\" OR TITLE_ABS:\"continuous monitoring\") AND (TITLE_ABS:\"anticancer drug\" OR TITLE_ABS:chemotherapy OR TITLE_ABS:nanomedicine*)",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)",
+      "searched_at": "2026-11-24T22:13:56-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (\"serial sampling\" OR \"continuous monitoring\") AND (\"anticancer drug\" OR chemotherapy OR nanomedicine))",
+      "hit_count": 6,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:13:56-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR fluorescence[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (\"serial sampling\"[tiab] OR \"continuous monitoring\"[tiab]) AND drift[tiab]",
+      "hit_count": 5,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:13:57-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:electrochemical) AND (TITLE_ABS:regression OR TITLE_ABS:calibration OR TITLE_ABS:pharmacokinetic*) AND (TITLE_ABS:\"serial sampling\" OR TITLE_ABS:\"continuous monitoring\") AND TITLE_ABS:drift",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)",
+      "searched_at": "2026-11-24T22:14:27-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (\"serial sampling\" OR \"continuous monitoring\") AND drift)",
+      "hit_count": 27,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:14:28-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_THEME",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR electrochemical[tiab] OR Raman[tiab]) AND (regression[tiab] OR chemometric*[tiab] OR calibration[tiab]) AND (anticancer[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab]) AND (matrix[tiab] OR transfer*[tiab] OR reference[tiab])",
+      "hit_count": 5,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:14:28-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_THEME",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:Raman OR ABSTRACT:Raman) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:calibration OR ABSTRACT:calibration) AND (TITLE:anticancer OR ABSTRACT:anticancer OR TITLE:chemotherapy OR ABSTRACT:chemotherapy OR TITLE:nanomedicine* OR ABSTRACT:nanomedicine*) AND (TITLE:matrix OR ABSTRACT:matrix OR TITLE:transfer* OR ABSTRACT:transfer* OR TITLE:reference OR ABSTRACT:reference)",
+      "hit_count": 4,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:14:52-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_THEME",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR electrochemical OR Raman) AND (regression OR chemometrics OR calibration) AND (anticancer OR chemotherapy OR nanomedicine) AND (matrix OR transfer OR reference))",
+      "hit_count": 22,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:14:52-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_CONTRARY",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR electrochemical[tiab] OR Raman[tiab]) AND (regression[tiab] OR chemometric*[tiab] OR calibration[tiab]) AND (matrix[tiab] OR transfer*[tiab] OR reference[tiab])",
+      "hit_count": 1560,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:14:53-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_CONTRARY",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:Raman OR ABSTRACT:Raman) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:calibration OR ABSTRACT:calibration) AND (TITLE:matrix OR ABSTRACT:matrix OR TITLE:transfer* OR ABSTRACT:transfer* OR TITLE:reference OR ABSTRACT:reference)",
+      "hit_count": null,
+      "returned": 0,
+      "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)",
+      "searched_at": "2026-11-24T22:15:23-0500"
+    },
+    {
+      "family_id": "S2.4_QF_S24_CONTRARY",
+      "section_ids": [
+        "S2.4"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR electrochemical OR Raman) AND (regression OR chemometrics OR calibration) AND (matrix OR transfer OR reference))",
+      "hit_count": 5549,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:15:24-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR fluorescen*[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (continuous[tiab] OR \"real-time\"[tiab]) AND (\"anticancer drug\"[tiab] OR \"anticancer drugs\"[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab])",
+      "hit_count": 51,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:16:12-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:calibration OR ABSTRACT:calibration OR TITLE:pharmacokinetic* OR ABSTRACT:pharmacokinetic*) AND (TITLE:continuous OR ABSTRACT:continuous OR TITLE:\"real-time\" OR ABSTRACT:\"real-time\") AND (TITLE:\"anticancer drug\" OR ABSTRACT:\"anticancer drug\" OR TITLE:\"anticancer drugs\" OR ABSTRACT:\"anticancer drugs\" OR TITLE:chemotherapy OR ABSTRACT:chemotherapy OR TITLE:nanomedicine* OR ABSTRACT:nanomedicine*)",
+      "hit_count": 52,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:16:38-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_THEME",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (continuous OR \"real-time\") AND (\"anticancer drug\" OR \"anticancer drugs\" OR chemotherapy OR nanomedicine))",
+      "hit_count": 122,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:16:39-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "pubmed",
+      "query": "(nanosensor*[tiab] OR fluorescen*[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (continuous[tiab] OR \"real-time\"[tiab]) AND drift[tiab]",
+      "hit_count": 53,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:16:40-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "europepmc",
+      "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:calibration OR ABSTRACT:calibration OR TITLE:pharmacokinetic* OR ABSTRACT:pharmacokinetic*) AND (TITLE:continuous OR ABSTRACT:continuous OR TITLE:\"real-time\" OR ABSTRACT:\"real-time\") AND (TITLE:drift OR ABSTRACT:drift)",
+      "hit_count": 58,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:17:08-0500"
+    },
+    {
+      "family_id": "S2.3_QF_S23_CONTRARY",
+      "section_ids": [
+        "S2.3"
+      ],
+      "source": "openalex",
+      "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (continuous OR \"real-time\") AND drift)",
+      "hit_count": 213,
+      "returned": 3,
+      "error": null,
+      "searched_at": "2026-11-24T22:17:09-0500"
+    }
+  ],
+  "search_record_count": 180,
+  "screened_record_count": 180,
+  "projection": {
+    "created": "2026-11-24T23:52:30",
+    "lines": [
+      {
+        "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+        "basis": "MEASURED_P90",
+        "calls": 5,
+        "usd": 1.0926,
+        "detail": "5 papers x $0.3642 (90th percentile of 17 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+      },
+      {
+        "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+        "basis": "MEASURED_P90",
+        "calls": 2,
+        "usd": 1.5531,
+        "detail": "2 papers x $1.0354 (90th percentile of 11 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+      },
+      {
+        "stage": "A06-SV whole-paper repeat (instability test)",
+        "basis": "MEASURED_P90",
+        "calls": 7,
+        "usd": 0.7417,
+        "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th percentile of A06 per-paper cost by level"
+      },
+      {
+        "stage": "A06-SV per theme",
+        "basis": "MEASURED_P90",
+        "calls": 17,
+        "usd": 1.5742,
+        "detail": "17 themes (2.321 per paper measured) x $0.0926"
+      },
+      {
+        "stage": "A07-SYN",
+        "basis": "CALIBRATED_FORECAST",
+        "validation": "within the largest cohort run; per-call rates still provisional",
+        "calls": 80,
+        "usd": 9.2224,
+        "baseline_usd": 7.0941,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 39.4264,
+        "scenarios": {
+          "baseline": 7.0941,
+          "low": 5.2858,
+          "high": 10.8005,
+          "adverse": 35.8064
+        },
+        "detail": "174 findings; calibrated from provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency); usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+      },
+      {
+        "stage": "A08-OL",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 1,
+        "usd": 0.1794,
+        "baseline_usd": 0.138,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 0.2109,
+        "scenarios": {
+          "baseline": 0.138,
+          "low": 0.0982,
+          "high": 0.1719,
+          "adverse": 0.2109
+        },
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 81854,
+        "detail": "up to 1 requests on gpt-6.1-sol; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; the outline request (map, element index, table coverage)"
+      },
+      {
+        "stage": "A09-WRI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 25,
+        "usd": 7.6291,
+        "baseline_usd": 5.8685,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 23.6551,
+        "scenarios": {
+          "baseline": 5.8685,
+          "low": 3.3054,
+          "high": 8.7173,
+          "adverse": 23.6551
+        },
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 303320,
+        "detail": "up to 25 requests on claude-opus-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; 8 sections assumed; sizes per finding from the compact fixture, each with up to 2 retrieval rounds and 0 redraft(s), plus front matter per draft"
+      },
+      {
+        "stage": "A10-RV",
+        "basis": "CALIBRATED_FORECAST",
+        "validation": "within the largest cohort run; per-call rates still provisional",
+        "calls": 288,
+        "usd": 12.2021,
+        "baseline_usd": 9.3862,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 123.7703,
+        "scenarios": {
+          "baseline": 9.3862,
+          "low": 5.9078,
+          "high": 18.7949,
+          "adverse": 103.0703
+        },
+        "detail": "174 findings; calibrated from production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10), scaled to the outline's 1,600 words; usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+      },
+      {
+        "stage": "A11-RC",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 2,
+        "usd": 1.5861,
+        "baseline_usd": 1.2201,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 1.8234,
+        "scenarios": {
+          "baseline": 1.2201,
+          "low": 0.4438,
+          "high": 1.4971,
+          "adverse": 1.8234
+        },
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 388548,
+        "detail": "up to 2 requests on kimi-k3.1-pro; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; up to 2 critique cycles: manuscript, map, ledger, A10 summary"
+      },
+      {
+        "stage": "A12-EDI",
+        "basis": "ESTIMATED_ENVELOPE",
+        "calls": 5,
+        "usd": 2.4111,
+        "baseline_usd": 1.8547,
+        "uncertainty_margin": 0.3,
+        "adverse_usd": 3.0381,
+        "scenarios": {
+          "baseline": 1.8547,
+          "low": 1.1271,
+          "high": 2.0914,
+          "adverse": 3.0381
+        },
+        "long_context_calls": 0,
+        "over_window_calls": 0,
+        "max_input_bound": 402851,
+        "detail": "up to 5 requests on claude-sonnet-5-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; integration per draft, up to 2 revisions, LINE and PROOF (whole-manuscript requests)"
+      }
+    ],
+    "spent_usd": 2.08,
+    "projected_remaining_usd": 38.19,
+    "projected_total_usd": 40.27,
+    "cap_usd": 50.0,
+    "verdict": "WITHIN_CAP",
+    "papers": 7,
+    "by_level": {
+      "ABSTRACT": 5,
+      "FULL_TEXT": 2
+    },
+    "findings_assumed": 174
+  },
+  "projection_problems": [
+    "the stage limits this projection needs add up to $50.25, over the $49.90 the run's $50.00 cap leaves after prior spend; reduce the selection"
+  ],
+  "accounts": {
+    "discovery_and_screening_spent_usd": 1.8311,
+    "smoke_test_and_other_prior_spend_usd": 0.0,
+    "smoke_test_spent_in_run_usd": 0.0991,
+    "unsettled_reservations_usd": 0.1247,
+    "spent_so_far_total_usd": 2.085,
+    "projected_remaining_usd_provisional": 38.19,
+    "retry_and_repair_allowance_usd": 10.0724,
+    "combined_maximum_exposure_usd": 50.0,
+    "hard_cap_usd": 50.0,
+    "projected_by_provider_usd": {
+      "anthropic": 24.2242,
+      "kimi": 1.5861,
+      "openai": 12.3815
+    },
+    "spent_by_provider_usd": {
+      "anthropic": 1.3578,
+      "openai": 0.7272
+    },
+    "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed output sizes; not a measured current-code cost. Provider allocation is estimated; the early combined extraction/validation forecast is split equally between their providers"
+  },
+  "actual_recorded_spend_usd": 2.0849717,
+  "held_usd": 0.12467099999999999,
+  "any_full_text_obtained": true,
+  "full_text_extraction_tested": false,
+  "cp2_approved": false,
+  "corpus_frozen": false,
+  "paid_extraction_started": false
+}

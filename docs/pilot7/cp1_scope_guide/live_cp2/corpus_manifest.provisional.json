@@ -1,0 +1,161 @@
+{
+  "manifest_version": 1,
+  "generated_from": "DISCOVERY_AND_SCREENING",
+  "frozen_at_checkpoint": "CP2",
+  "cp2_fingerprint": "5ea7a3f3bac9d8d68d87b58004b21577f39a6a83a0678bcf870d8ca431ca0f01",
+  "papers": [
+    {
+      "paper_id": "P01",
+      "record_id": "R0058",
+      "pmid": "42838683",
+      "doi": "10.1016/j.aca.2026.346185",
+      "title": "Impact of dataset partitioning on the reliability of SERS-machine learning models for antimicrobial resistance classification.",
+      "selection_reason": "contrary evidence; screened CORE; covers T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Abstract-only. Benchmarks data-partitioning strategies for SERS-ML classification of clinical S. aureus isolates; asks whether spectrum-level versus isolate- or subject-level splits change accuracy estimates. Non-drug, non-cancer system admitted only as methodological evidence for the Chapter 1 evaluation-unit question; not evidence for anticancer-drug exposure.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T4\",\"T3\"],\"target\":\"antimicrobial resistance phenotype of Staphylococcus aureus isolates (MRSA, ERSA, SSA)\",\"matrix\":\"clinical bacterial isolates; specimen preparation NOT_REPORTED in abstract\",\"inferred_output\":\"resistance phenotype class from SERS spectra\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"five ML models and three feature selection or dimensionality-reduction methods compared; conventional non-ML baseline not stated in abstract\",\"independent_unit\":\"isolate- or subject-level partitioning proposed as more realistic; spectrum-level splits treated as non-independent; held-out unit per strategy NOT_REPORTED in abstract\",\"contrary_summary\":\"Spectrum-level splits consistently overestimated accuracy; model performance depended more on partitioning strategy than on algorithm choice\"}",
+      "scientific_importance": "CORE",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S1.3",
+        "S1.4"
+      ],
+      "actual_access": {
+        "category": "NO_PMC_COPY_FOUND",
+        "level_read": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P02",
+      "record_id": "R0116",
+      "pmid": "38589380",
+      "doi": "10.1038/s41467-024-47044-7",
+      "title": "Optics miniaturization strategy for demanding Raman spectroscopy applications.",
+      "selection_reason": "adds uncovered subsections; screened CORE; covers T2 (S1.2), T3 (S1.3), T4 (S1.4), T5 (S2.1); screening reason: {\"rationale\":\"Full-text primary article on a miniaturized Raman spectrometer with a built-in reference channel. Its SERS application quantifies methotrexate in PBS (0-75 uM) with PLS calibration, a direct measurement of an anticancer drug. Methodological content (wavenumber and intensity calibration, fluorescence removal, bacterial ML identification) also answers Chapter 1 questions.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"DIRECT_ONCOLOGY_EXPOSURE\",\"informs_themes\":[\"T2\",\"T3\",\"T4\",\"T5\"],\"target\":\"methotrexate by SERS mapping; methanol, pHCA, glucose, serine and MgSO4/Na2HPO4 (non-oncology); bacterial species\",\"matrix\":\"PBS for MTX standards (mixed with methanol per Methods); water-ethanol and vodka solutions; whiskey through glass bottle; E. coli supernatant; in vivo human skin; bacterial isolates on CaF2\",\"inferred_output\":\"numerical concentration (MTX, PLS); numerical concentration (non-oncology analytes); identity (bacterial species by ML classification)\",\"target_reference\":\"NOT_REPORTED for MTX; HPLC for pHCA and glucose in fermentation supernatant only\",\"analytical_reference\":\"HPLC (non-oncology analytes); prior NPAS/SERS MTX study cited for LoD comparison only\",\"ai_baseline\":\"PLS calibration; no non-PLS baseline reported for MTX; ML classifier on Raman maps for bacteria compared with a prior research-grade study\",\"independent_unit\":\"NOT_REPORTED for MTX; 24 SERS chips used; bacteria: four Raman maps per isolate (three with bacteria, one background); held-out split unit not stated\",\"contrary_summary\":\"No finding identified that challenges the outline. Authors note limits: low-frequency Raman below 400 cm-1 not accessible, exposures longer than a few seconds blur spectra, dark noise of non-cooled sensor. Serine quantification in fluorescent supernatant checked against HPLC only; MgSO4/Na2HPO4 not validated by another technique.\"}",
+      "scientific_importance": "CORE",
+      "intended_reading_level": "FULL_TEXT",
+      "informs_sections": [
+        "S1.2",
+        "S1.3",
+        "S1.4",
+        "S2.1"
+      ],
+      "actual_access": {
+        "category": "FULL_TEXT_RETRIEVED",
+        "level_read": "FULL_TEXT",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P03",
+      "record_id": "R0004",
+      "pmid": null,
+      "doi": "10.21203/rs.3.rs-11186204/v1",
+      "title": "Machine Learning–Driven Inverse Design of Gradient Porous Elastomers for High-Performance Flexible Pressure Sensors",
+      "selection_reason": "adds uncovered subsections; screened SUPPORTING; covers T1 (S1.1); screening reason: {\"rationale\":\"Preprint reporting a finite element simulation with a machine learning surrogate for inverse design of gradient porous dielectric structure in a flexible thin-film pressure sensor, with fabrication and experimental validation of the optimized parameters stated in the abstract; not nanobiosensing and not biological; eligible as methodological design evidence for T1 only, with PREPRINT flag\",\"eligibility_route\":\"SENSOR_DESIGN\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T1\"],\"target\":\"pressure\",\"matrix\":null,\"inferred_output\":\"optimized structural parameters from surrogate model; pressure-capacitance response prediction\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":null,\"independent_unit\":null,\"contrary_summary\":null}",
+      "scientific_importance": "SUPPORTING",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S1.1"
+      ],
+      "actual_access": {
+        "category": "NO_PMC_COPY_FOUND",
+        "level_read": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P04",
+      "record_id": "R0090",
+      "pmid": "34256559",
+      "doi": "10.1021/acsami.1c09771",
+      "title": "3D Printed Microfluidic Device for Magnetic Trapping and SERS Quantitative Evaluation of Environmental and Biomedical Analytes.",
+      "selection_reason": "adds uncovered subsections; screened SUPPORTING; covers T3 (S1.3), T4 (S1.4), T5 (S2.1), T8 (S2.4); screening reason: {\"rationale\":\"Erlotinib, a clinically used anticancer drug, is quantified by a SERS-microfluidic competitive assay (PFR reporter on azide-functionalized Janus Fe3O4/Au nanostars) with PLS regression on measured spectra. Calibration is reported in water and in ethanol-deproteinized spiked human plasma (LOD_pu 0.54 uM in water, 0.69 uM in plasma). The authors' claim of a first erlotinib SERS quantification in plasma is not independently verified.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"DIRECT_ONCOLOGY_EXPOSURE\",\"informs_themes\":[\"T3\",\"T4\",\"T5\",\"T8\"],\"target\":\"erlotinib (anticancer drug); flumioxazin, crystal violet and p-mercaptobenzoic acid also measured but are non-oncology\",\"matrix\":\"spiked human plasma (K2 EDTA) after ethanol protein precipitation and dilution; also aqueous solution\",\"inferred_output\":\"numerical concentration (PLS-predicted, pseudo-univariate calibration) in spiked samples; no post-administration specimens reported\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"Monovariate band-integral calibrations are reported for CV and MBA only; no simpler baseline for erlotinib is reported\",\"independent_unit\":\"NOT_REPORTED: number of independent plasma specimens not stated; 45-spectrum maps averaged per spot are not independent specimens; cross-validation split unit not stated\",\"contrary_summary\":\"CV SERS signal not detected in the device after magnetic accumulation (desorption during washing); plasma signals weaker and LOD higher than in water, attributed by the authors to dilution and protein corona; no post-dose testing; false-positive risk from acetylene-containing compounds acknowledged for flumioxazin and erlotinib\"}",
+      "scientific_importance": "SUPPORTING",
+      "intended_reading_level": "FULL_TEXT",
+      "informs_sections": [
+        "S1.3",
+        "S1.4",
+        "S2.1",
+        "S2.4"
+      ],
+      "actual_access": {
+        "category": "FULL_TEXT_RETRIEVED",
+        "level_read": "FULL_TEXT",
+        "figure_legends_read": true,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P05",
+      "record_id": "R0131",
+      "pmid": null,
+      "doi": "10.20944/preprints202606.0143.v1",
+      "title": "Electrochemical Aptamer-Based Sensors for In Vivo Pharmacokinetic Monitoring of Anthracycline Chemotherapeutics: Mechanisms, Stability, and the Clinical Translation Landscape",
+      "selection_reason": "adds uncovered subsections; screened CONTEXT; covers T1 (S1.1), T5 (S2.1), T7 (S2.3), T8 (S2.4); screening reason: {\"rationale\":\"Preprint abstract describes a review-type synthesis of electrochemical aptamer-based sensors for in vivo anthracycline pharmacokinetic monitoring, including rodent dual-compartment monitoring and drift countermeasures. AI appears only as one listed advance (AI-guided aptamer design) with no method, output or evaluation stated in the abstract. Qualifies as CONTEXT because it is a secondary synthesis and the abstract does not establish a learned model acting on measured sensor responses. Eligible on topic (anthracycline measurement, nanoscale recognition element, temporal exposure).\",\"eligibility_route\":\"NOT_ESTABLISHED_FROM_ABSTRACT\",\"evidence_role\":\"BENCHMARK_CONTEXT\",\"informs_themes\":[\"T1\",\"T5\",\"T7\",\"T8\"],\"target\":\"anthracyclines (doxorubicin, daunorubicin)\",\"matrix\":\"live rodent plasma and interstitial fluid (per abstract)\",\"inferred_output\":\"continuous or near-continuous readout\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":null,\"independent_unit\":null,\"contrary_summary\":null}",
+      "scientific_importance": "CONTEXT",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S1.1",
+        "S2.1",
+        "S2.3",
+        "S2.4"
+      ],
+      "actual_access": {
+        "category": "NO_PMC_COPY_FOUND",
+        "level_read": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P06",
+      "record_id": "R0032",
+      "pmid": "43072943",
+      "doi": "10.1016/j.aca.2026.346514",
+      "title": "An intelligent fluorescent immunochromatographic platform coupled with machine learning for sensitive quantification of blood p-Tau181.",
+      "selection_reason": "strongest remaining; screened SUPPORTING; covers T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Fluorescent lateral-flow platform using gold nanocluster reporters and an inner-filter-effect signal, with KNN classification and Gaussian process regression on the fluorescence signal to discriminate and quantify blood p-Tau181; non-oncology biomarker included only as a non-drug method example for the signal-task and evaluation questions; abstract only\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"BENCHMARK_CONTEXT\",\"informs_themes\":[\"T3\",\"T4\"],\"target\":\"phosphorylated tau 181 (p-Tau181)\",\"matrix\":\"PBS buffer; human serum; preliminary plasma (as stated in abstract)\",\"inferred_output\":\"concentration category classification (KNN) and numerical concentration prediction (GPR)\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"not stated in abstract\",\"independent_unit\":null,\"contrary_summary\":\"none identified in abstract; specificity against non-phosphorylated and other phosphorylated tau isoforms is reported as positive\"}",
+      "scientific_importance": "SUPPORTING",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S1.3",
+        "S1.4"
+      ],
+      "actual_access": {
+        "category": "NO_PMC_COPY_FOUND",
+        "level_read": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    },
+    {
+      "paper_id": "P07",
+      "record_id": "R0060",
+      "pmid": "42526412",
+      "doi": "10.1016/j.saa.2026.128494",
+      "title": "Machine learning enabled surface-enhanced Raman spectroscopy quantitative analysis for food safety monitoring.",
+      "selection_reason": "strongest remaining; screened SUPPORTING; covers T2 (S1.2), T3 (S1.3), T4 (S1.4); screening reason: {\"rationale\":\"Abstract reports SERS on silver nanocubes quantifying crystal violet in fish matrices using PLS, SVM and RF regression on measured spectra: a nanoscale signal-generating component with a learned model estimating a numerical concentration. Non-oncology, non-drug food-safety analyte; retained as methodological evidence for T2/T3/T4 questions only, with application scope labelled. Abstract-only access.\",\"eligibility_route\":\"SENSOR_INTERPRETATION\",\"evidence_role\":\"METHODOLOGICAL\",\"informs_themes\":[\"T2\",\"T3\",\"T4\"],\"target\":\"crystal violet residues (prohibited dye; not an anticancer drug)\",\"matrix\":\"fish matrices (specific tissue not stated in abstract)\",\"inferred_output\":\"numerical concentration estimation (ppm)\",\"target_reference\":null,\"analytical_reference\":null,\"ai_baseline\":\"PLS regression (linear chemometric) and SVM regression compared with RF; PLS R2 0.9529 reported\",\"independent_unit\":null,\"contrary_summary\":\"Abstract reports PLS limited by linear assumptions and overfitting, and SVM robust mainly at lower concentrations with noise; RF test-set R2 0.9926 and MAE 0.0046 ppm reported. No null or negative result about the RF approach is stated in the abstract.\"}",
+      "scientific_importance": "SUPPORTING",
+      "intended_reading_level": "ABSTRACT",
+      "informs_sections": [
+        "S1.2",
+        "S1.3",
+        "S1.4"
+      ],
+      "actual_access": {
+        "category": "NO_PMC_COPY_FOUND",
+        "level_read": "ABSTRACT",
+        "figure_legends_read": false,
+        "figure_images_inspected": false,
+        "supplements_inspected": false
+      }
+    }
+  ]
+}
