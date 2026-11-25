@@ -1,0 +1,88 @@
+﻿{
+  "table_ids": [
+    "tbl1"
+  ],
+  "reviewed_image_tables": {
+    "tbl1": {
+      "pmcid": "PMC13397890",
+      "doi": "10.1021/acs.nanolett.6c01777",
+      "table_id": "tbl1",
+      "graphic": "nl6c01777_0010.jpg",
+      "source_url": "https://pmc-oa-opendata.s3.amazonaws.com/PMC13397890.1/nl6c01777_0010.jpg",
+      "sha256": "169c71ed22498e658d4064c0713ac999e0cf4b21ec360c43b3ba3c22bf1d0d49",
+      "footnote": "Red cells indicate a wavelength shift as the primary means of detection for the SWCNT, while blue cells indicate a change in intensity.",
+      "headings": [
+        "Anthracycline",
+        "Dissociation constant",
+        "Concentration-based PCA",
+        "Type classification by XGBoost"
+      ],
+      "signals": {
+        "red": "wavelength shift",
+        "blue": "intensity change"
+      },
+      "rows": [
+        [
+          "Daunorubicin",
+          [
+            "GGACGC-(8,7)",
+            "blue"
+          ],
+          [
+            "(TAT)₆-(10,2)",
+            "red"
+          ],
+          [
+            "(TCG)₄TC-(9,5)+(10,3)",
+            "red"
+          ]
+        ],
+        [
+          "Doxorubicin",
+          [
+            "(ATTT)₄-(10,2)",
+            "blue"
+          ],
+          [
+            "(T)₁₂-(9,4)",
+            "blue"
+          ],
+          [
+            "(GT)₃₀-(7,5)",
+            "blue"
+          ]
+        ],
+        [
+          "Epirubicin",
+          [
+            "(CTG)₃C-(9,4)",
+            "blue"
+          ],
+          [
+            "(TAT)₆-(7,6)",
+            "blue"
+          ],
+          [
+            "(T)₁₂-(8,7)",
+            "red"
+          ]
+        ],
+        [
+          "Idarubicin",
+          [
+            "CCGCGG-(8,7)",
+            "red"
+          ],
+          [
+            "(GT)₃₀-(9,4)",
+            "blue"
+          ],
+          [
+            "(CTG)₃C-(10,2)",
+            "red"
+          ]
+        ]
+      ]
+    }
+  }
+}

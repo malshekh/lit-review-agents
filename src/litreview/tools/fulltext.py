@@ -293,7 +293,7 @@ def _structured_material(tree):
     from ..paths import SCHEMAS_DIR
     ids = {x.get("pub-id-type"): (x.text or "").strip() for x in tree.findall("./front/article-meta/article-id")}
     path = SCHEMAS_DIR / "source_material_contracts" / f"{ids.get('pmid')}.json"
-    contract = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    contract = json.loads(path.read_text(encoding="utf-8-sig")) if path.exists() else {}
     body = tree.find("./body")
     body_sections = body.findall("./sec") if body is not None else []
     for group in contract.get("body_groups", []):
@@ -315,7 +315,26 @@ def _structured_material(tree):
     content, table_report, figure_report = {}, [], []
     for index, node in enumerate(tabs, 1):
         table = node.find(".//table")
-        if table is None: raise FullTextUnavailable("Image-only or missing table requires source remediation")
+        if table is None:
+            import hashlib
+            reviewed = contract.get("reviewed_image_tables", {}).get(node.get("id"))
+            if not reviewed:
+                raise FullTextUnavailable("Image-only or missing table requires source remediation")
+            graphic = node.find("graphic")
+            href = graphic.get("{http://www.w3.org/1999/xlink}href") if graphic is not None else None
+            if (ids.get("pmcid") != reviewed["pmcid"] or ids.get("doi") != reviewed["doi"]
+                    or href != reviewed["graphic"] or _text(node.find("table-wrap-foot/fn/p")) != reviewed["footnote"]
+                    or hashlib.sha256((path.parent / reviewed["graphic"]).read_bytes()).hexdigest() != reviewed["sha256"]):
+                raise FullTextUnavailable("Reviewed table image, article identity or legend mismatch")
+            label = node.findtext("label")
+            content[f"Table {label}"] = json.dumps({"caption": _text(node.find("caption")), **reviewed}, ensure_ascii=False)
+            for row, *cells in reviewed["rows"]:
+                for column, (value, color) in zip(reviewed["headings"][1:], cells, strict=True):
+                    location = f"Table {label} | {row} | {column}"
+                    content[location] = f"{row} | {column} | {value} | {color} | {reviewed['signals'][color]}"
+            table_report.append({"id": node.get("id"), "image_inspected": True, "image_sha256": reviewed["sha256"],
+                                 "method": "visually verified transcription", "rows": len(reviewed["rows"])})
+            continue
         info = {"id": node.get("id"), "label": node.findtext("label") or str(index),
                 "caption": _text(node.find("caption")), "footnotes": _text(node.find("table-wrap-foot")), **_grid(table)}
         content[f"Table {info['label']}"] = json.dumps(info, ensure_ascii=False)
