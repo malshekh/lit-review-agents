@@ -101,7 +101,7 @@ def test_paper_can_inform_multiple_approved_themes_without_inventing_one(run):
 
 def test_search_repair_retains_prior_successful_discovery_and_yields(run,monkeypatch):
     plans=iter([{'query_families':[]},{'query_families':[]}])
-    monkeypatch.setattr(run,'agent',lambda *a,**k:next(plans))
+    monkeypatch.setattr(approved_scope,'search_plan',lambda *a,**k:next(plans))
     rows=[]
     for i in (1,2):
         record=Record('pubmed','Independent sensor '+str(i),pmid=str(i),query_family_id='Q'+str(i)).to_dict()
@@ -112,3 +112,29 @@ def test_search_repair_retains_prior_successful_discovery_and_yields(run,monkeyp
     assert run.stage_search(run.state())=='qualify'
     assert len(run.load('records.json'))==2
     assert [r['family_id'] for r in run.load('search_log.json')]==['Q1','Q2']
+
+
+def test_bounded_question_planning_merges_all_eight_without_resending_old_failure(run,monkeypatch):
+    seen=[]
+    def agent(a,p,step):
+        seen.append((p,step));sid=p['planning_unit']['section_id']
+        return {'agent_id':'A03-LM','prompt_version':'0.7','status':'COMPLETE','warnings':[],'limitations':[],
+                'mode':p['mode'],'spec_version':'0.1','plan_version':'unit','concept_blocks':[],
+                'query_families':[{'family_id':'Q1','purpose':'THEME','theme_or_position':sid,'section_ids':[sid],
+                  'logic':'sensing and task','sources':['pubmed'],'routing_reason':'biomedical','compiled':[{'source':'pubmed','query':'sensor learning'}],
+                  'context_blocks_applied':[],'filters':{'date_from':None,'date_to':None,'languages':[],'publication_types_excluded':[]},
+                  'not_terms':[],'max_records':3,'expected_failure_modes':[]}],
+                'citation_expansion_seed_families':['Q1'],'repairs':[],'seeds_not_recalled':[]}
+    monkeypatch.setattr(run,'agent',agent)
+    spec=run.load('spec_approved.json');budget={'max_records_total':150,'max_records_per_family':60}
+    plan=approved_scope.search_plan(run,spec,{'pubmed':{}},budget)
+    assert len(seen)==8 and len(plan['query_families'])==8
+    assert len({f['family_id'] for f in plan['query_families']})==8
+    assert all(len(p['researcher_outline']['sections'])==1 and p['budget']['max_records_total']==18 for p,step in seen)
+    assert all(step!='A03-LM_plan' for p,step in seen)
+    assert all('scope_guide' not in p['review_spec'].get('researcher_decision',{}) for p,step in seen)
+    reports={'families':[{'family_id':f['family_id'],'returned':1,'error':None} for f in plan['query_families']]}
+    # An unavailable source is preserved, not an excuse to repeat all paid unit plans.
+    reports['families'][0].update(returned=0,error='SOURCE_UNAVAILABLE')
+    approved_scope.search_plan(run,spec,{'pubmed':{}},budget,mode='REPAIR',execution=reports,repair_number=1)
+    assert len(seen)==8

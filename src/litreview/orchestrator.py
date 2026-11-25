@@ -951,10 +951,14 @@ class Run:
         sources = enabled_sources()
         rcfg = self.cfg["retrieval"]
         budget = {"max_records_total": rcfg["max_records_total"], "max_records_per_family": rcfg["max_records_per_family"]}
-        plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
-                                     "budget": budget, "corpus_policy": corpus_policy.resolve(self),
-                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
-                                     **self._outline_input()}, step="A03-LM_plan")
+        from .approved_scope import guide, search_plan
+        if guide(self):
+            plan = search_plan(self, spec, sources, budget)
+        else:
+            plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
+                                         "budget": budget, "corpus_policy": corpus_policy.resolve(self),
+                                         "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
+                                         **self._outline_input()}, step="A03-LM_plan")
         self.save("search_plan.json", plan)
         self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
@@ -964,11 +968,14 @@ class Run:
             report = self._execution_report(plan, results, seeds)
             if not report["problems"]:
                 break
-            plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
-                                         "budget": budget, "previous_plan": plan,
-                                         "execution_report": report["families"],
-                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
-                                         **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
+            if guide(self):
+                plan = search_plan(self, spec, sources, budget, mode='REPAIR', previous=plan, execution=report, repair_number=i+1)
+            else:
+                plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
+                                             "budget": budget, "previous_plan": plan,
+                                             "execution_report": report["families"],
+                                             "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
+                                             **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
             self.save("search_plan.json", plan)
             self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)

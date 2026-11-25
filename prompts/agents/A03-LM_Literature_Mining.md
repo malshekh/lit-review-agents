@@ -211,3 +211,13 @@ Do not start from named candidate publications or seed papers. Budget the sum of
 returned records across compiled sources within max_records_total, while searching
 each question. Record translation limitations and actual search date; do not
 infer a field-wide evidence gap from a narrow search or missing access.
+
+
+## Bounded planning units
+When planning_unit is present, its covers_only_this_question flag localizes this
+call: plan only its single supplied question, not all eight questions. Code merges
+the independently planned units. One theme family plus at most one contrary/review
+family is sufficient for the unit. Keep concepts and rationales compact, and obey
+the unit's record budget across compiled sources. Global coverage is code's merge
+responsibility. In REPAIR mode address only the supplied execution reports; source
+outages remain recorded failures and are not evidence of a topic's absence.

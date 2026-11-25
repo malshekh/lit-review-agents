@@ -3,10 +3,10 @@ from pathlib import Path
 import datetime,io,json,shutil,subprocess,sys,tarfile
 import build_runtime
 REPO=Path(__file__).resolve().parents[1]
-OLD=Path(r'C:\Users\maykh\LitReviewStage1\execution-20261124-v27-pilot7-a06-only-50usd')
-DEST=Path(r'C:\Users\maykh\LitReviewStage1\execution-20261124-v28-pilot7-discovery-cp2-50usd')
+OLD=Path(r'C:\Users\maykh\LitReviewStage1\execution-20261124-v28-pilot7-discovery-cp2-50usd')
+DEST=Path(r'C:\Users\maykh\LitReviewStage1\execution-20261124-v29-pilot7-discovery-units-cp2-50usd')
 RUN='20261123-214928'
-SOURCE_PIN='4c6cb2cd1f025c85976f530b7afe22294af5837072b9e9d97598b6c471e618c8'
+SOURCE_PIN='7273992b9e12a4b9fc7d94ea42100cf429130b40dd46140259418a13750a5c89'
 def git(*a):return subprocess.check_output(['git',*a],cwd=REPO)
 def write(p,v):p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(v,indent=2)+'\n',encoding='utf-8')
 def main():
@@ -18,7 +18,7 @@ def main():
     verify(OLD,json.loads((OLD/'frozen_runtime_manifest.json').read_text()))
     source=OLD/'runs'/RUN
     before={p.relative_to(source).as_posix():sha(p) for p in source.rglob('*') if p.is_file()}
-    assert not (source/'checkpoints/CP1_approved.json').exists()
+    assert (source/'checkpoints/CP1_approved.json').exists()
     commit=git('rev-parse','HEAD').decode().strip();DEST.mkdir()
     with tarfile.open(fileobj=io.BytesIO(git('archive','--format=tar',commit,*build_runtime.FROM_GIT))) as tar:tar.extractall(DEST,filter='data')
     for relative in build_runtime.FROM_RUNTIME:
@@ -35,20 +35,20 @@ def main():
     write(DEST/'pilot_retained_hold_authorization.json',retained)
     authorization={'run_id':RUN,'approved_by':'May Khalid: explicit CP1 decision in chat','scope_guide_sha256':sha(DEST/'docs/pilot7/cp1_scope_guide/approved_scope_guide.json'),
                    'stop_at':'CP2','max_publications':7,'combined_cap_usd':50,'review_points_usd':[25,48],'CP1_approval_authorized':True,'CP2_approval_authorized':False,'no_seed_papers':True,
-                   'baseline_spend_usd':0.3256706,'baseline_held_usd':0.124671,'user_instructions':'Approved P1, eight discovery themes, two eligibility routes, evidence roles, six manuscript subheadings; preserve receipts and all holds. No corpus freeze or paid extraction.'}
+                   'baseline_spend_usd':0.5012766,'baseline_held_usd':0.124671,'user_instructions':'Approved P1, eight discovery themes, two eligibility routes, evidence roles, six manuscript subheadings; preserve receipts and all holds. No corpus freeze or paid extraction.'}
     write(DEST/'pilot_discovery_authorization.json',authorization)
-    manifest={'runtime_version':'stage1-v28-pilot7-discovery-cp2-50usd','git_commit':commit,'runtime_builder_sha256':sha(Path(__file__)),
+    manifest={'runtime_version':'stage1-v29-pilot7-discovery-units-cp2-50usd','git_commit':commit,'runtime_builder_sha256':sha(Path(__file__)),
               'built_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,
               'files':{p.relative_to(DEST).as_posix():sha(p) for p in DEST.rglob('*') if p.is_file() and p.relative_to(DEST).as_posix()!='records/model_record.jsonl'},
               'mutable_telemetry':{'baseline':'candidate/model_record_baseline.jsonl'}}
     write(DEST/'frozen_runtime_manifest.json',manifest);pin=sha(DEST/'frozen_runtime_manifest.json');verify(DEST,manifest)
     target=DEST/'runs'/RUN;shutil.copytree(source,target)
     assert all(sha(target/name)==h for name,h in before.items())
-    shutil.copy2(target/'input/runtime_pin.json',target/'input/runtime_pin.v27.json')
+    shutil.copy2(target/'input/runtime_pin.json',target/'input/runtime_pin.v28.json')
     write(target/'input/runtime_pin.json',{'run_id':RUN,'runtime':str(DEST),'manifest_sha256':pin,'reviewed_commit':commit})
-    write(target/'migration/v28_continuation.json',{'run_id':RUN,'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,
+    write(target/'migration/v29_continuation.json',{'run_id':RUN,'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,
           'runtime':str(DEST),'manifest_sha256':pin,'commit':commit,'original_run_files_sha256':before,'authorization':authorization,'new_paid_calls_at_migration':0})
     assert all(sha(source/name)==h for name,h in before.items())
     result={'runtime':str(DEST),'commit':commit,'manifest_sha256':pin,'run_id':RUN,**verify(DEST,manifest)}
-    write(REPO/'runs/v28_runtime_pin.json',result);print(json.dumps(result,indent=2))
+    write(REPO/'runs/v29_runtime_pin.json',result);print(json.dumps(result,indent=2))
 if __name__=='__main__':main()

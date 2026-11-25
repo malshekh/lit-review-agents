@@ -1,0 +1,18 @@
+{
+  "run_id": "20261123-214928",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v28-pilot7-discovery-cp2-50usd",
+  "source_manifest_sha256": "7273992b9e12a4b9fc7d94ea42100cf429130b40dd46140259418a13750a5c89",
+  "operation": "A03-LM_plan",
+  "provider": "openai",
+  "model": "gpt-6.1-sol",
+  "stop_reason": "length",
+  "output_tokens": 12000,
+  "response_text_characters": 0,
+  "receipt_sha256": "690eae6ee4d42535c89c3fd968ce4af1224e3ea26fd278671e78f34347a33449",
+  "actual_cost_usd": 0.175606,
+  "recorded_total_after_failure_usd": 0.5012766,
+  "existing_held_usd": 0.124671,
+  "new_hold": false,
+  "request_repeated": false,
+  "recovery": "Same model/schema/12000 token cap; one approved question per separately identified request; original response and cost preserved."
+}

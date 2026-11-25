@@ -80,3 +80,53 @@ def extend_screened_themes(run,qualifications,framework):
         if not isinstance(extra,list):extra=[]
         q['themes']=sorted(set(q.get('themes',[]))|{t for t in extra if isinstance(t,str) and t in valid})
         qualifications[rid]=q
+
+
+def search_plan(run,spec,sources,budget,mode='PLAN',previous=None,execution=None,repair_number=0):
+    """One approved question per request; unchanged model, schema and output cap.
+
+    A failed monolithic planning receipt is never reused as a valid plan, erased,
+    or resent. Each bounded unit has its own durable request identity.
+    """
+    from . import run_spec
+    outline,_=run_spec.load(run.dir)
+    questions=[s for s in outline['sections'] if s.get('parent_section_id')]
+    plans=[]
+    for question in questions:
+        sid=question['section_id']
+        old=run.load('search_units/'+sid+'.json')
+        reports=[r for r in (execution or {}).get('families',[]) if str(r.get('family_id','')).startswith(sid+'_')]
+        # A source/authorization outage is not repaired by repeating the same
+        # scientific planning call. Preserve its error; repair genuine zero-yield
+        # queries only, with the existing max_search_repairs bound.
+        needs=mode=='PLAN' or any(not r.get('error') and not r.get('returned') for r in reports)
+        if mode=='REPAIR' and not needs and old is not None:
+            plans.append(old);continue
+        compact={k:copy.deepcopy(spec.get(k)) for k in ('spec_version','central_question','selection_criteria','scope','audience')}
+        compact['approved_perspective']='P1'
+        compact['word_count_answer']=spec.get('researcher_decision',{}).get('answers_to_questions',{})
+        unit_budget={**budget,'max_records_total':max(1,int(budget['max_records_total'])//len(questions))}
+        payload={'mode':mode,'review_spec':compact,'sources_enabled':sources,'budget':unit_budget,
+                 'corpus_policy':__import__('litreview.corpus_policy',fromlist=['resolve']).resolve(run),
+                 'researcher_outline':{'review_question':outline['review_question'],'scope_statement':outline['scope_statement'],
+                    'global_instructions':outline.get('global_instructions',[]),'sections':[question]},
+                 'planning_unit':{'section_id':sid,'covers_only_this_question':True,
+                     'instruction':'Plan ONLY this one question now. Code combines all eight units. Return one THEME family and at most one contrary or review family, each tied only to this section. Keep concept blocks to at most four with at most three terms each. Use short phrases and one-sentence rationales. Do not plan the entire review. No literature claims, novelty assessment or exhaustive vocabulary are needed. Use plain terms and no controlled vocabulary unless supplied. Do not name seed publications. Keep the sum of max_records over compiled sources/families within this unit budget. Actual discovery and citations occur in code.'}}
+        if mode=='REPAIR':payload.update(previous_plan=old,execution_report=reports,seed_recall=[])
+        step='A03-LM_'+('unit_plan' if mode=='PLAN' else 'unit_repair'+str(repair_number))+'_'+sid.replace('.','_')
+        plan=run.agent('A03-LM',payload,step=step)
+        run._agent_human_review('A03-LM',step,plan)
+        old_ids={f['family_id']:sid+'_'+f['family_id'].removeprefix(sid+'_') for f in plan.get('query_families',[])}
+        for family in plan.get('query_families',[]):
+            if family.get('section_ids') and set(family['section_ids'])!={sid}:raise ValueError('Planning unit changed its approved question')
+            family['family_id']=old_ids[family['family_id']];family['section_ids']=[sid]
+        plan['citation_expansion_seed_families']=[old_ids.get(f,f) for f in plan.get('citation_expansion_seed_families',[])]
+        for repair in plan.get('repairs',[]):repair['family_id']=old_ids.get(repair['family_id'],repair['family_id'])
+        run.save('search_units/'+sid+'.json',plan);plans.append(plan)
+    merged=copy.deepcopy(plans[0])
+    for key in ('concept_blocks','query_families','citation_expansion_seed_families','repairs','seeds_not_recalled','warnings','limitations'):
+        merged[key]=[value for plan in plans for value in plan.get(key,[])]
+    merged.update(mode=mode,plan_version='approved-question-units-1',status='COMPLETE_WITH_WARNINGS' if merged['warnings'] else 'COMPLETE')
+    from .agents.base import validate
+    validate('A03-LM',merged)
+    return merged
