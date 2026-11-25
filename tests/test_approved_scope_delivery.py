@@ -152,3 +152,16 @@ def test_duplicate_guide_copies_removed_without_losing_unique_rules_or_mutating_
     assert payload['review_spec']['selection_criteria']==original['selection_criteria']
     other=copy.deepcopy(spec);other['approved_scope_guide']={'distinct':'retain'}
     assert approved_scope.enrich(run,'A04-CQ',{'review_spec':other})['review_spec']['approved_scope_guide']=={'distinct':'retain'}
+
+
+def test_screening_batch_override_is_at_the_effective_profile_level():
+    from litreview import config
+    import yaml
+    import copy
+    pipeline=yaml.safe_load((ROOT/'config/pipeline.yaml').read_text(encoding='utf-8'))
+    pipeline=copy.deepcopy(pipeline)
+    pipeline['profiles']['pilot7'].setdefault('overrides',{}).setdefault('loops',{})['cq_batch_size']=4
+    effective=config._merge(pipeline,pipeline['profiles']['pilot7']['overrides'])
+    assert effective['loops']['cq_batch_size']==4
+    assert effective['agents']['A04-CQ']['max_tokens']==pipeline['agents']['A04-CQ']['max_tokens']==16000
+    assert effective['agents']['A04-CQ']['model']==pipeline['agents']['A04-CQ']['model']

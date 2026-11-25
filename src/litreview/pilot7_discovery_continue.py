@@ -109,6 +109,14 @@ def main(root,run_id,action):
     guide=json.loads((root/'docs/pilot7/cp1_scope_guide/approved_scope_guide.json').read_text())
     assert sha(root/'docs/pilot7/cp1_scope_guide/approved_scope_guide.json')==auth['scope_guide_sha256']
     assert not [x for x in (run.dir/'input/seeds.txt').read_text().splitlines() if x.strip()]
+    if action=='audit':
+        return {'state':run.state(),'effective_screening_batch_size':run.cfg['loops']['cq_batch_size'],
+                'expected_screening_batch_size':auth.get('expected_screening_batch_size'),
+                'spend_cap_usd':run.budget.cap,'review_points_usd':run.budget.review_points,
+                'spent_usd':run.budget.spent(),'held_usd':run.budget.reserved(),
+                'models':{a:{'provider':config.agent_model(a).provider,'model':config.agent_model(a).model,'max_tokens':config.agent_model(a).max_tokens} for a in ('A03-LM','A04-CQ')}}
+    if auth.get('expected_screening_batch_size') is not None and run.cfg['loops']['cq_batch_size']!=auth['expected_screening_batch_size']:
+        raise ValueError('Effective screening batch size differs from the sealed authorization; no dispatch')
     if action=='approve-cp1':
         assert run.state()['stage']=='cp1'
         if not checkpoints.approved(run.dir,'CP1'):

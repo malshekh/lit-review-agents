@@ -20,3 +20,23 @@ The approval-service usage-limit rejection affected one offline inspection; it
 was retried through the same approval path after the user said Continue and
 succeeded. No approval check was bypassed. The usual scientist checkpoints and
 CP2-before-extraction stop remain in force.
+
+
+## Effective-profile correction
+
+V30's initial batch override was mistakenly placed under profiles.pilot7.loops,
+which config.effective does not merge into runtime loops. Actual request B002
+therefore still contained 20 records, although duplicate-guide removal applied.
+It reached max_tokens, cost $0.0135221 and was fully accounted with no new hold.
+It was not interrupted or blindly repeated. Recorded spending is $0.8813451;
+the original five holds remain $0.124671. This is combined pilot spending;
+smoke exposure remains $0.3785106, below its separate $1 allowance.
+
+V31 uses profiles.pilot7.overrides.loops.cq_batch_size=4. The builder asserts the
+effective merged value. The sealed authorization binds the expected batch size,
+and the launcher refuses dispatch on mismatch. A new audit action reports the
+actual effective size, model/token caps, spending cap and review points before
+paid execution. Focused regression suite: **33 passed** after this correction;
+last full suite **1,160 passed**. Models, 16,000-token A04 cap and financial limits
+are unchanged. The old attempted overrides and both failed dispatches remain in
+prior sealed runtimes and migrated receipts for audit.
