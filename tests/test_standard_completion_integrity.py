@@ -121,16 +121,17 @@ def test_batch_receipt_across_restart(replay, damage):
         for _ in range(2):assert verify(root,manifest)['telemetry_appends_verified']==5
 
 
-def test_only_newly_created_plan_hold_can_enter_agent(tmp_path):
+@pytest.mark.parametrize("turn", ["PLAN","GROUP_G0001_LOOKUP0","RECONCILE_0001_LOOKUP1","FINAL"])
+def test_only_newly_created_synthesis_hold_can_enter_agent(tmp_path, turn):
     from types import SimpleNamespace
     from litreview.orchestrator import Run
     from litreview.job_ledger import Ledger
-    step = 'A07-SYN_job0123456789abcdef_PLAN'
-    key = 'a07-0123456789abcdef-PLAN'
+    step = 'A07-SYN_job0123456789abcdef_'+turn
+    key = 'a07-0123456789abcdef-'+turn
     run = SimpleNamespace(dir=tmp_path, budget=SimpleNamespace(entries=lambda: []))
-    check = lambda holds: Run._fresh_plan_reservation(run, 'A07-SYN', step, key, holds)
+    check = lambda holds: Run._fresh_synthesis_reservation(run, 'A07-SYN', step, key, holds)
     assert not check([key])
-    run._active_plan_reservation = key
+    run._active_synthesis_reservation = key
     assert check([key])
     assert not check([key, 'unresolved-other'])
     path=tmp_path/'data/job_ledger.jsonl'

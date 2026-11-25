@@ -44,7 +44,7 @@ def main():
     seal(OLD, DEST, manifest, before, SOURCE_PIN, 'v33', 'v34', Path(__file__))
 
 
-def seal(OLD, DEST, manifest, before, SOURCE_PIN, previous_version, version, builder):
+def seal(OLD, DEST, manifest, before, SOURCE_PIN, previous_version, version, builder, stop_at="CP_SYN"):
     from build_pilot7_readiness_runtime import REPO, git, write
     from build_runtime import FROM_GIT, FROM_RUNTIME
     from litreview.runtime_integrity import sha, verify
@@ -61,7 +61,7 @@ def seal(OLD, DEST, manifest, before, SOURCE_PIN, previous_version, version, bui
         else:shutil.copy2(a,b)
     shutil.copy2(DEST/'scripts/runtime_bootstrap.py',DEST/'bootstrap.py')
     new={'runtime_version':DEST.name,'git_commit':commit,'runtime_builder_sha256':sha(builder),
-         'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,'stop_at':'CP_SYN',
+         'source_runtime':str(OLD),'source_manifest_sha256':SOURCE_PIN,'stop_at':stop_at,
          'built_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),
          'mutable_telemetry':manifest['mutable_telemetry'],
          'files':{p.relative_to(DEST).as_posix():sha(p) for p in DEST.rglob('*') if p.is_file()

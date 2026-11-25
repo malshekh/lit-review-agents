@@ -426,7 +426,7 @@ class Run:
             from .retained_hold import blocking_holds
             hold_auth = REPO_ROOT/'pilot_retained_hold_authorization.json'
             blocked = blocking_holds(self.budget, hold_auth) if hold_auth.exists() else []
-            if blocked and not self._fresh_plan_reservation(agent_id, step, reservation_key, blocked):
+            if blocked and not self._fresh_synthesis_reservation(agent_id, step, reservation_key, blocked):
                 raise Pause('New unresolved dispatch; preserve its hold and reconcile before continuing')
         payload = enrich(self, agent_id, payload)
         if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
@@ -645,12 +645,11 @@ class Run:
                           "provider": m.provider, "accepted_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         pilot.atomic(self.data("receipts.json"), receipts)
 
-    def _fresh_plan_reservation(self, agent, step, key, blocked):
-        # The run lock covers the caller's absence check, reservation and first send.
+    def _fresh_synthesis_reservation(self, agent, step, key, blocked):
         from .job_ledger import Ledger
-        return (agent == "A07-SYN" and re.fullmatch(r"A07-SYN_job[0-9a-f]{16}_PLAN", step)
-                and key == "a07-" + step[len("A07-SYN_job"):-len("_PLAN")] + "-PLAN"
-                and blocked == [key] and getattr(self, "_active_plan_reservation", None) == key
+        match = re.fullmatch(r"A07-SYN_job([0-9a-f]{16})_(PLAN|FINAL|(?:GROUP_G|RECONCILE_)[0-9]{4}_LOOKUP[0-9]+)", step)
+        return (agent == "A07-SYN" and match and key == f"a07-{match[1]}-{match[2]}"
+                and blocked == [key] and getattr(self, "_active_synthesis_reservation", None) == key
                 and not Ledger(self.dir).events(step)
                 and not any(e.get("reservation_key") == key for e in self.budget.entries()))
 
@@ -2719,6 +2718,14 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
+            if mode != "PLAN":
+                decision = checkpoints.approved(self.dir, "CP_SYN")
+                if not decision or decision.get("fingerprint") != job.identity or not (
+                        decision.get("approve_alignment") and decision.get("keep_approved_framework")):
+                    raise Pause("A07 synthesis requires the matching approved CP_SYN decision")
+                plan = job._committed("PLAN")
+                payload = {**payload, "cp_syn_researcher_decision": decision,
+                           "reviewed_organization_proposals": plan["theme_change_proposals"]}
             tokens, limit, usd = self._a07_quote(mode, payload, count)
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")
@@ -2728,8 +2735,7 @@ class Run:
             ok, available = self._reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation", steps=[f"A07-SYN_job{tag}_{name}"])
             if not ok:
                 raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
-            if mode == "PLAN":
-                self._active_plan_reservation = key
+            self._active_synthesis_reservation = key
             try:
                 out = self.agent("A07-SYN", payload, step=f"A07-SYN_job{tag}_{name}",
                                  overrides={"cache_system": True, "cache_payload": (), "cache_ttl": scfg.get("cache_ttl", "1h"),
@@ -2748,7 +2754,7 @@ class Run:
                     self.budget.release(key)
                 raise
             finally:
-                self._active_plan_reservation = None
+                self._active_synthesis_reservation = None
             self.budget.release(key)
             return out
 
