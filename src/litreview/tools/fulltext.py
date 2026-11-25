@@ -56,6 +56,26 @@ def _digest(sections):
     return hashlib.sha256(json.dumps(sections, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def normalize_pmcid(value):
+    """Canonicalize syntax only; a well-formed PMCID still requires publication verification."""
+    import re
+    value = str(value or "").strip().upper()
+    match = re.fullmatch(r"(?:PMC)?([1-9][0-9]*)", value)
+    return "PMC" + match.group(1) if match else None
+
+
+def _title_key(value):
+    import unicodedata
+    return "".join(c for c in unicodedata.normalize("NFKD", str(value or "")).casefold() if c.isalnum())
+
+
+def article_identity(tree):
+    ids = {x.get("pub-id-type"): (x.text or "").strip()
+           for x in tree.findall("./front/article-meta/article-id")}
+    ids["title"] = _text(tree.find("./front/article-meta/title-group/article-title"))
+    return ids
+
+
 def identity_problems(record, ids) -> str | None:
     """Why the XML's article identifiers do not identify this record, or None. The PMCID must match, every PMID and
     DOI the record has must match the XML, and at least one of them must be present: a PMCID alone is not checked
@@ -65,12 +85,14 @@ def identity_problems(record, ids) -> str | None:
         return "PMCID missing"
     if not pmid and not doi:
         return "neither PMID nor DOI on the record: identity cannot be confirmed"
-    if _pmc_identity(ids) != pmcid.removeprefix("PMC"):
+    if _pmc_identity(ids) != (normalize_pmcid(pmcid) or "").removeprefix("PMC"):
         return "PMCID mismatch"
     if pmid and ids.get("pmid") != pmid:
         return "PMID mismatch"
     if doi and ids.get("doi", "").lower() != doi.lower():
         return "DOI mismatch"
+    if record.get("title") and _title_key(record["title"]) != _title_key(ids.get("title")):
+        return "title missing or mismatch"
     return None
 
 
@@ -84,8 +106,8 @@ def verify_cached_source(record, sections, source):
         raise FullTextUnavailable("Cached source encoding invalid") from exc
     if (not isinstance(source, dict) or source.get("verified") is not True
             or source.get("pmid") != (str(record["pmid"]) if record.get("pmid") else None)
-            or source.get("pmcid") != record.get("pmcid")
-            or source.get("url") != URL.format(pmcid=record.get("pmcid"))
+            or normalize_pmcid(source.get("pmcid")) != normalize_pmcid(record.get("pmcid"))
+            or source.get("url") != URL.format(pmcid=normalize_pmcid(record.get("pmcid")))
             or source.get("sections_sha256") != _digest(sections)
             or not isinstance(source.get("xml_base64"), str)
             or source.get("xml_sha256") != hashlib.sha256(raw).hexdigest()
@@ -96,7 +118,7 @@ def verify_cached_source(record, sections, source):
         tree = ET.fromstring(base64.b64decode(source["xml_base64"], validate=True))
     except (ValueError, ET.ParseError) as exc:
         raise FullTextUnavailable("Cached source XML invalid") from exc
-    ids = {x.get("pub-id-type"): (x.text or "").strip() for x in tree.findall("./front/article-meta/article-id")}
+    ids = article_identity(tree)
     if identity_problems(record, ids):
         raise FullTextUnavailable("Cached source XML identity mismatch")
     body = tree.find("./body")
@@ -141,7 +163,9 @@ def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[st
                          timeout=timeout, headers=HEADERS)
         if r.status_code == 200:
             hits = (r.json().get("resultList") or {}).get("result") or []
-            pmcid = next((h.get("pmcid") for h in hits if h.get("pmcid")), None)
+            pmcid = next((normalize_pmcid(h.get("pmcid")) for h in hits if h.get("pmcid")
+                          and (not pmid or str(h.get("id")) == pmid)
+                          and (not doi or str(h.get("doi") or "").lower() == doi.lower())), None)
             if pmcid:
                 return pmcid, "found (Europe PMC)"
             reasons.append("Europe PMC lists no PMC copy" if hits else "Europe PMC has no record")
@@ -153,7 +177,9 @@ def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[st
         r = requests.get(IDCONV, params={"ids": pmid or doi, "format": "json", "tool": "litreview"}, timeout=timeout,
                          headers=HEADERS)
         if r.status_code == 200:
-            pmcid = next((x.get("pmcid") for x in r.json().get("records") or [] if x.get("pmcid")), None)
+            pmcid = next((normalize_pmcid(x.get("pmcid")) for x in r.json().get("records") or [] if x.get("pmcid")
+                          and (not pmid or str(x.get("pmid")) == pmid)
+                          and (not doi or str(x.get("doi") or "").lower() == doi.lower())), None)
             if pmcid:
                 return pmcid, "found (NCBI ID converter)"
             reasons.append("NCBI lists no PMC copy")
@@ -164,6 +190,24 @@ def find_pmcid(pmid: str | None, doi: str | None, timeout: int = 30) -> tuple[st
     return None, "; ".join(reasons)
 
 
+def verify_article_xml(record, raw):
+    """Verify publication identity and body independently of table/figure materialization.
+
+    A successful identity check does not mean the source is extractor-ready.
+    """
+    try:
+        tree = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        raise FullTextUnavailable("Full-text XML invalid") from exc
+    why = identity_problems(record, article_identity(tree))
+    if why:
+        raise FullTextUnavailable(f"Full-text XML identity mismatch: {why}")
+    body = tree.find("./body")
+    if body is None or not " ".join(body.itertext()).strip():
+        raise FullTextUnavailable("Full-text body missing")
+    return tree
+
+
 def fetch_verified_sections(record, timeout=60):
     """Materialize the required article only after verifying XML identity and body.
 
@@ -171,7 +215,7 @@ def fetch_verified_sections(record, timeout=60):
     Raw XML is retained in the returned source envelope for offline identity reinspection.
     """
     import hashlib, datetime, base64
-    pmid, pmcid = str(record.get("pmid") or ""), record.get("pmcid")
+    pmid, pmcid = str(record.get("pmid") or ""), normalize_pmcid(record.get("pmcid"))
     if not pmcid or (not pmid and not record.get("doi")):
         raise FullTextUnavailable("Required PMCID, and a PMID or DOI to confirm identity, missing")
     url = URL.format(pmcid=pmcid)
@@ -183,14 +227,9 @@ def fetch_verified_sections(record, timeout=60):
         tree = ET.fromstring(raw)
     except (requests.RequestException, ET.ParseError) as exc:
         raise FullTextUnavailable("Full-text retrieval/XML parse failed") from exc
-    ids = {x.get("pub-id-type"): (x.text or "").strip()
-           for x in tree.findall("./front/article-meta/article-id")}
-    why = identity_problems(record, ids)
-    if why:
-        raise FullTextUnavailable(f"Full-text XML identity mismatch: {why}")
+    tree = verify_article_xml(record, raw)
+    ids = article_identity(tree)
     body = tree.find("./body")
-    if body is None or not " ".join(body.itertext()).strip():
-        raise FullTextUnavailable("Full-text body missing")
     sections = _sections(tree, strict=True)
     names = [(sec.findtext("title") or "Untitled").strip() for sec in body.findall("./sec")]
     if not names or any(not sections.get(n, "").strip() for n in names):
@@ -198,7 +237,7 @@ def fetch_verified_sections(record, timeout=60):
     # Keep the established section-count contract while identity/body verification is explicit.
     sections.setdefault("Abstract", "")
     source = {"verified": True, "pmid": pmid or None, "pmcid": pmcid, "doi": ids.get("doi"), "url": url,
-              "identifiers_confirmed": [k for k in ("pmid", "doi") if record.get(k)],
+              "identifiers_confirmed": [k for k in ("pmid", "doi", "title") if record.get(k)], "title": ids.get("title"),
               "retrieved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
               "xml_sha256": hashlib.sha256(raw).hexdigest(), "sections_sha256": _digest(sections),
               "body_sections": names, "xml_base64": base64.b64encode(raw).decode("ascii")}

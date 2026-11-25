@@ -46,12 +46,12 @@ def fetch_by_pmids(ids: list[str], family_id: str) -> list[Record]:
             authors = [f"{x.findtext('LastName', '')} {x.findtext('Initials', '')}".strip()
                        for x in a.findall(".//Author")]
             year = art.findtext(".//PubDate/Year")
-            doi = next((e.text for e in art.findall(".//ArticleId") if e.get("IdType") == "doi"), None)
-            pmc = next((e.text for e in art.findall(".//ArticleId") if e.get("IdType") == "pmc"), None)
+            doi = next((e.text for e in art.findall("./PubmedData/ArticleIdList/ArticleId") if e.get("IdType") == "doi"), None)
+            pmc = next((e.text for e in art.findall("./PubmedData/ArticleIdList/ArticleId") if e.get("IdType") == "pmc"), None)
             records.append(Record(
                 source="pubmed", title="".join(a.find("ArticleTitle").itertext()) if a.find("ArticleTitle") is not None else "",
                 abstract=abstract, authors=authors, year=int(year) if year and year.isdigit() else None,
                 venue=a.findtext(".//Journal/ISOAbbreviation", ""),
                 publication_type=[p.text for p in a.findall(".//PublicationType") if p.text],
-                doi=doi, pmid=art.findtext(".//PMID"), pmcid=pmc, query_family_id=family_id))
+                doi=doi, pmid=art.findtext("./MedlineCitation/PMID"), pmcid=pmc, query_family_id=family_id))
     return records

@@ -1171,7 +1171,12 @@ class Run:
                 self.save(f"fulltext/{rid}.json", sections)
                 self.save(f"fulltext_provenance/{rid}.json", source)
             else:
-                sections = fetch_sections(by_id[rid].get("pmcid"))
+                try:
+                    sections = self._checked_fulltext(by_id[rid])
+                except FullTextUnavailable as exc:
+                    self.save(f"identity_quarantine/{rid}_retrieval.json", {
+                        "record": by_id[rid], "reason": str(exc), "level_used": "ABSTRACT"})
+                    sections = {}
             quals[rid]["_fulltext_checked"] = True
             if not sections:
                 continue
@@ -1335,7 +1340,9 @@ class Run:
                 prov = config.agent_model(agent).provider
                 by_provider[prov] = by_provider.get(prov, 0.0) + float(line["usd"])
         spent_now = self.budget.spent()
-        exposure = min(self.budget.cap, spent_now + max(projected, caps_total - spent_by(("A02-SP", "A03-LM", "A04-CQ"))))
+        nonstage = self.budget.prior_spend() + sum(e["cost_usd"] or 0.0 for e in entries
+                                                    if not config.stage_group(e["agent"]))
+        exposure = max(spent_now + projected, caps_total + nonstage) + self.budget.reserved()
         return {"discovery_and_screening_spent_usd": round(spent_by(("A02-SP", "A03-LM", "A04-CQ")), 4),
                 "smoke_test_and_other_prior_spend_usd": round(self.budget.prior_spend(), 4),
                 "smoke_test_spent_in_run_usd": round(spent_by(("smoke-test",)), 4),
@@ -1388,9 +1395,9 @@ class Run:
         derived = derive_stage_caps(stage_usd, float(settings.get("recovery_allowance", 0.15)))
         derived["from_projection_created"] = proj.get("created")
         room = self.budget.cap - self.budget.prior_spend() - sum(
-            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"]))
+            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"])) - self.budget.reserved()
         problem = (f"the stage limits this projection needs add up to ${derived['total_usd']:.2f}, over the "
-                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend; reduce the selection"
+                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend and retained reservations; reduce the selection"
                    if derived["total_usd"] > room else None)
         return derived, problem
 
@@ -1490,6 +1497,8 @@ class Run:
                 seen[key] = r["record_id"]
         access = {r["record_id"]: self._access_check(r) for r in selected[:max(limit, 0) or len(selected)]}
         for rid, a in access.items():
+            if a.get("materialization_blocker"):
+                problems.append(f"{rid}: source materialization blocked: {a['materialization_blocker']}")
             if a["category"] == "NO_SOURCE_TEXT":
                 problems.append(f"{rid}: neither full text nor an abstract could be obtained, so it cannot be read")
         proposals = {p["record_id"]: p["reason"] for p in (self.load("selection_proposal.json", {}) or {}).get("proposed", [])}
@@ -1555,7 +1564,27 @@ class Run:
         log = self.load("retrieval_log.json", {})
         entry = log.get(rid)
         if entry and not (retry and entry.get("category") == "LOOKUP_UNAVAILABLE"):
-            return entry
+            if entry.get("level_read") == "FULL_TEXT":
+                try:
+                    if entry.get("identity_only_source"):
+                        import base64, hashlib
+                        from .tools.fulltext import verify_article_xml
+                        proof = self.load(entry["identity_only_source"])
+                        raw = base64.b64decode(proof["xml_base64"], validate=True)
+                        if hashlib.sha256(raw).hexdigest() != proof["xml_sha256"]:
+                            raise FullTextUnavailable("Identity-only source hash mismatch")
+                        verify_article_xml(rec, raw)
+                        if not entry.get("materialization_blocker"):
+                            raise FullTextUnavailable("Identity-only source cannot be extractor-ready")
+                    else:
+                        verify_cached_source(rec, self.load(f"fulltext/{rid}.json"),
+                                             self.load(f"fulltext_provenance/{rid}.json"))
+                except (ValueError, KeyError, TypeError) as exc:
+                    self.save(f"identity_quarantine/{rid}_access_cache.json", {
+                        "record": rec, "access_entry": entry, "reason": str(exc)})
+                    entry = None
+            if entry:
+                return entry
         entry = {"record_id": rid, "pmid": rec.get("pmid"), "doi": rec.get("doi"), "attempts": (entry or {}).get("attempts", [])}
         sections, category = None, None
         pmcid = rec.get("pmcid")
@@ -1602,6 +1631,8 @@ class Run:
         """Extraction input for a discovered paper, from its access check (re-run only if access was unresolved)."""
         rid = rec["record_id"]
         entry = self._access_check(rec, retry=True)
+        if entry.get("materialization_blocker"):
+            raise Pause(f"{rid}: source materialization requires review: {entry['materialization_blocker']}")
         if entry["category"] in ("NO_SOURCE_TEXT",) or (entry["category"] == "LOOKUP_UNAVAILABLE" and not (rec.get("abstract") or "").strip()):
             raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
                         "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
@@ -1705,6 +1736,23 @@ class Run:
         for step, payload in pending:
             on_output(step, self.agent(agent_id, payload, step, exclude_providers=frozenset(exclude(step))))
 
+    def _checked_fulltext(self, rec: dict) -> dict:
+        """No unverified cache or bare-PMCID lookup reaches screening/extraction."""
+        rid = rec["record_id"]
+        sections = self.load(f"fulltext/{rid}.json")
+        source = self.load(f"fulltext_provenance/{rid}.json")
+        if sections:
+            try:
+                verify_cached_source(rec, sections, source)
+                return sections
+            except FullTextUnavailable as exc:
+                self.save(f"identity_quarantine/{rid}_cache.json", {
+                    "record": rec, "sections": sections, "source": source, "reason": str(exc)})
+        sections, source = fetch_verified_sections(rec)
+        self.save(f"fulltext/{rid}.json", sections)
+        self.save(f"fulltext_provenance/{rid}.json", source)
+        return sections
+
     def stage_extract(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
         items, rid_of = [], {}
@@ -1738,7 +1786,10 @@ class Run:
             elif rec.get("intended_reading_level") == "ABSTRACT":
                 sections = {"Abstract": rec.get("abstract") or ""}   # the manifest says abstract, whatever its importance
             elif rec.get("intended_reading_level") == "FULL_TEXT":
-                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid"))
+                try:
+                    sections = self._checked_fulltext(rec)
+                except FullTextUnavailable as exc:
+                    raise Pause(f"{rid}: required full text identity/body could not be verified: {exc}") from exc
                 if not sections or len(sections) < 2:
                     raise Pause(f"{rid} ({rec.get('manifest_paper_id')}) is marked for full-text reading in the corpus "
                                 "manifest, but no full text could be loaded. It is not silently read as an abstract: "
@@ -1746,8 +1797,12 @@ class Run:
             elif not self._tier_allows("extraction", "full_text_tiers", rec):
                 sections = {"Abstract": rec.get("abstract") or ""}   # not a full-text tier: abstract only, labelled so
             else:
-                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
-                    or {"Abstract": rec.get("abstract") or ""}
+                try:
+                    sections = self._checked_fulltext(rec)
+                except FullTextUnavailable as exc:
+                    self.save(f"identity_quarantine/{rid}_retrieval.json", {
+                        "record": rec, "reason": str(exc), "level_used": "ABSTRACT"})
+                    sections = {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
             rid_of[f"A05-KE_{rid}"] = rid

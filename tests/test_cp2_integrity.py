@@ -173,7 +173,7 @@ def xml(pmid="34638842", body=True):
     figures = ''.join(f'<fig id="ijms-22-10496-f{i:03d}"><label>Figure {i}</label><caption><p>Synthetic legend</p></caption><graphic href="fake{i}.png"/></fig>' for i in range(1,11))
     table = '<table-wrap id="ijms-22-10496-t001"><label>Table 1</label><table><thead><tr><th>Group</th><th>Value</th></tr></thead><tbody><tr><td>Synthetic row</td><td>12.3</td></tr></tbody></table></table-wrap>'
     sections = '<body><sec><title>Methods</title><p>Synthetic methods.</p></sec><sec><title>Results</title><p>Synthetic results.</p>'+table+figures+'</sec><sec><title>Discussion</title><p>Synthetic discussion.</p></sec></body>' if body else ''
-    return (f'<article><front><article-meta><article-id pub-id-type="pmid">{pmid}</article-id><article-id pub-id-type="pmc">8508702</article-id><abstract>Synthetic abstract</abstract></article-meta></front>'+sections+'</article>').encode()
+    return (f'<article><front><article-meta><title-group><article-title>Synthetic Liu</article-title></title-group><article-id pub-id-type="pmid">{pmid}</article-id><article-id pub-id-type="pmc">8508702</article-id><abstract>Synthetic abstract</abstract></article-meta></front>'+sections+'</article>').encode()
 
 
 @pytest.mark.parametrize("kind", ["http", "xml", "identity", "body"])

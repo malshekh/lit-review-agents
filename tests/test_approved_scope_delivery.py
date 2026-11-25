@@ -166,3 +166,62 @@ def test_screening_batch_override_is_at_the_effective_profile_level(batch_size):
     assert effective['loops']['cq_batch_size']==batch_size
     assert effective['agents']['A04-CQ']['max_tokens']==pipeline['agents']['A04-CQ']['max_tokens']==16000
     assert effective['agents']['A04-CQ']['model']==pipeline['agents']['A04-CQ']['model']
+
+
+def test_writing_dispatch_units_follow_plan_not_eight_themes(run, monkeypatch):
+    from litreview import bridge
+    writing=approved_scope.writing_outline(run,OUTLINE)
+    ids=[s["section_id"] for s in writing["sections"]]
+    assert len(ids)==8 and len([s for s in writing["sections"] if s.get("parent_section_id")])==6
+    seen=[]
+    monkeypatch.setattr(bridge,"writer_payload",lambda *args,**kwargs:{})
+    monkeypatch.setattr(bridge,"check_section",lambda *args:[])
+    def call(agent,payload,step,**kwargs):
+        sid=step.split("_draft_",1)[1].rsplit("_r",1)[0];seen.append(sid)
+        return {"status":"COMPLETE","section":{"section_id":sid,"heading":"Heading","text_markdown":"Organizing text."}}
+    monkeypatch.setattr(run,"_admitted",call)
+    ps={"plan":{"writing_order":ids},"packets":{sid:{} for sid in ids},"pv":"test-plan-version",
+        "ev":"test-evidence","pkg":{},"findings":[],"amap":{},"journal":{}}
+    assert len(run._write_sections(ps,"draft"))==8 and seen==ids
+
+
+def test_outline_word_target_sizes_downstream_forecast_without_changing_units(run,monkeypatch):
+    from litreview import config
+    from litreview.tools import cost_projection as cp
+    from litreview.tools import downstream_projection as dp
+    seen=[];original=dp.requests
+    def capture(route,cfg,n,inputs=None):
+        seen.append(copy.deepcopy(inputs));return original(route,cfg,n,inputs)
+    monkeypatch.setattr(dp,"requests",capture)
+    p=cp.for_selection(cp.load_rates(),[{"record_id":"R1"}],run.dir,run.budget,config.agent_model,run.cfg)
+    assert seen[0]["journal"]["limits"]["main_text_max_words"]==1600
+    assert config.load("journal_scirev")["limits"]["main_text_max_words"]==5000
+    a09=next(x for x in p["lines"] if x["stage"]=="A09-WRI")
+    assert "8 sections assumed" in a09["detail"] and a09["calls"]==25
+    assert cp._outline_words(run.dir)==1600
+
+
+def test_access_cache_cannot_budget_wrong_publication_as_fulltext(run,monkeypatch):
+    from litreview.tools.fulltext import FullTextUnavailable
+    rec={"record_id":"R0115","pmid":"41324706","doi":"10.1007/s00216-025-06241-z",
+         "pmcid":"PMC9421940","title":"Intended sensing publication","abstract":"Matched abstract."}
+    run.save("retrieval_log.json",{"R0115":{"level_read":"FULL_TEXT","category":"FULL_TEXT_RETRIEVED"}})
+    run.save("fulltext/R0115.json",{"Abstract":"Wrong article","Results":"Unrelated text"})
+    def rejected(*a,**k):raise FullTextUnavailable("PMID mismatch")
+    monkeypatch.setattr(orch,"fetch_verified_sections",rejected)
+    entry=run._access_check(rec)
+    assert entry["level_for_budget"]=="ABSTRACT" and entry["level_read"]=="ABSTRACT"
+    assert run.load("identity_quarantine/R0115_access_cache.json")
+
+
+def test_materialization_blocker_stops_before_extraction_source_handoff(run,monkeypatch):
+    monkeypatch.setattr(run,"_access_check",lambda *a,**k:{"materialization_blocker":"Image-only Table 1"})
+    with pytest.raises(orch.Pause,match="Image-only Table 1"):
+        run._retrieve_discovered({"record_id":"R0078"})
+
+
+def test_combined_stage_envelope_reports_excess_instead_of_clamping(run,monkeypatch):
+    monkeypatch.setattr(run.budget,"reserved",lambda:.124671)
+    monkeypatch.setattr(run.budget,"spent",lambda:2.0849717)
+    a=run.accounts({"projected_remaining_usd":38.65,"lines":[]},{"total_usd":50.81})
+    assert a["combined_maximum_exposure_usd"]>50 and a["unsettled_reservations_usd"]==.1247
