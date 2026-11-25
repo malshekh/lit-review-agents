@@ -1,0 +1,40 @@
+{
+  "state": {
+    "stage": "qualify",
+    "status": "FAILED: A04-CQ (A04-CQ_B014) failed: Output was truncated at max_tokens (16000). The partial output is saved as outputs/A04-CQ_B014.raw0.txt. Increase max_tokens for this call in config/pipeline.yaml.",
+    "counters": {
+      "scope": 1,
+      "cq_batch": 14
+    },
+    "execution_mode": "STANDARD",
+    "corpus_policy_fingerprint": "2350eb129f671f8cff979dc2a5e513cc0188063272622dd7d4e7009c0e52305c",
+    "profile": "pilot7"
+  },
+  "cost_receipt": {
+    "time": "2026-11-24T22:55:30",
+    "agent": "A04-CQ",
+    "step": "A04-CQ_B014",
+    "started_at": 1795578865.02,
+    "provider": "anthropic",
+    "model": "claude-haiku-5-5",
+    "input_tokens": 43253,
+    "cached_input_tokens": 0,
+    "cache_write_tokens": 0,
+    "cache_write_1h_tokens": 0,
+    "output_tokens": 16000,
+    "cost_usd": 0.0123253,
+    "cost_parts_usd": {
+      "input": 0.004325,
+      "cache_write": 0.0,
+      "cache_read": 0.0,
+      "output": 0.008
+    },
+    "reservation_key": "call-49c23cd16f93d735647273a2",
+    "prompt_chars": 115353
+  },
+  "preserved_screening_decisions": 44,
+  "completed_four_record_batches": 11,
+  "known_holds_usd": 0.124671,
+  "total_recorded_usd": 1.0044494,
+  "accepted_partial_output": false
+}
