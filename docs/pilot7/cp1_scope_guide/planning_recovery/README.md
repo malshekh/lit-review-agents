@@ -3,7 +3,7 @@
 The initial A03 planning request returned length at its unchanged 12,000-token
 cap, with 12,000 output tokens reported and zero response-text characters. It
 cost $0.175606, was fully accounted and released its transient reservation. The
-five original unresolved holds still total $0.124671. No request is unsettled,
+five original unresolved holds still total $0.124671. No new planning request is unsettled,
 no zero billing is assumed, and no original response or cost is deleted.
 
 The replacement is task decomposition, not a token-limit/model increase or a

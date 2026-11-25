@@ -138,3 +138,17 @@ def test_bounded_question_planning_merges_all_eight_without_resending_old_failur
     reports['families'][0].update(returned=0,error='SOURCE_UNAVAILABLE')
     approved_scope.search_plan(run,spec,{'pubmed':{}},budget,mode='REPAIR',execution=reports,repair_number=1)
     assert len(seen)==8
+
+
+def test_duplicate_guide_copies_removed_without_losing_unique_rules_or_mutating_source(run):
+    spec={'central_question':'unchanged','approved_scope_guide':copy.deepcopy(GUIDE),
+          'researcher_decision':{'selected_option_id':'P1','scope_guide':copy.deepcopy(GUIDE)},
+          'selection_criteria':{'rule':'Statistical significance must not decide eligibility.'},'researcher_outline':{'sections':['a']}}
+    original=copy.deepcopy(spec)
+    payload=approved_scope.enrich(run,'A04-CQ',{'review_spec':spec,'researcher_outline':{'sections':['a']}})
+    assert payload['approved_scope_guide']==GUIDE and spec==original
+    assert 'approved_scope_guide' not in payload['review_spec']
+    assert 'scope_guide' not in payload['review_spec']['researcher_decision']
+    assert payload['review_spec']['selection_criteria']==original['selection_criteria']
+    other=copy.deepcopy(spec);other['approved_scope_guide']={'distinct':'retain'}
+    assert approved_scope.enrich(run,'A04-CQ',{'review_spec':other})['review_spec']['approved_scope_guide']=={'distinct':'retain'}

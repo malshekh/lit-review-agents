@@ -14,6 +14,17 @@ def enrich(run,agent,payload):
     scope=guide(run)
     if not scope:return payload
     out={**payload,'approved_scope_guide':copy.deepcopy(scope)}
+    # Keep one complete authoritative guide, rather than repeated identical
+    # copies in the specification and its decision. Never remove distinct text.
+    if isinstance(out.get('review_spec'),dict):
+        spec=copy.deepcopy(out['review_spec'])
+        if spec.get('approved_scope_guide')==scope:spec.pop('approved_scope_guide')
+        decision=spec.get('researcher_decision')
+        if isinstance(decision,dict) and decision.get('scope_guide')==scope:
+            decision.pop('scope_guide')
+        if out.get('researcher_outline') is not None and spec.get('researcher_outline')==out['researcher_outline']:
+            spec.pop('researcher_outline')
+        out['review_spec']=spec
     if agent in ('A08-OL','A09-WRI','A10-RV','A11-RC','A12-EDI'):
         out['six_heading_map']=copy.deepcopy(scope['six_heading_map'])
         out['chapter_word_targets']=copy.deepcopy(scope['word_policy'])
