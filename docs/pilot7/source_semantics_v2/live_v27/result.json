@@ -1,0 +1,1011 @@
+{
+  "run_id": "20261123-214928",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v27-pilot7-a06-only-50usd",
+  "implementation_commit": "d523b32627a349444a99b085d8ccd908f030d7ea",
+  "manifest_sha256": "4c6cb2cd1f025c85976f530b7afe22294af5837072b9e9d97598b6c471e618c8",
+  "status": "PAUSED_AT_CP1",
+  "scientific_checkpoint_approved": false,
+  "new_paid_calls": 9,
+  "new_strict_checks": 7,
+  "reused_strict_successes": 7,
+  "new_a05_calls": 0,
+  "new_a06_calls": 1,
+  "format_repairs": 0,
+  "new_strict_actual_usd": 0.0283765,
+  "new_a06_actual_usd": 0.0492185,
+  "new_checks_actual_usd": 0.077595,
+  "scope_actual_usd": 0.071831,
+  "new_total_actual_usd": 0.149426,
+  "total_recorded_spend_usd": 0.3256706,
+  "outstanding_holds_usd": 0.124671,
+  "outstanding_hold_count": 5,
+  "new_unresolved_holds": 0,
+  "smoke_recorded_spend_usd": 0.2538396,
+  "smoke_exposure_usd": 0.3785106,
+  "smoke_remaining_usd": 0.6214894,
+  "combined_exposure_usd": 0.4503416,
+  "combined_remaining_usd": 49.5496584,
+  "review_pauses_usd": [
+    25,
+    48
+  ],
+  "original_receipts_preserved": 25,
+  "total_strict_receipts": 32,
+  "original_ledger_prefix_preserved": true,
+  "original_failed_verdict_preserved": true,
+  "a06_result": {
+    "accepted": true,
+    "problems": [],
+    "label_decisions": [
+      {
+        "entity_id": "E1",
+        "label": "ENDOGENOUS_METABOLITE",
+        "decision": "INSUFFICIENT_EVIDENCE",
+        "reason": "The supplied abstract calls diethyl-dithiocarbamate-copper the proposed active metabolite of DSF/Cu; this does not establish endogenous origin. No entity-bound lookup evidence was supplied. The neutral MOLECULE replacement is supported."
+      },
+      {
+        "entity_id": "E4",
+        "label": "APPROVED_DRUG",
+        "decision": "INSUFFICIENT_EVIDENCE",
+        "reason": "The supplied abstract reports a DSF combination-regimen dose but does not establish regulatory approval, and no approval lookup evidence was supplied. The neutral DRUG_STATUS_UNVERIFIED replacement is supported."
+      }
+    ],
+    "finding_dispositions": {
+      "F1": {
+        "finding_id": "F1",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "ADEQUATE",
+            "reason": "The abstract states that high-performance liquid chromatography-mass spectrometry determined drug concentrations in plasma and tumors and explicitly reports detection of diethyl-dithiocarbamate-copper in plasma."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Analytical controls, specimen handling and assay validation are not stated in the supplied abstract; a treatment comparator is not required for this descriptive detection finding."
+          },
+          "statistical": {
+            "finding": "NOT_APPLICABLE",
+            "reason": "The finding reports detection, not a statistical comparison or estimated population detection rate."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract does not state participant numbers, replicate measurements or repeated sampling."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "F1 resolves through object E2 to plasma, matching 'was detected in plasma'; the shared plasma-and-tumor context does not change the specimen."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The abstract supports plasma detection under the reported study conditions, not detection in every patient or other specimens."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "No specific demonstrated threat to the descriptive detection finding is identifiable from the three supplied sentences; assay and sampling details remain unreported."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "Limited to detection in the plasma specimens represented by the supplied abstract.",
+          "Descriptive detection requires no comparator: NOT_APPLICABLE is supported.",
+          "Concentrations, participant numbers, sampling times and assay performance are not stated in the supplied abstract.",
+          "Detection does not establish biological activity; the source calls the compound a proposed active metabolite."
+        ],
+        "plain_language_limit": "The abstract reports that diethyl-dithiocarbamate-copper was detected in plasma under the study conditions, without establishing its concentration, prevalence across patients or biological activity."
+      },
+      "F2": {
+        "finding_id": "F2",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "ADEQUATE",
+            "reason": "The abstract identifies high-performance liquid chromatography-mass spectrometry for plasma and tumor measurements and explicitly states that the compound was not detected in tumors; this supports non-detection, not biological absence."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Tumor sampling, analytical controls, recovery and detection limits are not stated in the supplied abstract; no treatment comparator is required for descriptive non-detection."
+          },
+          "statistical": {
+            "finding": "NOT_APPLICABLE",
+            "reason": "The passage reports analytical non-detection, not a non-significant comparison or an equivalence test."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract does not state the number of tumor specimens or repeated measurements."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "F2 resolves through object E3 to tumors, matching 'but not in tumors'; it is not a plasma finding or an untested-specimen inference."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The source supports non-detection only in the tested tumor specimens under the reported conditions."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "No demonstrated analytical failure is described; the unreported detection limit prevents interpreting non-detection as biological absence."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "Interpret negative DETECTED_IN polarity strictly as tested and not detected under the reported conditions.",
+          "The finding does not establish biological absence, failure to enter all tumors or a statistically non-significant effect.",
+          "The assay detection limit, sampling times and number of tumor specimens are not stated in the supplied abstract.",
+          "Descriptive non-detection requires no comparator: NOT_APPLICABLE is supported."
+        ],
+        "plain_language_limit": "The abstract reports that diethyl-dithiocarbamate-copper was not detected in tested tumors, but does not establish that the compound was biologically absent."
+      },
+      "F3": {
+        "finding_id": "F3",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "ADEQUATE",
+            "reason": "The exact passage states, 'The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d,' directly matching the dose endpoint, value, unit and combination regimen."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Dose-escalation design, dose-limiting toxicity criteria, observation window and analysis population are not stated in the supplied abstract."
+          },
+          "statistical": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract gives the maximum tolerated dose without the decision rule, participant counts or uncertainty supporting its determination."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract does not describe repeated determination or an expansion cohort."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "The predicate detail, quantity and context C2 all preserve DSF with RT and TMZ rather than DSF monotherapy."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The reported dose is bounded to the study's combination regimen and does not establish a monotherapy dose or tolerability in other populations."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "The supplied sentences do not demonstrate a specific design failure, but provide insufficient detail to assess the maximum tolerated dose determination independently."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "375 mg/d is the reported DSF dose with RT and TMZ, not a concentration or a monotherapy maximum tolerated dose.",
+          "The population, dose-escalation procedure, dose-limiting toxicities and observation window are not stated in the supplied abstract.",
+          "No comparator is reported; NONE_REPORTED is supported and does not imply that a comparator was required.",
+          "The abstract supports reporting the stated maximum tolerated dose, not an independent assessment of its determination or a general safety claim."
+        ],
+        "plain_language_limit": "The abstract reports a maximum tolerated DSF dose of 375 mg/d with RT and TMZ, without enough design information to independently assess that determination or extend it to monotherapy."
+      }
+    },
+    "run_id": "20261123-214928",
+    "payload_sha256": "1cb1af9df9d9767aec4b22fc23fb3b97c64d509f12ca78a08efcb8e220259056",
+    "schema_sha256": "0b351a7d084fba11ff10d94a498e63d6ad484e205c9a08d8a47e4ed6dfdb504f",
+    "request_identity": "59383627ec34a304ec06ddc82d079fce5f233782b9cc72c5ccd909ac254f8b5c",
+    "archived_a05_reused": true,
+    "new_a05_calls": 0,
+    "scientific_checkpoint_approved": false,
+    "full_text_extraction_tested": false,
+    "artifacts": {
+      "outputs/A06-SV_FUNCTIONAL_SOURCE_1_semantics_v2.json": "b928b2501a0ab100c02252db10058e234ce1eb7363c2de997d4d222de6dab6dc",
+      "outputs/A06-SV_FUNCTIONAL_SOURCE_1_semantics_v2.raw0.txt": "b928b2501a0ab100c02252db10058e234ce1eb7363c2de997d4d222de6dab6dc",
+      "outputs/A06-SV_FUNCTIONAL_SOURCE_1_semantics_v2.response0.json": "094762fb9dfcd8466268321008dbf310ef8ddc4b466d95592f0c49488238bd47"
+    },
+    "actual_cost_usd": 0.049218500000000005
+  },
+  "scope_spec": {
+    "agent_id": "A2-SP",
+    "prompt_version": "0.4",
+    "status": "COMPLETE_WITH_WARNINGS",
+    "warnings": [
+      "The supplied researcher outline fixes the question, perspective and structure. The single perspective entry records that outline rather than proposing alternative angles.",
+      "All title candidates, keywords and the contribution statement are PROVISIONAL.",
+      "No literature search or source inspection was performed. Search terminology and competing positions are planning constructs, not verified findings."
+    ],
+    "limitations": [
+      "No seed papers or source texts were supplied, so literature coverage, evidence availability and novelty relative to existing reviews cannot be established.",
+      "The outline supplies no publication-date or language restrictions; provisional search and screening assumptions are stated below.",
+      "This specification supports discovery and screening for the first two chapters only; it does not draft those chapters or authorize downstream work before researcher approval."
+    ],
+    "spec_version": "0.1",
+    "spec_state": "READY_WITH_ASSUMPTIONS",
+    "original_topic": "Write the first two chapters of a narrative review on AI-enabled nanobiosensing for cancer therapy.\n\nCentral question: How does AI contribute to sensor design and interpretation, and how reliably can these systems identify anticancer drugs and characterize exposure across biological matrices and time?\n\nInvestigate this question without assuming that AI improves every sensor or that laboratory performance establishes clinical usefulness.\n\nThe structure, section questions, word targets and instructions are in the outline supplied with this run (input/outline.json).\n",
+    "normalized_topic": "The first two chapters of a narrative review examining AI contributions to nanosensor and probe design, molecular recognition and signal interpretation, followed by the reliability of anticancer-drug identification, concentration estimation, nanomedicine measurement and temporal exposure assessment across biological matrices, without presuming AI superiority or clinical usefulness.",
+    "central_question": "How does AI contribute to sensor design and interpretation, and how reliably can these systems identify anticancer drugs and characterize exposure across biological matrices and time?",
+    "audience": "Non-specialist scientific readers, including researchers, educators and policymakers across fields; define sensing, machine-learning and pharmacokinetic terminology at first use.",
+    "readiness": {
+      "topic_boundaries": "PARTIAL",
+      "central_question": "CONFIRMED",
+      "audience": "PARTIAL",
+      "competing_positions": "PARTIAL"
+    },
+    "scope": {
+      "in_scope": [
+        "The supplied S1 and S2 chapters, with their eight subsections retained as the primary themes.",
+        "AI-assisted selection or optimization of sensing materials, surface chemistry, recognition elements, probe sequences, array components, fabrication and measurement conditions.",
+        "Learned interpretation of optical, Raman, multisensor-array, electrochemical and repeated nanosensor measurements, including the connection between sensing interactions, signals, model inputs and outputs.",
+        "Analytical performance, predictive performance, independent evaluation units and generalization across samples, individuals, matrices, batches and time.",
+        "Identification and quantification of anticancer drugs, distinguishing presence detection, identity classification, concentration categories and numerical concentration estimates.",
+        "Experiments in buffer, synthetic biofluids, spiked biological specimens and specimens collected after administration, kept as separate evidence settings.",
+        "Nanomedicine measurements distinguishing carrier-associated signals, intact carriers, payload, encapsulated or released drug, release-related changes and distribution.",
+        "Serial, continuous and near-continuous measurements, pharmacokinetic estimation and temporal prediction, with measured and modeled quantities distinguished.",
+        "Limitations on interpreting sampled concentrations as biological exposure, including matrix interference, reference measurements, transferability and sampled-compartment versus tumour exposure.",
+        "Methodological and simpler analytical comparators directly relevant to the included sensing tasks."
+      ],
+      "out_of_scope": [
+        "Later chapters on treatment response, toxicity and treatment decisions, including detailed treatment selection or dose-adjustment strategies.",
+        "Drug-delivery or formulation design without a directly evaluated sensing function.",
+        "General AI for oncology, drug discovery, molecular docking or pharmacokinetic prediction without a substantive connection to the included sensing systems.",
+        "Conventional non-nanoscale sensors as standalone coverage; directly relevant comparator or methodological context may be retained.",
+        "Cancer diagnosis or biomarker discovery as standalone applications without a direct contribution to the Chapter 1 design, recognition, signal-interpretation or evaluation questions.",
+        "Claims that a predictive fingerprint establishes biological mechanism, that a carrier label establishes released payload, or that laboratory performance establishes clinical utility without supporting evidence."
+      ]
+    },
+    "perspective_options": [
+      {
+        "option_id": "P1",
+        "angle": "The researcher-defined review examines what AI contributes to nanosensor design and interpretation and which evaluation conditions justify drug-identification and exposure claims.",
+        "organizing_principle": "Preserve S1.1–S1.4 on design, learned recognition, signal-to-task matching and evaluation, followed by S2.1–S2.4 on drug measurement, nanomedicine components, temporal exposure and interpretive limits.",
+        "why_timely": "The supplied outline identifies an unresolved assessment need: distinguishing computational contributions and laboratory measurement results from evidence for reliable exposure characterization; no recent field-wide development has been verified.",
+        "contribution": "The intended contribution is a connected assessment linking physical sensing processes, computational outputs, evaluation units and exposure interpretation. Whether existing reviews already provide this synthesis remains to be checked.",
+        "competing_positions": [
+          "Studies with matched simpler comparators may find no incremental benefit from AI, or may find that preprocessing or sensor chemistry explains apparent gains.",
+          "Independent evaluations may establish robust transfer across specimens, matrices, batches or time, challenging an overly restrictive assessment of generalizability.",
+          "Independent evaluations may instead show performance loss or leakage-sensitive results, challenging claims of reliable recognition or concentration estimation.",
+          "Validated reference comparisons and longitudinal measurements may support exposure claims beyond isolated laboratory demonstrations; their absence must not be assumed.",
+          "Some relevant sensing tasks may be adequately addressed by conventional calibration, whereas others may require learned interpretation of overlapping or multidimensional responses."
+        ],
+        "risks": [
+          "Direct anticancer-drug exposure studies combining a functional nanosensing component and a substantive AI contribution may be sparse.",
+          "Broad methodological evidence from Chapter 1 could be incorrectly presented as direct evidence for anticancer-drug exposure in Chapter 2.",
+          "Terminology may obscure whether a system measures a drug, a carrier-associated label, a surrogate or a model-derived quantity.",
+          "Overlapping subsection topics require explicit assignment rules to prevent duplicated study summaries.",
+          "No subsection word targets are present in the supplied outline object; chapter allocations cannot be checked against the journal's full-review word limit."
+        ],
+        "title_candidates": [
+          "AI-enabled nanobiosensing requires task-specific evaluation to substantiate anticancer-drug exposure claims."
+        ]
+      }
+    ],
+    "selection_criteria": {
+      "inclusion": [
+        {
+          "criterion": "A record must directly address at least one supplied subsection question; assign one or more T1–T8 themes and state the specific connection.",
+          "reason": "Relevance is determined by the fixed outline rather than agreement with an anticipated conclusion."
+        },
+        {
+          "criterion": "For core empirical coverage, require a functional nanoscale sensing component and an identifiable computational contribution to component design, recognition, signal processing, prediction or evaluation.",
+          "reason": "Prevents incidental use of AI or nanomaterial terminology from defining eligibility."
+        },
+        {
+          "criterion": "For Chapter 1, include non-drug analytes or non-cancer systems only when they directly inform an outlined design, recognition, signal-task or evaluation question; label their application scope explicitly.",
+          "reason": "Allows relevant methodological evidence without treating it as validation for anticancer-drug sensing."
+        },
+        {
+          "criterion": "For Chapter 2, require measurement of an anticancer drug, a relevant metabolite, a nanomedicine component or a release-related process, or direct methodological evidence needed to interpret those measurements.",
+          "reason": "Keeps exposure coverage tied to the specified therapeutic context."
+        },
+        {
+          "criterion": "Retain eligible evidence from buffer, synthetic fluids, spiked biological specimens and post-administration specimens, recording these settings separately.",
+          "reason": "Enables assessment of evidence progression without equating simplified and clinical matrices."
+        },
+        {
+          "criterion": "Include null results, poorer performance, failed transfer, conventional-method comparisons and methodological challenges when they address an outline question.",
+          "reason": "Contrary evidence is necessary to evaluate incremental contribution and reliability."
+        },
+        {
+          "criterion": "Include relevant work across in vitro, ex vivo, animal and human settings, while preserving organism, specimen, compartment and experimental context.",
+          "reason": "The outline imposes no organism restriction, but conclusions must remain bounded by the studied system."
+        },
+        {
+          "criterion": "Retain potentially relevant abstract-only records with their access limitations; use only information stated in the abstract and seek fuller access where needed.",
+          "reason": "Access limitations are not scientific negative findings or automatic grounds for exclusion."
+        },
+        {
+          "criterion": "Use reviews and methodological literature for definitions, context, evaluation principles and citation discovery; trace empirical performance claims to primary evidence when available.",
+          "reason": "Separates contextual synthesis from direct support for study-specific results."
+        }
+      ],
+      "exclusion": [
+        {
+          "criterion": "Exclude records with no identifiable connection to any S1.1–S2.4 question.",
+          "reason": "Maintains the researcher-defined scope."
+        },
+        {
+          "criterion": "Exclude standalone delivery or formulation optimization without a sensing function.",
+          "reason": "AI-assisted formulation design does not establish sensing or a sensing-feedback loop."
+        },
+        {
+          "criterion": "Exclude response, toxicity and treatment-decision studies unless a separable sensing-method or exposure result answers an included subsection question.",
+          "reason": "Reserves later-chapter content while retaining directly relevant measurement evidence."
+        },
+        {
+          "criterion": "Exclude stand-alone computational drug or exposure predictions unconnected to an included sensing measurement or sensing-design task.",
+          "reason": "The review concerns AI-enabled nanobiosensing rather than general predictive pharmacology."
+        },
+        {
+          "criterion": "Exclude duplicate reports as separate evidence units; link preprints, conference reports and journal versions of the same work.",
+          "reason": "Prevents double counting while preserving distinct results or relevant version differences."
+        },
+        {
+          "criterion": "Exclude retracted findings as affirmative scientific support; retain retraction information if needed to explain a directly relevant controversy.",
+          "reason": "Avoids treating invalidated findings as reliable evidence."
+        },
+        {
+          "criterion": "After relevance screening, deprioritize redundant studies only with a documented significance-based reason independent of result direction.",
+          "reason": "Supports selective narrative coverage without preferentially excluding null or contrary findings."
+        }
+      ],
+      "time_window": "Provisional: no lower publication-date cutoff; search through the actual final search date, which must be recorded when searching occurs.",
+      "languages": [
+        "No language restriction at discovery; interpretation requires source text accessible to the research team or a reliable translation. Unassessable records remain pending rather than scientifically excluded."
+      ],
+      "source_types": [
+        "Primary research articles",
+        "Primary methodological studies",
+        "Reviews and perspectives for context and citation discovery",
+        "Preprints, explicitly flagged",
+        "Published conference papers",
+        "Published conference abstracts, with abstract-level claim limits"
+      ],
+      "preprint_policy": "Preprints may be included and must be flagged; they may not be the sole support for a major point. Link subsequent published versions and document material differences.",
+      "significance_signals": [
+        "A clearly documented methodological advance with experimental evaluation of a model-recommended sensing component or condition.",
+        "A comparison that isolates the incremental contribution of AI against matched conventional calibration or simpler models.",
+        "Independent evaluation across biological specimens, individuals, matrices, sensor batches, laboratories or time.",
+        "Explicitly characterized drug identity, concentration measurand, matrix and independent analytical reference.",
+        "Evidence distinguishing carrier-associated signals from intact carrier, payload or released drug.",
+        "Longitudinal measurements or temporally separated validation that distinguish observations from model-derived exposure estimates.",
+        "A strong null, negative, replication or contrary result that materially changes interpretation of reliability.",
+        "A methodological analysis exposing evaluation-unit errors, data leakage or unsupported exposure inferences."
+      ],
+      "exclusion_reason_vocabulary": [
+        "OUT_OF_SCOPE_TOPIC",
+        "NO_RELEVANT_NANOSENSING_ROLE",
+        "NO_RELEVANT_COMPUTATIONAL_ROLE",
+        "DELIVERY_ONLY",
+        "LATER_CHAPTER_ONLY",
+        "PREDICTION_WITHOUT_SENSING_LINK",
+        "DUPLICATE",
+        "RETRACTED",
+        "LOWER_SIGNIFICANCE_THAN_ALTERNATIVES"
+      ]
+    },
+    "theme_framework": {
+      "primary_themes": [
+        {
+          "theme_id": "T1",
+          "name": "AI-assisted design and optimization of sensors and probes",
+          "outline_section_id": "S1.1",
+          "scope": "How are computational models used to select or optimize the physical components of a nanosensing system? Discuss relevant examples of selecting sensing materials, surface chemistry or recognition elements. Discuss relevant examples of designing or optimizing probe sequences. Discuss relevant examples of selecting complementary components for sensor arrays. Discuss relevant examples of optimizing fabrication or measurement conditions. Explain what enters the model, what it predicts or recommends, and whether the recommendation was experimentally evaluated. Distinguish designing a sensing component from selecting useful features in measurements already collected.",
+          "includes": "materials; surface chemistry; recognition elements; probe sequences; array components; fabrication and measurement conditions",
+          "excludes": "feature selection on already collected measurements; drug-delivery design without a sensing function; Drug-delivery design, unless it directly involves a sensing function."
+        },
+        {
+          "theme_id": "T2",
+          "name": "From individual recognition events to learned molecular fingerprints",
+          "outline_section_id": "S1.2",
+          "scope": "How can models interpret patterns across sensor responses to recognize analytes or characterize biological samples? Explain machine perception through the relationship between interactions at the sensing surface, the resulting spectral or multisensor response, the features used by the computational model, and the predicted analyte identity, concentration category or sample characteristic. Clarify how this differs from interpreting a single sensor response through a conventional calibration relationship.",
+          "includes": "spectral fingerprints; multisensor arrays; pattern recognition",
+          "excludes": "Implying that learned recognition eliminates the importance of sensor chemistry.; Implying that a predictive fingerprint necessarily establishes its biological mechanism."
+        },
+        {
+          "theme_id": "T3",
+          "name": "Matching learning tasks to biosensor signals",
+          "outline_section_id": "S1.3",
+          "scope": "Which computational tasks suit different biosensor signals, and why? Organize the discussion around signal, then analytical task, then method, then output. Optical or Raman spectra: preprocessing, denoising, feature extraction, classification and concentration estimation. Multisensor-array fingerprints: analyte discrimination, pattern recognition and multianalyte analysis. Electrochemical responses: calibration, interference discrimination and concentration estimation. Repeated measurements: drift correction, tracking and temporal prediction. Explain model families only where they clarify an included study. Distinguish exploratory dimensionality reduction from predictive classification or regression. Compare with simpler analytical approaches where the evidence permits.",
+          "includes": "optical and Raman spectra; multisensor arrays; electrochemical responses; repeated measurements",
+          "excludes": "Assuming that greater model complexity means better performance."
+        },
+        {
+          "theme_id": "T4",
+          "name": "Interpreting performance and generalization",
+          "outline_section_id": "S1.4",
+          "scope": "What does a reported performance result establish, and under which evaluation conditions? Distinguish analytical performance: measurement accuracy, precision, selectivity and useful concentration range. Distinguish predictive performance: classification or regression performance on appropriately separated evaluation data. Distinguish generalization: performance across new biological samples, individuals, matrices, sensor batches or time points. Identify the independent evaluation unit. Introduce these evaluation principles here; their consequences for drug-exposure measurement belong to Chapter 2.",
+          "includes": "analytical performance; predictive performance; generalization; evaluation units",
+          "excludes": "Describing multiple spectra from one specimen as multiple independent biological samples."
+        },
+        {
+          "theme_id": "T5",
+          "name": "Identifying anticancer drugs and estimating their concentrations",
+          "outline_section_id": "S2.1",
+          "scope": "What drug-related information do AI-enabled nanosensing systems actually produce? Distinguish detecting drug presence, identifying a drug, classifying a concentration into categories, and estimating a numerical concentration. For the selected studies, connect the drug, sensing mechanism, biological matrix, computational task and evaluation result. Separate experiments in buffer, synthetic biofluids, spiked biological specimens and specimens collected after administration. Where reported, identify the reference analytical method. Where reported, distinguish parent drug from metabolites, and total from unbound concentration.",
+          "includes": "anticancer drugs; biological matrices; reference methods",
+          "excludes": "Describing concentration classification as continuous quantitative measurement.; Describing synthetic-fluid performance as established patient performance."
+        },
+        {
+          "theme_id": "T6",
+          "name": "Measuring nanomedicines: carrier, payload and release",
+          "outline_section_id": "S2.2",
+          "scope": "When a nanomedicine is sensed, which component or process does the signal represent? A carrier-associated label does not by itself establish intact-carrier abundance, released drug concentration, or biologically available payload. Distinguish measurements of the nanocarrier or a carrier-associated signal, of the drug payload, of encapsulated and released drug, and of release-related changes or distribution. Explain the specific contribution of AI to interpreting these measurements. Evaluate whether sensing supplies feedback for assessing or refining a delivery system.",
+          "includes": "nanocarrier signals; payload; release; distribution",
+          "excludes": "treatment selection; dose adjustment; Inferring a demonstrated feedback loop merely because AI was used to design the formulation.; Detailed treatment selection and dose-adjustment strategies."
+        },
+        {
+          "theme_id": "T7",
+          "name": "From individual measurements to exposure over time",
+          "outline_section_id": "S2.3",
+          "scope": "How can sensor measurements support temporal exposure assessment, and which parts are measured versus modeled? Distinguish single measurements, serial sampling, continuous or near-continuous sensing, pharmacokinetic estimation and prediction of future concentrations. When measurements are coupled to pharmacokinetic or machine-learning models, identify the observations supplied to the model, the quantities estimated, the assumptions required, and how temporal predictions were evaluated. Address sampling frequency, response lag, reversibility, drift and recalibration where relevant.",
+          "includes": "serial and continuous sensing; pharmacokinetic models; temporal prediction",
+          "excludes": "Treating repeated technical measurements as longitudinal monitoring.; Presenting a predicted concentration-time curve as continuously measured data."
+        },
+        {
+          "theme_id": "T8",
+          "name": "Limits to interpreting measured concentrations as biological exposure",
+          "outline_section_id": "S2.4",
+          "scope": "What prevents the reported measurements from supporting broader exposure claims? Synthesize limitations demonstrated or left unresolved by the selected evidence: matrix interference and sample preparation; transfer across drugs, specimens, individuals and sensor batches; limited concentration ranges or temporal evaluation; differences between the sampled compartment and the tumour; missing independent reference measurements. Explain the consequence of each limitation. Distinguish not investigated, insufficiently reported, and tested with poor performance. Close with what the selected evidence supports and what remains necessary for reliable exposure assessment.",
+          "includes": "matrix effects; transferability; compartment versus tumour; reference measurements",
+          "excludes": "none stated"
+        }
+      ],
+      "count_justification": "One theme per subsection of the researcher's outline (8 subsections)."
+    },
+    "keywords": [
+      "Artificial intelligence",
+      "Nanobiosensing",
+      "Anticancer drugs",
+      "Molecular recognition",
+      "Nanomedicine",
+      "Drug exposure"
+    ],
+    "contribution_statement_draft": "PROVISIONAL: These chapters will connect AI-assisted nanosensor design and signal interpretation with the evidence required for anticancer-drug identification and exposure assessment. They will distinguish analytical and predictive performance from generalization, and measured concentrations from modeled exposure, to clarify what the selected evidence can support and where validation remains unresolved.",
+    "search_seeds": {
+      "core_concepts": [
+        "AI-assisted nanosensor materials, surface and recognition-element design",
+        "Probe-sequence and sensor-array optimization",
+        "Learned molecular recognition and chemical fingerprints",
+        "Optical, Raman, multisensor and electrochemical signal interpretation",
+        "Analytical validation, predictive evaluation and independent sampling units",
+        "Anticancer-drug identification and concentration estimation",
+        "Biological matrices, reference analytical methods and concentration measurands",
+        "Nanomedicine carrier, payload, encapsulation and release measurements",
+        "Serial and continuous sensing, pharmacokinetic estimation and temporal prediction",
+        "Matrix effects, transferability and sampled-compartment versus tumour exposure"
+      ],
+      "synonyms": [
+        {
+          "concept": "AI-assisted sensor design and optimization",
+          "synonyms": [
+            "machine learning",
+            "deep learning",
+            "Bayesian optimization",
+            "active learning",
+            "inverse design",
+            "materials informatics",
+            "probe sequence optimization",
+            "aptamer sequence design",
+            "sensor array selection",
+            "fabrication optimization"
+          ]
+        },
+        {
+          "concept": "Nanosensing platforms",
+          "synonyms": [
+            "nanosensor",
+            "nanobiosensor",
+            "nanomaterial-based sensor",
+            "nanoparticle sensor array",
+            "plasmonic sensor",
+            "surface-enhanced Raman scattering",
+            "SERS",
+            "nanostructured electrochemical sensor",
+            "fluorescent nanoprobes"
+          ]
+        },
+        {
+          "concept": "Learned recognition and signal-task mapping",
+          "synonyms": [
+            "chemical fingerprinting",
+            "molecular fingerprinting",
+            "cross-reactive sensor arrays",
+            "chemical nose",
+            "electronic tongue",
+            "pattern recognition",
+            "chemometrics",
+            "multivariate calibration",
+            "spectral unmixing",
+            "dimensionality reduction",
+            "classification",
+            "regression",
+            "denoising",
+            "feature extraction"
+          ]
+        },
+        {
+          "concept": "Performance and generalization",
+          "synonyms": [
+            "analytical validation",
+            "selectivity",
+            "interference testing",
+            "measurement precision",
+            "external validation",
+            "independent test set",
+            "specimen-level split",
+            "grouped cross-validation",
+            "data leakage",
+            "batch effects",
+            "domain shift",
+            "calibration transfer",
+            "sensor drift"
+          ]
+        },
+        {
+          "concept": "Anticancer-drug identification and quantification",
+          "synonyms": [
+            "antineoplastic agents",
+            "anticancer therapeutics",
+            "chemotherapeutic agents",
+            "targeted anticancer drugs",
+            "drug detection",
+            "drug discrimination",
+            "concentration classification",
+            "concentration estimation",
+            "therapeutic drug monitoring",
+            "bioanalysis"
+          ]
+        },
+        {
+          "concept": "Matrices and reference measurements",
+          "synonyms": [
+            "buffer",
+            "artificial biofluid",
+            "synthetic serum",
+            "spiked specimens",
+            "post-dose specimens",
+            "plasma",
+            "serum",
+            "whole blood",
+            "urine",
+            "interstitial fluid",
+            "tissue",
+            "parent drug",
+            "metabolite",
+            "unbound drug",
+            "total drug",
+            "liquid chromatography–mass spectrometry",
+            "high-performance liquid chromatography"
+          ]
+        },
+        {
+          "concept": "Nanomedicine components and release",
+          "synonyms": [
+            "nanocarrier",
+            "nanoparticle drug delivery",
+            "liposomal drug",
+            "carrier-associated label",
+            "encapsulated drug",
+            "free drug",
+            "released payload",
+            "release kinetics",
+            "biodistribution",
+            "release-responsive sensing"
+          ]
+        },
+        {
+          "concept": "Temporal exposure and interpretive limits",
+          "synonyms": [
+            "serial sampling",
+            "longitudinal sensing",
+            "continuous monitoring",
+            "near-continuous monitoring",
+            "real-time sensing",
+            "pharmacokinetic modeling",
+            "concentration-time profile",
+            "temporal prediction",
+            "response lag",
+            "reversibility",
+            "recalibration",
+            "matrix effect",
+            "tumour penetration",
+            "compartmental exposure"
+          ]
+        }
+      ],
+      "adjacent_fields": [
+        "Chemometrics and analytical chemistry",
+        "Materials informatics and experimental design",
+        "Molecular recognition and probe engineering",
+        "Spectroscopy and electroanalytical chemistry",
+        "Metrology and measurement validation",
+        "Machine-learning evaluation and domain adaptation",
+        "Bioanalytical method validation",
+        "Pharmacokinetics and therapeutic drug monitoring, limited to measurement and exposure",
+        "Nanomedicine characterization and drug-release analysis",
+        "Longitudinal biosensing and time-series analysis"
+      ],
+      "seed_papers": []
+    },
+    "assumptions": [
+      "The supplied researcher_outline object is the operative outline. Its subsection questions and exclusions are fixed; no alternative perspective or primary-theme structure is proposed.",
+      "For topic boundaries, nanobiosensing provisionally requires a nanoscale component with a functional sensing role, not merely a nanoscale delivery vehicle. A biological recognition element is not mandatory for chemical drug-sensing platforms relevant to the outline.",
+      "For topic boundaries, no organism or matrix restriction is imposed. Chapter 1 may draw on directly relevant methods outside anticancer-drug sensing, but such evidence does not establish Chapter 2 exposure performance.",
+      "For topic boundaries, discovery has no lower date cutoff or language restriction. The final search date and any practical translation limitations must be recorded during literature work.",
+      "For audience readiness, the journal's non-specialist scientific readership is adopted because the researcher supplied no narrower audience.",
+      "For competing-position readiness, the listed challenges are provisional screening targets rather than verified positions in the literature; their actual presence and evidential support require literature inspection.",
+      "AI terminology is treated broadly enough for discovery to capture machine learning, learned chemometric models and model-guided optimization. Conventional calibration and exploratory dimensionality reduction remain explicit comparators and must not automatically be relabeled as AI-enabled prediction.",
+      "Reference methods and conventional sensors may be retained as direct comparators or methodological context even when they do not themselves contain nanoscale or AI components.",
+      "No chapter or subsection word allocations are inferred: the supplied outline object contains none, and the journal's 5,000-word limit applies to the full review."
+    ],
+    "questions_for_researcher": [
+      "The supplied outline object contains no word targets. What combined or chapter-level word allocation should the first two chapters use within the full review's 5,000-word main-text limit?"
+    ],
+    "corpus_policy": {
+      "broad_discovery": true,
+      "citation_expansion": true,
+      "mode": "OPEN_CORPUS",
+      "papers": []
+    },
+    "theme_framework_proposed_by_A02": {
+      "primary_themes": [
+        {
+          "theme_id": "T1",
+          "name": "S1.1 — AI-assisted design and optimization of sensors and probes",
+          "scope": "How computational models select or optimize physical sensing components or experimental conditions.",
+          "includes": "Materials, surface chemistry, recognition elements, probe sequences, complementary array components, fabrication and measurement conditions; model inputs, recommendations and experimental evaluation.",
+          "excludes": "Feature selection from already collected measurements; delivery design without sensing; downstream recognition performance except where needed to evaluate a design recommendation."
+        },
+        {
+          "theme_id": "T2",
+          "name": "S1.2 — From individual recognition events to learned molecular fingerprints",
+          "scope": "How surface interactions and collective sensor responses become learned analyte or sample representations.",
+          "includes": "Spectral and multisensor fingerprints; links among sensing chemistry, measured response, computational features and predicted identity, concentration category or sample characteristic; contrasts with single-response calibration.",
+          "excludes": "Physical component optimization assigned to T1; general algorithm descriptions without a recognition connection; claims that predictive fingerprints alone establish mechanism."
+        },
+        {
+          "theme_id": "T3",
+          "name": "S1.3 — Matching learning tasks to biosensor signals",
+          "scope": "Which analytical tasks and computational methods suit particular signal types and outputs.",
+          "includes": "Optical and Raman preprocessing, denoising and feature extraction; classification and regression; multisensor discrimination and multianalyte analysis; electrochemical calibration and interference discrimination; drift correction, tracking and temporal prediction methods; simpler comparators.",
+          "excludes": "Exploratory dimensionality reduction described as validated prediction; drug-exposure conclusions without evidence assigned to Chapter 2; general method catalogues unrelated to included signals."
+        },
+        {
+          "theme_id": "T4",
+          "name": "S1.4 — Interpreting performance and generalization",
+          "scope": "What analytical and predictive results establish under their evaluation designs.",
+          "includes": "Accuracy, precision, selectivity, concentration range, classification and regression evaluation, independent evaluation units, specimen-level separation, leakage, external evaluation and transfer across individuals, matrices, batches or time.",
+          "excludes": "Drug-exposure-specific consequences, assigned to T8; treating multiple measurements from one specimen as independent biological samples."
+        },
+        {
+          "theme_id": "T5",
+          "name": "S2.1 — Identifying anticancer drugs and estimating their concentrations",
+          "scope": "What drug-related information nanosensing systems produce and how it is evaluated.",
+          "includes": "Presence detection, drug identification, concentration categories and numerical concentration estimates; sensing mechanism, biological matrix, computational task, evaluation and reference method; parent drug versus metabolites and total versus unbound concentration where reported.",
+          "excludes": "Carrier and release-specific interpretation assigned to T6; longitudinal exposure inference assigned to T7; equating synthetic-fluid results with patient performance."
+        },
+        {
+          "theme_id": "T6",
+          "name": "S2.2 — Measuring nanomedicines: carrier, payload and release",
+          "scope": "Which nanomedicine component or process an observed signal represents and what AI contributes to interpreting it.",
+          "includes": "Carrier-associated signals, intact-carrier measurements, payload, encapsulated and released drug, release-related changes and distribution; demonstrated sensing feedback used to assess or refine delivery systems.",
+          "excludes": "Formulation optimization without sensing; inference of released or biologically available payload from carrier labels alone; detailed treatment selection and dose adjustment."
+        },
+        {
+          "theme_id": "T7",
+          "name": "S2.3 — From individual measurements to exposure over time",
+          "scope": "How observations support temporal exposure estimates and how measured quantities differ from modeled quantities.",
+          "includes": "Single measurements as contrasted with serial sampling, continuous or near-continuous sensing, pharmacokinetic estimation and future-concentration prediction; model observations, estimates, assumptions and temporal validation; sampling frequency, lag, reversibility, drift and recalibration.",
+          "excludes": "Technical repetition characterized as longitudinal monitoring; predicted concentration-time curves characterized as continuously measured data; treatment decisions."
+        },
+        {
+          "theme_id": "T8",
+          "name": "S2.4 — Limits to interpreting measured concentrations as biological exposure",
+          "scope": "Consequences of demonstrated or unresolved measurement limitations for broader exposure claims.",
+          "includes": "Matrix interference, sample preparation, transfer across drugs and specimens, individuals and batches, concentration and temporal coverage, sampled-compartment versus tumour exposure and independent reference measurements; distinctions among not investigated, insufficiently reported and tested with poor performance.",
+          "excludes": "Standalone generic evaluation principles assigned to T4; unsupported assertions that an unreported measurement failed; detailed response, toxicity or treatment-decision discussions."
+        }
+      ],
+      "count_justification": "Eight primary themes reproduce the eight supplied subsections exactly. S1 and S2 are parent chapters, not additional themes. Records may receive multiple theme assignments when they answer distinct subsection questions; shared evidence should be synthesized without duplicating paper summaries."
+    },
+    "researcher_outline": {
+      "review_question": "How does AI contribute to sensor design and interpretation, and how reliably can these systems identify anticancer drugs and characterize exposure across biological matrices and time?",
+      "scope_statement": "Write the first two chapters of a narrative review on AI-enabled nanobiosensing for cancer therapy. Investigate the central question without assuming that AI improves every sensor or that laboratory performance establishes clinical usefulness.",
+      "global_instructions": [
+        "Use connected scientific prose rather than consecutive paper summaries.",
+        "Preserve the actual source-access level of every claim.",
+        "Include contrary evidence.",
+        "Report unsupported subthemes as gaps.",
+        "Do not fill missing evidence with assumptions.",
+        "Do not prescribe particular papers.",
+        "Do not expand into the later response, toxicity and treatment-decision chapters."
+      ],
+      "sections": [
+        {
+          "section_id": "S1",
+          "heading": "AI-enabled nanobiosensing: design, recognition and signal interpretation",
+          "questions": [
+            "Where does AI contribute to a nanobiosensing system, and what additional information does it enable the system to produce?"
+          ],
+          "scope": {
+            "includes": [
+              "sensor and probe design",
+              "learned recognition",
+              "signal-to-task mapping",
+              "performance and generalization"
+            ],
+            "excludes": [
+              "drug-exposure measurement (Chapter 2)",
+              "response, toxicity and treatment decisions"
+            ]
+          }
+        },
+        {
+          "section_id": "S1.1",
+          "parent_section_id": "S1",
+          "heading": "AI-assisted design and optimization of sensors and probes",
+          "questions": [
+            "How are computational models used to select or optimize the physical components of a nanosensing system?"
+          ],
+          "guidance": [
+            "Discuss relevant examples of selecting sensing materials, surface chemistry or recognition elements.",
+            "Discuss relevant examples of designing or optimizing probe sequences.",
+            "Discuss relevant examples of selecting complementary components for sensor arrays.",
+            "Discuss relevant examples of optimizing fabrication or measurement conditions.",
+            "Explain what enters the model, what it predicts or recommends, and whether the recommendation was experimentally evaluated.",
+            "Distinguish designing a sensing component from selecting useful features in measurements already collected."
+          ],
+          "avoid": [
+            "Drug-delivery design, unless it directly involves a sensing function."
+          ],
+          "scope": {
+            "includes": [
+              "materials",
+              "surface chemistry",
+              "recognition elements",
+              "probe sequences",
+              "array components",
+              "fabrication and measurement conditions"
+            ],
+            "excludes": [
+              "feature selection on already collected measurements",
+              "drug-delivery design without a sensing function"
+            ]
+          }
+        },
+        {
+          "section_id": "S1.2",
+          "parent_section_id": "S1",
+          "heading": "From individual recognition events to learned molecular fingerprints",
+          "questions": [
+            "How can models interpret patterns across sensor responses to recognize analytes or characterize biological samples?"
+          ],
+          "guidance": [
+            "Explain machine perception through the relationship between interactions at the sensing surface, the resulting spectral or multisensor response, the features used by the computational model, and the predicted analyte identity, concentration category or sample characteristic.",
+            "Clarify how this differs from interpreting a single sensor response through a conventional calibration relationship."
+          ],
+          "avoid": [
+            "Implying that learned recognition eliminates the importance of sensor chemistry.",
+            "Implying that a predictive fingerprint necessarily establishes its biological mechanism."
+          ],
+          "scope": {
+            "includes": [
+              "spectral fingerprints",
+              "multisensor arrays",
+              "pattern recognition"
+            ],
+            "excludes": []
+          }
+        },
+        {
+          "section_id": "S1.3",
+          "parent_section_id": "S1",
+          "heading": "Matching learning tasks to biosensor signals",
+          "questions": [
+            "Which computational tasks suit different biosensor signals, and why?"
+          ],
+          "guidance": [
+            "Organize the discussion around signal, then analytical task, then method, then output.",
+            "Optical or Raman spectra: preprocessing, denoising, feature extraction, classification and concentration estimation.",
+            "Multisensor-array fingerprints: analyte discrimination, pattern recognition and multianalyte analysis.",
+            "Electrochemical responses: calibration, interference discrimination and concentration estimation.",
+            "Repeated measurements: drift correction, tracking and temporal prediction.",
+            "Explain model families only where they clarify an included study.",
+            "Distinguish exploratory dimensionality reduction from predictive classification or regression.",
+            "Compare with simpler analytical approaches where the evidence permits."
+          ],
+          "avoid": [
+            "Assuming that greater model complexity means better performance."
+          ],
+          "scope": {
+            "includes": [
+              "optical and Raman spectra",
+              "multisensor arrays",
+              "electrochemical responses",
+              "repeated measurements"
+            ],
+            "excludes": []
+          }
+        },
+        {
+          "section_id": "S1.4",
+          "parent_section_id": "S1",
+          "heading": "Interpreting performance and generalization",
+          "questions": [
+            "What does a reported performance result establish, and under which evaluation conditions?"
+          ],
+          "guidance": [
+            "Distinguish analytical performance: measurement accuracy, precision, selectivity and useful concentration range.",
+            "Distinguish predictive performance: classification or regression performance on appropriately separated evaluation data.",
+            "Distinguish generalization: performance across new biological samples, individuals, matrices, sensor batches or time points.",
+            "Identify the independent evaluation unit.",
+            "Introduce these evaluation principles here; their consequences for drug-exposure measurement belong to Chapter 2."
+          ],
+          "avoid": [
+            "Describing multiple spectra from one specimen as multiple independent biological samples."
+          ],
+          "scope": {
+            "includes": [
+              "analytical performance",
+              "predictive performance",
+              "generalization",
+              "evaluation units"
+            ],
+            "excludes": []
+          }
+        },
+        {
+          "section_id": "S2",
+          "heading": "Sensing drug and nanomedicine exposure",
+          "questions": [
+            "Can learned models reliably identify anticancer drugs and estimate their concentrations in biological matrices, and what additional evidence is needed to characterize exposure over time?"
+          ],
+          "scope": {
+            "includes": [
+              "drug identification and quantification",
+              "nanomedicine carrier, payload and release",
+              "temporal exposure",
+              "limits of exposure claims"
+            ],
+            "excludes": [
+              "detailed treatment selection and dose-adjustment strategies",
+              "response, toxicity and treatment decisions"
+            ]
+          }
+        },
+        {
+          "section_id": "S2.1",
+          "parent_section_id": "S2",
+          "heading": "Identifying anticancer drugs and estimating their concentrations",
+          "questions": [
+            "What drug-related information do AI-enabled nanosensing systems actually produce?"
+          ],
+          "guidance": [
+            "Distinguish detecting drug presence, identifying a drug, classifying a concentration into categories, and estimating a numerical concentration.",
+            "For the selected studies, connect the drug, sensing mechanism, biological matrix, computational task and evaluation result.",
+            "Separate experiments in buffer, synthetic biofluids, spiked biological specimens and specimens collected after administration.",
+            "Where reported, identify the reference analytical method.",
+            "Where reported, distinguish parent drug from metabolites, and total from unbound concentration."
+          ],
+          "avoid": [
+            "Describing concentration classification as continuous quantitative measurement.",
+            "Describing synthetic-fluid performance as established patient performance."
+          ],
+          "scope": {
+            "includes": [
+              "anticancer drugs",
+              "biological matrices",
+              "reference methods"
+            ],
+            "excludes": []
+          }
+        },
+        {
+          "section_id": "S2.2",
+          "parent_section_id": "S2",
+          "heading": "Measuring nanomedicines: carrier, payload and release",
+          "questions": [
+            "When a nanomedicine is sensed, which component or process does the signal represent?"
+          ],
+          "guidance": [
+            "A carrier-associated label does not by itself establish intact-carrier abundance, released drug concentration, or biologically available payload.",
+            "Distinguish measurements of the nanocarrier or a carrier-associated signal, of the drug payload, of encapsulated and released drug, and of release-related changes or distribution.",
+            "Explain the specific contribution of AI to interpreting these measurements.",
+            "Evaluate whether sensing supplies feedback for assessing or refining a delivery system."
+          ],
+          "avoid": [
+            "Inferring a demonstrated feedback loop merely because AI was used to design the formulation.",
+            "Detailed treatment selection and dose-adjustment strategies."
+          ],
+          "scope": {
+            "includes": [
+              "nanocarrier signals",
+              "payload",
+              "release",
+              "distribution"
+            ],
+            "excludes": [
+              "treatment selection",
+              "dose adjustment"
+            ]
+          }
+        },
+        {
+          "section_id": "S2.3",
+          "parent_section_id": "S2",
+          "heading": "From individual measurements to exposure over time",
+          "questions": [
+            "How can sensor measurements support temporal exposure assessment, and which parts are measured versus modeled?"
+          ],
+          "guidance": [
+            "Distinguish single measurements, serial sampling, continuous or near-continuous sensing, pharmacokinetic estimation and prediction of future concentrations.",
+            "When measurements are coupled to pharmacokinetic or machine-learning models, identify the observations supplied to the model, the quantities estimated, the assumptions required, and how temporal predictions were evaluated.",
+            "Address sampling frequency, response lag, reversibility, drift and recalibration where relevant."
+          ],
+          "avoid": [
+            "Treating repeated technical measurements as longitudinal monitoring.",
+            "Presenting a predicted concentration-time curve as continuously measured data."
+          ],
+          "scope": {
+            "includes": [
+              "serial and continuous sensing",
+              "pharmacokinetic models",
+              "temporal prediction"
+            ],
+            "excludes": []
+          }
+        },
+        {
+          "section_id": "S2.4",
+          "parent_section_id": "S2",
+          "heading": "Limits to interpreting measured concentrations as biological exposure",
+          "questions": [
+            "What prevents the reported measurements from supporting broader exposure claims?"
+          ],
+          "guidance": [
+            "Synthesize limitations demonstrated or left unresolved by the selected evidence: matrix interference and sample preparation; transfer across drugs, specimens, individuals and sensor batches; limited concentration ranges or temporal evaluation; differences between the sampled compartment and the tumour; missing independent reference measurements.",
+            "Explain the consequence of each limitation.",
+            "Distinguish not investigated, insufficiently reported, and tested with poor performance.",
+            "Close with what the selected evidence supports and what remains necessary for reliable exposure assessment."
+          ],
+          "avoid": [],
+          "scope": {
+            "includes": [
+              "matrix effects",
+              "transferability",
+              "compartment versus tumour",
+              "reference measurements"
+            ],
+            "excludes": []
+          }
+        }
+      ]
+    }
+  },
+  "test_excerpt_in_discovery_corpus": false,
+  "full_text_extraction_tested": false,
+  "cp1_review": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v27-pilot7-a06-only-50usd\\runs\\20261123-214928\\checkpoints\\CP1_review.md",
+  "cp1_decision_unfilled": {
+    "selected_option_id": null,
+    "edited_angle": null,
+    "approve_selection_criteria": null,
+    "edited_selection_criteria": null,
+    "edited_theme_framework": null,
+    "answers_to_questions": {},
+    "notes": "",
+    "confirm_corpus_policy": false,
+    "corpus_policy_fingerprint": "2350eb129f671f8cff979dc2a5e513cc0188063272622dd7d4e7009c0e52305c"
+  }
+}
