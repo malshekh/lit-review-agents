@@ -1,0 +1,36 @@
+{
+  "problems": [
+    "R0078: source materialization blocked: Image-only Table 1 (tbl1); existing strict materialization refuses missing machine-readable table. No image values transcribed or inspected.",
+    "the stage limits this projection needs add up to $50.81, over the $49.78 the run's $50.00 cap leaves after prior spend and retained reservations; reduce the selection"
+  ],
+  "fingerprint": "bb599e9445a9c500e191d65d1593e2c8f2464db2d9397b2306e62513bb15b608",
+  "accounts": {
+    "discovery_and_screening_spent_usd": 1.8311,
+    "smoke_test_and_other_prior_spend_usd": 0.0,
+    "smoke_test_spent_in_run_usd": 0.0991,
+    "unsettled_reservations_usd": 0.1247,
+    "spent_so_far_total_usd": 2.085,
+    "projected_remaining_usd_provisional": 38.65,
+    "retry_and_repair_allowance_usd": 10.1786,
+    "combined_maximum_exposure_usd": 51.0338,
+    "hard_cap_usd": 50.0,
+    "projected_by_provider_usd": {
+      "anthropic": 23.3309,
+      "kimi": 1.4869,
+      "openai": 13.8278
+    },
+    "spent_by_provider_usd": {
+      "anthropic": 1.3578,
+      "openai": 0.7272
+    },
+    "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed output sizes; not a measured current-code cost. Provider allocation is estimated; the early combined extraction/validation forecast is split equally between their providers"
+  },
+  "papers": [
+    "R0078",
+    "R0115",
+    "R0090",
+    "R0116",
+    "R0058",
+    "R0039"
+  ]
+}

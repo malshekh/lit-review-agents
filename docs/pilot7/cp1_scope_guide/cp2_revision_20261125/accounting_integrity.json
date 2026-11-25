@@ -1,0 +1,32 @@
+{
+  "run_id": "20261123-214928",
+  "new_paid_calls": 0,
+  "spend_usd": 2.0849717,
+  "held_usd": 0.124671,
+  "hold_count": 5,
+  "smoke_exposure_usd": 0.3785106,
+  "review_pauses_usd": [
+    25,
+    48
+  ],
+  "combined_cap_usd": 50,
+  "CP2_approved": false,
+  "frozen": false,
+  "full_text_extraction_tested": false,
+  "original_smoke_and_functional_files_verified": 54,
+  "strict_receipts": 32,
+  "cost_ledger_sha256": "f5a92e6be87ddf71e9ce4dec6b74a0439ae84026bd3753d1c0b96ec263ecb490",
+  "job_ledger_sha256": "b5d67c7532e7d170da04ecf5c2c6e48d91fc96561b4570009d9dc2ece84da90c",
+  "sealed_runtime_source_unchanged": true,
+  "sealed_runtime_commit": "98f7fbd14775c8d2b3d1bb8e02c6d9f6b9d06977",
+  "sealed_manifest_sha256": "93559fee89b744e1b5137612d17ed61796be3fe7bc8900103ca2f47e20d5787c",
+  "offline_fix_commit": "33f0e37c2646f69b676a7cc87bd0a473af3df556",
+  "fresh_runtime_required_before_paid_continuation": true,
+  "tests_full_passed": 1173,
+  "source_files_sha256": {
+    "src/litreview/tools/literature/pubmed.py": "32547518407d86098d536f250183f2cc7d9275bd81acbac726125bb76c7b4579",
+    "src/litreview/tools/fulltext.py": "4e1d6c41a07ba7ce8eb6cf435e2277053541b2d6bfd84a3cb326fe00e5b6b175",
+    "src/litreview/tools/cost_projection.py": "6fe095f66d604f741aa551479c5eaf0bb09b8910ecec0208c77c566036896848",
+    "src/litreview/orchestrator.py": "fe954a31a48ac349d53284c5952cd84daa143ae5221abcc79dcbb29f0844c1ed"
+  }
+}

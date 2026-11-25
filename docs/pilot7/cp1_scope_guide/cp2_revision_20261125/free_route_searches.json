@@ -1,0 +1,12 @@
+{
+  "purpose": "Find free copies of the six existing screened publications only; no new discovery or corpus additions.",
+  "queries": [
+    "\"10.1021/acssensors.8b00450\" full text",
+    "\"10.1007/s00216-025-06241-z\" full text",
+    "\"10.1016/j.aca.2026.346185\" repository",
+    "\"acssensors.8b00450\" site:mdr.nims.go.jp",
+    "\"Functional Nanoparticles-Coated\" filetype:pdf",
+    "\"s00216-025-06241-z\" repository manuscript"
+  ],
+  "outcome": "No additional identity-verifiable free full-text copy obtained for R0039, R0115 or R0058. Search snippets and papers merely citing them were not counted as retrieved full text."
+}

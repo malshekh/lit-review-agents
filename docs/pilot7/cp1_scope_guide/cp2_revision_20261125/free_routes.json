@@ -1,0 +1,79 @@
+[
+  {
+    "record_id": "R0078",
+    "route": "pmc_xml",
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC13397890/fullTextXML",
+    "status": 200,
+    "content_type": "application/xml",
+    "bytes": 174732,
+    "sha256": "27be543d0c151e3666a67f25dda764d8ac136229cdebea8d69df1abbccbb0811",
+    "file": "R0078_pmc_xml.raw",
+    "at": "2026-11-25T13:22:33.988229+00:00"
+  },
+  {
+    "record_id": "R0115",
+    "route": "quarantined_pmc_xml",
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC9421940/fullTextXML",
+    "status": 500,
+    "content_type": "application/json",
+    "bytes": 150,
+    "sha256": "3d8e7c38d9997dae563e221b6e013e790d4263f507643c1303720416c6daf834",
+    "file": "R0115_quarantined_pmc_xml.raw",
+    "at": "2026-11-25T13:22:33.988586+00:00"
+  },
+  {
+    "record_id": "R0115",
+    "route": "publisher",
+    "url": "https://link.springer.com/article/10.1007/s00216-025-06241-z",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "bytes": 419303,
+    "sha256": "1fa62fe1c3a045293694258b961cebf63bed94b185ef22df5f443e3bf50d61ef",
+    "file": "R0115_publisher.raw",
+    "at": "2026-11-25T13:22:33.988780+00:00"
+  },
+  {
+    "record_id": "R0039",
+    "route": "publisher",
+    "url": "https://pubs.acs.org/doi/10.1021/acssensors.8b00450",
+    "status": 403,
+    "content_type": "text/html; charset=UTF-8",
+    "bytes": 5503,
+    "sha256": "2b5335abcb02f0bc4c40ae0bb5f9db01073913ba00d2037e692dacf0f127b46f",
+    "file": "R0039_publisher.raw",
+    "at": "2026-11-25T13:22:33.989141+00:00"
+  },
+  {
+    "record_id": "R0039",
+    "route": "publisher_pdf",
+    "url": "https://pubs.acs.org/doi/pdf/10.1021/acssensors.8b00450",
+    "status": 403,
+    "content_type": "text/html; charset=UTF-8",
+    "bytes": 5515,
+    "sha256": "931cd5c87235f0c90c432f3252576316e6f97c19e9eb1d2f3374d7bfee82f27a",
+    "file": "R0039_publisher_pdf.raw",
+    "at": "2026-11-25T13:22:34.196352+00:00"
+  },
+  {
+    "record_id": "R0058",
+    "route": "publisher",
+    "url": "https://www.sciencedirect.com/science/article/pii/S0003267026011359",
+    "status": 403,
+    "content_type": "text/html; charset=UTF-8",
+    "bytes": 832979,
+    "sha256": "589d8ec0ed45d191f0d6bc332b5ffbb9dec9de4130adc7ccca8e9a0379ad7a7b",
+    "file": "R0058_publisher.raw",
+    "at": "2026-11-25T13:22:34.368173+00:00"
+  },
+  {
+    "record_id": "R0058",
+    "route": "repository",
+    "url": "https://avesis.erciyes.edu.tr/publication/details/b01eba29-1150-4cb1-a3c5-e66c1bb76725/oai",
+    "status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "bytes": 67671,
+    "sha256": "af65d7adf59a84147f3e3ee8cf1006a44e0983bff4a0aa94492ff0470d20a43f",
+    "file": "R0058_repository.raw",
+    "at": "2026-11-25T13:22:34.638171+00:00"
+  }
+]
