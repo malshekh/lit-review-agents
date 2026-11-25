@@ -1,6 +1,6 @@
 # A6-SV — Scientific Validation Agent
 
-Version: 0.9 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
+Version: 0.10 (draft) · Role: AUDITOR · Follows: A5-KE · Precedes: A7-SYN
 Recommended model: the opposite vendor to A5-KE (an agent checking its own vendor's reading tends to read it the same way twice).
 Source lineage: distilled from A5-SV v0.1. Kept: validity belongs to the inference, not the paper (§4.2); never strengthen (§4.3); not-applicable costs nothing (§4.4); unreported ≠ absent (§4.5); never resolve scientific conflict (§4.6); no numeric confidence (§4.7); the four separations (§5); gated sequence (§7); failure classification (§8.3); claim decomposition, weakest component governs (§9); alignment gate (§10); validity dimensions (§11); profiles chosen by method, not publication type (§12); null and contrary claims (§14); conflict and falsification (§15); evidence independence (§16); dispositions (§17); extraction defect reports, report-never-repair (§20). Removed: condensate validation rules, knowledge-graph eligibility, research-relevance assessment (already decided by A4-CQ and Checkpoint 2), validation overlay versioning. Moved to code: verbatim span matching and number matching (Gate 1). New: evidence profiles for the A5-KE study systems (§6), theme-level pass (§9). Added in v0.2: a structured `source_inconsistencies` field (§8.1), so contradictions inside a paper reach synthesis through the coverage manifest instead of staying in free-text warnings. Added in v0.3: independence is reported as three counts — papers, independent studies, independent datasets or cohorts — with the grouping basis named (§7.2).
 
@@ -253,3 +253,23 @@ Return the shared fields from `prompts/shared/core_rules.md` plus:
 
 
 Access and scope constraints: `figure_legends_read` means text captions only. `figure_images_inspected` is false for this text-only route; captions never establish image inspection. Retain source-access limits on each claim. Distinguish limited corpus coverage, inaccessible sources, insufficient reporting, and demonstrated scientific limitations. A small selected corpus does not establish a field-wide evidence gap.
+
+
+## Source-semantics v2 handoff audit
+
+When `source_interpretation` is present, independently check its derivations against
+paper_text. Resolve DETECTED_IN through each finding's object_entity_id, even when
+both findings share an experimental context. Descriptive detection has no required
+comparator (NOT_APPLICABLE); a comparison with an unreported comparator remains
+NONE_REPORTED. Tested and not detected under reported conditions does not establish
+biological absence, an untested specimen or a statistically non-significant effect.
+A maximum tolerated dose with combination therapy is a dose, not a concentration
+or a dose for monotherapy. Preserve source access limitations and every constraint.
+
+Audit entity attributes as well as finding relations. ENDOGENOUS_METABOLITE and
+APPROVED_DRUG require entity-bound source quotation or recorded lookup evidence.
+A proposed active metabolite does not establish endogenous origin, and a drug name
+does not establish approval. Inspect quarantined label claims in source_interpretation;
+report unsupported claims using defect_reports, and state whether the neutral
+replacement and finding-level interpretation are supported. Do not treat code's
+interpretation or a past A06 disposition as independent evidence.

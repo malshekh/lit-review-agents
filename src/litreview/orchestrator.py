@@ -2053,6 +2053,21 @@ class Run:
     def _prepare_validation(self, rid):
         ext = self.load(f'extractions/{rid}.json', {})
         sections = self.load(f'fulltext/{rid}.json', {})
+        from .source_semantics import interpret, load_evidence
+        try:
+            corrected, semantic_audit = interpret(ext, sections, load_evidence(self.dir, self.load(f'entity_label_evidence/{rid}.json', [])))
+        except ValueError as exc:
+            raise Pause(f'{rid}: source interpretation requires correction: {exc}') from exc
+        prior = self.load(f'source_semantics/{rid}.json', {})
+        if prior.get('entity_label_defects') and not semantic_audit['entity_label_defects']:
+            semantic_audit['entity_label_defects'] = prior['entity_label_defects']
+        self.save(f'source_semantics/{rid}.json', semantic_audit)
+        if corrected != ext:
+            archive = f'source_semantics/original_extractions/{rid}.json'
+            if not self.data(archive).exists():
+                self.save(archive, ext)
+            self._write_validation(f'extractions/{rid}.json', corrected)
+            ext = corrected
         repaired = span_check.repair_findings(ext, sections)
         if repaired != ext:
             self._write_validation(f'extractions/{rid}.json', repaired)
@@ -2143,6 +2158,9 @@ class Run:
     def _save_a06_input(self, rid: str, step: str, payload: dict) -> None:
         """The exact A06 PER_PAPER input, saved as the call is made. The instability test replays it as is:
         a conflict stripped or an identity corrected afterwards changes the extraction file, not this."""
+        semantic_audit = self.load(f'source_semantics/{rid}.json')
+        if semantic_audit:
+            payload['source_interpretation'] = semantic_audit
         self.save(f"a06_inputs/{rid}.json", {"step": step, "payload_sha256": self._payload_sha256(payload),
                                              **self._a06_conditions(rid), "payload": payload})
 
@@ -2297,7 +2315,9 @@ class Run:
         out = []
         for rec in corpus:
             rid = rec["record_id"]
-            ext = self.load(f"extractions/{rid}.json", {})
+            ext, semantic_sections = self._prepare_validation(rid)
+            from .source_semantics import interpret, load_evidence
+            _, semantic_audit = interpret(ext, semantic_sections, load_evidence(self.dir, self.load(f'entity_label_evidence/{rid}.json', [])))
             val_doc = self.load(f"validations/{rid}.json", {})
             self._require_complete_validation(rid, val_doc, ext)
             val_doc = self._recover_validation_review(rid, val_doc)
@@ -2327,6 +2347,7 @@ class Run:
                             **self._finding_themes(f, rec),
                             # the handoff contract (handoff.py): relation, direction, hedging, attribution
                             **handoff.project(f, v, ext.get("prompt_version")),
+                            "source_interpretation": semantic_audit['findings'].get(f['finding_id'], {}),
                             "span": f.get("span"), "quantities": f.get("quantities", []),
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),

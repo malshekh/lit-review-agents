@@ -4,6 +4,7 @@ import copy, hashlib, json
 from pathlib import Path
 import jsonschema
 from . import config
+from .source_semantics import RULE_VERSION
 from .paths import SCHEMAS_DIR
 
 MODE = "ordinary_json_local_v1"
@@ -22,7 +23,8 @@ def identity():
     shape=(SCHEMAS_DIR/"A05-KE.schema.json").read_bytes()
     return {"generation_mode": MODE if active() else "anthropic_strict_legacy",
             "contract_version":CONTRACT_VERSION,"canonical_schema_sha256":hashlib.sha256(shape).hexdigest(),
-            "acceptance_version":ACCEPTANCE_VERSION,"provider_schema_submitted":False if active() else True}
+            "acceptance_version":ACCEPTANCE_VERSION,
+            "source_semantics_version":RULE_VERSION,"provider_schema_submitted":False if active() else True}
 
 
 def strict_object(text):

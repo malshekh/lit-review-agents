@@ -251,7 +251,7 @@ def test_functional_planner_is_read_only_and_reports_new_mode_separately(tmp_pat
 def test_expectation_failure_is_not_accepted_and_does_not_erase_saved_science():
     ext=functional_record();ext['contexts'][0]['fields']['comparator']='NOT_APPLICABLE'
     before=copy.deepcopy(ext)
-    with pytest.raises(jsonschema.ValidationError):a05_functional.require_expected(ext,a05_functional.fixture()['expected'])
+    with pytest.raises(jsonschema.ValidationError):a05_functional.require_expected_v1(ext,a05_functional.fixture()['expected'])
     assert ext==before and len(ext['findings'])==3
     # Independent handoff itself requires a valid canonical extraction; expectation mismatch does not mutate it.
     base.validate('A05-KE',ext)

@@ -24,9 +24,11 @@ def _run(tmp_path, monkeypatch):
     run.save_state({"stage": "validate", "status": "READY", "counters": {}})
     run.save("selected_corpus.json", [{"record_id": "R0001"}])
     run.save("fulltext/R0001.json", {"Abstract": "We repurposed disulfiram (DSF) against glioblastoma. DSF suppressed growth by 92%."})
+    # This fixture's excerpt establishes the name/relation, not approval status.
+    # Keep identity-conflict/review tests independent of the label-evidence gate.
     run.save("extractions/R0001.json", {
         "record_id": "R0001",
-        "entities": [{"entity_id": "E1", "mention": "DSF", "type": "APPROVED_DRUG", **WRONG},
+        "entities": [{"entity_id": "E1", "mention": "DSF", "type": "DRUG_STATUS_UNVERIFIED", **WRONG},
                      {"entity_id": "E2", "mention": "growth", "type": "PHENOTYPE", "normalization_state": "UNRESOLVED"}],
         "findings": [{"finding_id": "F1", "subject_entity_id": "E1", "object_entity_id": "E2", "predicate": "DECREASES",
                       "span": "DSF suppressed growth by 92%.", "context_id": "C1"}],
@@ -54,7 +56,7 @@ def test_a06_conflict_strips_the_identity_everywhere_and_keeps_it_only_in_the_au
     vf = run._validated_findings(run.load("selected_corpus.json"))
     blob = json.dumps(vf)
     assert "CHEBI:81585" not in blob and "dodecenoic" not in blob             # never reaches A06 theme, A07, A10
-    assert vf[0]["entities"]["E1"] == {"mention": "DSF", "type": "APPROVED_DRUG", "normalization_state": "CONFLICT"}
+    assert vf[0]["entities"]["E1"] == {"mention": "DSF", "type": "DRUG_STATUS_UNVERIFIED", "normalization_state": "CONFLICT"}
     # scientific validity is judged against the mention: the finding stands, and the stripping is not an
     # identity change (A06 raised it and validated against the mention)
     assert vf[0]["eligibility"]["status"] == "SUPPORTING"

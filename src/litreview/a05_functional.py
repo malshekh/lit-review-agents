@@ -4,6 +4,7 @@ import copy, dataclasses, hashlib, json
 from pathlib import Path
 import jsonschema
 from . import config, extraction_mode
+from .source_semantics import RULE_VERSION
 from .paths import REPO_ROOT
 
 SOURCE=REPO_ROOT/"docs/pilot7/a05_functional/source_and_expectations.json"
@@ -11,13 +12,13 @@ A05_OUTPUT_TOKENS=4000
 A06_OUTPUT_TOKENS=2500
 A05_INPUT_BYTES=52000
 A06_INPUT_BYTES=64000
-CHECK_VERSION=1
+CHECK_VERSION=2
 
 
 def fixture():return json.loads(SOURCE.read_text(encoding="utf-8"))
 
 
-def require_expected(ext,expected):
+def require_expected_v1(ext,expected):
     entities={e['entity_id']:e for e in ext.get('entities',[])}
     contexts={c['context_id']:c['fields'] for c in ext.get('contexts',[])}
     findings=ext.get('findings',[])
@@ -43,10 +44,47 @@ def require_expected(ext,expected):
     return True
 
 
+def require_expected(ext, expected, *, allow_quarantined_labels=False):
+    """Version 2: exact source, finding-specific specimen, quantity task and label evidence."""
+    from .source_semantics import interpret
+    try:
+        corrected, audit = interpret(ext, fixture()['payload']['record']['content'])
+    except ValueError as exc:
+        raise jsonschema.ValidationError(str(exc)) from exc
+    if audit['entity_label_defects'] and not allow_quarantined_labels:
+        raise jsonschema.ValidationError('Unsupported entity labels: ' + str(audit['entity_label_defects']))
+    entities = {e['entity_id']: e for e in corrected.get('entities', [])}
+    contexts = {c['context_id']: c['fields'] for c in corrected.get('contexts', [])}
+    findings = corrected.get('findings', [])
+    if len(findings) < expected['min_findings']:
+        raise jsonschema.ValidationError('Functional omission: nonempty expected findings are missing')
+    for requirement in expected['requirements']:
+        def matches(f):
+            subject = entities.get(f.get('subject_entity_id'), {}).get('mention', '').lower()
+            analyte = requirement.get('analyte_contains', '').lower()
+            if (analyte == 'dsf' and not any(x in subject for x in ('dsf','disulfiram'))) or (analyte != 'dsf' and analyte not in subject):return False
+            item = audit['findings'][f['finding_id']]
+            if requirement.get('matrix') and requirement['matrix'].rstrip('s').lower() != str(item.get('specimen','')).rstrip('s').lower():return False
+            if f.get('predicate') != requirement['predicate'] or f.get('polarity') != requirement['polarity'] or f.get('span') != requirement['quote']:return False
+            context = contexts[f['context_id']]
+            if f.get('predicate') == 'DETECTED_IN':
+                if item['comparator'] != 'NOT_APPLICABLE' or context.get('comparator') not in ('NOT_APPLICABLE','NONE_REPORTED',None):return False
+                if any(x in str(context.get('readout','')).lower() for x in ('numerical','regression','estimate')):return False
+            elif context.get('comparator') != 'NONE_REPORTED':return False
+            if 'raw_value' in requirement:
+                if not any(q.get('raw_value') == requirement['raw_value'] and q.get('raw_unit') == requirement['raw_unit'] and q.get('value_type') == 'DOSE' for q in f.get('quantities',[])):return False
+            elif f.get('quantities'):return False
+            return True
+        if not any(matches(f) for f in findings):
+            raise jsonschema.ValidationError('Functional omission or incorrect scientific reading: ' + str(requirement))
+    return True
+
+
 def check_identity():
     from .agents.base import build_system_prompt
     from . import structured
     return {**extraction_mode.identity(),'functional_check_version':CHECK_VERSION,
+            'source_semantics_rule':RULE_VERSION,
             'source_expectations_sha256':hashlib.sha256(SOURCE.read_bytes()).hexdigest(),
             'models':{a:dataclasses.asdict(config.agent_model(a)) for a in ('A05-KE','A06-SV')},
             'prompts':{a:hashlib.sha256(build_system_prompt(a).encode()).hexdigest() for a in ('A05-KE','A06-SV')},

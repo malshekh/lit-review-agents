@@ -1,0 +1,177 @@
+{
+  "agent_id": "A06-SV",
+  "prompt_version": "0.9",
+  "status": "COMPLETE_WITH_WARNINGS",
+  "warnings": [
+    "Validation is restricted to the three supplied abstract sentences; methodological adequacy cannot be independently established from this input."
+  ],
+  "limitations": [
+    "Only the supplied abstract text was inspected; no full text, figure images, figure legends or supplements were inspected.",
+    "Participant numbers, sampling times, assay detection limits and assay validation are not stated in the supplied abstract.",
+    "Dose-escalation methods, dose-limiting toxicities, treatment schedule and the basis for determining the maximum tolerated dose are not stated in the supplied abstract.",
+    "The HUMAN_INTERVENTIONAL evidence profile follows the supplied extraction; the three abstract sentences do not independently establish the study design."
+  ],
+  "mode": "PER_PAPER",
+  "record_id": "FUNCTIONAL_SOURCE_1",
+  "validations": [
+    {
+      "finding_id": "F1",
+      "structure": "ATOMIC",
+      "components": [],
+      "gate1": "PASSED",
+      "gate2": "ALIGNED",
+      "profiles": [
+        "Human interventional"
+      ],
+      "dimensions": {
+        "construct": {
+          "finding": "ADEQUATE",
+          "reason": "The abstract identifies high-performance liquid chromatography-mass spectrometry as the concentration measurement method and explicitly reports detection of diethyl-dithiocarbamate-copper in plasma; this supports a detection claim, not biological activity."
+        },
+        "internal": {
+          "finding": "NOT_REPORTED",
+          "reason": "Assay controls and validation procedures are not stated in the supplied abstract."
+        },
+        "statistical": {
+          "finding": "NOT_REPORTED",
+          "reason": "The supplied abstract states detection without sample counts, quantitative concentrations or uncertainty estimates."
+        },
+        "reproducibility": {
+          "finding": "NOT_REPORTED",
+          "reason": "Repeated measurements, participant-level consistency and independent replication are not stated in the supplied abstract."
+        },
+        "context_alignment": {
+          "finding": "ALIGNED",
+          "reason": "Both the finding and the abstract identify plasma as the detection matrix."
+        },
+        "generalization": {
+          "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+          "reason": "The finding records detection in the reported plasma samples without asserting detection in other populations or treatment conditions."
+        },
+        "threats": [
+          {
+            "threat": "NONE_IDENTIFIED",
+            "reason": "No specific material methodological threat can be established from the supplied sentences; assay validation and sampling details remain unreported in this input."
+          }
+        ]
+      },
+      "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "constraints": [
+        "Supported as an abstract-reported detection in the sampled plasma, not as independently verified analytical performance.",
+        "Detection frequency, concentration and sampling times are not stated in the supplied abstract.",
+        "Detection does not establish biological activity; the source describes the compound as the proposed active metabolite."
+      ],
+      "plain_language_limit": "The supplied abstract reports that diethyl-dithiocarbamate-copper was detected in plasma, without specifying concentrations, detection frequency or sampling times."
+    },
+    {
+      "finding_id": "F2",
+      "structure": "ATOMIC",
+      "components": [],
+      "gate1": "PASSED",
+      "gate2": "ALIGNED",
+      "profiles": [
+        "Human interventional"
+      ],
+      "dimensions": {
+        "construct": {
+          "finding": "ADEQUATE",
+          "reason": "The abstract explicitly reports non-detection in tumors using the stated analytical approach; the finding preserves non-detection rather than claiming molecular absence."
+        },
+        "internal": {
+          "finding": "NOT_REPORTED",
+          "reason": "Tumor sample handling, assay controls, recovery and matrix validation are not stated in the supplied abstract."
+        },
+        "statistical": {
+          "finding": "NOT_REPORTED",
+          "reason": "The supplied abstract provides no tumor sample count, detection limit or quantitative uncertainty."
+        },
+        "reproducibility": {
+          "finding": "NOT_REPORTED",
+          "reason": "Numbers of tumor samples and repeated measurements are not stated in the supplied abstract."
+        },
+        "context_alignment": {
+          "finding": "ALIGNED",
+          "reason": "The finding's tumor matrix and non-detection polarity match 'but not in tumors' in the abstract."
+        },
+        "generalization": {
+          "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+          "reason": "The finding is limited to non-detection in the reported tumor samples and does not assert absence across tumors or treatment conditions."
+        },
+        "threats": [
+          {
+            "threat": "NONE_IDENTIFIED",
+            "reason": "The supplied text establishes no specific assay defect; the unstated detection limit and sampling conditions restrict interpretation without demonstrating a methodological failure."
+          }
+        ]
+      },
+      "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "constraints": [
+        "Supported as abstract-reported non-detection in the sampled tumors under the study's analytical and sampling conditions.",
+        "The detection limit, sampling times and number of tumor samples are not stated in the supplied abstract.",
+        "Non-detection does not establish absence from tumors, failure of tumor penetration or lack of biological activity."
+      ],
+      "plain_language_limit": "The supplied abstract reports that diethyl-dithiocarbamate-copper was not detected in tumors, but does not establish that it was absent."
+    },
+    {
+      "finding_id": "F3",
+      "structure": "ATOMIC",
+      "components": [],
+      "gate1": "PASSED",
+      "gate2": "ALIGNED",
+      "profiles": [
+        "Human interventional"
+      ],
+      "dimensions": {
+        "construct": {
+          "finding": "NOT_REPORTED",
+          "reason": "The abstract explicitly labels 375 mg/d as the maximum tolerated dose, but does not state the toxicity criteria or operational definition used to determine it."
+        },
+        "internal": {
+          "finding": "NOT_REPORTED",
+          "reason": "Dose-escalation design, evaluable population and dose-limiting toxicity assessment are not stated in the supplied abstract."
+        },
+        "statistical": {
+          "finding": "NOT_REPORTED",
+          "reason": "Dose-level participant counts, decision rules and uncertainty are not stated in the supplied abstract."
+        },
+        "reproducibility": {
+          "finding": "NOT_REPORTED",
+          "reason": "Cohort expansion, repeated evaluation and sufficient procedural detail for replication are not stated in the supplied abstract."
+        },
+        "context_alignment": {
+          "finding": "ALIGNED",
+          "reason": "The predicate detail and context retain the abstract's qualification that the DSF maximum tolerated dose applies with RT and TMZ."
+        },
+        "generalization": {
+          "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+          "reason": "The finding retains the combination-treatment context and does not establish an MTD for DSF alone or for other regimens."
+        },
+        "threats": [
+          {
+            "threat": "NONE_IDENTIFIED",
+            "reason": "The supplied abstract does not establish a specific design defect; the missing dose-escalation and toxicity information prevents methodological appraisal."
+          }
+        ]
+      },
+      "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+      "constraints": [
+        "Supported as the abstract-reported maximum tolerated dose of DSF with RT and TMZ: 375 mg/d.",
+        "The dose applies to the studied combination regimen and population, whose detailed schedule and characteristics are not stated in the supplied abstract.",
+        "The basis for the MTD determination cannot be assessed from the supplied sentences.",
+        "This value does not establish an MTD for DSF alone, general safety or a recommended treatment dose."
+      ],
+      "plain_language_limit": "The supplied abstract reports a DSF maximum tolerated dose of 375 mg/d with RT and TMZ, without providing the methods or toxicity data underlying that determination."
+    }
+  ],
+  "defect_reports": [],
+  "defect_count": 0,
+  "normalization_conflicts": [],
+  "source_inconsistencies": [],
+  "theme": null,
+  "conflicts": [],
+  "independence": [],
+  "evidence_reach": null,
+  "cross_packet_candidates": [],
+  "packet_conflicts_not_retained": [],
+  "retrieval_requests": []
+}
