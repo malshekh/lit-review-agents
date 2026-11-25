@@ -425,7 +425,8 @@ class Run:
             from .paths import REPO_ROOT
             from .retained_hold import blocking_holds
             hold_auth = REPO_ROOT/'pilot_retained_hold_authorization.json'
-            if hold_auth.exists() and blocking_holds(self.budget, hold_auth):
+            blocked = blocking_holds(self.budget, hold_auth) if hold_auth.exists() else []
+            if blocked and not self._fresh_plan_reservation(agent_id, step, reservation_key, blocked):
                 raise Pause('New unresolved dispatch; preserve its hold and reconcile before continuing')
         payload = enrich(self, agent_id, payload)
         if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
@@ -643,6 +644,15 @@ class Run:
         receipts[step] = {"request": request_id, "output_sha256": fingerprint(out), "model": m.model,
                           "provider": m.provider, "accepted_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         pilot.atomic(self.data("receipts.json"), receipts)
+
+    def _fresh_plan_reservation(self, agent, step, key, blocked):
+        # The run lock covers the caller's absence check, reservation and first send.
+        from .job_ledger import Ledger
+        return (agent == "A07-SYN" and re.fullmatch(r"A07-SYN_job[0-9a-f]{16}_PLAN", step)
+                and key == "a07-" + step[len("A07-SYN_job"):-len("_PLAN")] + "-PLAN"
+                and blocked == [key] and getattr(self, "_active_plan_reservation", None) == key
+                and not Ledger(self.dir).events(step)
+                and not any(e.get("reservation_key") == key for e in self.budget.entries()))
 
     def _call_guard(self, agent_id: str, step: str, reservation_key: str | None):
         """reserve() before every send on the standard path. The first send uses the caller's reservation when it
@@ -2718,6 +2728,8 @@ class Run:
             ok, available = self._reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation", steps=[f"A07-SYN_job{tag}_{name}"])
             if not ok:
                 raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
+            if mode == "PLAN":
+                self._active_plan_reservation = key
             try:
                 out = self.agent("A07-SYN", payload, step=f"A07-SYN_job{tag}_{name}",
                                  overrides={"cache_system": True, "cache_payload": (), "cache_ttl": scfg.get("cache_ttl", "1h"),
@@ -2729,8 +2741,14 @@ class Run:
                     self.budget.release(key)
                 raise
             except (Pause, BudgetExceeded, UnpricedModel):
-                self.budget.release(key)
+                from .job_ledger import Ledger
+                sent = any(e["state"] == "DISPATCHED" and e.get("reservation") == key
+                           for e in Ledger(self.dir).events(f"A07-SYN_job{tag}_{name}"))
+                if not sent or any(e.get("reservation_key") == key for e in self.budget.entries()):
+                    self.budget.release(key)
                 raise
+            finally:
+                self._active_plan_reservation = None
             self.budget.release(key)
             return out
 

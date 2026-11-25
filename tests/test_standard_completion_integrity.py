@@ -120,3 +120,19 @@ def test_batch_receipt_across_restart(replay, damage):
     else:
         for _ in range(2):assert verify(root,manifest)['telemetry_appends_verified']==5
 
+
+def test_only_newly_created_plan_hold_can_enter_agent(tmp_path):
+    from types import SimpleNamespace
+    from litreview.orchestrator import Run
+    from litreview.job_ledger import Ledger
+    step = 'A07-SYN_job0123456789abcdef_PLAN'
+    key = 'a07-0123456789abcdef-PLAN'
+    run = SimpleNamespace(dir=tmp_path, budget=SimpleNamespace(entries=lambda: []))
+    check = lambda holds: Run._fresh_plan_reservation(run, 'A07-SYN', step, key, holds)
+    assert not check([key])
+    run._active_plan_reservation = key
+    assert check([key])
+    assert not check([key, 'unresolved-other'])
+    path=tmp_path/'data/job_ledger.jsonl'
+    write_rows(path,[{'step':step,'state':'DISPATCHED','reservation':key}])
+    assert not check([key])
