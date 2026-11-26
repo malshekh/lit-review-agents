@@ -386,6 +386,17 @@ class Run:
         if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"} and not margin_included:
             # Hold the future-work margin, not merely check it. Actual charges settle this hold.
             usd = float(Decimal(str(usd)) * Decimal("1.30"))
+        if agent_id == "A07-SYN" and getattr(self, "_reconciliation_approval", None):
+            from .reconciliation_paging import check_spend
+            auth = self._reconciliation_approval
+            if any("_RECONCILE_" in step for step in steps):
+                if not any(step.startswith(f"A07-SYN_job{auth['job_tag']}_{turn}_LOOKUP")
+                           for step in steps for turn in auth["approved_turns"]):
+                    raise Pause("reconciliation page outside the approved tranche")
+                try:
+                    check_spend(auth, self.budget.stage_committed("A07"), usd)
+                except ValueError as exc:
+                    raise Pause(str(exc)) from exc
         if pilot.enabled(self):
             try:
                 pilot.require(self,agent_id)
@@ -666,6 +677,13 @@ class Run:
             reserve = (self.cfg.get("admission") or {}).get("reasoning_reserve_tokens") or {}
             out_tokens = int(model.max_tokens) + int(reserve.get(model.provider) or 0)
             usd = worst_case_usd(self.budget, model, offline_tokens(system) + offline_tokens(message), out_tokens)
+            if getattr(self, "_reconciliation_approval", None) and "_RECONCILE_" in step:
+                from .reconciliation_paging import body_bytes, generation_body
+                body = generation_body(system, message, model, model.max_tokens, model.cache_system, model.cache_ttl)
+                input_upper = len(body_bytes(body)) + 2048
+                if input_upper + out_tokens > self.cfg["synthesis"]["context_ceiling_tokens"]:
+                    raise Pause("reconciliation repair exceeds the configured context limit")
+                usd = self.budget.cost(model.model, 0, out_tokens, 0, 0, input_upper)
             if usd is None:
                 raise UnpricedModel(model.model)
             key = "call-" + fingerprint([step, attempt, model.model, model.max_tokens])[:24]
@@ -2733,6 +2751,22 @@ class Run:
                     "elsewhere. Use source_item_ids for source links. A paper with usable evidence needs "
                     "a proposition citing its eligible finding. Keep unknown study independence explicit.")}
             tokens, limit, usd = self._a07_quote(mode, payload, count)
+            if mode == "RECONCILE" and "prefill_finding_ids" in payload:
+                from . import reconciliation_paging, decisions
+                from .approved_scope import enrich
+                enriched = enrich(self, "A07-SYN", payload)
+                enriched = decisions.attach(self.dir, "A07-SYN", {**enriched,"source_access":self.load("source_access.json", {})})
+                route = self.route("A07-SYN")
+                body = reconciliation_paging.provider_body(self, enriched, route, limit)
+                request_bytes = reconciliation_paging.body_bytes(body)
+                reviewed = getattr(self, "_reconciliation_request_hashes", {})
+                if reviewed and name.endswith("_LOOKUP0"):
+                    from hashlib import sha256
+                    if reviewed.get(name.removesuffix("_LOOKUP0")) != sha256(request_bytes).hexdigest():
+                        raise Pause("reconciliation request differs from its reviewed provider body")
+                tokens = len(request_bytes) + 2048
+                usd = self.budget.cost(route.model, 0, limit, 0, 0, tokens)
+
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")
             key = f"a07-{tag}-{name}"
@@ -2746,7 +2780,8 @@ class Run:
                 out = self.agent("A07-SYN", payload, step=f"A07-SYN_job{tag}_{name}",
                                  overrides={"cache_system": True, "cache_payload": (), "cache_ttl": scfg.get("cache_ttl", "1h"),
                                             "max_tokens": limit},
-                                 schema_file=f"A07-SYN.bounded-{mode.lower()}.schema.json", reservation_key=key)
+                                 schema_file=f"A07-SYN.bounded-{mode.lower()}.schema.json", reservation_key=key,
+                                 truncation_retries=0 if mode == "RECONCILE" and "prefill_finding_ids" in payload else None)
             except AgentError as exc:
                 # Known responses are logged, including refusal/truncation; unknown API billing stays held.
                 if any(e["step"] == f"A07-SYN_job{tag}_{name}" for e in self.budget.entries()):
@@ -2773,6 +2808,23 @@ class Run:
 
         job = self._synthesis_job_class()(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
                                           identity, approve, served_by=lambda: self.last_model)
+        auth = self.load("reconciliation_repair_approved.json")
+        if auth:
+            plan = self.load("reconciliation_repair_plan.json")
+            if (not plan or auth.get("approved") is not True or not auth.get("approved_by")
+                    or auth.get("job_tag") != tag or plan.get("job_identity") != job.identity
+                    or plan.get("run_id") != self.id or auth.get("plan_fingerprint") != fingerprint(plan)
+                    or plan.get("registry") != job.registry.digest
+                    or not auth.get("approved_turns") or auth.get("max_increment_usd", 0) <= 0
+                    or auth.get("baseline_stage_usd") != plan.get("baseline_stage_usd")
+                    or any(t not in plan.get("reservations", {}) for t in auth["approved_turns"])
+                    or len(set(auth["approved_turns"])) != len(auth["approved_turns"])
+                    or Decimal(str(auth["max_increment_usd"])) > sum(
+                        Decimal(plan["reservations"][t]) for t in auth["approved_turns"])):
+                raise Pause("reconciliation approval or plan identity mismatch")
+            job.evidence_pages = plan["pages"]
+            self._reconciliation_approval = auth
+            self._reconciliation_request_hashes = plan["request_hashes"]
         return job, tag
 
     def _provenance_summary(self) -> dict:

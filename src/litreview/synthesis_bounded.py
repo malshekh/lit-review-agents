@@ -82,6 +82,14 @@ class RegistrySynthesisJob(SynthesisJob):
         return next((e for e in self.ledger.events()
                      if e["event"] in ("TURN_ACCEPTED", "TURN_IMPORTED_REPAIR") and e["turn"] == turn), None)
 
+    def _review_page_hash(self, turn):
+        if not turn.startswith("RECONCILE_"):
+            return None
+        number = int(turn.split("_")[1])
+        if number < 1001 or not getattr(self, "evidence_pages", None):
+            return None
+        return fingerprint(self.evidence_pages[number - 1001])
+
     def _committed(self, turn):
         out = super()._committed(turn)
         if out is not None:
@@ -92,6 +100,8 @@ class RegistrySynthesisJob(SynthesisJob):
                         or proof.get("registry") != self.registry.digest or proof.get("group") != turn[6:]
                         or proof.get("run_id") != self.dir.parent.parent.name or proof.get("job") != self.dir.name):
                     raise JobStopped("GROUP recovery provenance mismatch")
+            if marker and marker.get("review_page_hash") != self._review_page_hash(turn):
+                raise JobStopped(f"accepted reconciliation page fingerprint mismatch: {turn}")
             if not marker or fingerprint(out) != marker["output_sha256"]:
                 raise JobStopped(f"accepted turn hash mismatch: {turn}")
         return out
@@ -105,6 +115,9 @@ class RegistrySynthesisJob(SynthesisJob):
         origin = ({"event": "TURN_IMPORTED_REPAIR", "model": "researcher-approved offline recovery",
                    "import_record": import_record, "import_record_sha256": fingerprint(import_record)}
                   if import_record is not None else {"event": "TURN_ACCEPTED", "model": self.served_by()})
+        page_hash = self._review_page_hash(turn)
+        if page_hash:
+            origin["review_page_hash"] = page_hash
         self.ledger.append({**origin, "turn": turn, "output_sha256": fingerprint(output), **staged})
 
     @staticmethod
@@ -205,7 +218,7 @@ class RegistrySynthesisJob(SynthesisJob):
                                          "(approve-plan-import with the repaired SHA-256)")
 
     def _with_retrieval(self, mode, turn, payload):
-        retrieved = set()
+        retrieved = set(payload.get("prefill_finding_ids", ())) if mode == "RECONCILE" else set()
         for n in range(self.cfg.get("max_retrieval_rounds", 2) + 1):
             key = f"{turn}_LOOKUP{n}"
             request = {**payload, "retrieved_evidence": self.registry.details(sorted(retrieved))}
@@ -366,6 +379,10 @@ class RegistrySynthesisJob(SynthesisJob):
                 for p in self._committed(t).get("propositions", [])]
 
     def reconciliation_payloads(self):
+        if getattr(self, "evidence_pages", None):
+            for n, payload in enumerate(self.evidence_pages, 1001):
+                yield f"RECONCILE_{n:04d}", payload
+            return
         props = self._all_props()
         index = [compact_proposition(p) for p in props]
         for n, focus in enumerate(chunks(index, self.cfg.get("reconcile_page_size", 32)), 1):

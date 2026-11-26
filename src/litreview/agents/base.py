@@ -321,6 +321,10 @@ def run_agent(agent_id: str, payload: dict, run_dir: Path, step: str,
             if ledger is not None:
                 ledger.record(step, attempt, "PREPARED", model=call_model.model, max_tokens=call_model.max_tokens,
                               kind="REPAIR" if repairing is not None else "PRIMARY", request_id=request_id)
+            if repairing is not None and agent_id == "A07-SYN" and "prefill_finding_ids" in payload:
+                # Preserve the judging turn's exact evidence visibility during a bounded format repair.
+                message = [*message, {"text": "Evidence available for checking existing citations only:\n" +
+                                        json.dumps(payload["retrieved_evidence"], ensure_ascii=False), "cache": False}]
             held = dispatch_guard(attempt, call_system, message, call_model) if dispatch_guard else reservation_key
             guarded = bool(dispatch_guard) and held != reservation_key
             if ledger is not None:
