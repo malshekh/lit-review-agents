@@ -2736,6 +2736,8 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
+            if mode == "FINAL" and getattr(self, "_reconciliation_approval", None):
+                raise Pause("FINAL requires separate researcher approval after reconciliation")
             if mode != "PLAN":
                 decision = checkpoints.approved(self.dir, "CP_SYN")
                 if not decision or decision.get("fingerprint") != job.identity or not (

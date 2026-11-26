@@ -392,9 +392,11 @@ class RegistrySynthesisJob(SynthesisJob):
                                                  for i in self.mandatory if self.mandatory[i]["kind"] == "CONFLICT"],
                     "retrieval": {"available": True, "operations": ["finding_ids", "query"]}}
 
-    def reconcile(self):
+    def reconcile(self, only_turn=None):
         props = {p["proposition_id"]: p for p in self._all_props()}
         for turn, payload in self.reconciliation_payloads():
+            if only_turn is not None and turn != only_turn:
+                continue
             if self._committed(turn):
                 continue
             out, retrieved = self._with_retrieval("RECONCILE", turn, payload)
