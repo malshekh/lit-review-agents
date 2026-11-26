@@ -393,6 +393,10 @@ class Run:
                 if not any(step.startswith(f"A07-SYN_job{auth['job_tag']}_{turn}_LOOKUP")
                            for step in steps for turn in auth["approved_turns"]):
                     raise Pause("reconciliation page outside the approved tranche")
+                if key.startswith("call-") and getattr(self, "_reconciliation_format_caps", None):
+                    for turn, limit in self._reconciliation_format_caps.items():
+                        if any(f"_{turn}_LOOKUP" in step for step in steps) and Decimal(str(usd)) > Decimal(str(limit)):
+                            raise Pause("format repair exceeds its reviewed reservation limit")
                 try:
                     check_spend(auth, self.budget.stage_committed("A07"), usd)
                 except ValueError as exc:
@@ -2766,6 +2770,11 @@ class Run:
                     from hashlib import sha256
                     if reviewed.get(name.removesuffix("_LOOKUP0")) != sha256(request_bytes).hexdigest():
                         raise Pause("reconciliation request differs from its reviewed provider body")
+                followups = getattr(self, "_reconciliation_lookup_hashes", {})
+                if name in followups:
+                    from hashlib import sha256
+                    if sha256(request_bytes).hexdigest() != followups[name]:
+                        raise Pause("reconciliation lookup differs from its reviewed provider body")
                 tokens = len(request_bytes) + 2048
                 usd = self.budget.cost(route.model, 0, limit, 0, 0, tokens)
 
@@ -2827,6 +2836,8 @@ class Run:
             job.evidence_pages = plan["pages"]
             self._reconciliation_approval = auth
             self._reconciliation_request_hashes = plan["request_hashes"]
+            self._reconciliation_format_caps = plan.get("format_repair_caps", {})
+            self._reconciliation_lookup_hashes = plan.get("lookup_hashes", {})
         return job, tag
 
     def _provenance_summary(self) -> dict:

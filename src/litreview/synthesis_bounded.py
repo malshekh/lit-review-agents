@@ -88,7 +88,10 @@ class RegistrySynthesisJob(SynthesisJob):
         number = int(turn.split("_")[1])
         if number < 1001 or not getattr(self, "evidence_pages", None):
             return None
-        return fingerprint(self.evidence_pages[number - 1001])
+        for name, payload in self.reconciliation_payloads():
+            if name == turn.split("_LOOKUP",1)[0]:
+                return fingerprint(payload)
+        raise JobStopped("reconciliation turn is absent from the reviewed plan")
 
     def _committed(self, turn):
         out = super()._committed(turn)
@@ -231,6 +234,8 @@ class RegistrySynthesisJob(SynthesisJob):
                 found = self.registry.retrieve(out["retrieval_requests"], self.cfg.get("retrieval_limit", 12))
             except ValueError as exc:
                 raise JobStopped(str(exc)) from exc
+            if payload.get("issue_link_contract") == "page1001-v2" and (n != 0 or found != ["R0078:F28"]):
+                raise JobStopped("additional evidence outside the reviewed F28 lookup; pause before dispatch")
             if not self._committed(key):
                 self._commit(key, out, self.empty())
             retrieved.update(found)
@@ -381,7 +386,10 @@ class RegistrySynthesisJob(SynthesisJob):
     def reconciliation_payloads(self):
         if getattr(self, "evidence_pages", None):
             for n, payload in enumerate(self.evidence_pages, 1001):
-                yield f"RECONCILE_{n:04d}", payload
+                name = f"RECONCILE_{n:04d}"
+                if n == 1001 and payload.get("issue_link_contract") == "page1001-v2":
+                    name = "RECONCILE_1101"
+                yield name, payload
             return
         props = self._all_props()
         index = [compact_proposition(p) for p in props]
@@ -404,6 +412,9 @@ class RegistrySynthesisJob(SynthesisJob):
             reviewed = [r["proposition_id"] for r in out["reviews"]]
             if set(reviewed) != focus or len(reviewed) != len(focus):
                 raise JobStopped("global reconciliation did not review every focal proposition exactly once")
+            if payload.get("issue_link_contract") == "page1001-v2":
+                from .reconciliation_links import explained_links
+                explained_links(out, retrieved, props)
             issue_ids = set()
             for issue in out["issues"]:
                 related = set(issue["proposition_ids"])
