@@ -234,10 +234,13 @@ class RegistrySynthesisJob(SynthesisJob):
                 found = self.registry.retrieve(out["retrieval_requests"], self.cfg.get("retrieval_limit", 12))
             except ValueError as exc:
                 raise JobStopped(str(exc)) from exc
-            if payload.get("issue_link_contract") == "page1001-v2" and (n != 0 or found != ["R0078:F28"]):
+            pause_after_lookup = payload.get("pause_before_lookup_judgment") is True
+            if not pause_after_lookup and payload.get("issue_link_contract") == "page1001-v2" and (n != 0 or found != ["R0078:F28"]):
                 raise JobStopped("additional evidence outside the reviewed F28 lookup; pause before dispatch")
             if not self._committed(key):
                 self._commit(key, out, self.empty())
+            if pause_after_lookup:
+                raise JobStopped(f"{turn}: requested {found}; separate approval required before lookup judgment")
             retrieved.update(found)
         raise AssertionError("unreachable")
 
@@ -388,7 +391,7 @@ class RegistrySynthesisJob(SynthesisJob):
             for n, payload in enumerate(self.evidence_pages, 1001):
                 name = f"RECONCILE_{n:04d}"
                 if n == 1001 and payload.get("issue_link_contract") == "page1001-v2":
-                    name = "RECONCILE_1101"
+                    name = "RECONCILE_1102" if payload.get("pause_before_lookup_judgment") else "RECONCILE_1101"
                 yield name, payload
             return
         props = self._all_props()

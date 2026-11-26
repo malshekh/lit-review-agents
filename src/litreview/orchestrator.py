@@ -2758,6 +2758,8 @@ class Run:
                     "a proposition citing its eligible finding. Keep unknown study independence explicit.")}
             tokens, limit, usd = self._a07_quote(mode, payload, count)
             if mode == "RECONCILE" and "prefill_finding_ids" in payload:
+                if payload.get("pause_before_lookup_judgment") and not name.endswith("_LOOKUP0"):
+                    raise Pause("lookup judgment requires separate researcher approval")
                 from . import reconciliation_paging, decisions
                 from .approved_scope import enrich
                 enriched = enrich(self, "A07-SYN", payload)
