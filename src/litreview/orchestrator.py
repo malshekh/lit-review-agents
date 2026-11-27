@@ -2740,7 +2740,7 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
-            if mode == "FINAL" and getattr(self, "_reconciliation_approval", None):
+            if mode == "FINAL" and getattr(self, "_reconciliation_approval", None) and not self._reconciliation_approval.get("final_approved_under_stage_cap"):
                 raise Pause("FINAL requires separate researcher approval after reconciliation")
             if mode != "PLAN":
                 decision = checkpoints.approved(self.dir, "CP_SYN")

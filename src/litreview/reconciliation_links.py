@@ -12,7 +12,38 @@ RULE = ("Each issue limitation must consist of one line per referenced propositi
         "For every R0078:F13 line and the G0004.P3 review rationale use exactly: " + SVM +
         " Keep all commentary on the SVM decline in those fields. A causal explanation is unestablished.")
 
-def explained_links(out, visible, props):
+def matched_test_comparison(review, props, visible, records):
+    """Recognize the bounded DT/SVM comparison from the two visible, co-reported findings."""
+    match = re.fullmatch(
+        r"The (decision tree|SVM) reached (\d+)% on the same intermediate-concentration test set "
+        r"on which (decision tree|SVM) reached (\d+)% in (G\d{4}\.P\d+)"
+        r"(?:; different models on one dataset, not a contradiction)?\.",
+        review["rationale"], re.IGNORECASE)
+    if not match or not records:
+        return False
+    first, score, second, other_score, reference = match.groups()
+    models = {"decision tree": "R0078:F14", "svm": "R0078:F13"}
+    left, right = models[first.lower()], models[second.lower()]
+    if left == right or not {left, right} <= visible:
+        return False
+    for pid, fid in ((review["proposition_id"], left), ("GROUP_" + reference.upper(), right)):
+        if fid not in {e["finding_id"] for e in props.get(pid, {}).get("evidence", [])}:
+            return False
+    a, b = records.get(left, {}), records.get(right, {})
+    span = a.get("span", "")
+    if not span or span != b.get("span") or a.get("record_id") != "R0078" or b.get("record_id") != "R0078":
+        return False
+    scores = re.search(
+        r"test set with intermediate concentrations.*?3-fold cross-validation.*?"
+        r"\(DT\),.*?\(SVM\), and .*?\(XGBoost\)\. Test set performance .*?"
+        r"accuracies of (\d+)%, (\d+)%, and \d+%, respectively", span, re.DOTALL)
+    if not scores:
+        return False
+    measured = dict(zip(("decision tree", "svm"), scores.groups()))
+    return measured[first.lower()] == score and measured[second.lower()] == other_score
+
+
+def explained_links(out, visible, props, records=None):
     links = []
     if "G0004.P3" not in {r["proposition_id"].removeprefix("GROUP_") for r in out["reviews"]}:
         raise JobStopped("missing focal Israel review")
@@ -23,7 +54,7 @@ def explained_links(out, visible, props):
     classifiers = {"R0078:F12", "R0078:F13", "R0078:F14"}
     for review in out["reviews"]:
         pid = review["proposition_id"]
-        if pid != "GROUP_G0004.P3":
+        if pid != "GROUP_G0004.P3" and not matched_test_comparison(review, props, visible, records):
             local = {e["finding_id"] for e in props.get(pid, {}).get("evidence", [])}
             other_text.append((review["rationale"], bool(local & classifiers)))
     for issue in out["issues"]:
