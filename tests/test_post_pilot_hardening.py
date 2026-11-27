@@ -543,3 +543,12 @@ def test_batch_results_are_matched_by_request_id_not_by_returned_order(tmp_path,
     assert all(out["id"] == step for step, out in got.items() if out.get("status") == "OK")   # each to its own step
     batched = [e["step"] for e in r.budget.entries() if e.get("batch_id")]
     assert len(batched) == len(set(batched)) == len(tb.STEPS) - 2          # probe + the missing one ran interactively
+
+
+@pytest.fixture(autouse=True)
+def _generic_transport_legacy_mode(monkeypatch):
+    """These generic recovery/routing tests use tiny non-scientific JSON fixtures and exercise legacy retry policy.
+    The ordinary canonical mode and its no-increase policy have dedicated nonempty integration tests.
+    """
+    from litreview import config as mode_config
+    monkeypatch.setitem(mode_config.load('pipeline')['extraction'],'generation_mode','anthropic_strict_legacy')

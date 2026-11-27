@@ -262,10 +262,12 @@
         "type": "object",
         "properties": {
           "display_id": {
-            "const": "T1"
+            "const": "T1",
+            "type": "string"
           },
           "type": {
-            "const": "TABLE_COMPARISON"
+            "const": "TABLE_COMPARISON",
+            "type": "string"
           },
           "placement_section_id": {
             "type": "string"

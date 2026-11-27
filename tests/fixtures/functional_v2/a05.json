@@ -1,0 +1,240 @@
+{
+  "agent_id": "A05-KE",
+  "prompt_version": "0.9",
+  "status": "COMPLETE_WITH_WARNINGS",
+  "warnings": [
+    "Abstract-only extraction: three abstract sentences supplied; no methods, sample sizes, statistics, dosing schedule or comparator details are available."
+  ],
+  "limitations": [
+    "Only three abstract sentences were inspected; no full text, figures or supplements.",
+    "The abstract does not state the number of patients, sampling timepoints, detection limits, or the basis for the MTD determination (e.g. dose-limiting toxicities).",
+    "Non-detection of diethyl-dithiocarbamate-copper in tumors is limited to what the abstract states; the abstract does not state the assay detection limit, so this is not evidence that the metabolite was absent from tumors."
+  ],
+  "record_id": "FUNCTIONAL_SOURCE_1",
+  "content_level": "ABSTRACT",
+  "sections_inspected": [
+    "Abstract"
+  ],
+  "study_profile": {
+    "study_type": "PRIMARY_RESEARCH",
+    "evidence_systems": [
+      "HUMAN_INTERVENTIONAL"
+    ],
+    "in_silico_subtype": [],
+    "human_design": null,
+    "trial_phase": null,
+    "registration_id": null,
+    "funding_and_conflicts": "NOT_REPORTED"
+  },
+  "entities": [
+    {
+      "entity_id": "E1",
+      "mention": "Diethyl-dithiocarbamate-copper",
+      "type": "ENDOGENOUS_METABOLITE",
+      "subtype": null,
+      "roles": [
+        "OUTCOME_MEASURE"
+      ],
+      "molecule_species": null,
+      "measured_at": null,
+      "identity_relation": "ACTIVE_METABOLITE",
+      "normalized_id": null,
+      "normalization_state": null
+    },
+    {
+      "entity_id": "E2",
+      "mention": "plasma",
+      "type": "TISSUE_OR_ORGAN",
+      "subtype": null,
+      "roles": [
+        "OUTCOME_MEASURE"
+      ],
+      "molecule_species": null,
+      "measured_at": null,
+      "identity_relation": null,
+      "normalized_id": null,
+      "normalization_state": null
+    },
+    {
+      "entity_id": "E3",
+      "mention": "tumors",
+      "type": "TISSUE_OR_ORGAN",
+      "subtype": null,
+      "roles": [
+        "OUTCOME_MEASURE"
+      ],
+      "molecule_species": null,
+      "measured_at": null,
+      "identity_relation": null,
+      "normalized_id": null,
+      "normalization_state": null
+    },
+    {
+      "entity_id": "E4",
+      "mention": "DSF",
+      "type": "APPROVED_DRUG",
+      "subtype": null,
+      "roles": [
+        "INTERVENTION"
+      ],
+      "molecule_species": null,
+      "measured_at": null,
+      "identity_relation": null,
+      "status_source": null,
+      "normalized_id": null,
+      "normalization_state": null
+    }
+  ],
+  "contexts": [
+    {
+      "context_id": "C1",
+      "fields": {
+        "evidence_system": "HUMAN_INTERVENTIONAL",
+        "assay": "high-performance liquid chromatography-mass spectrometry",
+        "readout": "drug concentrations in plasma and tumors",
+        "comparator": "NOT_APPLICABLE",
+        "n": null,
+        "n_participants": null,
+        "dose_or_concentration": null,
+        "matrix": "plasma and tumors"
+      },
+      "context_source": "IN_SPAN",
+      "context_spans": [
+        "Pharmacokinetic analyses determined drug concentrations in plasma and tumors using high-performance liquid chromatography-mass spectrometry."
+      ]
+    },
+    {
+      "context_id": "C2",
+      "fields": {
+        "evidence_system": "HUMAN_INTERVENTIONAL",
+        "agent": "DSF with RT and TMZ",
+        "comparator": "NONE_REPORTED",
+        "n": null,
+        "n_participants": null
+      },
+      "context_source": "IN_SPAN",
+      "context_spans": [
+        "The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d."
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "F1",
+      "subject_entity_id": "E1",
+      "predicate": "DETECTED_IN",
+      "predicate_detail": null,
+      "object_entity_id": "E2",
+      "polarity": "POSITIVE",
+      "modality": "ASSERTED",
+      "direction": "NOT_APPLICABLE",
+      "assertion_type": "REPORTED_RESULT",
+      "origin": "EXPLICIT",
+      "context_id": "C1",
+      "span": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "premise_spans": [],
+      "bridge": null,
+      "warrant_note": "'was detected in plasma' licenses DETECTED_IN with positive polarity.",
+      "quantities": [],
+      "contradicts_prior_report": false,
+      "attributed_to": null,
+      "primary_theme_id": "T1",
+      "subthemes": [
+        "plasma detection of DSF/Cu metabolite"
+      ],
+      "emerging": false,
+      "emerging_note": null,
+      "knowledge_assist": null
+    },
+    {
+      "finding_id": "F2",
+      "subject_entity_id": "E1",
+      "predicate": "DETECTED_IN",
+      "predicate_detail": null,
+      "object_entity_id": "E3",
+      "polarity": "NULL",
+      "modality": "ASSERTED",
+      "direction": "NOT_APPLICABLE",
+      "assertion_type": "REPORTED_RESULT",
+      "origin": "EXPLICIT",
+      "context_id": "C1",
+      "span": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "premise_spans": [],
+      "bridge": null,
+      "warrant_note": "'but not in tumors' licenses a not-detected (NULL polarity) result in tumors; detection limit not stated.",
+      "quantities": [],
+      "contradicts_prior_report": false,
+      "attributed_to": null,
+      "primary_theme_id": "T1",
+      "subthemes": [
+        "tumor non-detection of DSF/Cu metabolite"
+      ],
+      "emerging": false,
+      "emerging_note": null,
+      "knowledge_assist": null
+    },
+    {
+      "finding_id": "F3",
+      "subject_entity_id": "E4",
+      "predicate": "MAXIMUM_TOLERATED_DOSE",
+      "predicate_detail": "maximum tolerated dose of DSF with RT and TMZ",
+      "object_entity_id": null,
+      "polarity": "POSITIVE",
+      "modality": "ASSERTED",
+      "direction": "NOT_APPLICABLE",
+      "assertion_type": "REPORTED_RESULT",
+      "origin": "EXPLICIT",
+      "context_id": "C2",
+      "span": "The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d.",
+      "span_location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "premise_spans": [],
+      "bridge": null,
+      "warrant_note": "'maximum tolerated dose of DSF with RT and TMZ is 375 mg/d' states the MTD value directly.",
+      "quantities": [
+        {
+          "measured_property": "maximum tolerated dose of DSF with RT and TMZ",
+          "raw_value": "375",
+          "raw_unit": "mg/d",
+          "value_type": "DOSE",
+          "variance_or_ci": null,
+          "p_value": null,
+          "n": null,
+          "converted": null
+        }
+      ],
+      "contradicts_prior_report": false,
+      "attributed_to": null,
+      "primary_theme_id": "T1",
+      "subthemes": [
+        "maximum tolerated dose"
+      ],
+      "emerging": false,
+      "emerging_note": null,
+      "knowledge_assist": null
+    }
+  ],
+  "author_stated_limitations": [],
+  "in_paper_conflicts": [],
+  "out_of_scope_observations": [],
+  "source_access": {
+    "level": "ABSTRACT",
+    "figure_images_inspected": false,
+    "figure_legends_read": false,
+    "supplements_inspected": false,
+    "note": "Only three cached abstract sentences supplied; no full text inspected."
+  }
+}

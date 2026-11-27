@@ -1,0 +1,24 @@
+{
+  "record_id": "R0115",
+  "field": "pmcid",
+  "quarantined_value": "9421940",
+  "replacement": null,
+  "reason": "Identifier belongs to cited reference, not this article",
+  "first_saved_evidence": "data/search_results/5d24cb9eb12b5433efb44ca144f737165b3a88386d035c85c84b9931dc1b9dc2.json",
+  "upstream_provider": "pubmed",
+  "parser_before": "art.findall(.//ArticleId) picks first cited-reference pmc when own pmc is absent",
+  "own_identifiers": {
+    "pubmed": "41324706",
+    "doi": "10.1007/s00216-025-06241-z",
+    "pii": "10.1007/s00216-025-06241-z"
+  },
+  "reference_xml": "<Reference><Citation>Makker V, MacKay H, Ray-Coquard I, Levine DA, Westin SN, Aoki D, et al. Endometrial cancer. Nat Rev Dis Primers. 2021;7(1):88. https://doi.org/10.1038/s41572-021-00324-8 .</Citation><ArticleIdList><ArticleId IdType=\"doi\">10.1038/s41572-021-00324-8</ArticleId><ArticleId IdType=\"pubmed\">34887451</ArticleId><ArticleId IdType=\"pmc\">9421940</ArticleId></ArticleIdList></Reference>",
+  "wrong_publication": {
+    "title": "Endometrial Cancer",
+    "pmid": "34887451",
+    "doi": "10.1038/s41572-021-00324-8",
+    "pmcid": "PMC9421940"
+  },
+  "raw_xml_sha256": "2552c8acc27ce3d3430eb754b47bef41b0d5c6da866ffb7078cc8839aecac96c",
+  "other_five_same_defect": false
+}

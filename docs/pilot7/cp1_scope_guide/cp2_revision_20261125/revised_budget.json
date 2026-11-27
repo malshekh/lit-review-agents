@@ -1,0 +1,706 @@
+{
+  "requested_six": {
+    "record_ids": [
+      "R0078",
+      "R0115",
+      "R0090",
+      "R0116",
+      "R0058",
+      "R0039"
+    ],
+    "manifest_provisional": {
+      "manifest_version": 1,
+      "generated_from": "DISCOVERY_AND_SCREENING",
+      "frozen_at_checkpoint": "CP2",
+      "cp2_fingerprint": "6b8798896197118ebe1f63b557311faaa8759b2f2809ef7e2d16a4d2a42a00c2",
+      "papers": [
+        {
+          "paper_id": "P01",
+          "record_id": "R0078",
+          "pmid": "42409644",
+          "doi": "10.1021/acs.nanolett.6c01777",
+          "title": "Optical Spectral Fingerprinting Enables Sensitive Detection of Anthracycline Chemotherapeutics in Synthetic Clinical Biofluids.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "FULL_TEXT",
+          "informs_sections": [
+            "S1.2",
+            "S1.3",
+            "S1.4",
+            "S2.1"
+          ],
+          "actual_access": {
+            "category": "FULL_TEXT_RETRIEVED",
+            "level_read": "FULL_TEXT",
+            "figure_legends_read": true,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P02",
+          "record_id": "R0115",
+          "pmid": "41324706",
+          "doi": "10.1007/s00216-025-06241-z",
+          "title": "Application of surface-enhanced Raman scattering combined with artificial intelligence for multiplex detection of chemotherapeutic agents used in solid tumors.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.2",
+            "S1.3",
+            "S2.1"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P03",
+          "record_id": "R0090",
+          "pmid": "34256559",
+          "doi": "10.1021/acsami.1c09771",
+          "title": "3D Printed Microfluidic Device for Magnetic Trapping and SERS Quantitative Evaluation of Environmental and Biomedical Analytes.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "FULL_TEXT",
+          "informs_sections": [
+            "S1.3",
+            "S1.4",
+            "S2.1",
+            "S2.4"
+          ],
+          "actual_access": {
+            "category": "FULL_TEXT_RETRIEVED",
+            "level_read": "FULL_TEXT",
+            "figure_legends_read": true,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P04",
+          "record_id": "R0116",
+          "pmid": "38589380",
+          "doi": "10.1038/s41467-024-47044-7",
+          "title": "Optics miniaturization strategy for demanding Raman spectroscopy applications.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "CORE",
+          "intended_reading_level": "FULL_TEXT",
+          "informs_sections": [
+            "S1.2",
+            "S1.3",
+            "S1.4",
+            "S2.1"
+          ],
+          "actual_access": {
+            "category": "FULL_TEXT_RETRIEVED",
+            "level_read": "FULL_TEXT",
+            "figure_legends_read": true,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P05",
+          "record_id": "R0058",
+          "pmid": "42838683",
+          "doi": "10.1016/j.aca.2026.346185",
+          "title": "Impact of dataset partitioning on the reliability of SERS-machine learning models for antimicrobial resistance classification.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "CORE",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.3",
+            "S1.4"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P06",
+          "record_id": "R0039",
+          "pmid": "30110149",
+          "doi": "10.1021/acssensors.8b00450",
+          "title": "Functional Nanoparticles-Coated Nanomechanical Sensor Arrays for Machine Learning-Based Quantitative Odor Analysis",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.1",
+            "S1.2",
+            "S1.3",
+            "S1.4"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        }
+      ]
+    },
+    "projection": {
+      "created": "2026-11-25T08:31:24",
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 0.7284,
+          "detail": "3 papers x $0.3642 (90th percentile of 17 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 2.0708,
+          "detail": "3 papers x $1.0354 (90th percentile of 11 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 6,
+          "usd": 0.7407,
+          "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th percentile of A06 per-paper cost by level"
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 14,
+          "usd": 1.2964,
+          "detail": "14 themes (2.321 per paper measured) x $0.0926"
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "validation": "within the largest cohort run; per-call rates still provisional",
+          "calls": 80,
+          "usd": 9.2851,
+          "baseline_usd": 7.1424,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 39.5454,
+          "scenarios": {
+            "baseline": 7.1424,
+            "low": 5.3303,
+            "high": 10.8543,
+            "adverse": 35.9254
+          },
+          "detail": "179 findings; calibrated from provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency); usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.1812,
+          "baseline_usd": 0.1394,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 0.2126,
+          "scenarios": {
+            "baseline": 0.1394,
+            "low": 0.0995,
+            "high": 0.1734,
+            "adverse": 0.2126
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 83354,
+          "detail": "up to 1 requests on gpt-6.1-sol; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; the outline request (map, element index, table coverage)"
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 25,
+          "usd": 6.9966,
+          "baseline_usd": 5.382,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 22.4518,
+          "scenarios": {
+            "baseline": 5.382,
+            "low": 2.9479,
+            "high": 8.1248,
+            "adverse": 22.4518
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 269120,
+          "detail": "up to 25 requests on claude-opus-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; 8 sections assumed; sizes per finding from the compact fixture, each with up to 2 retrieval rounds and 0 redraft(s), plus front matter per draft"
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "validation": "within the largest cohort run; per-call rates still provisional",
+          "calls": 306,
+          "usd": 13.6466,
+          "baseline_usd": 10.4974,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 132.1331,
+          "scenarios": {
+            "baseline": 10.4974,
+            "low": 6.5468,
+            "high": 20.5948,
+            "adverse": 109.7771
+          },
+          "detail": "179 findings; calibrated from production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10), scaled to the outline's 1,600 words; usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.4869,
+          "baseline_usd": 1.1438,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 1.7345,
+          "scenarios": {
+            "baseline": 1.1438,
+            "low": 0.4104,
+            "high": 1.417,
+            "adverse": 1.7345
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 348518,
+          "detail": "up to 2 requests on kimi-k3.1-pro; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; up to 2 critique cycles: manuscript, map, ledger, A10 summary"
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 5,
+          "usd": 2.2129,
+          "baseline_usd": 1.7022,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 2.8157,
+          "scenarios": {
+            "baseline": 1.7022,
+            "low": 1.0271,
+            "high": 1.9313,
+            "adverse": 2.8157
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 362821,
+          "detail": "up to 5 requests on claude-sonnet-5-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; integration per draft, up to 2 revisions, LINE and PROOF (whole-manuscript requests)"
+        }
+      ],
+      "spent_usd": 2.0849717,
+      "held_and_reserved_usd": 0.12467099999999999,
+      "projected_remaining_usd": 38.65,
+      "projected_total_usd": 40.86,
+      "cap_usd": 50.0,
+      "verdict": "WITHIN_CAP",
+      "papers": 6,
+      "by_level": {
+        "ABSTRACT": 3,
+        "FULL_TEXT": 3
+      },
+      "findings_assumed": 179
+    },
+    "stage_caps": {
+      "caps_usd": {
+        "A02-A04": 2.29,
+        "A05-A06": 6.24,
+        "A07": 11.61,
+        "A08-A09": 8.98,
+        "A10": 17.06,
+        "A11-A12": 4.63
+      },
+      "projected_usd": {
+        "A02-A04": 1.8311,
+        "A05-A06": 4.991,
+        "A07": 9.2851,
+        "A08-A09": 7.1778,
+        "A10": 13.6466,
+        "A11-A12": 3.6998
+      },
+      "recovery_allowance": 0.25,
+      "total_usd": 50.81,
+      "from_projection_created": "2026-11-25T08:31:24"
+    },
+    "stage_cap_problem": "the stage limits this projection needs add up to $50.81, over the $49.78 the run's $50.00 cap leaves after prior spend and retained reservations; reduce the selection",
+    "recorded_spend_usd": 2.0849717,
+    "retained_holds_usd": 0.12467099999999999,
+    "nonstage_paid_usd": 0.0991156,
+    "central_exposure_usd": 40.8596427,
+    "complete_stage_limit_envelope_usd": 51.0337866,
+    "accounts": {
+      "discovery_and_screening_spent_usd": 1.8311,
+      "smoke_test_and_other_prior_spend_usd": 0.0,
+      "smoke_test_spent_in_run_usd": 0.0991,
+      "unsettled_reservations_usd": 0.1247,
+      "spent_so_far_total_usd": 2.085,
+      "projected_remaining_usd_provisional": 38.65,
+      "retry_and_repair_allowance_usd": 10.1786,
+      "combined_maximum_exposure_usd": 51.0338,
+      "hard_cap_usd": 50.0,
+      "projected_by_provider_usd": {
+        "anthropic": 23.3309,
+        "kimi": 1.4869,
+        "openai": 13.8278
+      },
+      "spent_by_provider_usd": {
+        "anthropic": 1.3578,
+        "openai": 0.7272
+      },
+      "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed output sizes; not a measured current-code cost. Provider allocation is estimated; the early combined extraction/validation forecast is split equally between their providers"
+    },
+    "writing_unit_assumption": 8,
+    "manuscript_subheadings": 6,
+    "chapter_word_targets": [
+      800,
+      800
+    ],
+    "R0078_materialization_blocker": "Image-only Table 1 (tbl1); existing strict materialization refuses missing machine-readable table. No image values transcribed or inspected.",
+    "CP2_approved": false
+  },
+  "fallback_five_without_R0116": {
+    "record_ids": [
+      "R0078",
+      "R0115",
+      "R0090",
+      "R0058",
+      "R0039"
+    ],
+    "manifest_provisional": {
+      "manifest_version": 1,
+      "generated_from": "DISCOVERY_AND_SCREENING",
+      "frozen_at_checkpoint": "CP2",
+      "cp2_fingerprint": "53d244555dfcd7c6857bb124b68911f7327d9550c0f91456cc9d47b3a29cad07",
+      "papers": [
+        {
+          "paper_id": "P01",
+          "record_id": "R0078",
+          "pmid": "42409644",
+          "doi": "10.1021/acs.nanolett.6c01777",
+          "title": "Optical Spectral Fingerprinting Enables Sensitive Detection of Anthracycline Chemotherapeutics in Synthetic Clinical Biofluids.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "FULL_TEXT",
+          "informs_sections": [
+            "S1.2",
+            "S1.3",
+            "S1.4",
+            "S2.1"
+          ],
+          "actual_access": {
+            "category": "FULL_TEXT_RETRIEVED",
+            "level_read": "FULL_TEXT",
+            "figure_legends_read": true,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P02",
+          "record_id": "R0115",
+          "pmid": "41324706",
+          "doi": "10.1007/s00216-025-06241-z",
+          "title": "Application of surface-enhanced Raman scattering combined with artificial intelligence for multiplex detection of chemotherapeutic agents used in solid tumors.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.2",
+            "S1.3",
+            "S2.1"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P03",
+          "record_id": "R0090",
+          "pmid": "34256559",
+          "doi": "10.1021/acsami.1c09771",
+          "title": "3D Printed Microfluidic Device for Magnetic Trapping and SERS Quantitative Evaluation of Environmental and Biomedical Analytes.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "FULL_TEXT",
+          "informs_sections": [
+            "S1.3",
+            "S1.4",
+            "S2.1",
+            "S2.4"
+          ],
+          "actual_access": {
+            "category": "FULL_TEXT_RETRIEVED",
+            "level_read": "FULL_TEXT",
+            "figure_legends_read": true,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P04",
+          "record_id": "R0058",
+          "pmid": "42838683",
+          "doi": "10.1016/j.aca.2026.346185",
+          "title": "Impact of dataset partitioning on the reliability of SERS-machine learning models for antimicrobial resistance classification.",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "CORE",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.3",
+            "S1.4"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        },
+        {
+          "paper_id": "P05",
+          "record_id": "R0039",
+          "pmid": "30110149",
+          "doi": "10.1021/acssensors.8b00450",
+          "title": "Functional Nanoparticles-Coated Nanomechanical Sensor Arrays for Machine Learning-Based Quantitative Odor Analysis",
+          "selection_reason": "Researcher-requested CP2 revision, pending approval",
+          "scientific_importance": "SUPPORTING",
+          "intended_reading_level": "ABSTRACT",
+          "informs_sections": [
+            "S1.1",
+            "S1.2",
+            "S1.3",
+            "S1.4"
+          ],
+          "actual_access": {
+            "category": "MATCHED_ABSTRACT_ONLY",
+            "level_read": "ABSTRACT",
+            "figure_legends_read": false,
+            "figure_images_inspected": false,
+            "supplements_inspected": false
+          }
+        }
+      ]
+    },
+    "projection": {
+      "created": "2026-11-25T08:31:24",
+      "lines": [
+        {
+          "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+          "basis": "MEASURED_P90",
+          "calls": 3,
+          "usd": 0.7284,
+          "detail": "3 papers x $0.3642 (90th percentile of 17 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+        },
+        {
+          "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+          "basis": "MEASURED_P90",
+          "calls": 2,
+          "usd": 1.5531,
+          "detail": "2 papers x $1.0354 (90th percentile of 11 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+        },
+        {
+          "stage": "A06-SV whole-paper repeat (instability test)",
+          "basis": "MEASURED_P90",
+          "calls": 5,
+          "usd": 0.6063,
+          "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th percentile of A06 per-paper cost by level"
+        },
+        {
+          "stage": "A06-SV per theme",
+          "basis": "MEASURED_P90",
+          "calls": 12,
+          "usd": 1.1112,
+          "detail": "12 themes (2.321 per paper measured) x $0.0926"
+        },
+        {
+          "stage": "A07-SYN",
+          "basis": "CALIBRATED_FORECAST",
+          "validation": "within the largest cohort run; per-call rates still provisional",
+          "calls": 74,
+          "usd": 8.3241,
+          "baseline_usd": 6.4032,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 36.1336,
+          "scenarios": {
+            "baseline": 6.4032,
+            "low": 4.742,
+            "high": 9.8137,
+            "adverse": 32.6876
+          },
+          "detail": "138 findings; calibrated from provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency); usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+        },
+        {
+          "stage": "A08-OL",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 1,
+          "usd": 0.166,
+          "baseline_usd": 0.1277,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 0.1989,
+          "scenarios": {
+            "baseline": 0.1277,
+            "low": 0.0892,
+            "high": 0.1611,
+            "adverse": 0.1989
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 71054,
+          "detail": "up to 1 requests on gpt-6.1-sol; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; the outline request (map, element index, table coverage)"
+        },
+        {
+          "stage": "A09-WRI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 25,
+          "usd": 6.616,
+          "baseline_usd": 5.0892,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 21.6318,
+          "scenarios": {
+            "baseline": 5.0892,
+            "low": 2.7429,
+            "high": 7.7558,
+            "adverse": 21.6318
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 256820,
+          "detail": "up to 25 requests on claude-opus-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; 8 sections assumed; sizes per finding from the compact fixture, each with up to 2 retrieval rounds and 0 redraft(s), plus front matter per draft"
+        },
+        {
+          "stage": "A10-RV",
+          "basis": "CALIBRATED_FORECAST",
+          "validation": "within the largest cohort run; per-call rates still provisional",
+          "calls": 288,
+          "usd": 12.2021,
+          "baseline_usd": 9.3862,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 123.7703,
+          "scenarios": {
+            "baseline": 9.3862,
+            "low": 5.9078,
+            "high": 18.7949,
+            "adverse": 103.0703
+          },
+          "detail": "138 findings; calibrated from production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10), scaled to the outline's 1,600 words; usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+        },
+        {
+          "stage": "A11-RC",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 2,
+          "usd": 1.472,
+          "baseline_usd": 1.1323,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 1.721,
+          "scenarios": {
+            "baseline": 1.1323,
+            "low": 0.4054,
+            "high": 1.4049,
+            "adverse": 1.721
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 342438,
+          "detail": "up to 2 requests on kimi-k3.1-pro; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; up to 2 critique cycles: manuscript, map, ledger, A10 summary"
+        },
+        {
+          "stage": "A12-EDI",
+          "basis": "ESTIMATED_ENVELOPE",
+          "calls": 5,
+          "usd": 2.1827,
+          "baseline_usd": 1.679,
+          "uncertainty_margin": 0.3,
+          "adverse_usd": 2.7819,
+          "scenarios": {
+            "baseline": 1.679,
+            "low": 1.0119,
+            "high": 1.907,
+            "adverse": 2.7819
+          },
+          "long_context_calls": 0,
+          "over_window_calls": 0,
+          "max_input_bound": 356741,
+          "detail": "up to 5 requests on claude-sonnet-5-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; integration per draft, up to 2 revisions, LINE and PROOF (whole-manuscript requests)"
+        }
+      ],
+      "spent_usd": 2.0849717,
+      "held_and_reserved_usd": 0.12467099999999999,
+      "projected_remaining_usd": 34.96,
+      "projected_total_usd": 37.17,
+      "cap_usd": 50.0,
+      "verdict": "WITHIN_CAP",
+      "papers": 5,
+      "by_level": {
+        "ABSTRACT": 3,
+        "FULL_TEXT": 2
+      },
+      "findings_assumed": 138
+    },
+    "stage_caps": {
+      "caps_usd": {
+        "A02-A04": 2.29,
+        "A05-A06": 5.2,
+        "A07": 10.41,
+        "A08-A09": 8.48,
+        "A10": 15.26,
+        "A11-A12": 4.57
+      },
+      "projected_usd": {
+        "A02-A04": 1.8311,
+        "A05-A06": 4.1537,
+        "A07": 8.3241,
+        "A08-A09": 6.782,
+        "A10": 12.2021,
+        "A11-A12": 3.6547
+      },
+      "recovery_allowance": 0.25,
+      "total_usd": 46.21,
+      "from_projection_created": "2026-11-25T08:31:24"
+    },
+    "stage_cap_problem": null,
+    "recorded_spend_usd": 2.0849717,
+    "retained_holds_usd": 0.12467099999999999,
+    "nonstage_paid_usd": 0.0991156,
+    "central_exposure_usd": 37.1696427,
+    "complete_stage_limit_envelope_usd": 46.4337866,
+    "accounts": {
+      "discovery_and_screening_spent_usd": 1.8311,
+      "smoke_test_and_other_prior_spend_usd": 0.0,
+      "smoke_test_spent_in_run_usd": 0.0991,
+      "unsettled_reservations_usd": 0.1247,
+      "spent_so_far_total_usd": 2.085,
+      "projected_remaining_usd_provisional": 34.96,
+      "retry_and_repair_allowance_usd": 9.2623,
+      "combined_maximum_exposure_usd": 46.4338,
+      "hard_cap_usd": 50.0,
+      "projected_by_provider_usd": {
+        "anthropic": 21.1218,
+        "kimi": 1.472,
+        "openai": 12.3681
+      },
+      "spent_by_provider_usd": {
+        "anthropic": 1.3578,
+        "openai": 0.7272
+      },
+      "basis": "projection PROVISIONAL: October 2026 per-paper rates re-priced (older procedure) and assumed output sizes; not a measured current-code cost. Provider allocation is estimated; the early combined extraction/validation forecast is split equally between their providers"
+    },
+    "writing_unit_assumption": 8,
+    "manuscript_subheadings": 6,
+    "chapter_word_targets": [
+      800,
+      800
+    ],
+    "R0078_materialization_blocker": "Image-only Table 1 (tbl1); existing strict materialization refuses missing machine-readable table. No image values transcribed or inspected.",
+    "CP2_approved": false
+  }
+}

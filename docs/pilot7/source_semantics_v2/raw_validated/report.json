@@ -1,0 +1,420 @@
+{
+  "rule_version": "source-semantics-2",
+  "functional_check_version": 2,
+  "verdict": "FINDING_COVERAGE_PASS_LABEL_DEFECTS_QUARANTINED_REVALIDATION_REQUIRED",
+  "source_excerpt": {
+    "Abstract": "Pharmacokinetic analyses determined drug concentrations in plasma and tumors using high-performance liquid chromatography-mass spectrometry. Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors. The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d."
+  },
+  "expected_findings_omitted": [],
+  "findings": [
+    {
+      "finding_id": "F1",
+      "subject_entity_id": "E1",
+      "object_entity_id": "E2",
+      "predicate": "DETECTED_IN",
+      "polarity": "POSITIVE",
+      "quotation": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+      "location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "quantities": [],
+      "interpretation": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NOT_APPLICABLE",
+        "specimen_entity_id": "E2",
+        "specimen": "plasma",
+        "detection_outcome": "DETECTED_UNDER_REPORTED_CONDITIONS",
+        "comparator_basis": "Descriptive specimen-specific detection; no comparative effect claimed"
+      },
+      "archived_a06": {
+        "finding_id": "F1",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "ADEQUATE",
+            "reason": "The abstract identifies high-performance liquid chromatography-mass spectrometry as the concentration measurement method and explicitly reports detection of diethyl-dithiocarbamate-copper in plasma; this supports a detection claim, not biological activity."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Assay controls and validation procedures are not stated in the supplied abstract."
+          },
+          "statistical": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract states detection without sample counts, quantitative concentrations or uncertainty estimates."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "Repeated measurements, participant-level consistency and independent replication are not stated in the supplied abstract."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "Both the finding and the abstract identify plasma as the detection matrix."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The finding records detection in the reported plasma samples without asserting detection in other populations or treatment conditions."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "No specific material methodological threat can be established from the supplied sentences; assay validation and sampling details remain unreported in this input."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "Supported as an abstract-reported detection in the sampled plasma, not as independently verified analytical performance.",
+          "Detection frequency, concentration and sampling times are not stated in the supplied abstract.",
+          "Detection does not establish biological activity; the source describes the compound as the proposed active metabolite."
+        ],
+        "plain_language_limit": "The supplied abstract reports that diethyl-dithiocarbamate-copper was detected in plasma, without specifying concentrations, detection frequency or sampling times."
+      }
+    },
+    {
+      "finding_id": "F2",
+      "subject_entity_id": "E1",
+      "object_entity_id": "E3",
+      "predicate": "DETECTED_IN",
+      "polarity": "NEGATIVE",
+      "quotation": "Diethyl-dithiocarbamate-copper, the proposed active metabolite of DSF/Cu, was detected in plasma but not in tumors.",
+      "location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "quantities": [],
+      "interpretation": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NOT_APPLICABLE",
+        "specimen_entity_id": "E3",
+        "specimen": "tumors",
+        "detection_outcome": "NOT_DETECTED_UNDER_REPORTED_CONDITIONS",
+        "comparator_basis": "Descriptive specimen-specific detection; no comparative effect claimed"
+      },
+      "archived_a06": {
+        "finding_id": "F2",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "ADEQUATE",
+            "reason": "The abstract explicitly reports non-detection in tumors using the stated analytical approach; the finding preserves non-detection rather than claiming molecular absence."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Tumor sample handling, assay controls, recovery and matrix validation are not stated in the supplied abstract."
+          },
+          "statistical": {
+            "finding": "NOT_REPORTED",
+            "reason": "The supplied abstract provides no tumor sample count, detection limit or quantitative uncertainty."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "Numbers of tumor samples and repeated measurements are not stated in the supplied abstract."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "The finding's tumor matrix and non-detection polarity match 'but not in tumors' in the abstract."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The finding is limited to non-detection in the reported tumor samples and does not assert absence across tumors or treatment conditions."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "The supplied text establishes no specific assay defect; the unstated detection limit and sampling conditions restrict interpretation without demonstrating a methodological failure."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "Supported as abstract-reported non-detection in the sampled tumors under the study's analytical and sampling conditions.",
+          "The detection limit, sampling times and number of tumor samples are not stated in the supplied abstract.",
+          "Non-detection does not establish absence from tumors, failure of tumor penetration or lack of biological activity."
+        ],
+        "plain_language_limit": "The supplied abstract reports that diethyl-dithiocarbamate-copper was not detected in tumors, but does not establish that it was absent."
+      }
+    },
+    {
+      "finding_id": "F3",
+      "subject_entity_id": "E4",
+      "object_entity_id": null,
+      "predicate": "MAXIMUM_TOLERATED_DOSE",
+      "polarity": "POSITIVE",
+      "quotation": "The maximum tolerated dose of DSF with RT and TMZ is 375 mg/d.",
+      "location": {
+        "section": "Abstract",
+        "figure_or_table": null,
+        "paragraph": null
+      },
+      "quantities": [
+        {
+          "measured_property": "maximum tolerated dose of DSF with RT and TMZ",
+          "raw_value": "375",
+          "raw_unit": "mg/d",
+          "value_type": "DOSE",
+          "variance_or_ci": null,
+          "p_value": null,
+          "n": null,
+          "converted": null
+        }
+      ],
+      "interpretation": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NONE_REPORTED"
+      },
+      "archived_a06": {
+        "finding_id": "F3",
+        "structure": "ATOMIC",
+        "components": [],
+        "gate1": "PASSED",
+        "gate2": "ALIGNED",
+        "profiles": [
+          "Human interventional"
+        ],
+        "dimensions": {
+          "construct": {
+            "finding": "NOT_REPORTED",
+            "reason": "The abstract explicitly labels 375 mg/d as the maximum tolerated dose, but does not state the toxicity criteria or operational definition used to determine it."
+          },
+          "internal": {
+            "finding": "NOT_REPORTED",
+            "reason": "Dose-escalation design, evaluable population and dose-limiting toxicity assessment are not stated in the supplied abstract."
+          },
+          "statistical": {
+            "finding": "NOT_REPORTED",
+            "reason": "Dose-level participant counts, decision rules and uncertainty are not stated in the supplied abstract."
+          },
+          "reproducibility": {
+            "finding": "NOT_REPORTED",
+            "reason": "Cohort expansion, repeated evaluation and sufficient procedural detail for replication are not stated in the supplied abstract."
+          },
+          "context_alignment": {
+            "finding": "ALIGNED",
+            "reason": "The predicate detail and context retain the abstract's qualification that the DSF maximum tolerated dose applies with RT and TMZ."
+          },
+          "generalization": {
+            "finding": "SUPPORTED_IN_TESTED_CONTEXT",
+            "reason": "The finding retains the combination-treatment context and does not establish an MTD for DSF alone or for other regimens."
+          },
+          "threats": [
+            {
+              "threat": "NONE_IDENTIFIED",
+              "reason": "The supplied abstract does not establish a specific design defect; the missing dose-escalation and toxicity information prevents methodological appraisal."
+            }
+          ]
+        },
+        "disposition": "SUPPORTED_WITH_CONSTRAINTS",
+        "constraints": [
+          "Supported as the abstract-reported maximum tolerated dose of DSF with RT and TMZ: 375 mg/d.",
+          "The dose applies to the studied combination regimen and population, whose detailed schedule and characteristics are not stated in the supplied abstract.",
+          "The basis for the MTD determination cannot be assessed from the supplied sentences.",
+          "This value does not establish an MTD for DSF alone, general safety or a recommended treatment dose."
+        ],
+        "plain_language_limit": "The supplied abstract reports a DSF maximum tolerated dose of 375 mg/d with RT and TMZ, without providing the methods or toxicity data underlying that determination."
+      }
+    }
+  ],
+  "source_audit": {
+    "rule_version": "source-semantics-2",
+    "input_sha256": "5ad04ef3332a8fe77f67a31c0f1664fe9fa0b36f15ac22c763148ceca94612a6",
+    "entity_label_defects": [
+      {
+        "entity_id": "E1",
+        "unsupported_label": "ENDOGENOUS_METABOLITE",
+        "replacement": "MOLECULE",
+        "action": "QUARANTINED_LABEL",
+        "reason": "No entity-bound source or recorded lookup evidence"
+      },
+      {
+        "entity_id": "E4",
+        "unsupported_label": "APPROVED_DRUG",
+        "replacement": "DRUG_STATUS_UNVERIFIED",
+        "action": "QUARANTINED_LABEL",
+        "reason": "No entity-bound source or recorded lookup evidence"
+      }
+    ],
+    "findings": {
+      "F1": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NOT_APPLICABLE",
+        "specimen_entity_id": "E2",
+        "specimen": "plasma",
+        "detection_outcome": "DETECTED_UNDER_REPORTED_CONDITIONS",
+        "comparator_basis": "Descriptive specimen-specific detection; no comparative effect claimed"
+      },
+      "F2": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NOT_APPLICABLE",
+        "specimen_entity_id": "E3",
+        "specimen": "tumors",
+        "detection_outcome": "NOT_DETECTED_UNDER_REPORTED_CONDITIONS",
+        "comparator_basis": "Descriptive specimen-specific detection; no comparative effect claimed"
+      },
+      "F3": {
+        "rule_version": "source-semantics-2",
+        "comparator": "NONE_REPORTED"
+      }
+    },
+    "output_sha256": "8e338dbc161927211d9659172485db75cba83875bb3f983e582604e9d55e533e"
+  },
+  "raw_extraction_entity_audit_passed": false,
+  "archived_a06_did_not_report_entity_defects": true,
+  "negative_controls": {
+    "swapped_specimens": {
+      "rejected": true,
+      "reason": "F1: specimen/polarity contradicts the source"
+    },
+    "biological_absence": {
+      "rejected": true,
+      "reason": "F2: non-detection cannot establish biological absence"
+    },
+    "dose_as_concentration": {
+      "rejected": true,
+      "reason": "F3: maximum tolerated dose is not a concentration"
+    },
+    "unsupported_entity_label": {
+      "rejected": true,
+      "reason": "Unsupported entity labels: [{'entity_id': 'E1', 'unsupported_label': 'ENDOGENOUS_METABOLITE', 'replacement': 'MOLECULE', 'action': 'QUARANTINED_LABEL', 'reason': 'No entity-bound source or recorded lookup evidence'}]"
+    },
+    "empty_findings": {
+      "rejected": true,
+      "reason": "Functional omission: nonempty expected findings are missing"
+    }
+  },
+  "all_controls_rejected": true,
+  "new_a05_required": false,
+  "a06_only_required": true,
+  "archived_a06_is_new_validation": false,
+  "paid_dispatches": 0,
+  "new_spend_usd": 0,
+  "corpus_selection": false,
+  "full_text_extraction_tested": false,
+  "original_gate_accepted": false,
+  "original_gate_preserved": true,
+  "run_id": "20261123-214928",
+  "verification_plan": {
+    "status": "PREPARED_OFFLINE_NOT_AUTHORIZED",
+    "new_a05_calls": 0,
+    "a06_provider": "openai",
+    "a06_model": "gpt-6.1-sol",
+    "a06_submitted_schema_sha256": "0b351a7d084fba11ff10d94a498e63d6ad484e205c9a08d8a47e4ed6dfdb504f",
+    "a06_only_worst_case_usd": 0.37,
+    "a06_primary_and_at_most_one_format_repair": true,
+    "a06_input_byte_cap": 64000,
+    "a06_prepared_input_bound": 47636,
+    "a06_output_token_cap": 2500,
+    "a06_payload_sha256": "1cb1af9df9d9767aec4b22fc23fb3b97c64d509f12ca78a08efcb8e220259056",
+    "required_order": [
+      "A06 exact strict check",
+      "A06-only corrected-record independent validation"
+    ],
+    "a06_prerequisite_strict_worst_case_usd": 0.034475,
+    "pending_strict_checks": [
+      "A02-SP.schema.json",
+      "A03-LM.schema.json",
+      "A06-SV.schema.json",
+      "A08-OL.schema.json",
+      "A10-RV.bounded.schema.json",
+      "A12-EDI.schema.json",
+      "A12-EDI.unit.schema.json"
+    ],
+    "strict_worst_case_usd": 0.180645,
+    "prior_successes_still_matching": [
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672",
+        "schema_file": "A07-SYN.bounded-reconcile.schema.json",
+        "receipt": "smoke-18ff5ab4bbf845729c74c510c9382d86.json",
+        "receipt_sha256": "95bb772d32205677ee3f09ca24b769f5252d058c20db85fe3a7b00020a7f6e5c",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0",
+        "schema_file": "A07-SYN.bounded-group.schema.json",
+        "receipt": "smoke-2737963220ce4299bfe44fce8d980b3b.json",
+        "receipt_sha256": "137fdf1f8cb14a34197e10125f4c70e2890c9f7106c917257370f296befddb1d",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b",
+        "schema_file": "A09-WRI.section.schema.json",
+        "receipt": "smoke-4c660ea6a34c46c1aef32cea6a49fa99.json",
+        "receipt_sha256": "390dc6b7c387ce91ae71211d35e5b5912d6b79cb93b1a72a7bdbed8dc94621da",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b",
+        "schema_file": "A09-WRI.front.schema.json",
+        "receipt": "smoke-9fe15ae0350b494a8f61a41695796a90.json",
+        "receipt_sha256": "f0406cb20faee2a6664472782127ef287535ed552469bd3f487504894f63a3a0",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8",
+        "schema_file": "A07-SYN.bounded-final.schema.json",
+        "receipt": "smoke-a33868034a354804b0c37e5dca506a7b.json",
+        "receipt_sha256": "c0a26b83fd30c68179aaae3687f521f57a7df3efd91b24ce43be27611bc7b2a2",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-haiku-5-5",
+        "schema_sha256": "d82af624db2e303f8c7895c98e422bdd8c6fb5498210e71775cd87f05d4ab2c4",
+        "schema_file": "A04-CQ.schema.json",
+        "receipt": "smoke-a384dfc56dde48baaab6d0ee9f84eb6f.json",
+        "receipt_sha256": "c90cac6cc523d60e5267fd38bf14cb7cbcd92efeb4c7c7811f7b8e12952d987f",
+        "exact_response_validation": true
+      },
+      {
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92",
+        "schema_file": "A07-SYN.bounded-plan.schema.json",
+        "receipt": "smoke-aa3424031e194a0aafe2a862da263179.json",
+        "receipt_sha256": "d645323de6ed67b3c7b69d4375bb98b114f9330ce7cb8a1da62f49c02d6cd848",
+        "exact_response_validation": true
+      }
+    ],
+    "prior_success_count": 7,
+    "recorded_spend_usd": 0.1762446,
+    "outstanding_holds_usd": 0.12467099999999999,
+    "hold_count": 5,
+    "strict_receipt_count": 25,
+    "smoke_remaining_usd": 0.6990844,
+    "exposure_after_all_strict_and_a06_only_usd": 0.8515606,
+    "remaining_after_all_strict_and_a06_only_usd": 0.1484394,
+    "caps": {
+      "smoke_usd": 1,
+      "combined_usd": 50,
+      "review_pauses_usd": [
+        25,
+        48
+      ]
+    },
+    "prices_basis": "Existing configured prices checked 2026-11-23; conservative maximum input/cache-read/cache-write rate. No price or model changes."
+  }
+}

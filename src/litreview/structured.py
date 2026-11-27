@@ -77,6 +77,8 @@ def enabled(provider: str) -> bool:
 def response_schema(agent_id: str, schema_file: str | None, provider: str, model: str) -> dict | None:
     """{"name", "schema"} when this exact combination has passed the smoke test; otherwise None."""
     from .agents.registry import AGENTS
+    from .extraction_mode import active
+    if active(agent_id):return None
     if not enabled(provider):
         return None
     name = schema_file or AGENTS[agent_id].schema_file
@@ -94,6 +96,8 @@ def schema_inventory() -> list[dict]:
     rows = []
     for agent in AGENTS:
         model = config.agent_model(agent)
+        from .extraction_mode import active
+        if active(agent):continue
         if not enabled(model.provider):continue  # JSON-object providers receive no schema; full local validation still applies.
         for name in schema_files(agent):
             try:
@@ -115,6 +119,8 @@ def targets() -> list[dict]:
     out, seen = [], set()
     for agent in AGENTS:
         m = config.agent_model(agent)
+        from .extraction_mode import active
+        if active(agent):continue  # Separate nonempty functional check; never a strict-schema smoke success.
         if not enabled(m.provider):
             continue
         for name in schema_files(agent):
@@ -142,18 +148,27 @@ SMOKE_SYSTEM = ("This is a connectivity check. Return the smallest JSON object t
 SMOKE_MAX_TOKENS = 1500
 
 
+def smoke_worst(budget, provider, model, input_bound, output_bound):
+    """OpenAI can report implicit cache writes even without client cache markers; reserve the dearer class."""
+    ordinary=budget.cost(model,input_bound,output_bound) or 0.0
+    if provider!="openai":return ordinary
+    return max(ordinary,budget.cost(model,0,output_bound,cached_input_tokens=input_bound) or 0.0,
+               budget.cost(model,0,output_bound,cache_write_tokens=input_bound) or 0.0)
+
+
 def smoke_estimate(budget) -> tuple[float, list[dict]]:
     """(worst-case USD of the smoke test, the targets still to verify). Input counted as bytes; output at the cap."""
     todo = [t for t in targets() if not t["already_verified"]]
     usd = 0.0
     for t in todo:
         tokens = len(SMOKE_SYSTEM.encode()) + len(json.dumps(t["schema"]).encode()) + 200
-        usd += budget.cost(t["model"], tokens, SMOKE_MAX_TOKENS) or 0.0
+        usd += smoke_worst(budget,t["provider"],t["model"],tokens,SMOKE_MAX_TOKENS)
     return usd, todo
 
 
 def recover_smoke_receipts(budget) -> None:
     """Settle received calls exactly once; an uncertain dispatch retains its reservation and stops."""
+    accepted_receipts = set()
     for p in sorted((budget.log_path.parent / "smoke_receipts").glob("*.json")):
         receipt = json.loads(p.read_text(encoding="utf-8"))
         key = receipt["reservation"]
@@ -161,7 +176,9 @@ def recover_smoke_receipts(budget) -> None:
             continue
         if not any(e["step"] == key for e in budget.entries()):
             budget.record("smoke-test", receipt["provider"], receipt["model"],
-                          receipt["input_tokens"], receipt["output_tokens"], step=key, reservation_key=key)
+                          receipt["input_tokens"], receipt["output_tokens"], step=key, reservation_key=key,
+                          cached_input_tokens=receipt.get("cached_input_tokens",0),cache_write_tokens=receipt.get("cache_write_tokens",0),
+                          cache_write_1h_tokens=receipt.get("cache_write_1h_tokens",0))
         enrichment_path = budget.log_path.parent / "smoke_receipt_enrichment.json"
         enrichment = json.loads(enrichment_path.read_text(encoding="utf-8")) if enrichment_path.exists() else {}
         _, validation = smoke_validation.receipt_evidence(p, enrichment)
@@ -176,8 +193,14 @@ def recover_smoke_receipts(budget) -> None:
             except (ValueError, OSError) as exc:
                 validation["accepted"] = False
                 validation["problems"].append("current provider contract incompatible; no approval retained")
-        record(receipt["provider"], receipt["model"], receipt["schema_sha256"], validation["accepted"],
-               "reassessed persisted receipt", validation=validation)
+        identity = _key(receipt["provider"], receipt["model"], receipt["schema_sha256"])
+        # UUID filename order is not chronology. An invalid receipt cannot erase a separately
+        # validated success for the identical current provider/model/schema.
+        if validation["accepted"] or identity not in accepted_receipts:
+            record(receipt["provider"], receipt["model"], receipt["schema_sha256"], validation["accepted"],
+                   "reassessed persisted receipt", validation=validation)
+        if validation["accepted"]:
+            accepted_receipts.add(identity)
         budget.release(key)
 
 
@@ -258,12 +281,13 @@ def settle_smoke_hold(budget, reservation: str, billed_usd: float, evidence: str
     return {"reservation": reservation, **settlement}
 
 
-def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None) -> dict:
+def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None, *, retained_hold_authorization: Path | None = None) -> dict:
     """One tiny live request per unverified combination. Refused unless its worst case fits the approved amount.
     Records what each provider accepted; a rejected schema is recorded too, so it is never tried in a paid stage."""
     from .llm import complete
     recover_smoke_receipts(budget)
-    if any(k.startswith("smoke-") for k in budget.reservations()):
+    from .retained_hold import blocking_holds
+    if blocking_holds(budget, retained_hold_authorization):
         raise ValueError("unsettled smoke receipt: settle it on billing evidence first (litreview settle-smoke-hold "
                          "<run_id>); no call sent")
     usd, todo = smoke_estimate(budget)
@@ -278,7 +302,7 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
         import uuid
         budget.check_priced(t["model"])
         worst_input = len(SMOKE_SYSTEM.encode()) + len(json.dumps(t["schema"]).encode()) + 200
-        worst = budget.cost(t["model"], worst_input, SMOKE_MAX_TOKENS)
+        worst = smoke_worst(budget,t["provider"],t["model"],worst_input,SMOKE_MAX_TOKENS)
         key = "smoke-" + uuid.uuid4().hex
         ok, room = budget.reserve(key, worst, "smoke-test", "live schema check; uncertain calls retain reservation")
         if not ok:
@@ -297,11 +321,13 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
             _write_json(receipt, {"state": "RECEIVED", "reservation": key,
                 "input_tokens": resp.input_tokens, "output_tokens": resp.output_tokens,
                 "provider": t["provider"], "model": t["model"], "schema_sha256": t["schema_sha256"], "text": resp.text,
+                "cached_input_tokens":resp.cached_input_tokens,"cache_write_tokens":resp.cache_write_tokens,"cache_write_1h_tokens":resp.cache_write_1h_tokens,
                 "submitted_schema": t["schema"], "stop_reason": resp.stop_reason, "schema_file": t["schema_file"], "response_provider": resp.provider, "response_model": resp.model})
             budget.record("smoke-test", t["provider"], t["model"], resp.input_tokens, resp.output_tokens,
-                          step=key, reservation_key=key)
+                          step=key, reservation_key=key,cached_input_tokens=resp.cached_input_tokens,
+                          cache_write_tokens=resp.cache_write_tokens,cache_write_1h_tokens=resp.cache_write_1h_tokens)
             row.update(input_tokens=resp.input_tokens, output_tokens=resp.output_tokens,
-                       cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens))
+                       cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens,resp.cached_input_tokens,resp.cache_write_tokens,resp.cache_write_1h_tokens))
             validation = smoke_validation.inspect_response(t["provider"], resp.text, resp.stop_reason, t["schema"], t["schema_sha256"])
             if (resp.provider, resp.model) != (t["provider"], t["model"]):
                 validation["accepted"] = False
@@ -309,7 +335,7 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
             parsed = validation["accepted"]
             row.update(accepted=parsed, stop_reason=resp.stop_reason, input_tokens=resp.input_tokens,
                        output_tokens=resp.output_tokens,
-                       cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens))
+                       cost_usd=budget.cost(t["model"], resp.input_tokens, resp.output_tokens,resp.cached_input_tokens,resp.cache_write_tokens,resp.cache_write_1h_tokens))
             record(t["provider"], t["model"], t["schema_sha256"], parsed, f"stop_reason {resp.stop_reason}", validation=validation)
         except Exception as exc:   # noqa: BLE001 — the point of the test is to learn what each provider does with the schema
             row.update(accepted=False, error=_error_text(exc))
@@ -326,5 +352,7 @@ def smoke_test(budget, approve_usd: float, by: str, log_path: Path | None = None
         results.append(row)
         with open(log, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(row) + "\n")
+        if not row["accepted"]:
+            break  # Preserve failure evidence; no further dispatch until reviewed.
     return {"tested": len(results), "accepted": sum(r["accepted"] for r in results),
             "spent_usd": round(sum(r.get("cost_usd") or 0 for r in results), 4), "results": results}

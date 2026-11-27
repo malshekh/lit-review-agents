@@ -1,0 +1,10 @@
+{
+  "run_id": "20261123-214928",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v26-pilot7-functional-only-50usd",
+  "original_artifacts": {
+    "functional_checks/a05_canonical_json/work/outputs/A05-KE_FUNCTIONAL_SOURCE_1.json": "5112c27555ce1fed82d39574ff1f8a11ebce682c327f6aefab913863d4010aee",
+    "functional_checks/a05_canonical_json/work/outputs/A06-SV_FUNCTIONAL_SOURCE_1_v1.json": "354d1473ca93214672ef35bdedb9b4434be83fa054308563d942d0d17b5c791f"
+  },
+  "engineering_only": true,
+  "corpus_selection": false
+}

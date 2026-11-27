@@ -394,3 +394,12 @@ def test_provenance_summary_names_every_model_and_flags_mixed_agents(run):
     assert s["models_by_agent"]["A07-SYN"] == {"claude-opus-5": 1, "claude-sonnet-5-5": 1}
     assert s["mixed_model_agents"] == ["A07-SYN"] and s["synthesis_models_by_turn"]["GROUP_G2"] == "claude-sonnet-5-5"
     assert s["refusals"] == [{"agent": "A07-SYN", "model": "claude-opus-5", "step": "j_GROUP_G2"}]
+
+
+@pytest.fixture(autouse=True)
+def _generic_transport_legacy_mode(monkeypatch):
+    """These generic recovery/routing tests use tiny non-scientific JSON fixtures and exercise legacy retry policy.
+    The ordinary canonical mode and its no-increase policy have dedicated nonempty integration tests.
+    """
+    from litreview import config as mode_config
+    monkeypatch.setitem(mode_config.load('pipeline')['extraction'],'generation_mode','anthropic_strict_legacy')

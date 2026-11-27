@@ -1,0 +1,29 @@
+{
+  "retracted": [],
+  "concern": [],
+  "unchecked": [
+    {
+      "record_id": "R0009",
+      "doi": "10.48550/arxiv.2608.18333",
+      "reason": "DOI not found in Crossref"
+    },
+    {
+      "record_id": "R0070",
+      "reason": "no DOI"
+    },
+    {
+      "record_id": "R0071",
+      "doi": "10.48448/zwtp-c445",
+      "reason": "DOI not found in Crossref"
+    },
+    {
+      "record_id": "R0108",
+      "reason": "no DOI"
+    },
+    {
+      "record_id": "R0114",
+      "reason": "no DOI"
+    }
+  ],
+  "checked": 175
+}

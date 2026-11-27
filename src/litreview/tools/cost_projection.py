@@ -165,6 +165,15 @@ def downstream(budget, route, cfg: dict, n_findings: int, a07_done: int = 0, inp
     a10 = calibrated_line("A10-RV", n_findings, cfg, budget, route, words=words)
     # A08, A09, A11 and A12 from the bridge's bounded request builders (downstream_projection.py)
     from .downstream_projection import lines as bridge_lines
+    # The outlined chapter target also sizes writing/critique/editing prose, not only A10.
+    # Preserve front-matter/legend allowances and all configured retry/output limits.
+    if words is not None:
+        import copy
+        from .. import config
+        inputs = dict(inputs or {})
+        journal = copy.deepcopy(inputs.get("journal") or config.load("journal_scirev"))
+        journal.setdefault("limits", {})["main_text_max_words"] = int(words)
+        inputs["journal"] = journal
     a08, a09, a11, a12 = bridge_lines(budget, route, cfg, n_findings, inputs)
     return [a07, a08, a09, a10, a11, a12]
 
@@ -363,10 +372,11 @@ def batch_gate(run, agent_id: str, steps: list[str], reserve_usd: float, limit_u
 
 def _total(lines: list[dict], budget, basis: dict) -> dict:
     projected = round(sum(x.get("usd", 0) for x in lines), 2)
-    spent = round(budget.spent(), 2)
+    spent = budget.spent()
+    held = getattr(budget, "reserved", lambda: 0.0)()
     return {"created": time.strftime("%Y-%m-%dT%H:%M:%S"), "lines": lines, "spent_usd": spent,
-            "projected_remaining_usd": projected, "projected_total_usd": round(spent + projected, 2),
-            "cap_usd": budget.cap, "verdict": "WITHIN_CAP" if spent + projected <= budget.cap else "OVER_CAP",
+            "held_and_reserved_usd": held, "projected_remaining_usd": projected, "projected_total_usd": round(spent + held + projected, 2),
+            "cap_usd": budget.cap, "verdict": "WITHIN_CAP" if spent + held + projected <= budget.cap else "OVER_CAP",
             **basis}
 
 

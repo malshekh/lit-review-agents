@@ -94,6 +94,27 @@ def for_structured_output(schema: dict, provider: str = "anthropic") -> tuple[di
                     out[k] = kept
             else:
                 out[k] = strip(v, f"{path}.{k}") if isinstance(v, (dict, list)) else v
+        # OpenAI requires an explicit type for fixed string values. This is value-set preserving:
+        # const/enum already restricts every allowed value to a string. Never infer mixed/unknown shapes.
+        if provider == "openai" and "type" not in out and ("const" in out or "enum" in out):
+            values=[out["const"]] if "const" in out else out["enum"]
+            if values and all(isinstance(value,str) for value in values):out["type"]="string"
+        # Anthropic rejects enum + a list-valued type, even for a valid nullable string enum.
+        # Encode exactly the same allowed values as typed branches; do not relax or drop an enum.
+        if provider == "anthropic" and isinstance(out.get("type"), list) and "enum" in out:
+            if set(out["type"]) != {"string", "null"} or set(out) - {"type", "enum", "description", "default"}:
+                raise SchemaCompatibilityError(path + ": unsupported enum/type union; author explicit typed branches")
+            values=out["enum"]
+            if any(v is not None and not isinstance(v,str) for v in values):
+                raise SchemaCompatibilityError(path + ": enum values do not match nullable string type")
+            branches=[]
+            strings=[v for v in values if v is not None]
+            if strings:branches.append({"type":"string","enum":strings})
+            if None in values:branches.append({"type":"null"})
+            out={**{k:v for k,v in out.items() if k not in ("type","enum")},"anyOf":branches}
+        if provider == "anthropic" and out.get("type") in (["string", "null"], ["null", "string"]):
+            rest={k:v for k,v in out.items() if k!="type"}
+            out={"anyOf":[{"type":"string",**rest},{"type":"null"}]}
         return out
     result = strip(copy.deepcopy(schema), "$")
     from .structured_contract import problems

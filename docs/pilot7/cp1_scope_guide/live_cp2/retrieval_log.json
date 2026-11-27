@@ -1,0 +1,215 @@
+{
+  "R0058": {
+    "record_id": "R0058",
+    "pmid": "42838683",
+    "doi": "10.1016/j.aca.2026.346185",
+    "attempts": [
+      {
+        "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+        "outcome": "NOT_LISTED",
+        "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+        "at": "2026-11-24T23:51:11"
+      }
+    ],
+    "category": "NO_PMC_COPY_FOUND",
+    "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+    "level_read": "ABSTRACT",
+    "level_for_budget": "ABSTRACT",
+    "figure_legends_read": false,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0116": {
+    "record_id": "R0116",
+    "pmid": "38589380",
+    "doi": "10.1038/s41467-024-47044-7",
+    "attempts": [
+      {
+        "route": "PMC open-access XML via Europe PMC",
+        "outcome": "RETRIEVED_VERIFIED",
+        "detail": "PMC11001912",
+        "xml_sha256": "077439c2b4480e5f2704f2a87c28ea4c0aba1bff3a8991b780d366ef3ea36f91",
+        "identifiers_confirmed": [
+          "pmid",
+          "doi"
+        ],
+        "at": "2026-11-24T23:51:13"
+      }
+    ],
+    "category": "FULL_TEXT_RETRIEVED",
+    "meaning": "an open-access copy in PMC was found and its identity verified",
+    "level_read": "FULL_TEXT",
+    "level_for_budget": "FULL_TEXT",
+    "figure_legends_read": true,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0004": {
+    "record_id": "R0004",
+    "pmid": null,
+    "doi": "10.21203/rs.3.rs-11186204/v1",
+    "attempts": [
+      {
+        "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+        "outcome": "NOT_LISTED",
+        "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+        "at": "2026-11-24T23:51:13"
+      }
+    ],
+    "category": "NO_PMC_COPY_FOUND",
+    "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+    "level_read": "ABSTRACT",
+    "level_for_budget": "ABSTRACT",
+    "figure_legends_read": false,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0090": {
+    "record_id": "R0090",
+    "pmid": "34256559",
+    "doi": "10.1021/acsami.1c09771",
+    "attempts": [
+      {
+        "route": "PMC open-access XML via Europe PMC",
+        "outcome": "RETRIEVED_VERIFIED",
+        "detail": "PMC8397251",
+        "xml_sha256": "aaa7162db559e9015ab9959d21a9efb305835c449983ed5a8ac481cf97ff55b1",
+        "identifiers_confirmed": [
+          "pmid",
+          "doi"
+        ],
+        "at": "2026-11-24T23:51:42"
+      }
+    ],
+    "category": "FULL_TEXT_RETRIEVED",
+    "meaning": "an open-access copy in PMC was found and its identity verified",
+    "level_read": "FULL_TEXT",
+    "level_for_budget": "FULL_TEXT",
+    "figure_legends_read": true,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0131": {
+    "record_id": "R0131",
+    "pmid": null,
+    "doi": "10.20944/preprints202606.0143.v1",
+    "attempts": [
+      {
+        "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+        "outcome": "NOT_LISTED",
+        "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+        "at": "2026-11-24T23:51:48"
+      }
+    ],
+    "category": "NO_PMC_COPY_FOUND",
+    "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+    "level_read": "ABSTRACT",
+    "level_for_budget": "ABSTRACT",
+    "figure_legends_read": false,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0032": {
+    "record_id": "R0032",
+    "pmid": "43072943",
+    "doi": "10.1016/j.aca.2026.346514",
+    "attempts": [
+      {
+        "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+        "outcome": "NOT_LISTED",
+        "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+        "at": "2026-11-24T23:52:05"
+      }
+    ],
+    "category": "NO_PMC_COPY_FOUND",
+    "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+    "level_read": "ABSTRACT",
+    "level_for_budget": "ABSTRACT",
+    "figure_legends_read": false,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  },
+  "R0060": {
+    "record_id": "R0060",
+    "pmid": "42526412",
+    "doi": "10.1016/j.saa.2026.128494",
+    "attempts": [
+      {
+        "route": "PMC identifier lookup (Europe PMC, then NCBI)",
+        "outcome": "NOT_LISTED",
+        "detail": "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403",
+        "at": "2026-11-24T23:52:30"
+      }
+    ],
+    "category": "NO_PMC_COPY_FOUND",
+    "meaning": "the PMC lookup answered: no PMC copy is listed. This does not establish that the paper is paywalled or that no open-access full text exists elsewhere",
+    "level_read": "ABSTRACT",
+    "level_for_budget": "ABSTRACT",
+    "figure_legends_read": false,
+    "figure_images_inspected": false,
+    "supplements_inspected": false,
+    "routes_not_attempted": [
+      "publisher website",
+      "Unpaywall and other open-access aggregators",
+      "institutional and subject repositories",
+      "preprint servers",
+      "author copies",
+      "subscription access"
+    ],
+    "note": "Figure legends are read as text only; figure images and supplementary files are not retrieved. Routes not attempted are listed, so a missing copy here says nothing about the paper's access elsewhere."
+  }
+}

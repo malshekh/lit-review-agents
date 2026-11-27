@@ -95,6 +95,7 @@ class EvidenceRegistry:
             return [eid, e.get("mention"), e.get("type")]
         # Never truncate an assertion and then present the fragment as scientific evidence.
         return {"id": fid, "record": f["record_id"], "theme": self.theme_of(f),
+                **({"source_recovery": f["source_recovery"]} if "source_recovery" in f else {}),
                 "relation": [entity(f.get("subject")), f.get("predicate"), f.get("predicate_detail"), entity(f.get("object"))],
                 "state": [status_of(f), f.get("direction"), f.get("polarity"), f.get("modality"),
                           f.get("assertion_type"), f.get("attributed_to")],

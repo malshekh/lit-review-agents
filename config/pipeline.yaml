@@ -227,6 +227,7 @@ run_spec:
   max_full_text: 5
   first_tranche: {full_text: 1, abstract: 2}   # read first; the run stops (CP_EARLY) for inspection, then continues
 extraction:
+  generation_mode: ordinary_json_local_v1  # A05-only; canonical JSON plus full local/scientific validation
   # Full text is read for these tiers only; other papers are extracted from their abstract and labelled
   # ABSTRACT, which every later stage sees. null: full text for every paper that has it (the old behaviour).
   # The staged pilot ignores this: its corpus authority fixes each paper's level.

@@ -1,0 +1,55 @@
+{
+  "run_id": "20261123-214928",
+  "status": "PAUSED_AT_CP2",
+  "runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v32-pilot7-single-screening-cp2-50usd",
+  "implementation_commit": "98f7fbd14775c8d2b3d1bb8e02c6d9f6b9d06977",
+  "manifest_sha256": "93559fee89b744e1b5137612d17ed61796be3fe7bc8900103ca2f47e20d5787c",
+  "CP1": "explicit researcher approval P1, eight themes and approved scope guide",
+  "CP2_approved": false,
+  "corpus_frozen": false,
+  "paid_extraction_started": false,
+  "discovered_deduplicated": 180,
+  "screening_counts": {
+    "QUALIFIED": 81,
+    "EXCLUDED": 44,
+    "UNRESOLVED_FULL_TEXT_REQUIRED": 51,
+    "UNRESOLVED_HUMAN_REVIEW": 4
+  },
+  "proposal_record_ids": [
+    "R0058",
+    "R0116",
+    "R0004",
+    "R0090",
+    "R0131",
+    "R0032",
+    "R0060"
+  ],
+  "full_text_retrieved": 2,
+  "abstract_only": 5,
+  "full_text_extraction_tested": false,
+  "actual_recorded_spend_usd": 2.0849717,
+  "new_discovery_and_screening_spend_usd": 1.7593011,
+  "outstanding_holds_usd": 0.124671,
+  "outstanding_hold_count": 5,
+  "new_unresolved_holds": 0,
+  "smoke_spent_usd": 0.2538396,
+  "smoke_exposure_usd": 0.3785106,
+  "smoke_remaining_usd": 0.6214894,
+  "combined_exposure_usd": 2.2096427,
+  "remaining_combined_allowance_usd": 47.7903573,
+  "central_forecast_including_holds_usd": 40.3996427,
+  "stage_envelope_including_holds_usd": 50.4737866,
+  "budget_blocker": [
+    "the stage limits this projection needs add up to $50.25, over the $49.90 the run's $50.00 cap leaves after prior spend; reduce the selection"
+  ],
+  "optional_six_stage_envelope_usd": 49.0137866,
+  "review_pauses_usd": [
+    25,
+    48
+  ],
+  "original_ledger_prefix_preserved": true,
+  "strict_receipts_preserved": 32,
+  "provider_schema_changes_since_successful_checks": 0,
+  "scientific_test_excerpt_in_discovery_corpus": false,
+  "checked_at": "2026-11-25T04:57:36.880786+00:00"
+}

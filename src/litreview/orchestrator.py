@@ -386,6 +386,21 @@ class Run:
         if agent_id in {"A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"} and not margin_included:
             # Hold the future-work margin, not merely check it. Actual charges settle this hold.
             usd = float(Decimal(str(usd)) * Decimal("1.30"))
+        if agent_id == "A07-SYN" and getattr(self, "_reconciliation_approval", None):
+            from .reconciliation_paging import check_spend
+            auth = self._reconciliation_approval
+            if any("_RECONCILE_" in step for step in steps):
+                if not any(step.startswith(f"A07-SYN_job{auth['job_tag']}_{turn}_LOOKUP")
+                           for step in steps for turn in auth["approved_turns"]):
+                    raise Pause("reconciliation page outside the approved tranche")
+                if key.startswith("call-") and getattr(self, "_reconciliation_format_caps", None):
+                    for turn, limit in self._reconciliation_format_caps.items():
+                        if any(f"_{turn}_LOOKUP" in step for step in steps) and Decimal(str(usd)) > Decimal(str(limit)):
+                            raise Pause("format repair exceeds its reviewed reservation limit")
+                try:
+                    check_spend(auth, self.budget.stage_committed("A07"), usd)
+                except ValueError as exc:
+                    raise Pause(str(exc)) from exc
         if pilot.enabled(self):
             try:
                 pilot.require(self,agent_id)
@@ -420,9 +435,19 @@ class Run:
               reservation_key: str | None = None, repair_limit: int | None = None,
               truncation_retries: int | None = None, repair_from: tuple[str, str] | None = None) -> dict:
         from . import a06_batches, decisions
+        from .approved_scope import enrich, save_delivery
+        if getattr(self.budget, 'profile', None) == 'pilot7':
+            from .paths import REPO_ROOT
+            from .retained_hold import blocking_holds
+            hold_auth = REPO_ROOT/'pilot_retained_hold_authorization.json'
+            blocked = blocking_holds(self.budget, hold_auth) if hold_auth.exists() else []
+            if blocked and not self._fresh_synthesis_reservation(agent_id, step, reservation_key, blocked):
+                raise Pause('New unresolved dispatch; preserve its hold and reconcile before continuing')
+        payload = enrich(self, agent_id, payload)
         if agent_id in {"A06-SV", "A07-SYN", "A08-OL", "A09-WRI", "A10-RV", "A11-RC", "A12-EDI"}:
             payload = {**payload, "source_access": payload.get("source_access", self.load("source_access.json", {}))}
         payload = decisions.attach(self.dir, agent_id, payload)   # applied decisions travel in the request identity
+        save_delivery(self, agent_id, step, payload)
         if agent_id == "A06-SV" and a06_batches.enabled(self,payload):
             try:return a06_batches.audit(self,payload,step,overrides,schema_file,exclude_providers)
             except ValueError as exc:raise Pause("A06 batch validation rejected: " + str(exc)) from exc
@@ -589,9 +614,11 @@ class Run:
         from .agents.registry import AGENTS
         from .synthesis_registry import fingerprint
         schema = (SCHEMAS_DIR / (schema_file or AGENTS[agent_id].schema_file)).read_bytes()
-        return fingerprint([agent_id, payload, m.provider, m.model,
-                            hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),
-                            hashlib.sha256(schema).hexdigest()])
+        from .extraction_mode import active, identity
+        basis=[agent_id, payload, m.provider, m.model,
+               hashlib.sha256(build_system_prompt(agent_id).encode()).hexdigest(),hashlib.sha256(schema).hexdigest()]
+        if active(agent_id):basis.append(identity())
+        return fingerprint(basis)
 
     def _receipt_reuse(self, agent_id: str, step: str, request_id: str, schema_file: str | None):
         """The accepted output saved for this step, if its receipt matches this request (or it is a researcher's
@@ -615,6 +642,10 @@ class Run:
                         "after acceptance; restore it or import it with `litreview repair-import`.")
         try:
             validate(agent_id, accepted, schema_file)
+            from .extraction_mode import active
+            if active(agent_id):
+                # The receipt request already binds the original payload; run_many also rechecks its source.
+                if not (self.dir/'input/extraction_generation.json').exists():raise ValueError('Missing ordinary-mode receipt identity')
         except Exception as exc:   # noqa: BLE001 — jsonschema raises several families; any means "not reusable"
             raise Pause(f"{step}: the saved output fails its current schema ({str(exc)[:200]}). Repair it with "
                         "`litreview repair-import` or delete its receipt to pay for a fresh call.") from exc
@@ -629,6 +660,14 @@ class Run:
                           "provider": m.provider, "accepted_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
         pilot.atomic(self.data("receipts.json"), receipts)
 
+    def _fresh_synthesis_reservation(self, agent, step, key, blocked):
+        from .job_ledger import Ledger
+        match = re.fullmatch(r"A07-SYN_job([0-9a-f]{16})_(PLAN|FINAL|(?:GROUP_G|RECONCILE_)[0-9]{4}_LOOKUP[0-9]+)", step)
+        return (agent == "A07-SYN" and match and key == f"a07-{match[1]}-{match[2]}"
+                and blocked == [key] and getattr(self, "_active_synthesis_reservation", None) == key
+                and not Ledger(self.dir).events(step)
+                and not any(e.get("reservation_key") == key for e in self.budget.entries()))
+
     def _call_guard(self, agent_id: str, step: str, reservation_key: str | None):
         """reserve() before every send on the standard path. The first send uses the caller's reservation when it
         made one; every other send (a first send with none, a truncation retry, a repair) holds its own cold worst
@@ -642,6 +681,13 @@ class Run:
             reserve = (self.cfg.get("admission") or {}).get("reasoning_reserve_tokens") or {}
             out_tokens = int(model.max_tokens) + int(reserve.get(model.provider) or 0)
             usd = worst_case_usd(self.budget, model, offline_tokens(system) + offline_tokens(message), out_tokens)
+            if getattr(self, "_reconciliation_approval", None) and "_RECONCILE_" in step:
+                from .reconciliation_paging import body_bytes, generation_body
+                body = generation_body(system, message, model, model.max_tokens, model.cache_system, model.cache_ttl)
+                input_upper = len(body_bytes(body)) + 2048
+                if input_upper + out_tokens > self.cfg["synthesis"]["context_ceiling_tokens"]:
+                    raise Pause("reconciliation repair exceeds the configured context limit")
+                usd = self.budget.cost(model.model, 0, out_tokens, 0, 0, input_upper)
             if usd is None:
                 raise UnpricedModel(model.model)
             key = "call-" + fingerprint([step, attempt, model.model, model.max_tokens])[:24]
@@ -855,6 +901,9 @@ class Run:
             self.pause_for_checkpoint("CP1")
         spec = self.load("spec.json")
         spec["researcher_decision"] = decision
+        if decision.get('scope_guide'):
+            spec['approved_scope_guide'] = decision['scope_guide']
+            spec['central_question'] = decision['scope_guide']['organizing_question']
         if decision.get("edited_selection_criteria"):
             spec["selection_criteria"] = decision["edited_selection_criteria"]
         proposed = decision.get("edited_theme_framework") or spec.get("theme_framework")
@@ -933,32 +982,43 @@ class Run:
         sources = enabled_sources()
         rcfg = self.cfg["retrieval"]
         budget = {"max_records_total": rcfg["max_records_total"], "max_records_per_family": rcfg["max_records_per_family"]}
-        plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
-                                     "budget": budget, "corpus_policy": corpus_policy.resolve(self),
-                                     "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
-                                     **self._outline_input()}, step="A03-LM_plan")
+        from .approved_scope import guide, search_plan
+        if guide(self):
+            plan = search_plan(self, spec, sources, budget)
+        else:
+            plan = self.agent("A03-LM", {"mode": "PLAN", "review_spec": spec, "sources_enabled": sources,
+                                         "budget": budget, "corpus_policy": corpus_policy.resolve(self),
+                                         "corpus_policy_fingerprint": self.state().get("corpus_policy_fingerprint"),
+                                         **self._outline_input()}, step="A03-LM_plan")
         self.save("search_plan.json", plan)
         self._agent_human_review("A03-LM", "PLAN", plan)
         results = self._execute_plan(plan, sources)
+        all_results = list(results)
         seeds = spec.get("search_seeds", {}).get("seed_papers", [])
         for i in range(int(self.cfg["loops"]["max_search_repairs"])):
             report = self._execution_report(plan, results, seeds)
             if not report["problems"]:
                 break
-            plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
-                                         "budget": budget, "previous_plan": plan,
-                                         "execution_report": report["families"],
-                                         "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
-                                         **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
+            if guide(self):
+                plan = search_plan(self, spec, sources, budget, mode='REPAIR', previous=plan, execution=report, repair_number=i+1)
+            else:
+                plan = self.agent("A03-LM", {"mode": "REPAIR", "review_spec": spec, "sources_enabled": sources,
+                                             "budget": budget, "previous_plan": plan,
+                                             "execution_report": report["families"],
+                                             "seed_recall": report["seed_recall"], "corpus_policy": corpus_policy.resolve(self),
+                                             **self._outline_input()}, step=f"A03-LM_repair{i + 1}")
             self.save("search_plan.json", plan)
             self._agent_human_review("A03-LM", f"REPAIR{i + 1}", plan)
             results = self._execute_plan(plan, sources)
+            all_results.extend(results)
+        # Repairs do not discard independently retrieved records or query yields.
+        all_results = list({(r['source'], r['family_id'], r['query']): r for r in all_results}.values())
         self.save("search_plan.json", plan)
         all_records = [Record(**{k: v for k, v in r.items() if k in Record.__dataclass_fields__})
-                       for res in results for r in res["records"]]
+                       for res in all_results for r in res["records"]]
         records, stats = deduplicate(all_records)
         self.save("records.json", records)
-        self.save("search_log.json", [{k: v for k, v in r.items() if k != "records"} for r in results])
+        self.save("search_log.json", [{k: v for k, v in r.items() if k != "records"} for r in all_results])
         self.prov.tool_run("search+dedup", "search", stats)
         return "qualify"
 
@@ -977,17 +1037,25 @@ class Run:
             for src in fam.get("sources", []):
                 if src not in sources or src not in queries:
                     continue
-                res = search(src, queries[src], fam["family_id"],
-                             min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"]))
+                maximum = min(int(fam.get("max_records") or 200), self.cfg["retrieval"]["max_records_per_family"])
+                cache_key = hashlib.sha256(json.dumps([src, queries[src], fam["family_id"], maximum]).encode()).hexdigest()
+                cached = self.load(f'search_results/{cache_key}.json')
+                if cached is not None:
+                    out.append(cached)
+                    continue
+                res = search(src, queries[src], fam["family_id"], maximum)
                 try:
                     corpus_policy.require_records(self, [r.to_dict() for r in res.records])
                 except ValueError as exc:
                     self.save("retrieval_boundary_error.json", {"source": src, "family_id": fam["family_id"],
                         "unexpected_pmids": [r.pmid for r in res.records if str(r.pmid) not in corpus_policy.fixed(self)]})
                     raise Pause(str(exc)) from exc
-                out.append({"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
-                            "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
-                            "error": res.error, "records": [r.to_dict() for r in res.records]})
+                entry = {"source": res.source, "family_id": res.family_id, "purpose": fam.get("purpose"),
+                         "query": res.query, "hit_count": res.hit_count, "returned": len(res.records),
+                         "section_ids": fam.get('section_ids', []), "searched_at": time.strftime('%Y-%m-%dT%H:%M:%S%z'),
+                         "error": res.error, "records": [r.to_dict() for r in res.records]}
+                self.save(f'search_results/{cache_key}.json', entry)
+                out.append(entry)
         return out
 
     @staticmethod
@@ -1059,7 +1127,10 @@ class Run:
         identities = corpus_policy.registry(records, corpus_policy.fixed(self))
         prior_registry = self.load("corpus_membership.json")
         if prior_registry is not None and prior_registry != identities:
-            raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+            from .approved_scope import registry_extension
+            if corpus_policy.fixed(self) or not registry_extension(prior_registry, identities):
+                raise Pause("Canonical corpus mapping changed; explicit human identity resolution required")
+            self.save("corpus_membership.json", identities)
         if prior_registry is None:
             self.save("corpus_membership.json", identities)
         quals: dict[str, dict] = {q["record_id"]: q for q in self.load("qualifications.json", [])}
@@ -1106,6 +1177,8 @@ class Run:
                         self.save("screening_review.json", reviews)
                     quals[r["record_id"]]["in_fixed_corpus"] = True
                     quals[r["record_id"]]["membership_source"] = "PERSISTED_RUN_POLICY"
+            from .approved_scope import extend_screened_themes
+            extend_screened_themes(self, quals, fw)
             self.save("qualifications.json", list(quals.values()))
             self._agent_human_review("A04-CQ", bid, reviews[bid])
         # Level 2: full text for records the agent could not decide from the abstract
@@ -1129,13 +1202,18 @@ class Run:
                 self.save(f"fulltext/{rid}.json", sections)
                 self.save(f"fulltext_provenance/{rid}.json", source)
             else:
-                sections = fetch_sections(by_id[rid].get("pmcid"))
+                try:
+                    sections = self._checked_fulltext(by_id[rid])
+                except FullTextUnavailable as exc:
+                    self.save(f"identity_quarantine/{rid}_retrieval.json", {
+                        "record": by_id[rid], "reason": str(exc), "level_used": "ABSTRACT"})
+                    sections = {}
             quals[rid]["_fulltext_checked"] = True
             if not sections:
                 continue
             out = self.agent("A04-CQ", {"review_spec": spec, "batch_id": f"FT-{rid}", "records": [
                 {**{k: by_id[rid].get(k) for k in fields}, "content_level": "FULL_TEXT", "sections": sections}],
-                "identifier_registry": identities}, step=f"A04-CQ_FT_{rid}")
+                "identifier_registry": identities, **self._outline_input()}, step=f"A04-CQ_FT_{rid}")
             bid = f"FT-{rid}"
             reviews[bid] = {k: out.get(k) for k in ("status", "warnings", "limitations", "human_review_queue", "criteria_defects")}
             reviews[bid].update(origin_agent="A04-CQ", output_step=f"A04-CQ_FT_{rid}", input_record_ids=[rid])
@@ -1152,8 +1230,12 @@ class Run:
                     reviews[bid]["membership_claim_conflicts"] = [{"record_id": rid, "canonical_membership": True, "model_claim": False}]
                     self.save("screening_review.json", reviews)
                 quals[rid].update(in_fixed_corpus=True, membership_source="PERSISTED_RUN_POLICY")
+            from .approved_scope import extend_screened_themes
+            extend_screened_themes(self, quals, fw)
             self.save("qualifications.json", list(quals.values()))
             self._agent_human_review("A04-CQ", bid, reviews[bid])
+        from .approved_scope import extend_screened_themes
+        extend_screened_themes(self, quals, fw)
         self.save("qualifications.json", list(quals.values()))
         self.save("bias_report.json", self._bias_report(records, list(quals.values())))
 
@@ -1289,7 +1371,9 @@ class Run:
                 prov = config.agent_model(agent).provider
                 by_provider[prov] = by_provider.get(prov, 0.0) + float(line["usd"])
         spent_now = self.budget.spent()
-        exposure = min(self.budget.cap, spent_now + max(projected, caps_total - spent_by(("A02-SP", "A03-LM", "A04-CQ"))))
+        nonstage = self.budget.prior_spend() + sum(e["cost_usd"] or 0.0 for e in entries
+                                                    if not config.stage_group(e["agent"]))
+        exposure = max(spent_now + projected, caps_total + nonstage) + self.budget.reserved()
         return {"discovery_and_screening_spent_usd": round(spent_by(("A02-SP", "A03-LM", "A04-CQ")), 4),
                 "smoke_test_and_other_prior_spend_usd": round(self.budget.prior_spend(), 4),
                 "smoke_test_spent_in_run_usd": round(spent_by(("smoke-test",)), 4),
@@ -1342,9 +1426,9 @@ class Run:
         derived = derive_stage_caps(stage_usd, float(settings.get("recovery_allowance", 0.15)))
         derived["from_projection_created"] = proj.get("created")
         room = self.budget.cap - self.budget.prior_spend() - sum(
-            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"]))
+            e["cost_usd"] or 0.0 for e in self.budget.entries() if not config.stage_group(e["agent"])) - self.budget.reserved()
         problem = (f"the stage limits this projection needs add up to ${derived['total_usd']:.2f}, over the "
-                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend; reduce the selection"
+                   f"${room:.2f} the run's ${self.budget.cap:.2f} cap leaves after prior spend and retained reservations; reduce the selection"
                    if derived["total_usd"] > room else None)
         return derived, problem
 
@@ -1363,7 +1447,8 @@ class Run:
         """{"researcher_outline": ...} for the agents before A08, in an outlined run; {} otherwise."""
         from . import run_spec
         outline, _ = run_spec.load(self.dir)
-        return {"researcher_outline": run_spec.outline_brief(outline)} if outline else {}
+        from .approved_scope import enrich
+        return enrich(self, 'A03-LM', {"researcher_outline": run_spec.outline_brief(outline)}) if outline else {}
 
     def _propose_selection(self, quals: list[dict]) -> None:
         """A discovery run: propose the corpus from the screening results and pre-mark it in CP2_records.csv. Only
@@ -1443,6 +1528,8 @@ class Run:
                 seen[key] = r["record_id"]
         access = {r["record_id"]: self._access_check(r) for r in selected[:max(limit, 0) or len(selected)]}
         for rid, a in access.items():
+            if a.get("materialization_blocker"):
+                problems.append(f"{rid}: source materialization blocked: {a['materialization_blocker']}")
             if a["category"] == "NO_SOURCE_TEXT":
                 problems.append(f"{rid}: neither full text nor an abstract could be obtained, so it cannot be read")
         proposals = {p["record_id"]: p["reason"] for p in (self.load("selection_proposal.json", {}) or {}).get("proposed", [])}
@@ -1508,7 +1595,27 @@ class Run:
         log = self.load("retrieval_log.json", {})
         entry = log.get(rid)
         if entry and not (retry and entry.get("category") == "LOOKUP_UNAVAILABLE"):
-            return entry
+            if entry.get("level_read") == "FULL_TEXT":
+                try:
+                    if entry.get("identity_only_source"):
+                        import base64, hashlib
+                        from .tools.fulltext import verify_article_xml
+                        proof = self.load(entry["identity_only_source"])
+                        raw = base64.b64decode(proof["xml_base64"], validate=True)
+                        if hashlib.sha256(raw).hexdigest() != proof["xml_sha256"]:
+                            raise FullTextUnavailable("Identity-only source hash mismatch")
+                        verify_article_xml(rec, raw)
+                        if not entry.get("materialization_blocker"):
+                            raise FullTextUnavailable("Identity-only source cannot be extractor-ready")
+                    else:
+                        verify_cached_source(rec, self.load(f"fulltext/{rid}.json"),
+                                             self.load(f"fulltext_provenance/{rid}.json"))
+                except (ValueError, KeyError, TypeError) as exc:
+                    self.save(f"identity_quarantine/{rid}_access_cache.json", {
+                        "record": rec, "access_entry": entry, "reason": str(exc)})
+                    entry = None
+            if entry:
+                return entry
         entry = {"record_id": rid, "pmid": rec.get("pmid"), "doi": rec.get("doi"), "attempts": (entry or {}).get("attempts", [])}
         sections, category = None, None
         pmcid = rec.get("pmcid")
@@ -1555,6 +1662,8 @@ class Run:
         """Extraction input for a discovered paper, from its access check (re-run only if access was unresolved)."""
         rid = rec["record_id"]
         entry = self._access_check(rec, retry=True)
+        if entry.get("materialization_blocker"):
+            raise Pause(f"{rid}: source materialization requires review: {entry['materialization_blocker']}")
         if entry["category"] in ("NO_SOURCE_TEXT",) or (entry["category"] == "LOOKUP_UNAVAILABLE" and not (rec.get("abstract") or "").strip()):
             raise Pause(f"{rid} ({rec.get('manifest_paper_id')}): no full text and no abstract could be obtained "
                         "(data/retrieval_log.json). Nothing is extracted from a title. Supply its text in "
@@ -1642,7 +1751,13 @@ class Run:
                 continue
             done = self.dir / "outputs" / f"{step}.json"
             if done.exists():
-                on_output(step, json.loads(done.read_text(encoding="utf-8")))
+                from .extraction_mode import active,record_identity
+                if active(agent_id):
+                    from .agents.base import prepare_output
+                    record_identity(self.dir)
+                    accepted=prepare_output(agent_id,done.read_text(encoding="utf-8"),payload)
+                else:accepted=json.loads(done.read_text(encoding="utf-8"))
+                on_output(step,accepted)
             else:
                 pending.append((step, payload))
         bcfg = self.cfg.get("batch") or {}
@@ -1651,6 +1766,23 @@ class Run:
             return
         for step, payload in pending:
             on_output(step, self.agent(agent_id, payload, step, exclude_providers=frozenset(exclude(step))))
+
+    def _checked_fulltext(self, rec: dict) -> dict:
+        """No unverified cache or bare-PMCID lookup reaches screening/extraction."""
+        rid = rec["record_id"]
+        sections = self.load(f"fulltext/{rid}.json")
+        source = self.load(f"fulltext_provenance/{rid}.json")
+        if sections:
+            try:
+                verify_cached_source(rec, sections, source)
+                return sections
+            except FullTextUnavailable as exc:
+                self.save(f"identity_quarantine/{rid}_cache.json", {
+                    "record": rec, "sections": sections, "source": source, "reason": str(exc)})
+        sections, source = fetch_verified_sections(rec)
+        self.save(f"fulltext/{rid}.json", sections)
+        self.save(f"fulltext_provenance/{rid}.json", source)
+        return sections
 
     def stage_extract(self, st: dict) -> str:
         spec = self.load("spec_approved.json")
@@ -1685,7 +1817,10 @@ class Run:
             elif rec.get("intended_reading_level") == "ABSTRACT":
                 sections = {"Abstract": rec.get("abstract") or ""}   # the manifest says abstract, whatever its importance
             elif rec.get("intended_reading_level") == "FULL_TEXT":
-                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid"))
+                try:
+                    sections = self._checked_fulltext(rec)
+                except FullTextUnavailable as exc:
+                    raise Pause(f"{rid}: required full text identity/body could not be verified: {exc}") from exc
                 if not sections or len(sections) < 2:
                     raise Pause(f"{rid} ({rec.get('manifest_paper_id')}) is marked for full-text reading in the corpus "
                                 "manifest, but no full text could be loaded. It is not silently read as an abstract: "
@@ -1693,8 +1828,12 @@ class Run:
             elif not self._tier_allows("extraction", "full_text_tiers", rec):
                 sections = {"Abstract": rec.get("abstract") or ""}   # not a full-text tier: abstract only, labelled so
             else:
-                sections = self.load(f"fulltext/{rid}.json") or fetch_sections(rec.get("pmcid")) \
-                    or {"Abstract": rec.get("abstract") or ""}
+                try:
+                    sections = self._checked_fulltext(rec)
+                except FullTextUnavailable as exc:
+                    self.save(f"identity_quarantine/{rid}_retrieval.json", {
+                        "record": rec, "reason": str(exc), "level_used": "ABSTRACT"})
+                    sections = {"Abstract": rec.get("abstract") or ""}
             level = "FULL_TEXT" if len(sections) > 1 else "ABSTRACT"
             self.save(f"fulltext/{rid}.json", sections)
             rid_of[f"A05-KE_{rid}"] = rid
@@ -1786,7 +1925,9 @@ class Run:
         the run from these measurements: the remaining papers at the measured cost per level, and the downstream
         stages at the findings count the measured papers imply."""
         from .synthesis_registry import fingerprint
-        digest = fingerprint({"run": self.id, "first_tranche": sorted(first)})
+        from .extraction_mode import identity as extraction_identity
+        digest = fingerprint({"run": self.id, "first_tranche": sorted(first),"extraction_generation":extraction_identity(),
+            "reviewed_artifacts":{rid:{name:self.load(f"{name}/{rid}.json") for name in ("extractions","validations","fulltext")} for rid in sorted(first)}})
         if checkpoints.review_approved(self.dir, "CP_EARLY", digest):
             return
         from . import run_spec
@@ -1825,6 +1966,10 @@ class Run:
                    "access_limitations": a.get("meaning") if a.get("category") != "FULL_TEXT_RETRIEVED" else
                    "legends read as text; images and supplements not retrieved",
                    "projected_per_paper_usd": projected_per_paper.get(lv)}
+            row["omission_review"]={"status":"REQUIRES_SOURCE_COMPARISON",
+                "source":f"data/fulltext/{rid}.json","extraction":f"data/extractions/{rid}.json",
+                "independent_validation":f"data/validations/{rid}.json",
+                "instruction":"Inspect relevant source passages for omitted analytes, matrices, measurement tasks, numerical values/units, comparators, uncertainty, contrary findings and author qualifications. Matching spans and a complete schema do not establish recall. Concentration classification does not establish numerical estimation."}
             row["measured_per_paper_usd"] = round(row["extraction_usd"] + row["validation_usd"], 4)
             papers.append(row)
             measured.setdefault(lv, []).append(row)
@@ -2035,6 +2180,21 @@ class Run:
     def _prepare_validation(self, rid):
         ext = self.load(f'extractions/{rid}.json', {})
         sections = self.load(f'fulltext/{rid}.json', {})
+        from .source_semantics import interpret, load_evidence
+        try:
+            corrected, semantic_audit = interpret(ext, sections, load_evidence(self.dir, self.load(f'entity_label_evidence/{rid}.json', [])))
+        except ValueError as exc:
+            raise Pause(f'{rid}: source interpretation requires correction: {exc}') from exc
+        prior = self.load(f'source_semantics/{rid}.json', {})
+        if prior.get('entity_label_defects') and not semantic_audit['entity_label_defects']:
+            semantic_audit['entity_label_defects'] = prior['entity_label_defects']
+        self.save(f'source_semantics/{rid}.json', semantic_audit)
+        if corrected != ext:
+            archive = f'source_semantics/original_extractions/{rid}.json'
+            if not self.data(archive).exists():
+                self.save(archive, ext)
+            self._write_validation(f'extractions/{rid}.json', corrected)
+            ext = corrected
         repaired = span_check.repair_findings(ext, sections)
         if repaired != ext:
             self._write_validation(f'extractions/{rid}.json', repaired)
@@ -2125,6 +2285,9 @@ class Run:
     def _save_a06_input(self, rid: str, step: str, payload: dict) -> None:
         """The exact A06 PER_PAPER input, saved as the call is made. The instability test replays it as is:
         a conflict stripped or an identity corrected afterwards changes the extraction file, not this."""
+        semantic_audit = self.load(f'source_semantics/{rid}.json')
+        if semantic_audit:
+            payload['source_interpretation'] = semantic_audit
         self.save(f"a06_inputs/{rid}.json", {"step": step, "payload_sha256": self._payload_sha256(payload),
                                              **self._a06_conditions(rid), "payload": payload})
 
@@ -2279,7 +2442,9 @@ class Run:
         out = []
         for rec in corpus:
             rid = rec["record_id"]
-            ext = self.load(f"extractions/{rid}.json", {})
+            ext, semantic_sections = self._prepare_validation(rid)
+            from .source_semantics import interpret, load_evidence
+            _, semantic_audit = interpret(ext, semantic_sections, load_evidence(self.dir, self.load(f'entity_label_evidence/{rid}.json', [])))
             val_doc = self.load(f"validations/{rid}.json", {})
             self._require_complete_validation(rid, val_doc, ext)
             val_doc = self._recover_validation_review(rid, val_doc)
@@ -2302,13 +2467,18 @@ class Run:
                       and elig[fid]['status'] not in ('QUARANTINED','REJECTED','HELD_FOR_CORRECTION')):
                     elig[fid] = {'status':'REVALIDATION_REQUIRED', 'disposition':val.get(fid, {}).get('disposition'),
                                  'reason':'source or extracted finding changed after validation'}
+            recovery_path = f"offline_recovery/{rid}/audit.json"
+            recovered = self.load(recovery_path, {}).get("after_recovery", {}).get("source_derived_additions", [])
             ctx = {c["context_id"]: c for c in ext.get("contexts", [])}
             for f in ext.get("findings", []):
                 v = val.get(f["finding_id"], {})
                 out.append({"finding_id": f"{rid}:{f['finding_id']}", "record_id": rid,
                             **self._finding_themes(f, rec),
+                            **({"source_recovery": {"audit": recovery_path, "basis": f.get("warrant_note")}}
+                               if f["finding_id"] in recovered else {}),
                             # the handoff contract (handoff.py): relation, direction, hedging, attribution
                             **handoff.project(f, v, ext.get("prompt_version")),
+                            "source_interpretation": semantic_audit['findings'].get(f['finding_id'], {}),
                             "span": f.get("span"), "quantities": f.get("quantities", []),
                             "context_id": f"{rid}:{f['context_id']}" if f.get("context_id") else None,
                             "context": ctx.get(f.get("context_id"), {}).get("fields"),
@@ -2570,7 +2740,46 @@ class Run:
             return offline_tokens(system) + offline_tokens(user_parts(payload))
 
         def call(mode, payload, name):
+            if mode == "FINAL" and getattr(self, "_reconciliation_approval", None) and not self._reconciliation_approval.get("final_approved_under_stage_cap"):
+                raise Pause("FINAL requires separate researcher approval after reconciliation")
+            if mode != "PLAN":
+                decision = checkpoints.approved(self.dir, "CP_SYN")
+                if not decision or decision.get("fingerprint") != job.identity or not (
+                        decision.get("approve_alignment") and decision.get("keep_approved_framework")):
+                    raise Pause("A07 synthesis requires the matching approved CP_SYN decision")
+                plan = job._committed("PLAN")
+                payload = {**payload, "cp_syn_researcher_decision": decision,
+                           "reviewed_organization_proposals": plan["theme_change_proposals"]}
+            if mode == "GROUP":
+                payload = {**payload, "coverage_instruction": (
+                    "For satisfies use exact IDs from group.manifest_item_ids only. Assign each fulfilled "
+                    "obligation once to the proposition or gap that fulfills it. Leave satisfies empty "
+                    "elsewhere. Use source_item_ids for source links. A paper with usable evidence needs "
+                    "a proposition citing its eligible finding. Keep unknown study independence explicit.")}
             tokens, limit, usd = self._a07_quote(mode, payload, count)
+            if mode == "RECONCILE" and "prefill_finding_ids" in payload:
+                if payload.get("pause_before_lookup_judgment") and not name.endswith("_LOOKUP0"):
+                    raise Pause("lookup judgment requires separate researcher approval")
+                from . import reconciliation_paging, decisions
+                from .approved_scope import enrich
+                enriched = enrich(self, "A07-SYN", payload)
+                enriched = decisions.attach(self.dir, "A07-SYN", {**enriched,"source_access":self.load("source_access.json", {})})
+                route = self.route("A07-SYN")
+                body = reconciliation_paging.provider_body(self, enriched, route, limit)
+                request_bytes = reconciliation_paging.body_bytes(body)
+                reviewed = getattr(self, "_reconciliation_request_hashes", {})
+                if reviewed and name.endswith("_LOOKUP0"):
+                    from hashlib import sha256
+                    if reviewed.get(name.removesuffix("_LOOKUP0")) != sha256(request_bytes).hexdigest():
+                        raise Pause("reconciliation request differs from its reviewed provider body")
+                followups = getattr(self, "_reconciliation_lookup_hashes", {})
+                if name in followups:
+                    from hashlib import sha256
+                    if sha256(request_bytes).hexdigest() != followups[name]:
+                        raise Pause("reconciliation lookup differs from its reviewed provider body")
+                tokens = len(request_bytes) + 2048
+                usd = self.budget.cost(route.model, 0, limit, 0, 0, tokens)
+
             if tokens + limit > scfg["context_ceiling_tokens"]:
                 raise JobStopped("A07 context admission refused before dispatch")
             key = f"a07-{tag}-{name}"
@@ -2579,19 +2788,27 @@ class Run:
             ok, available = self._reserve(key, usd, "A07-SYN", "bounded synthesis pre-call reservation", steps=[f"A07-SYN_job{tag}_{name}"])
             if not ok:
                 raise BudgetExceeded(f"A07 call reserves ${usd:.2f}; only ${available:.2f} remains")
+            self._active_synthesis_reservation = key
             try:
                 out = self.agent("A07-SYN", payload, step=f"A07-SYN_job{tag}_{name}",
                                  overrides={"cache_system": True, "cache_payload": (), "cache_ttl": scfg.get("cache_ttl", "1h"),
                                             "max_tokens": limit},
-                                 schema_file=f"A07-SYN.bounded-{mode.lower()}.schema.json", reservation_key=key)
+                                 schema_file=f"A07-SYN.bounded-{mode.lower()}.schema.json", reservation_key=key,
+                                 truncation_retries=0 if mode == "RECONCILE" and "prefill_finding_ids" in payload else None)
             except AgentError as exc:
                 # Known responses are logged, including refusal/truncation; unknown API billing stays held.
                 if any(e["step"] == f"A07-SYN_job{tag}_{name}" for e in self.budget.entries()):
                     self.budget.release(key)
                 raise
             except (Pause, BudgetExceeded, UnpricedModel):
-                self.budget.release(key)
+                from .job_ledger import Ledger
+                sent = any(e["state"] == "DISPATCHED" and e.get("reservation") == key
+                           for e in Ledger(self.dir).events(f"A07-SYN_job{tag}_{name}"))
+                if not sent or any(e.get("reservation_key") == key for e in self.budget.entries()):
+                    self.budget.release(key)
                 raise
+            finally:
+                self._active_synthesis_reservation = None
             self.budget.release(key)
             return out
 
@@ -2604,6 +2821,25 @@ class Run:
 
         job = self._synthesis_job_class()(self.dir / "data" / f"synthesis_job_{tag}", registry, call, count, scfg,
                                           identity, approve, served_by=lambda: self.last_model)
+        auth = self.load("reconciliation_repair_approved.json")
+        if auth:
+            plan = self.load("reconciliation_repair_plan.json")
+            if (not plan or auth.get("approved") is not True or not auth.get("approved_by")
+                    or auth.get("job_tag") != tag or plan.get("job_identity") != job.identity
+                    or plan.get("run_id") != self.id or auth.get("plan_fingerprint") != fingerprint(plan)
+                    or plan.get("registry") != job.registry.digest
+                    or not auth.get("approved_turns") or auth.get("max_increment_usd", 0) <= 0
+                    or auth.get("baseline_stage_usd") != plan.get("baseline_stage_usd")
+                    or any(t not in plan.get("reservations", {}) for t in auth["approved_turns"])
+                    or len(set(auth["approved_turns"])) != len(auth["approved_turns"])
+                    or Decimal(str(auth["max_increment_usd"])) > sum(
+                        Decimal(plan["reservations"][t]) for t in auth["approved_turns"])):
+                raise Pause("reconciliation approval or plan identity mismatch")
+            job.evidence_pages = plan["pages"]
+            self._reconciliation_approval = auth
+            self._reconciliation_request_hashes = plan["request_hashes"]
+            self._reconciliation_format_caps = plan.get("format_repair_caps", {})
+            self._reconciliation_lookup_hashes = plan.get("lookup_hashes", {})
         return job, tag
 
     def _provenance_summary(self) -> dict:
@@ -2780,7 +3016,9 @@ class Run:
             from . import run_spec
             outline, _ = run_spec.load(self.dir)
             if outline:
-                extra, coverage = run_spec.plan_problems(plan, outline)
+                from .approved_scope import writing_outline, heading_problems
+                extra, coverage = run_spec.plan_problems(plan, writing_outline(self, outline))
+                extra += heading_problems(self, plan)
                 problems = problems + extra
                 queue = run_spec.unmapped(ledger)
                 self.save("unmapped_evidence.json", {"status": "NEEDS_RESEARCHER_REVIEW" if queue else "EMPTY",
@@ -3053,9 +3291,11 @@ class Run:
         payload = bridge.outline_payload(pkg, corpus, journal, table, bcfg, findings)
         outline, _ = run_spec.load(self.dir)
         if outline:
-            payload["researcher_outline"] = outline
+            from .approved_scope import writing_outline
+            payload["researcher_outline"] = writing_outline(self, outline)
             payload["source_access"] = self.load("source_access.json", {})
-        return payload
+        from .approved_scope import enrich
+        return enrich(self, 'A08-OL', payload)
 
     def _sample_mode(self) -> bool:
         return False
@@ -3088,6 +3328,8 @@ class Run:
         threshold, the projection line, the runtime gate and the cap (an existing reservation, held for the call).
         Raises AdmissionRefused when the request does not fit; the caller subdivides by its fixed rule or stops."""
         from . import admission
+        from .approved_scope import enrich
+        payload = enrich(self, agent_id, payload)
         from .synthesis_registry import fingerprint
         m = self.route(agent_id, exclude)
         overrides = {}
@@ -3674,6 +3916,9 @@ class Run:
              for t in tables], corpus, float(self._journal_limits().get("table_max_pages", 1)))
         from . import run_spec
         outline_now, _ = run_spec.load(self.dir)
+        if outline_now:
+            from .approved_scope import writing_outline
+            outline_now = writing_outline(self, outline_now)
         lengths = (run_spec.chapter_word_report(outline_now, m["sections"], compliance.word_count,
                                                 float((self.cfg.get("run_spec") or {}).get("chapter_tolerance", 0.15)))
                    if outline_now else [])

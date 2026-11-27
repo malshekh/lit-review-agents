@@ -1,0 +1,154 @@
+{
+  "created": "2026-11-24T23:52:30",
+  "lines": [
+    {
+      "stage": "A05-KE + A06-SV per paper (ABSTRACT)",
+      "basis": "MEASURED_P90",
+      "calls": 5,
+      "usd": 1.0926,
+      "detail": "5 papers x $0.3642 (90th percentile of 17 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+    },
+    {
+      "stage": "A05-KE + A06-SV per paper (FULL_TEXT)",
+      "basis": "MEASURED_P90",
+      "calls": 2,
+      "usd": 1.5531,
+      "detail": "2 papers x $1.0354 (90th percentile of 11 papers in 20261025-100039); batch factor 0.5 after one interactive probe"
+    },
+    {
+      "stage": "A06-SV whole-paper repeat (instability test)",
+      "basis": "MEASURED_P90",
+      "calls": 7,
+      "usd": 0.7417,
+      "detail": "one repeat per paper (every paper assumed to have a blocked finding) at the 90th percentile of A06 per-paper cost by level"
+    },
+    {
+      "stage": "A06-SV per theme",
+      "basis": "MEASURED_P90",
+      "calls": 17,
+      "usd": 1.5742,
+      "detail": "17 themes (2.321 per paper measured) x $0.0926"
+    },
+    {
+      "stage": "A07-SYN",
+      "basis": "CALIBRATED_FORECAST",
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "calls": 80,
+      "usd": 9.2224,
+      "baseline_usd": 7.0941,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 39.4264,
+      "scenarios": {
+        "baseline": 7.0941,
+        "low": 5.2858,
+        "high": 10.8005,
+        "adverse": 35.8064
+      },
+      "detail": "174 findings; calibrated from provider-counted input of the production bounded-synthesis requests (docs/a07_efficiency); usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+    },
+    {
+      "stage": "A08-OL",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 1,
+      "usd": 0.1794,
+      "baseline_usd": 0.138,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 0.2109,
+      "scenarios": {
+        "baseline": 0.138,
+        "low": 0.0982,
+        "high": 0.1719,
+        "adverse": 0.2109
+      },
+      "long_context_calls": 0,
+      "over_window_calls": 0,
+      "max_input_bound": 81854,
+      "detail": "up to 1 requests on gpt-6.1-sol; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; the outline request (map, element index, table coverage)"
+    },
+    {
+      "stage": "A09-WRI",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 25,
+      "usd": 7.6291,
+      "baseline_usd": 5.8685,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 23.6551,
+      "scenarios": {
+        "baseline": 5.8685,
+        "low": 3.3054,
+        "high": 8.7173,
+        "adverse": 23.6551
+      },
+      "long_context_calls": 0,
+      "over_window_calls": 0,
+      "max_input_bound": 303320,
+      "detail": "up to 25 requests on claude-opus-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; 8 sections assumed; sizes per finding from the compact fixture, each with up to 2 retrieval rounds and 0 redraft(s), plus front matter per draft"
+    },
+    {
+      "stage": "A10-RV",
+      "basis": "CALIBRATED_FORECAST",
+      "validation": "within the largest cohort run; per-call rates still provisional",
+      "calls": 288,
+      "usd": 12.2021,
+      "baseline_usd": 9.3862,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 123.7703,
+      "scenarios": {
+        "baseline": 9.3862,
+        "low": 5.9078,
+        "high": 18.7949,
+        "adverse": 103.0703
+      },
+      "detail": "174 findings; calibrated from production request bounds for a 5,000-word manuscript (docs/integrated_validation/a10), scaled to the outline's 1,600 words; usd = baseline x 1.30; scenario assumptions in pipeline.yaml -> forecast; every call admitted and reserved at its own bound"
+    },
+    {
+      "stage": "A11-RC",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 2,
+      "usd": 1.5861,
+      "baseline_usd": 1.2201,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 1.8234,
+      "scenarios": {
+        "baseline": 1.2201,
+        "low": 0.4438,
+        "high": 1.4971,
+        "adverse": 1.8234
+      },
+      "long_context_calls": 0,
+      "over_window_calls": 0,
+      "max_input_bound": 388548,
+      "detail": "up to 2 requests on kimi-k3.1-pro; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; up to 2 critique cycles: manuscript, map, ledger, A10 summary"
+    },
+    {
+      "stage": "A12-EDI",
+      "basis": "ESTIMATED_ENVELOPE",
+      "calls": 5,
+      "usd": 2.4111,
+      "baseline_usd": 1.8547,
+      "uncertainty_margin": 0.3,
+      "adverse_usd": 3.0381,
+      "scenarios": {
+        "baseline": 1.8547,
+        "low": 1.1271,
+        "high": 2.0914,
+        "adverse": 3.0381
+      },
+      "long_context_calls": 0,
+      "over_window_calls": 0,
+      "max_input_bound": 402851,
+      "detail": "up to 5 requests on claude-sonnet-5-5; usd = calibrated baseline x 1.30; adverse = every request, full output, bytes / 1.8; integration per draft, up to 2 revisions, LINE and PROOF (whole-manuscript requests)"
+    }
+  ],
+  "spent_usd": 2.08,
+  "projected_remaining_usd": 38.19,
+  "projected_total_usd": 40.27,
+  "cap_usd": 50.0,
+  "verdict": "WITHIN_CAP",
+  "papers": 7,
+  "by_level": {
+    "ABSTRACT": 5,
+    "FULL_TEXT": 2
+  },
+  "findings_assumed": 174
+}

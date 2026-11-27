@@ -215,7 +215,7 @@ def test_pmcid_lookup_uses_europe_pmc_then_ncbi_and_reports_why_not(monkeypatch)
         assert headers["User-Agent"] == "litreview/0.1" and "email" not in (params or {})
         if "europepmc" in url:
             pmcid = "PMC8508702" if "34638842" in params["query"] else None
-            return FakeResp({"resultList": {"result": [{"pmid": "x", "pmcid": pmcid}]}})
+            return FakeResp({"resultList": {"result": [{"id": "34638842" if pmcid else "x", "pmcid": pmcid}]}})
         return FakeResp(None, 403)
     monkeypatch.setattr(requests, "get", get)
     assert fulltext.find_pmcid("34638842", None) == ("PMC8508702", "found (Europe PMC)") and len(calls) == 1

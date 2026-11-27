@@ -1,0 +1,68 @@
+{
+  "max_papers": 7,
+  "proposed": [
+    {
+      "record_id": "R0078",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    },
+    {
+      "record_id": "R0115",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    },
+    {
+      "record_id": "R0090",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    },
+    {
+      "record_id": "R0116",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    },
+    {
+      "record_id": "R0058",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    },
+    {
+      "record_id": "R0039",
+      "reason": "Researcher-requested CP2 revision from existing screened pool; pending corpus decision."
+    }
+  ],
+  "rule": "Explicit researcher-requested revision; no new discovery, screening, eligibility exclusion, or checkpoint approval",
+  "revision": {
+    "run_id": "20261123-214928",
+    "requested_by": "Researcher in chat, 2026-11-25",
+    "decision_type": "PROPOSAL_REVISION_ONLY_NOT_CP2_APPROVAL",
+    "original_record_ids": [
+      "R0058",
+      "R0116",
+      "R0004",
+      "R0090",
+      "R0131",
+      "R0032",
+      "R0060"
+    ],
+    "revised_record_ids": [
+      "R0078",
+      "R0115",
+      "R0090",
+      "R0116",
+      "R0058",
+      "R0039"
+    ],
+    "added": [
+      "R0078",
+      "R0115",
+      "R0039"
+    ],
+    "removed": [
+      "R0004",
+      "R0131",
+      "R0032",
+      "R0060"
+    ],
+    "search_or_screening_repeated": false,
+    "CP2_approved": false,
+    "corpus_frozen": false,
+    "paid_calls": 0,
+    "at": "2026-11-25T13:35:47.154070+00:00"
+  }
+}

@@ -423,6 +423,18 @@ def write_early_review(run_dir: Path, digest: str, report: dict) -> None:
                      f"{'yes' if p.get('figure_legends_read') else 'no'} (images: no) | {p['findings']} | {p['supported']} | "
                      f"{p['not_established']} | {p['rejected']} | {p['unresolved']} | {p['comparator_not_reported']} | "
                      f"{p['comparator_missing']} |")
+    lines += ["", "## Omissions and interpretation review", "",
+              "Compare the supplied source with the extraction, including source passages that produced no finding. "
+              "A valid JSON record and matching quotations do not establish completeness. Check classification into "
+              "a concentration range separately from numerical concentration estimation; inspect unreported comparators, "
+              "uncertainty, negative results and author interpretation. Record omissions in the checkpoint notes. "
+              "Limited corpus coverage or retrieval does not establish a field-wide evidence gap."]
+    for p in report["papers"]:
+        review=p.get("omission_review")
+        if review:
+            lines.append(f"- {p['record_id']}: [source](../{review['source']}), "
+                         f"[extraction](../{review['extraction']}), [independent validation](../{review['independent_validation']}). "
+                         "Omission status: requires source comparison.")
     lines += ["", "| Paper | Extraction | Validation | Together | Projected at CP2 (same quantity) |", "|---|---:|---:|---:|---:|"]
     for p in report["papers"]:
         lines.append(f"| {p.get('paper_id') or p['record_id']} | ${p['extraction_usd']:.2f} | ${p['validation_usd']:.2f} | "

@@ -34,10 +34,10 @@ class ItemResult:
 
 
 def request(provider: str, custom_id: str, system: str, user, model: str, max_tokens: int, temperature: float,
-            effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m") -> dict:
+            effort: str | None = None, cache_system: bool = False, cache_ttl: str = "5m", trace: dict | None = None) -> dict:
     if provider == "anthropic":
         return {"custom_id": custom_id, "params": anthropic_client.message_params(
-            system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl)}
+            system, user, model, max_tokens, temperature, effort, cache_system, cache_ttl, trace=trace)}
     if provider == "openai":
         return {"custom_id": custom_id, "method": "POST", "url": "/v1/chat/completions",
                 "body": openai_compatible.chat_params(system, user, model, max_tokens, temperature, provider, effort)}

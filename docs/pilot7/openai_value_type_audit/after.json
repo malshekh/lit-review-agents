@@ -1,0 +1,116 @@
+{
+  "scope": "OFFLINE ONLY; no corrected strict schema dispatched",
+  "missing_string_value_types_before": 34,
+  "missing_after": 0,
+  "schemas": [
+    {
+      "schema_file": "A02-SP.schema.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "before_sha256": "d76487961257884d9e44a87211e42cb2091590343f9fa32743d8e0c37390c269",
+      "after_sha256": "3ba8419671fa9d4ffeee8cc7bb058ad6a4eb3124b29950efd360a3b78a7ff19d",
+      "previously_missing_types": 6,
+      "untyped_const_or_enum_after": [],
+      "strict": true
+    },
+    {
+      "schema_file": "A03-LM.schema.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "before_sha256": "0f43e2b45387073914ab0d4b3a352664c3fa2891d83f8a3891dc63955989e9f9",
+      "after_sha256": "07931ed1baa7491d4c586bf8a4e3767302cb2551003db1b2836c4ec8849fe37d",
+      "previously_missing_types": 7,
+      "untyped_const_or_enum_after": [],
+      "strict": true
+    },
+    {
+      "schema_file": "A06-SV.schema.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "before_sha256": "157cbeb66719080072638fdd497a2d4f42ee6c1897a1f10c00271e84ca1389b6",
+      "after_sha256": "0b351a7d084fba11ff10d94a498e63d6ad484e205c9a08d8a47e4ed6dfdb504f",
+      "previously_missing_types": 8,
+      "untyped_const_or_enum_after": [],
+      "strict": true
+    },
+    {
+      "schema_file": "A08-OL.schema.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "before_sha256": "6cf8656f20883e59a2f50fedf8410e90fac117d934728039c783c511a34c39c4",
+      "after_sha256": "e4b416ce84b61d05f32261abc6041339e29515831b74e9a755c2fb00106ebe59",
+      "previously_missing_types": 6,
+      "untyped_const_or_enum_after": [],
+      "strict": true
+    },
+    {
+      "schema_file": "A10-RV.bounded.schema.json",
+      "provider": "openai",
+      "model": "gpt-6.1-sol",
+      "before_sha256": "d6fe749cf93b4826c163ed55c74d35b2418a78dd97470b7ed48607b7c8b80a9d",
+      "after_sha256": "2d56fb43efc383d91eff2d1f15b3ea28e9684466230194e0db4df21fb63ecd80",
+      "previously_missing_types": 7,
+      "untyped_const_or_enum_after": [],
+      "strict": true
+    }
+  ],
+  "matching_previous_successes": [
+    {
+      "schema_file": "A04-CQ.schema.json",
+      "provider": "anthropic",
+      "model": "claude-haiku-5-5",
+      "schema_sha256": "d82af624db2e303f8c7895c98e422bdd8c6fb5498210e71775cd87f05d4ab2c4"
+    },
+    {
+      "schema_file": "A07-SYN.bounded-plan.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "44172971adfd767431d9c72711a02d911000c6009782d16f053d03eff4f4fb92"
+    },
+    {
+      "schema_file": "A07-SYN.bounded-group.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "acfbaa1b5c4b47a991ed4c32c42ba8a582ce9a04a713ae49d7187bb2ffcc0cb0"
+    },
+    {
+      "schema_file": "A07-SYN.bounded-reconcile.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "581c4066431a2e8db4ca8bb69f8140f56db626a1359fda9957fbc3dbf1d7e672"
+    },
+    {
+      "schema_file": "A07-SYN.bounded-final.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "667c5cd3c46db22f6248fae1e9d9676005dff7d9aa3be5937c3da153fbb24ab8"
+    },
+    {
+      "schema_file": "A09-WRI.section.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "b84f329a8f7268f18f183369010292d429ec841069809b0bfaaab14b6a16ff6b"
+    },
+    {
+      "schema_file": "A09-WRI.front.schema.json",
+      "provider": "anthropic",
+      "model": "claude-opus-5",
+      "schema_sha256": "f9ff5fa3d0ef304ef0f811108fc641779a1e39b7ead1c74f2a664e65d6bfc65b"
+    }
+  ],
+  "remaining_strict_checks": [
+    "A02-SP.schema.json",
+    "A03-LM.schema.json",
+    "A06-SV.schema.json",
+    "A08-OL.schema.json",
+    "A10-RV.bounded.schema.json",
+    "A12-EDI.schema.json",
+    "A12-EDI.unit.schema.json"
+  ],
+  "remaining_strict_worst_case_usd": 0.180645,
+  "functional_execution_uses_unchanged_sealed_a06_schema": true,
+  "approved_functional_fingerprint": "076cd17577f92a2b65429e62f368874a08da3030484ac5c517afca77e6c21e97",
+  "actual_receipt_source_runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v26-pilot7-functional-only-50usd",
+  "pricing_basis": "Input bytes as token bound, output at cap, OpenAI input at maximum ordinary/read/write rate to include observed implicit cache writes; Anthropic smoke has no cache markers.",
+  "future_functional_reforecast_usd": 0.658
+}

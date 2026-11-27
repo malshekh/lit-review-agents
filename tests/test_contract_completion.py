@@ -136,3 +136,23 @@ def test_a_received_reply_or_a_mismatched_request_id_is_not_settled_by_attestati
     with pytest.raises(ValueError, match="RECEIVED"):
         structured.settle_smoke_hold(budget, key, 0, "console", "May")
     assert key in budget.reservations()
+
+
+def test_anthropic_nullable_enum_uses_equivalent_typed_branches():
+    from litreview.tools.structured_contract import problems
+    local={"type":"object","properties":{"role":{"type":["string","null"],"enum":["PRIMARY","CONTEXT",None]}},
+           "required":["role"],"additionalProperties":False}
+    assert any("list-valued type" in x for x in problems(local,"anthropic"))
+    wire,_=contract.for_structured_output(local,"anthropic")
+    assert wire["properties"]["role"]=={"anyOf":[{"type":"string","enum":["PRIMARY","CONTEXT"]},{"type":"null"}]}
+    for value in ["PRIMARY","CONTEXT",None,"OTHER",0,False,[],{}]:
+        assert jsonschema.Draft202012Validator(local).is_valid({"role":value})==jsonschema.Draft202012Validator(wire).is_valid({"role":value})
+    assert contract.for_structured_output(local,"openai")[0]==local
+
+
+def test_anthropic_plain_nullable_strings_preserve_values_with_explicit_alternatives():
+    local={"type":"object","properties":{"x":{"type":["string","null"]}},"required":["x"],"additionalProperties":False}
+    wire,_=contract.for_structured_output(local,"anthropic")
+    assert wire['properties']['x']=={'anyOf':[{'type':'string'},{'type':'null'}]}
+    for value in [None,'','null','arbitrary',0,False,[],{}]:
+        assert jsonschema.Draft202012Validator(local).is_valid({'x':value})==jsonschema.Draft202012Validator(wire).is_valid({'x':value})

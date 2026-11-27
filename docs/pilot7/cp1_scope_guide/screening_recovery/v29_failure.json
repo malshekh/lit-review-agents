@@ -1,0 +1,22 @@
+{
+  "run_id": "20261123-214928",
+  "source_runtime": "C:\\Users\\maykh\\LitReviewStage1\\execution-20261124-v29-pilot7-discovery-units-cp2-50usd",
+  "manifest_sha256": "4e4954da4800c8c32eac3d05c36e6c98dd7d8037790df5e4528fadf4c6c06d44",
+  "step": "A04-CQ_B001",
+  "model": "claude-haiku-5-5",
+  "stop_reason": "max_tokens",
+  "input_tokens": 63374,
+  "output_tokens": 16000,
+  "response_text_characters": 0,
+  "receipt_sha256": "8f15900d0eb9941cd2ff42720bf06cd177499531672c58bd60aa0a11bb4c4f5f",
+  "actual_cost_usd": 0.0143374,
+  "total_recorded_spend_usd": 0.867823,
+  "original_five_holds_usd": 0.124671,
+  "new_unresolved_holds": 0,
+  "discovered_unique_records": 140,
+  "replacement_batch_size": 4,
+  "prior_batch_size": 20,
+  "model_unchanged": true,
+  "output_cap_unchanged": 16000,
+  "screening_decisions_recovered": 0
+}

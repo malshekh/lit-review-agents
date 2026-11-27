@@ -1,0 +1,139 @@
+[
+  {
+    "depth": 1,
+    "seed": "R0004",
+    "direction": "references",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0004",
+    "direction": "citations",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0005",
+    "direction": "references",
+    "returned": 15,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0005",
+    "direction": "citations",
+    "returned": 10,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0006",
+    "direction": "references",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0006",
+    "direction": "citations",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0009",
+    "direction": "references",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0009",
+    "direction": "citations",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0013",
+    "direction": "references",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0013",
+    "direction": "citations",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0016",
+    "direction": "references",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0016",
+    "direction": "citations",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0018",
+    "direction": "references",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0018",
+    "direction": "citations",
+    "returned": 0,
+    "error": "NOT_FOUND_IN_S2"
+  },
+  {
+    "depth": 1,
+    "seed": "R0021",
+    "direction": "references",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0021",
+    "direction": "citations",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0022",
+    "direction": "references",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0022",
+    "direction": "citations",
+    "returned": 0,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "seed": "R0025",
+    "direction": "references",
+    "returned": 15,
+    "error": null
+  },
+  {
+    "depth": 1,
+    "note": "expansion cap reached (40 new records at this depth); remaining seeds not expanded"
+  }
+]

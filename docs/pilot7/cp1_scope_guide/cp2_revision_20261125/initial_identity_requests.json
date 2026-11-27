@@ -1,0 +1,164 @@
+[
+  {
+    "record_id": "R0078",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42409644+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0078_epmc.json",
+    "sha256": "51cd2ee0e3df6bb794686ba2063a0d75413b588c6e73772177577fb6c393bc35",
+    "at": "2026-11-25T13:20:56.279474+00:00"
+  },
+  {
+    "record_id": "R0078",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=42409644&retmode=xml",
+    "file": "R0078_pubmed.xml",
+    "sha256": "4ac4edd692ba2c31f52f0b2db3d592a14830c7e18266e8b109059c4a126b9ff3",
+    "at": "2026-11-25T13:20:56.280051+00:00"
+  },
+  {
+    "record_id": "R0078",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1021/acs.nanolett.6c01777",
+    "file": "R0078_openalex.json",
+    "sha256": "cb216bb08a254a38ec1a3286bbc07bb6addada1c0d7d90ddcabe218ca2e28163",
+    "at": "2026-11-25T13:20:56.280452+00:00"
+  },
+  {
+    "record_id": "R0115",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A41324706+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0115_epmc.json",
+    "sha256": "53599bd5431f328baa4be997623da71c1d091fa7236a1fe32cfa4137a9815cea",
+    "at": "2026-11-25T13:20:56.280760+00:00"
+  },
+  {
+    "record_id": "R0115",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=41324706&retmode=xml",
+    "file": "R0115_pubmed.xml",
+    "sha256": "2552c8acc27ce3d3430eb754b47bef41b0d5c6da866ffb7078cc8839aecac96c",
+    "at": "2026-11-25T13:20:56.743745+00:00"
+  },
+  {
+    "record_id": "R0115",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1007/s00216-025-06241-z",
+    "file": "R0115_openalex.json",
+    "sha256": "e8890032dd37608bd4c28b60b1324a2e20b2dd260b56b09a4289ce25bcb3699e",
+    "at": "2026-11-25T13:20:57.569501+00:00"
+  },
+  {
+    "record_id": "R0090",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A34256559+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0090_epmc.json",
+    "sha256": "03f63f7eb131195db06d8e37f7a20f056721de4ab5aebb81f7f402f104da8751",
+    "at": "2026-11-25T13:20:57.630931+00:00"
+  },
+  {
+    "record_id": "R0090",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=34256559&retmode=xml",
+    "file": "R0090_pubmed.xml",
+    "sha256": "b3acbe1b91b6316c37e5320ef5cef2e18025f076b87cae067cde7824f896b675",
+    "at": "2026-11-25T13:20:57.764849+00:00"
+  },
+  {
+    "record_id": "R0090",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1021/acsami.1c09771",
+    "file": "R0090_openalex.json",
+    "sha256": "5be55aeaf4bc286d915855a90da38739f3fac35fa1bf0ad43231c4feacd23f10",
+    "at": "2026-11-25T13:20:57.963125+00:00"
+  },
+  {
+    "record_id": "R0116",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A38589380+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0116_epmc.json",
+    "sha256": "96fc25f99cd929a7cd52b99c0fe43347b694427389358c5f1bcaadf90ac16462",
+    "at": "2026-11-25T13:20:58.176388+00:00"
+  },
+  {
+    "record_id": "R0116",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=38589380&retmode=xml",
+    "file": "R0116_pubmed.xml",
+    "sha256": "4521a5b1510c454d7787b2ff31ccca445aeae1191c94244b9a227a377f991d03",
+    "at": "2026-11-25T13:21:12.782436+00:00"
+  },
+  {
+    "record_id": "R0116",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1038/s41467-024-47044-7",
+    "file": "R0116_openalex.json",
+    "sha256": "b4b5aabb3666a59e97a2d593f4e871091671f76eff4a7fb298ed1e93b175d803",
+    "at": "2026-11-25T13:21:12.793193+00:00"
+  },
+  {
+    "record_id": "R0058",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A42838683+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0058_epmc.json",
+    "sha256": "306cb3a314d15fc8687db5b2ef7aac1046105d3be647dc04d3389b15afc614ce",
+    "at": "2026-11-25T13:21:13.001494+00:00"
+  },
+  {
+    "record_id": "R0058",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=42838683&retmode=xml",
+    "file": "R0058_pubmed.xml",
+    "sha256": "4158b6b09abdafd8e6757e2c54d1ed088fbff851a8c7720f4497df41a266c029",
+    "at": "2026-11-25T13:21:13.056695+00:00"
+  },
+  {
+    "record_id": "R0058",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1016/j.aca.2026.346185",
+    "file": "R0058_openalex.json",
+    "sha256": "35af4a9489d1d3b4b57a13f11d6713f6b3e099669bb00ec2fdb8a6daec818281",
+    "at": "2026-11-25T13:21:13.225369+00:00"
+  },
+  {
+    "record_id": "R0039",
+    "route": "epmc",
+    "status": 200,
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID%3A30110149+AND+SRC%3AMED&format=json&resultType=core",
+    "file": "R0039_epmc.json",
+    "sha256": "2ad0c4b61438b018e2d8358f2a64e560829d34f2795f008a0efe7f1585df1a76",
+    "at": "2026-11-25T13:21:13.491550+00:00"
+  },
+  {
+    "record_id": "R0039",
+    "route": "pubmed",
+    "status": 200,
+    "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=30110149&retmode=xml",
+    "file": "R0039_pubmed.xml",
+    "sha256": "73b3f86112b7ee491281eb29ff46676e89e4ab77f609c45f40fab8941501596b",
+    "at": "2026-11-25T13:21:14.971992+00:00"
+  },
+  {
+    "record_id": "R0039",
+    "route": "openalex",
+    "status": 200,
+    "url": "https://api.openalex.org/works/https://doi.org/10.1021/acssensors.8b00450",
+    "file": "R0039_openalex.json",
+    "sha256": "fc01082c69687805cb3d650124f81e2fc1b1a611d6a627d22dfb02b10de5fa77",
+    "at": "2026-11-25T13:21:15.143093+00:00"
+  }
+]

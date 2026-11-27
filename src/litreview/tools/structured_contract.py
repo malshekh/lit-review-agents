@@ -56,10 +56,14 @@ def problems(schema: dict, provider: str) -> list[str]:
             errors.append(path+': unsupported keyword '+key+' for '+provider)
         if path=='$' and node.get('type')!='object' and '$ref' not in node:
             errors.append(path+': root must be an object')
+        if provider=='openai' and ('const' in node or 'enum' in node) and 'type' not in node:
+            errors.append(path+': openai const/enum requires an explicit type declaration')
         props=node.get('properties',{})
         known=declared|set(props)
         missing=set(node.get('required',[]))-known
         if missing:errors.append(path+': undeclared required fields '+','.join(sorted(missing)))
+        if provider=='anthropic' and isinstance(node.get('type'),list) and 'enum' in node:
+            errors.append(path+': anthropic enum with list-valued type requires explicit typed branches')
         types=node.get('type',[]); types=[types] if isinstance(types,str) else types
         if 'object' in types or 'properties' in node:
             if not props:errors.append(path+': unspecified/empty object; define useful fields explicitly')

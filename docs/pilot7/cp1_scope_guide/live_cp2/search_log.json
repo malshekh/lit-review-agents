@@ -1,0 +1,678 @@
+[
+  {
+    "source": "pubmed",
+    "family_id": "S1.1_QF_S1_1_THEME",
+    "purpose": "THEME",
+    "query": "(sensor*[tiab] OR nanosensor*[tiab] OR biosensor*[tiab]) AND (\"machine learning\"[tiab] OR \"Bayesian optimization\"[tiab] OR \"inverse design\"[tiab]) AND (design*[tiab] OR optim*[tiab] OR fabricat*[tiab])",
+    "hit_count": 4517,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:09:40-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.1_QF_S1_1_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE:sensor* OR ABSTRACT:sensor* OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:biosensor* OR ABSTRACT:biosensor*) AND (TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"Bayesian optimization\" OR ABSTRACT:\"Bayesian optimization\" OR TITLE:\"inverse design\" OR ABSTRACT:\"inverse design\") AND (TITLE:design* OR ABSTRACT:design* OR TITLE:optim* OR ABSTRACT:optim* OR TITLE:fabricat* OR ABSTRACT:fabricat*)",
+    "hit_count": 4745,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:09:56-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.1_QF_S1_1_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((sensor OR nanosensor OR biosensor) AND (\"machine learning\" OR \"Bayesian optimization\" OR \"inverse design\") AND (design OR optimization OR fabrication))",
+    "hit_count": 32572,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:09:57-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.1_QF_S1_1_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(sensor*[tiab] OR nanosensor*[tiab] OR biosensor*[tiab]) AND (\"machine learning\"[tiab] OR \"Bayesian optimization\"[tiab] OR \"inverse design\"[tiab]) AND (design*[tiab] OR optim*[tiab] OR fabricat*[tiab]) AND (fail*[tiab] OR reproducib*[tiab] OR baseline*[tiab])",
+    "hit_count": 495,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:09:57-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.1_QF_S1_1_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE:sensor* OR ABSTRACT:sensor* OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:biosensor* OR ABSTRACT:biosensor*) AND (TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"Bayesian optimization\" OR ABSTRACT:\"Bayesian optimization\" OR TITLE:\"inverse design\" OR ABSTRACT:\"inverse design\") AND (TITLE:design* OR ABSTRACT:design* OR TITLE:optim* OR ABSTRACT:optim* OR TITLE:fabricat* OR ABSTRACT:fabricat*) AND (TITLE:fail* OR ABSTRACT:fail* OR TITLE:reproducib* OR ABSTRACT:reproducib* OR TITLE:baseline* OR ABSTRACT:baseline*)",
+    "hit_count": 557,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:10:22-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.1_QF_S1_1_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((sensor OR nanosensor OR biosensor) AND (\"machine learning\" OR \"Bayesian optimization\" OR \"inverse design\") AND (design OR optimization OR fabrication) AND (failure OR reproducibility OR baseline))",
+    "hit_count": 4193,
+    "returned": 3,
+    "section_ids": [
+      "S1.1"
+    ],
+    "searched_at": "2026-11-24T22:10:23-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.2_QF_S1_2_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR SERS[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR \"pattern recognition\"[tiab]) AND (fingerprint*[tiab] OR analyte*[tiab] OR sample*[tiab])",
+    "hit_count": 1136,
+    "returned": 3,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:10:24-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.2_QF_S1_2_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\" OR TITLE_ABS:SERS) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:\"pattern recognition\") AND (TITLE_ABS:fingerprint* OR TITLE_ABS:analyte* OR TITLE_ABS:sample*)",
+    "hit_count": 1125,
+    "returned": 3,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:10:49-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.2_QF_S1_2_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR SERS) AND (\"machine learning\" OR chemometrics OR \"pattern recognition\") AND (fingerprint OR fingerprints OR analyte OR analytes OR sample OR samples))",
+    "hit_count": 2584,
+    "returned": 3,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:10:50-0500",
+    "error": null
+  },
+  {
+    "source": "semanticscholar",
+    "family_id": "S1.2_QF_S1_2_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor* | \"sensor array\" | \"sensor arrays\" | SERS) + (\"machine learning\" | chemometric* | \"pattern recognition\") + (fingerprint* | analyte* | sample*)",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:10:57-0500",
+    "error": "SEARCH_FAILED: 429 Client Error:  for url: https://api.semanticscholar.org/graph/v1/paper/search/bulk?query=%28nanosensor%2A+%7C+%22sensor+array%22+%7C+%22sensor+arrays%22+%7C+SERS%29+%2B+%28%22machine+learning%22+%7C+chemometric%2A+%7C+%22pattern+recognition%22%29+%2B+%28fingerprint%2A+%7C+analyte%2A+%7C+sample%2A%29&fields=paperId%2Ctitle%2Cabstract%2Cauthors%2Cyear%2Cvenue%2CpublicationTypes%2CexternalIds%2CisOpenAccess"
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.2_QF_S1_2_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR SERS[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR \"pattern recognition\"[tiab]) AND (fingerprint*[tiab] OR analyte*[tiab] OR sample*[tiab]) AND (calibration[tiab] OR interferen*[tiab] OR confound*[tiab])",
+    "hit_count": 164,
+    "returned": 2,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:10:58-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.2_QF_S1_2_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\" OR TITLE_ABS:SERS) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:\"pattern recognition\") AND (TITLE_ABS:fingerprint* OR TITLE_ABS:analyte* OR TITLE_ABS:sample*) AND (TITLE_ABS:calibration OR TITLE_ABS:interferen* OR TITLE_ABS:confound*)",
+    "hit_count": 154,
+    "returned": 2,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:11:09-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.2_QF_S1_2_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR SERS) AND (\"machine learning\" OR chemometrics OR \"pattern recognition\") AND (fingerprint OR fingerprints OR analyte OR analytes OR sample OR samples) AND (calibration OR interference OR confounding))",
+    "hit_count": 331,
+    "returned": 2,
+    "section_ids": [
+      "S1.2"
+    ],
+    "searched_at": "2026-11-24T22:11:10-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.3_QF_S1_3",
+    "purpose": "THEME",
+    "query": "(Raman[tiab] OR fluorescen*[tiab] OR electrochemical[tiab] OR nanosensor*[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab] OR nanoparticle*[tiab]) AND (chemometric*[tiab] OR \"machine learning\"[tiab] OR \"pattern recognition\"[tiab]) AND (classif*[tiab] OR regress*[tiab] OR \"drift correction\"[tiab])",
+    "hit_count": 3645,
+    "returned": 6,
+    "section_ids": [
+      "S1.3"
+    ],
+    "searched_at": "2026-11-24T22:11:11-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.3_QF_S1_3",
+    "purpose": "THEME",
+    "query": "(TITLE:Raman OR ABSTRACT:Raman OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:\"sensor array\" OR ABSTRACT:\"sensor array\" OR TITLE:\"sensor arrays\" OR ABSTRACT:\"sensor arrays\" OR TITLE:nanoparticle* OR ABSTRACT:nanoparticle*) AND (TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:\"machine learning\" OR ABSTRACT:\"machine learning\" OR TITLE:\"pattern recognition\" OR ABSTRACT:\"pattern recognition\") AND (TITLE:classif* OR ABSTRACT:classif* OR TITLE:regress* OR ABSTRACT:regress* OR TITLE:\"drift correction\" OR ABSTRACT:\"drift correction\")",
+    "hit_count": 3692,
+    "returned": 6,
+    "section_ids": [
+      "S1.3"
+    ],
+    "searched_at": "2026-11-24T22:11:33-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.3_QF_S1_3",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((Raman OR fluorescence OR electrochemical OR nanosensor OR nanosensors OR \"sensor array\" OR \"sensor arrays\" OR nanoparticle OR nanoparticles) AND (chemometrics OR \"machine learning\" OR \"pattern recognition\") AND (classification OR regression OR \"drift correction\"))",
+    "hit_count": 8083,
+    "returned": 6,
+    "section_ids": [
+      "S1.3"
+    ],
+    "searched_at": "2026-11-24T22:11:34-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.4_QF_S1_4_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR SERS[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab]) AND (\"machine learning\"[tiab] OR chemometrics[tiab] OR optimization[tiab]) AND (validation[tiab] OR accuracy[tiab] OR generalization[tiab])",
+    "hit_count": 931,
+    "returned": 9,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:11:35-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.4_QF_S1_4_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\") AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometrics OR TITLE_ABS:optimization) AND (TITLE_ABS:validation OR TITLE_ABS:accuracy OR TITLE_ABS:generalization)",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:12:06-0500",
+    "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)"
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.4_QF_S1_4_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor OR nanosensors OR SERS OR \"sensor array\" OR \"sensor arrays\") AND (\"machine learning\" OR chemometrics OR optimization) AND (validation OR accuracy OR generalization))",
+    "hit_count": 5224,
+    "returned": 9,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:12:07-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S1.4_QF_S1_4_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR SERS[tiab] OR \"sensor array\"[tiab] OR \"sensor arrays\"[tiab]) AND (\"machine learning\"[tiab] OR chemometrics[tiab] OR optimization[tiab]) AND (\"data leakage\"[tiab] OR overfitting[tiab] OR \"batch effects\"[tiab])",
+    "hit_count": 22,
+    "returned": 9,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:12:07-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S1.4_QF_S1_4_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:\"sensor array\" OR TITLE_ABS:\"sensor arrays\") AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometrics OR TITLE_ABS:optimization) AND (TITLE_ABS:\"data leakage\" OR TITLE_ABS:overfitting OR TITLE_ABS:\"batch effects\")",
+    "hit_count": 22,
+    "returned": 9,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:12:14-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S1.4_QF_S1_4_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor OR nanosensors OR SERS OR \"sensor array\" OR \"sensor arrays\") AND (\"machine learning\" OR chemometrics OR optimization) AND (\"data leakage\" OR overfitting OR \"batch effects\"))",
+    "hit_count": 99,
+    "returned": 9,
+    "section_ids": [
+      "S1.4"
+    ],
+    "searched_at": "2026-11-24T22:12:15-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.1_QF_S21_01",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR SERS[tiab] OR electrochemical[tiab]) AND (chemometric*[tiab] OR regression[tiab] OR optimiz*[tiab] OR optimis*[tiab]) AND (anticancer[tiab] OR antineoplastic*[tiab] OR doxorubicin[tiab])",
+    "hit_count": 145,
+    "returned": 9,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:15-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.1_QF_S21_01",
+    "purpose": "THEME",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:electrochemical) AND (TITLE_ABS:chemometric* OR TITLE_ABS:regression OR TITLE_ABS:optimiz* OR TITLE_ABS:optimis*) AND (TITLE_ABS:anticancer OR TITLE_ABS:antineoplastic* OR TITLE_ABS:doxorubicin)",
+    "hit_count": 128,
+    "returned": 9,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:21-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.1_QF_S21_01",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor* OR SERS OR electrochemical) AND (chemometric* OR regression OR optimiz* OR optimis*) AND (anticancer OR antineoplastic* OR doxorubicin))",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:21-0500",
+    "error": "SEARCH_FAILED: 400 Client Error: Bad Request for url: https://api.openalex.org/works?filter=title_and_abstract.search%3A%28%28nanosensor%2A+OR+SERS+OR+electrochemical%29+AND+%28chemometric%2A+OR+regression+OR+optimiz%2A+OR+optimis%2A%29+AND+%28anticancer+OR+antineoplastic%2A+OR+doxorubicin%29%29&per-page=100&cursor=%2A"
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.1_QF_S21_02",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR SERS[tiab] OR electrochemical[tiab]) AND (chemometric*[tiab] OR regression[tiab] OR optimiz*[tiab] OR optimis*[tiab]) AND (anticancer[tiab] OR antineoplastic*[tiab] OR doxorubicin[tiab]) AND (interference[tiab] OR \"matrix effect\"[tiab] OR \"matrix effects\"[tiab] OR calibration[tiab])",
+    "hit_count": 15,
+    "returned": 9,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:22-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.1_QF_S21_02",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:SERS OR TITLE_ABS:electrochemical) AND (TITLE_ABS:chemometric* OR TITLE_ABS:regression OR TITLE_ABS:optimiz* OR TITLE_ABS:optimis*) AND (TITLE_ABS:anticancer OR TITLE_ABS:antineoplastic* OR TITLE_ABS:doxorubicin) AND (TITLE_ABS:interference OR TITLE_ABS:\"matrix effect\" OR TITLE_ABS:\"matrix effects\" OR TITLE_ABS:calibration OR METHODS:interference OR METHODS:\"matrix effects\")",
+    "hit_count": 18,
+    "returned": 9,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:37-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.1_QF_S21_02",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor* OR SERS OR electrochemical) AND (chemometric* OR regression OR optimiz* OR optimis*) AND (anticancer OR antineoplastic* OR doxorubicin) AND (interference OR \"matrix effect\" OR \"matrix effects\" OR calibration))",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S2.1"
+    ],
+    "searched_at": "2026-11-24T22:12:37-0500",
+    "error": "SEARCH_FAILED: 400 Client Error: Bad Request for url: https://api.openalex.org/works?filter=title_and_abstract.search%3A%28%28nanosensor%2A+OR+SERS+OR+electrochemical%29+AND+%28chemometric%2A+OR+regression+OR+optimiz%2A+OR+optimis%2A%29+AND+%28anticancer+OR+antineoplastic%2A+OR+doxorubicin%29+AND+%28interference+OR+%22matrix+effect%22+OR+%22matrix+effects%22+OR+calibration%29%29&per-page=100&cursor=%2A"
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.2_QF_S22_THEME",
+    "purpose": "THEME",
+    "query": "(nanocarrier*[tiab] OR nanomedicine*[tiab] OR \"drug release\"[tiab]) AND (sensor*[tiab] OR fluorescence[tiab] OR Raman[tiab]) AND (\"machine learning\"[tiab] OR chemometric*[tiab] OR optimization[tiab])",
+    "hit_count": 175,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:12:38-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.2_QF_S22_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE_ABS:nanocarrier* OR TITLE_ABS:nanomedicine* OR TITLE_ABS:\"drug release\") AND (TITLE_ABS:sensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:Raman) AND (TITLE_ABS:\"machine learning\" OR TITLE_ABS:chemometric* OR TITLE_ABS:optimization)",
+    "hit_count": 169,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:12:58-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.2_QF_S22_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanocarrier OR nanomedicine OR \"drug release\") AND (sensor OR fluorescence OR Raman) AND (\"machine learning\" OR chemometrics OR optimization))",
+    "hit_count": 1013,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:12:59-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.2_QF_S22_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanocarrier*[tiab] OR nanomedicine*[tiab] OR \"drug release\"[tiab]) AND (sensor*[tiab] OR fluorescence[tiab] OR Raman[tiab]) AND (interference[tiab] OR validation[tiab] OR specificity[tiab])",
+    "hit_count": 402,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:12:59-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.2_QF_S22_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE_ABS:nanocarrier* OR TITLE_ABS:nanomedicine* OR TITLE_ABS:\"drug release\") AND (TITLE_ABS:sensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:Raman) AND (TITLE_ABS:interference OR TITLE_ABS:validation OR TITLE_ABS:specificity)",
+    "hit_count": 355,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:13:24-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.2_QF_S22_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanocarrier OR nanomedicine OR \"drug release\") AND (sensor OR fluorescence OR Raman) AND (interference OR validation OR specificity))",
+    "hit_count": 2560,
+    "returned": 3,
+    "section_ids": [
+      "S2.2"
+    ],
+    "searched_at": "2026-11-24T22:13:25-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR fluorescence[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (\"serial sampling\"[tiab] OR \"continuous monitoring\"[tiab]) AND (\"anticancer drug\"[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab])",
+    "hit_count": 0,
+    "returned": 0,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:13:26-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:electrochemical) AND (TITLE_ABS:regression OR TITLE_ABS:calibration OR TITLE_ABS:pharmacokinetic*) AND (TITLE_ABS:\"serial sampling\" OR TITLE_ABS:\"continuous monitoring\") AND (TITLE_ABS:\"anticancer drug\" OR TITLE_ABS:chemotherapy OR TITLE_ABS:nanomedicine*)",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:13:56-0500",
+    "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)"
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (\"serial sampling\" OR \"continuous monitoring\") AND (\"anticancer drug\" OR chemotherapy OR nanomedicine))",
+    "hit_count": 6,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:13:56-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR fluorescence[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (\"serial sampling\"[tiab] OR \"continuous monitoring\"[tiab]) AND drift[tiab]",
+    "hit_count": 5,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:13:57-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE_ABS:nanosensor* OR TITLE_ABS:fluorescence OR TITLE_ABS:electrochemical) AND (TITLE_ABS:regression OR TITLE_ABS:calibration OR TITLE_ABS:pharmacokinetic*) AND (TITLE_ABS:\"serial sampling\" OR TITLE_ABS:\"continuous monitoring\") AND TITLE_ABS:drift",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:14:27-0500",
+    "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)"
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (\"serial sampling\" OR \"continuous monitoring\") AND drift)",
+    "hit_count": 27,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:14:28-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.4_QF_S24_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR electrochemical[tiab] OR Raman[tiab]) AND (regression[tiab] OR chemometric*[tiab] OR calibration[tiab]) AND (anticancer[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab]) AND (matrix[tiab] OR transfer*[tiab] OR reference[tiab])",
+    "hit_count": 5,
+    "returned": 3,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:14:28-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.4_QF_S24_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:Raman OR ABSTRACT:Raman) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:calibration OR ABSTRACT:calibration) AND (TITLE:anticancer OR ABSTRACT:anticancer OR TITLE:chemotherapy OR ABSTRACT:chemotherapy OR TITLE:nanomedicine* OR ABSTRACT:nanomedicine*) AND (TITLE:matrix OR ABSTRACT:matrix OR TITLE:transfer* OR ABSTRACT:transfer* OR TITLE:reference OR ABSTRACT:reference)",
+    "hit_count": 4,
+    "returned": 3,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:14:52-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.4_QF_S24_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor OR electrochemical OR Raman) AND (regression OR chemometrics OR calibration) AND (anticancer OR chemotherapy OR nanomedicine) AND (matrix OR transfer OR reference))",
+    "hit_count": 22,
+    "returned": 3,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:14:52-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.4_QF_S24_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR electrochemical[tiab] OR Raman[tiab]) AND (regression[tiab] OR chemometric*[tiab] OR calibration[tiab]) AND (matrix[tiab] OR transfer*[tiab] OR reference[tiab])",
+    "hit_count": 1560,
+    "returned": 3,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:14:53-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.4_QF_S24_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:electrochemical OR ABSTRACT:electrochemical OR TITLE:Raman OR ABSTRACT:Raman) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:chemometric* OR ABSTRACT:chemometric* OR TITLE:calibration OR ABSTRACT:calibration) AND (TITLE:matrix OR ABSTRACT:matrix OR TITLE:transfer* OR ABSTRACT:transfer* OR TITLE:reference OR ABSTRACT:reference)",
+    "hit_count": null,
+    "returned": 0,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:15:23-0500",
+    "error": "SEARCH_FAILED: HTTPSConnectionPool(host='www.ebi.ac.uk', port=443): Read timed out. (read timeout=30)"
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.4_QF_S24_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor OR electrochemical OR Raman) AND (regression OR chemometrics OR calibration) AND (matrix OR transfer OR reference))",
+    "hit_count": 5549,
+    "returned": 3,
+    "section_ids": [
+      "S2.4"
+    ],
+    "searched_at": "2026-11-24T22:15:24-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "(nanosensor*[tiab] OR fluorescen*[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (continuous[tiab] OR \"real-time\"[tiab]) AND (\"anticancer drug\"[tiab] OR \"anticancer drugs\"[tiab] OR chemotherapy[tiab] OR nanomedicine*[tiab])",
+    "hit_count": 51,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:16:12-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:calibration OR ABSTRACT:calibration OR TITLE:pharmacokinetic* OR ABSTRACT:pharmacokinetic*) AND (TITLE:continuous OR ABSTRACT:continuous OR TITLE:\"real-time\" OR ABSTRACT:\"real-time\") AND (TITLE:\"anticancer drug\" OR ABSTRACT:\"anticancer drug\" OR TITLE:\"anticancer drugs\" OR ABSTRACT:\"anticancer drugs\" OR TITLE:chemotherapy OR ABSTRACT:chemotherapy OR TITLE:nanomedicine* OR ABSTRACT:nanomedicine*)",
+    "hit_count": 52,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:16:38-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.3_QF_S23_THEME",
+    "purpose": "THEME",
+    "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (continuous OR \"real-time\") AND (\"anticancer drug\" OR \"anticancer drugs\" OR chemotherapy OR nanomedicine))",
+    "hit_count": 122,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:16:39-0500",
+    "error": null
+  },
+  {
+    "source": "pubmed",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(nanosensor*[tiab] OR fluorescen*[tiab] OR electrochemical[tiab]) AND (regression[tiab] OR calibration[tiab] OR pharmacokinetic*[tiab]) AND (continuous[tiab] OR \"real-time\"[tiab]) AND drift[tiab]",
+    "hit_count": 53,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:16:40-0500",
+    "error": null
+  },
+  {
+    "source": "europepmc",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "(TITLE:nanosensor* OR ABSTRACT:nanosensor* OR TITLE:fluorescen* OR ABSTRACT:fluorescen* OR TITLE:electrochemical OR ABSTRACT:electrochemical) AND (TITLE:regression OR ABSTRACT:regression OR TITLE:calibration OR ABSTRACT:calibration OR TITLE:pharmacokinetic* OR ABSTRACT:pharmacokinetic*) AND (TITLE:continuous OR ABSTRACT:continuous OR TITLE:\"real-time\" OR ABSTRACT:\"real-time\") AND (TITLE:drift OR ABSTRACT:drift)",
+    "hit_count": 58,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:17:08-0500",
+    "error": null
+  },
+  {
+    "source": "openalex",
+    "family_id": "S2.3_QF_S23_CONTRARY",
+    "purpose": "CONTRARY_EVIDENCE",
+    "query": "title_and_abstract.search:((nanosensor OR fluorescence OR electrochemical) AND (regression OR calibration OR pharmacokinetics) AND (continuous OR \"real-time\") AND drift)",
+    "hit_count": 213,
+    "returned": 3,
+    "section_ids": [
+      "S2.3"
+    ],
+    "searched_at": "2026-11-24T22:17:09-0500",
+    "error": null
+  }
+]

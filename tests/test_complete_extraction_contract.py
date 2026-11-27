@@ -17,6 +17,8 @@ def _wire_fill(schema, value):
     if kind=='object':
         value=value or {}
         return {k:_wire_fill(v,value.get(k)) for k,v in schema['properties'].items()}
+    if kind=='array' and schema.get('maxItems')==1 and schema.get('description','').startswith('Nullable string transport'):
+        return [] if value is None else [value]
     if kind=='array':return [_wire_fill(schema['items'],v) for v in value or []]
     if value is not None:return value
     if kind=='null' or isinstance(kind,list) and 'null' in kind:return None
@@ -42,13 +44,15 @@ def extraction():
                      'n':'3','variance_or_ci':None,'p_value':None,'converted':None}]}],
       'author_stated_limitations':[{'text':'No patient samples were tested.','location':'Discussion'}],
       'source_access':{'level':'FULL_TEXT','figure_legends_read':True,'figure_images_inspected':False,'supplements_inspected':False}}
-    return _wire_fill(json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text()),value)
+    from litreview.tools.extraction_transport import decode
+    return decode(_wire_fill(json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text()),value))[0]
 
 def test_complete_nonempty_extraction_reaches_real_independent_validation_input(tmp_path,monkeypatch):
     from litreview import orchestrator as orch,model_record
     ext=extraction(); validate('A05-KE',ext)
     shape,digest=structured.slim('A05-KE.schema.json','anthropic')
-    jsonschema.validate(ext,shape)
+    wire=_wire_fill(json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text()),ext)
+    jsonschema.validate(wire,shape)
     sections={'Results':ext['findings'][0]['span'],'Discussion':'No patient samples were tested.'}
     assert all(span_check.passed(g) for g in span_check.check_findings(ext,sections))
     monkeypatch.setattr(orch,'RUNS_DIR',tmp_path)
@@ -109,8 +113,8 @@ def legacy_a02(tmp_path,monkeypatch):
 
 def test_every_configured_schema_is_audited_and_legacy_gaps_are_blockers(legacy_a02):
     rows=structured.schema_inventory()
-    assert len(rows)==15
-    assert not next(r for r in rows if r['schema_file']=='A05-KE.schema.json')['problems']
+    assert len(rows)==14  # A05 ordinary JSON is checked separately by a nonempty functional task.
+    assert not any(r['schema_file']=='A05-KE.schema.json' for r in rows)
     assert next(r for r in rows if r['schema_file']=='A02-SP.schema.json')['problems']
     with pytest.raises(structured_contract.SchemaCompatibilityError):structured.targets()
 
@@ -210,3 +214,16 @@ def test_definition_and_property_names_are_not_mistaken_for_keywords():
     shape,_=contract.for_structured_output(schema,'anthropic')
     jsonschema.validate({'result':{'then':'scientific value'}},shape)
     assert 'if' in shape['$defs'] and 'then' in shape['$defs']['if']['properties']
+
+
+def test_a05_nullable_transport_roundtrip_preserves_values_and_rejects_multiple_values():
+    from litreview.tools.extraction_transport import decode
+    author=json.loads((ROOT/'schemas/A05-KE.anthropic.schema.json').read_text())
+    for value in [None,"", "null", "NOT_REPORTED", "3", "95% CI 1-2"]:
+        canonical=extraction();canonical['findings'][0]['quantities'][0]['variance_or_ci']=value
+        wire=_wire_fill(author,canonical)
+        decoded,paths=decode(wire)
+        assert decoded==canonical and paths
+        assert wire['findings'][0]['quantities'][0]['variance_or_ci']==([] if value is None else [value])
+    wire['findings'][0]['quantities'][0]['variance_or_ci']=["1","2"]
+    with pytest.raises(jsonschema.ValidationError):decode(wire)

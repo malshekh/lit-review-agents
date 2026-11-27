@@ -5,6 +5,7 @@ Scientific contradictions remain explicit limitations; unsupported interpretatio
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -81,22 +82,53 @@ class RegistrySynthesisJob(SynthesisJob):
         return next((e for e in self.ledger.events()
                      if e["event"] in ("TURN_ACCEPTED", "TURN_IMPORTED_REPAIR") and e["turn"] == turn), None)
 
+    def _review_page_hash(self, turn):
+        if not turn.startswith("RECONCILE_"):
+            return None
+        number = int(turn.split("_")[1])
+        if number < 1001 or not getattr(self, "evidence_pages", None):
+            return None
+        for name, payload in self.reconciliation_payloads():
+            if name == turn.split("_LOOKUP",1)[0]:
+                return fingerprint(payload)
+        raise JobStopped("reconciliation turn is absent from the reviewed plan")
+
     def _committed(self, turn):
         out = super()._committed(turn)
         if out is not None:
             marker = self._marker(turn)
+            if marker and turn.startswith("GROUP_") and marker["event"] == "TURN_IMPORTED_REPAIR":
+                proof = marker.get("import_record", {})
+                if (fingerprint(proof) != marker.get("import_record_sha256") or proof.get("fingerprint") != self.identity
+                        or proof.get("registry") != self.registry.digest or proof.get("group") != turn[6:]
+                        or proof.get("run_id") != self.dir.parent.parent.name or proof.get("job") != self.dir.name):
+                    raise JobStopped("GROUP recovery provenance mismatch")
+            if marker and marker.get("review_page_hash") != self._review_page_hash(turn):
+                raise JobStopped(f"accepted reconciliation page fingerprint mismatch: {turn}")
+            if marker and turn.startswith("RECONCILE_") and marker["event"] == "TURN_IMPORTED_REPAIR":
+                proof = marker.get("import_record", {})
+                if (fingerprint(proof) != marker.get("import_record_sha256") or proof.get("turn") != turn
+                        or proof.get("page_hash") != marker.get("review_page_hash")
+                        or proof.get("registry") != self.registry.digest or proof.get("fingerprint") != self.identity
+                        or proof.get("run_id") != self.dir.parent.parent.name or proof.get("job") != self.dir.name):
+                    raise JobStopped("reconciliation import provenance mismatch")
             if not marker or fingerprint(out) != marker["output_sha256"]:
                 raise JobStopped(f"accepted turn hash mismatch: {turn}")
         return out
 
-    def _commit(self, turn, output, staged):
+    def _commit(self, turn, output, staged, import_record=None):
         # One commit event carries all effects. No orphaned staging effects can be replayed twice.
         path = self._turn_file(turn)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(canonical(output), encoding="utf-8")
         os.replace(tmp, path)
-        self.ledger.append({"event": "TURN_ACCEPTED", "turn": turn, "model": self.served_by(),
-                            "output_sha256": fingerprint(output), **staged})
+        origin = ({"event": "TURN_IMPORTED_REPAIR", "model": "researcher-approved offline recovery",
+                   "import_record": import_record, "import_record_sha256": fingerprint(import_record)}
+                  if import_record is not None else {"event": "TURN_ACCEPTED", "model": self.served_by()})
+        page_hash = self._review_page_hash(turn)
+        if page_hash:
+            origin["review_page_hash"] = page_hash
+        self.ledger.append({**origin, "turn": turn, "output_sha256": fingerprint(output), **staged})
 
     @staticmethod
     def empty():
@@ -196,7 +228,7 @@ class RegistrySynthesisJob(SynthesisJob):
                                          "(approve-plan-import with the repaired SHA-256)")
 
     def _with_retrieval(self, mode, turn, payload):
-        retrieved = set()
+        retrieved = set(payload.get("prefill_finding_ids", ())) if mode == "RECONCILE" else set()
         for n in range(self.cfg.get("max_retrieval_rounds", 2) + 1):
             key = f"{turn}_LOOKUP{n}"
             request = {**payload, "retrieved_evidence": self.registry.details(sorted(retrieved))}
@@ -209,8 +241,13 @@ class RegistrySynthesisJob(SynthesisJob):
                 found = self.registry.retrieve(out["retrieval_requests"], self.cfg.get("retrieval_limit", 12))
             except ValueError as exc:
                 raise JobStopped(str(exc)) from exc
+            pause_after_lookup = payload.get("pause_before_lookup_judgment") is True
+            if not pause_after_lookup and payload.get("issue_link_contract") == "page1001-v2" and (n != 0 or found != ["R0078:F28"]):
+                raise JobStopped("additional evidence outside the reviewed F28 lookup; pause before dispatch")
             if not self._committed(key):
                 self._commit(key, out, self.empty())
+            if pause_after_lookup:
+                raise JobStopped(f"{turn}: requested {found}; separate approval required before lookup judgment")
             retrieved.update(found)
         raise AssertionError("unreachable")
 
@@ -283,6 +320,39 @@ class RegistrySynthesisJob(SynthesisJob):
         if self._committed(turn):
             return
         out, retrieved = self._with_retrieval("GROUP", turn, self.registry.packet_payload(packet))
+        self._accept_group(packet, out, retrieved)
+
+    def import_group(self, group_id, candidate_bytes, approval):
+        """Import one explicitly reviewed packet through the same checks as its first reading."""
+        run = self.dir.parent.parent
+        turn = "GROUP_" + group_id
+        candidate_hash = hashlib.sha256(candidate_bytes).hexdigest()
+        plan = self._committed("PLAN")
+        if (not plan or approval["run_id"] != run.name or approval["job"] != self.dir.name
+                or approval["group"] != group_id or approval["candidate_sha256"] != candidate_hash
+                or approval["fingerprint"] != self.identity or approval["registry"] != self.registry.digest
+                or approval["plan_sha256"] != fingerprint(plan)):
+            raise JobStopped("GROUP import identity mismatch")
+        checkpoint = (run / "checkpoints/CP_SYN_approved.json").read_bytes()
+        decision = json.loads(checkpoint)
+        if (hashlib.sha256(checkpoint).hexdigest() != approval["cp_syn_approved_sha256"]
+                or decision["fingerprint"] != self.identity or not decision["approve_alignment"]
+                or not decision["keep_approved_framework"]):
+            raise JobStopped("GROUP import requires the bound CP_SYN approval")
+        packet = next((p for p in self.packets if p["group_id"] == group_id), None)
+        if packet is None or packet not in plan["groups"]:
+            raise JobStopped("GROUP import packet absent from approved plan")
+        committed = self._committed(turn)
+        if committed is not None:
+            if self._marker(turn).get("import_record") != approval:
+                raise JobStopped("GROUP already committed under a different identity")
+            return
+        out = json.loads(candidate_bytes)
+        self.validate_output("GROUP", out)
+        self._accept_group(packet, out, set(), import_record=approval)
+
+    def _accept_group(self, packet, out, retrieved, import_record=None):
+        turn = "GROUP_" + packet["group_id"]
         gap_limit = 16 if packet.get("source_only") else 8
         if len(out["knowledge_gaps"]) > gap_limit:
             raise JobStopped("packet knowledge-gap output bound exceeded")
@@ -317,13 +387,20 @@ class RegistrySynthesisJob(SynthesisJob):
             if not any(f == fid for f, _ in staged["finding_uses"]):
                 staged["finding_uses"].append((fid, "GAP"))
         self._commit(turn, {**out, "propositions": props, "knowledge_gaps": gaps,
-                            "_group_id": packet["group_id"]}, staged)
+                            "_group_id": packet["group_id"]}, staged, import_record=import_record)
 
     def _all_props(self):
         return [p for t in self.ledger.state()["committed"] if t.startswith("GROUP_") and "_LOOKUP" not in t
                 for p in self._committed(t).get("propositions", [])]
 
     def reconciliation_payloads(self):
+        if getattr(self, "evidence_pages", None):
+            for n, payload in enumerate(self.evidence_pages, 1001):
+                name = f"RECONCILE_{n:04d}"
+                if n == 1001 and payload.get("issue_link_contract") == "page1001-v2":
+                    name = "RECONCILE_1102" if payload.get("pause_before_lookup_judgment") else "RECONCILE_1101"
+                yield name, payload
+            return
         props = self._all_props()
         index = [compact_proposition(p) for p in props]
         for n, focus in enumerate(chunks(index, self.cfg.get("reconcile_page_size", 32)), 1):
@@ -333,37 +410,68 @@ class RegistrySynthesisJob(SynthesisJob):
                                                  for i in self.mandatory if self.mandatory[i]["kind"] == "CONFLICT"],
                     "retrieval": {"available": True, "operations": ["finding_ids", "query"]}}
 
-    def reconcile(self):
+    def reconcile(self, only_turn=None):
         props = {p["proposition_id"]: p for p in self._all_props()}
         for turn, payload in self.reconciliation_payloads():
+            if only_turn is not None and turn != only_turn:
+                continue
             if self._committed(turn):
                 continue
             out, retrieved = self._with_retrieval("RECONCILE", turn, payload)
-            focus = {p["proposition_id"] for p in payload["focus"]}
-            reviewed = [r["proposition_id"] for r in out["reviews"]]
-            if set(reviewed) != focus or len(reviewed) != len(focus):
-                raise JobStopped("global reconciliation did not review every focal proposition exactly once")
-            issue_ids = set()
-            for issue in out["issues"]:
-                related = set(issue["proposition_ids"])
-                if not related or related - set(props) or not related & focus:
-                    raise JobStopped("reconciliation issue has invalid proposition references")
-                anchors = set(issue["finding_ids"])
-                if not anchors or anchors - retrieved:
-                    raise JobStopped("reconciliation issue lacks evidence anchors")
-                for pid in related:
-                    linked = {e["finding_id"] for e in props[pid].get("evidence", [])}
-                    if linked and not anchors & linked:
-                        raise JobStopped("reconciliation issue lacks referenced proposition evidence")
-                if issue["kind"] == "UNSUPPORTED_INTERPRETATION":
-                    raise JobStopped("unsupported interpretation: human/upstream review required")
-                issue["issue_id"] = "RC-" + fingerprint({"kind": issue["kind"], "propositions": sorted(related),
-                                                        "findings": sorted(anchors), "limitation": issue["limitation"]})[:16]
-                issue_ids.add(issue["issue_id"])
-            if any(r["outcome"] == "ISSUES_IDENTIFIED" and not any(r["proposition_id"] in i["proposition_ids"] for i in out["issues"])
-                   for r in out["reviews"]):
-                raise JobStopped("reconciliation flagged an issue without recording it")
-            self._commit(turn, out, self.empty())
+            self._accept_reconciliation(turn, payload, out, retrieved, props)
+
+    def import_reconciliation(self, turn, candidate_bytes, approval):
+        """Use the same evidence and focal checks as a paid page; the caller holds the run lock."""
+        page = dict(self.reconciliation_payloads()).get(turn)
+        if (page is None or approval.get("turn") != turn
+                or approval.get("candidate_sha256") != hashlib.sha256(candidate_bytes).hexdigest()
+                or approval.get("run_id") != self.dir.parent.parent.name
+                or approval.get("job") != self.dir.name or approval.get("registry") != self.registry.digest
+                or approval.get("fingerprint") != self.identity
+                or approval.get("page_hash") != fingerprint(page)
+                or approval.get("details_hash") != fingerprint(self.registry.details(page["prefill_finding_ids"]))):
+            raise JobStopped("reconciliation import identity mismatch")
+        previous = self._committed(turn)
+        if previous is not None:
+            if self._marker(turn).get("import_record") != approval:
+                raise JobStopped("reconciliation page already accepted under another identity")
+            return
+        out = json.loads(candidate_bytes)
+        self.validate_output("RECONCILE", out)
+        if out["status"] == "NEEDS_EVIDENCE":
+            raise JobStopped("cannot import an incomplete reconciliation")
+        self._accept_reconciliation(turn, page, out, set(page["prefill_finding_ids"]),
+                                    {p["proposition_id"]:p for p in self._all_props()}, approval)
+
+    def _accept_reconciliation(self, turn, payload, out, retrieved, props, import_record=None):
+        focus = {p["proposition_id"] for p in payload["focus"]}
+        reviewed = [r["proposition_id"] for r in out["reviews"]]
+        if set(reviewed) != focus or len(reviewed) != len(focus):
+            raise JobStopped("global reconciliation did not review every focal proposition exactly once")
+        if payload.get("issue_link_contract") == "page1001-v2":
+            from .reconciliation_links import explained_links
+            explained_links(out, retrieved, props, self.registry.findings)
+        issue_ids = set()
+        for issue in out["issues"]:
+            related = set(issue["proposition_ids"])
+            if not related or related - set(props) or not related & focus:
+                raise JobStopped("reconciliation issue has invalid proposition references")
+            anchors = set(issue["finding_ids"])
+            if not anchors or anchors - retrieved:
+                raise JobStopped("reconciliation issue lacks evidence anchors")
+            for pid in related:
+                linked = {e["finding_id"] for e in props[pid].get("evidence", [])}
+                if linked and not anchors & linked:
+                    raise JobStopped("reconciliation issue lacks referenced proposition evidence")
+            if issue["kind"] == "UNSUPPORTED_INTERPRETATION":
+                raise JobStopped("unsupported interpretation: human/upstream review required")
+            issue["issue_id"] = "RC-" + fingerprint({"kind": issue["kind"], "propositions": sorted(related),
+                                                    "findings": sorted(anchors), "limitation": issue["limitation"]})[:16]
+            issue_ids.add(issue["issue_id"])
+        if any(r["outcome"] == "ISSUES_IDENTIFIED" and not any(r["proposition_id"] in i["proposition_ids"] for i in out["issues"])
+               for r in out["reviews"]):
+            raise JobStopped("reconciliation flagged an issue without recording it")
+        self._commit(turn, out, self.empty(), import_record=import_record)
 
     def final_payload(self):
         return {"mode": "FINAL", "proposition_index": [compact_proposition(p) for p in self._all_props()],

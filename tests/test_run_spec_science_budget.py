@@ -244,6 +244,7 @@ def test_the_request_carries_the_schema_and_the_full_validator_still_runs():
     assert "format" not in anthropic_client.message_params("s", "u", "claude-opus-5", 100, 0.0, "medium").get("output_config", {})
     chat = oc.chat_params("s", "u", "gpt-6.1-sol", 100, 0.0, effort="medium", response_schema=shape)
     assert chat["response_format"]["type"] == "json_schema" and chat["response_format"]["json_schema"]["schema"] == shape["schema"]
+    assert chat["response_format"]["json_schema"]["strict"] is True
     assert oc.chat_params("s", "u", "gpt-6.1-sol", 100, 0.0)["response_format"] == {"type": "json_object"}
 
 
@@ -271,8 +272,12 @@ def test_smoke_test_lists_targets_and_refuses_without_an_approved_amount(tmp_pat
         return LLMResponse('{"ok":true}', provider, kw["model"], 500, 20, "end_turn" if provider=="anthropic" else "stop")
     monkeypatch.setattr("litreview.llm.complete", complete)
     result = structured.smoke_test(b, usd + 1, "May Khalid", tmp_path / "smoke.jsonl")
-    assert result["tested"] == len(todo) == len(calls) and all(c[2] for c in calls)
-    assert result["accepted"] == result["tested"] - sum(1 for t in todo if t["model"] == "claude-haiku-5-5")
+    assert result["tested"] == len(calls) == 1 and all(c[2] for c in calls)
+    assert result["accepted"] == 0
+    assert b.reserved() > 0 and not b.entries()
+    with pytest.raises(ValueError, match="unsettled smoke"):
+        structured.smoke_test(b, usd + 1, "May Khalid")
+    assert len(calls) == 1
     assert structured.smoke_estimate(b)[1] != [] or result["accepted"] == result["tested"]    # rejected ones stay listed
 
 
@@ -353,6 +358,8 @@ def test_extraction_stops_after_one_full_text_and_two_abstracts_until_the_resear
     report = run.load("early_check.json")
     assert [p["level"] for p in report["papers"]] == ["FULL_TEXT", "ABSTRACT", "ABSTRACT"]
     assert report["papers"][0]["comparator_not_reported"] == 1 and "forecast" in report
+    assert report["papers"][0]["omission_review"]["status"]=="REQUIRES_SOURCE_COMPARISON"
+    assert "Concentration classification" in report["papers"][0]["omission_review"]["instruction"]
     access = run.load("source_access.json")
     assert access["R0006"]["level"] == "ABSTRACT" and access["R0001"]["figure_images_inspected"] is False
     cp = orch.checkpoints.cp_dir(run.dir)

@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FROM_GIT = ["src", "config", "prompts", "schemas", "records", "a07_a09_sample.py", "scripts/reconcile_billing.py",
-            "scripts/plan_budget.py", "scripts/runtime_bootstrap.py", "scripts/pilot_smoke_continue.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
+            "scripts/continue_page1001_import.py", "scripts/dispatch_preloaded_page.py", "scripts/run_pilot7_reconciliation.py", "scripts/import_pilot7_group.py", "scripts/plan_budget.py", "scripts/runtime_bootstrap.py", "scripts/pilot_smoke_continue.py", "scripts/pilot7_control.py", "scripts/pilot7_semantics_control.py", "scripts/pilot7_discovery_control.py", "scripts/plan_a05_functional.py", "scripts/offline_guard.py", "scripts/pilot_report.py", "docs/run_spec", "docs/pilot7",
             "pyproject.toml", "requirements.txt",
             "LICENSE.md"]
 FROM_RUNTIME = ["vendor", "cli_entry.py", "candidate/model_record_baseline.jsonl",

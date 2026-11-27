@@ -68,3 +68,71 @@ def test_lookup_status_separates_not_listed_from_unavailable():
     assert fulltext.lookup_status(None, "Europe PMC lists no PMC copy; NCBI ID converter HTTP 403") == "NOT_LISTED"
     assert fulltext.lookup_status(None, "Europe PMC unavailable: ConnectTimeout; NCBI ID converter HTTP 403") == "UNAVAILABLE"
     assert "publisher website" in fulltext.ROUTES_NOT_ATTEMPTED
+
+
+def test_valid_pmcid_for_wrong_publication_is_quarantined_before_handoff(tmp_path, monkeypatch, serve):
+    from litreview.orchestrator import Run
+    serve(pmid="34887451", pmc="9421940", doi="10.1038/s41572-021-00324-8")
+    intended = {"record_id": "R0115", "title": "Multiplex chemotherapeutic sensing",
+                "pmid": "41324706", "doi": "10.1007/s00216-025-06241-z", "pmcid": "9421940"}
+    run = object.__new__(Run); run.dir = tmp_path
+    run.save("fulltext/R0115.json", {"Abstract": "Wrong publication", "Results": "Unrelated science"})
+    with pytest.raises(fulltext.FullTextUnavailable, match="PMID mismatch"):
+        run._checked_fulltext(intended)
+    assert run.load("identity_quarantine/R0115_cache.json")["sections"]["Results"] == "Unrelated science"
+    assert run.load("fulltext_provenance/R0115.json") is None
+
+
+def test_title_mismatch_blocks_fulltext_even_if_identifiers_match(serve):
+    serve()
+    with pytest.raises(fulltext.FullTextUnavailable, match="title missing or mismatch"):
+        fulltext.fetch_verified_sections({"title": "Expected publication", "pmid": "12345678",
+                                          "pmcid": "PMC9876543", "doi": "10.1000/sers.2025.1"})
+
+
+def test_pubmed_own_identifiers_never_come_from_a_cited_reference(monkeypatch):
+    from litreview.tools.literature import pubmed
+    xml = b"""<PubmedArticleSet><PubmedArticle><MedlineCitation><PMID>41324706</PMID><Article>
+      <ArticleTitle>Multiplex chemotherapeutic sensing</ArticleTitle><Abstract><AbstractText>Matched abstract.</AbstractText></Abstract>
+      </Article></MedlineCitation><PubmedData><ArticleIdList>
+      <ArticleId IdType="pubmed">41324706</ArticleId><ArticleId IdType="doi">10.1007/s00216-025-06241-z</ArticleId>
+      </ArticleIdList><ReferenceList><Reference><ArticleIdList>
+      <ArticleId IdType="doi">10.1038/s41572-021-00324-8</ArticleId><ArticleId IdType="pmc">9421940</ArticleId>
+      </ArticleIdList></Reference></ReferenceList></PubmedData></PubmedArticle></PubmedArticleSet>"""
+    class Response:
+        content=xml
+        def raise_for_status(self): pass
+    monkeypatch.setattr(pubmed.requests, "post", lambda *a, **k: Response())
+    rec=pubmed.fetch_by_pmids(["41324706"], "existing-query")[0]
+    assert rec.pmid == "41324706" and rec.doi == "10.1007/s00216-025-06241-z"
+    assert rec.pmcid is None and rec.abstract == "Matched abstract."
+
+
+def test_lookup_rejects_an_unrelated_pmc_candidate(monkeypatch):
+    class Response:
+        status_code=200
+        def json(self):
+            return {"resultList":{"result":[{"id":"34887451","doi":"10.1038/s41572-021-00324-8","pmcid":"PMC9421940"}]},
+                    "records":[{"pmid":"34887451","doi":"10.1038/s41572-021-00324-8","pmcid":"PMC9421940"}]}
+    monkeypatch.setattr(fulltext.requests,"get",lambda *a,**k:Response())
+    assert fulltext.find_pmcid("41324706","10.1007/s00216-025-06241-z")[0] is None
+
+
+def test_projection_does_not_call_an_over_cap_retained_hold_free():
+    from litreview.tools.cost_projection import _total
+    class Budget:
+        cap=50
+        def spent(self): return 2.0849717
+        def reserved(self): return .124671
+    p=_total([{"usd":47.9}],Budget(),{})
+    assert p["verdict"]=="OVER_CAP" and p["held_and_reserved_usd"]==.124671
+
+
+def test_identity_verified_image_table_remains_an_extraction_blocker(monkeypatch):
+    raw=XML.format(pmid="12345678",pmc="9876543",doi="10.1000/sers.2025.1").replace(
+        "</body>",'<table-wrap id="tbl1"><label>1</label><graphic href="table.jpg"/></table-wrap></body>').encode()
+    rec={"pmid":"12345678","pmcid":"PMC9876543","doi":"10.1000/sers.2025.1"}
+    assert fulltext.verify_article_xml(rec,raw).find("./body") is not None
+    monkeypatch.setattr(fulltext.requests,"get",lambda *a,**k:Resp(raw))
+    with pytest.raises(fulltext.FullTextUnavailable,match="Image-only"):
+        fulltext.fetch_verified_sections(rec)

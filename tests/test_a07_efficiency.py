@@ -136,3 +136,12 @@ def test_gap_limits_are_enforced_atomically(tmp_path,source_only):
     if source_only:
         assert all(not j._committed(f'GROUP_{p["group_id"]}') for p in j.packets if p.get('source_only'))
     else:assert not j._all_props()
+
+def test_plan_index_preserves_source_recovery():
+    data=corpus(1,2)
+    first,second=data['validated_findings'][:2]
+    recovery={'audit':'offline_recovery/R0001/audit.json','basis':'Source-derived table cell omitted by A05.'}
+    first['source_recovery']=recovery
+    registry=EvidenceRegistry(data)
+    assert registry.index_line(first['finding_id'])['source_recovery']==recovery
+    assert 'source_recovery' not in registry.index_line(second['finding_id'])

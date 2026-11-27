@@ -1,0 +1,305 @@
+{
+  "selected_option_id": "P1",
+  "edited_angle": "Where does a learned model contribute to nanosensor design or interpretation, what does the resulting system infer, and how far has that inference been tested?",
+  "approve_selection_criteria": true,
+  "edited_selection_criteria": {
+    "inclusion": [
+      {
+        "criterion": "A record must directly address at least one supplied subsection question; assign one or more T1–T8 themes and state the specific connection.",
+        "reason": "Relevance is determined by the fixed outline rather than agreement with an anticipated conclusion."
+      },
+      {
+        "criterion": "Use the approved SENSOR_DESIGN and SENSOR_INTERPRETATION routes. A computational sensing-design proposal is eligible as design evidence even when not built; claims of improved physical sensing performance require experimental evidence. For interpretation, require a nanoscale recognition/signal role and a learned model using measured responses. Conventional calibration and reference methods remain eligible comparators/context.",
+        "reason": "The researcher explicitly separates design proposals, experimental performance and measured-response interpretation."
+      },
+      {
+        "criterion": "For Chapter 1, include non-drug analytes or non-cancer systems only when they directly inform an outlined design, recognition, signal-task or evaluation question; label their application scope explicitly.",
+        "reason": "Allows relevant methodological evidence without treating it as validation for anticancer-drug sensing."
+      },
+      {
+        "criterion": "For Chapter 2, require measurement of an anticancer drug, a relevant metabolite, a nanomedicine component or a release-related process, or direct methodological evidence needed to interpret those measurements.",
+        "reason": "Keeps exposure coverage tied to the specified therapeutic context."
+      },
+      {
+        "criterion": "Retain eligible evidence from buffer, synthetic fluids, spiked biological specimens and post-administration specimens, recording these settings separately.",
+        "reason": "Enables assessment of evidence progression without equating simplified and clinical matrices."
+      },
+      {
+        "criterion": "Include null results, poorer performance, failed transfer, conventional-method comparisons and methodological challenges when they address an outline question.",
+        "reason": "Contrary evidence is necessary to evaluate incremental contribution and reliability."
+      },
+      {
+        "criterion": "Include relevant work across in vitro, ex vivo, animal and human settings, while preserving organism, specimen, compartment and experimental context.",
+        "reason": "The outline imposes no organism restriction, but conclusions must remain bounded by the studied system."
+      },
+      {
+        "criterion": "Retain potentially relevant abstract-only records with their access limitations; use only information stated in the abstract and seek fuller access where needed.",
+        "reason": "Access limitations are not scientific negative findings or automatic grounds for exclusion."
+      },
+      {
+        "criterion": "Use reviews and methodological literature for definitions, context, evaluation principles and citation discovery; trace empirical performance claims to primary evidence when available.",
+        "reason": "Separates contextual synthesis from direct support for study-specific results."
+      }
+    ],
+    "exclusion": [
+      {
+        "criterion": "Exclude records with no identifiable connection to any S1.1–S2.4 question.",
+        "reason": "Maintains the researcher-defined scope."
+      },
+      {
+        "criterion": "Exclude standalone delivery or formulation optimization without a sensing function.",
+        "reason": "AI-assisted formulation design does not establish sensing or a sensing-feedback loop."
+      },
+      {
+        "criterion": "Exclude response, toxicity and treatment-decision studies unless a separable sensing-method or exposure result answers an included subsection question.",
+        "reason": "Reserves later-chapter content while retaining directly relevant measurement evidence."
+      },
+      {
+        "criterion": "Exclude stand-alone computational drug or exposure predictions unconnected to an included sensing measurement or sensing-design task.",
+        "reason": "The review concerns AI-enabled nanobiosensing rather than general predictive pharmacology."
+      },
+      {
+        "criterion": "Exclude duplicate reports as separate evidence units; link preprints, conference reports and journal versions of the same work.",
+        "reason": "Prevents double counting while preserving distinct results or relevant version differences."
+      },
+      {
+        "criterion": "Exclude retracted findings as affirmative scientific support; retain retraction information if needed to explain a directly relevant controversy.",
+        "reason": "Avoids treating invalidated findings as reliable evidence."
+      }
+    ],
+    "time_window": "Provisional: no lower publication-date cutoff; search through the actual final search date, which must be recorded when searching occurs.",
+    "languages": [
+      "No language restriction at discovery; interpretation requires source text accessible to the research team or a reliable translation. Unassessable records remain pending rather than scientifically excluded."
+    ],
+    "source_types": [
+      "Primary research articles",
+      "Primary methodological studies",
+      "Reviews and perspectives for context and citation discovery",
+      "Preprints, explicitly flagged",
+      "Published conference papers",
+      "Published conference abstracts, with abstract-level claim limits"
+    ],
+    "preprint_policy": "Preprints may be included and must be flagged; they may not be the sole support for a major point. Link subsequent published versions and document material differences.",
+    "significance_signals": [
+      "A clearly documented methodological advance with experimental evaluation of a model-recommended sensing component or condition.",
+      "A comparison that isolates the incremental contribution of AI against matched conventional calibration or simpler models.",
+      "Independent evaluation across biological specimens, individuals, matrices, sensor batches, laboratories or time.",
+      "Explicitly characterized drug identity, concentration measurand, matrix and independent analytical reference.",
+      "Evidence distinguishing carrier-associated signals from intact carrier, payload or released drug.",
+      "Longitudinal measurements or temporally separated validation that distinguish observations from model-derived exposure estimates.",
+      "A strong null, negative, replication or contrary result that materially changes interpretation of reliability.",
+      "A methodological analysis exposing evaluation-unit errors, data leakage or unsupported exposure inferences."
+    ],
+    "exclusion_reason_vocabulary": [
+      "OUT_OF_SCOPE_TOPIC",
+      "NO_RELEVANT_NANOSENSING_ROLE",
+      "NO_RELEVANT_COMPUTATIONAL_ROLE",
+      "DELIVERY_ONLY",
+      "LATER_CHAPTER_ONLY",
+      "PREDICTION_WITHOUT_SENSING_LINK",
+      "DUPLICATE",
+      "RETRACTED"
+    ],
+    "significance_signals_definition": "Relevance, independent evidence and contribution signals for ranking eligible records; statistical significance and result direction do not determine eligibility.",
+    "redundancy_policy": "Judge redundancy by relevance, independent evidence and contribution to an outline question. Statistical significance and direction of results must not determine eligibility.",
+    "pilot_selection_policy": {
+      "max_publications": 7,
+      "redundancy_rule": "Judge redundancy by relevance, independent evidence and contribution to an outline question. Statistical significance and direction of results must not determine eligibility.",
+      "eligible_unselected_code": "ELIGIBLE_NOT_SELECTED_PILOT_LIMIT",
+      "separate_scientific_exclusions": true,
+      "include_contrary_findings": true
+    },
+    "eligibility_routes": [
+      {
+        "route": "SENSOR_DESIGN",
+        "rule": "The model selects, recommends or optimizes a sensing material, recognition element, array composition, fabrication condition or operating condition against a stated sensing objective. Record the recommendation and whether it was built and tested. A computational proposal can inform design; improved physical performance requires experimental evidence. Feature selection from spectra already collected belongs under interpretation."
+      },
+      {
+        "route": "SENSOR_INTERPRETATION",
+        "rule": "A nanoscale component has an identifiable recognition or signal-generation role and a learned model uses its measured response to identify, classify, estimate or track something. Record physical signal and model output. Conventional calibration is eligible as a comparator. Exploratory PCA alone supports patterns in analyzed data; predictive claims require a prediction task and evaluation."
+      }
+    ],
+    "evidence_roles": {
+      "DIRECT_ONCOLOGY_EXPOSURE": "Relevant sensing measurement of anticancer drug, metabolite, payload, carrier-associated signal or release process.",
+      "METHODOLOGICAL": "Work directly answering a Chapter 1 question.",
+      "BENCHMARK_CONTEXT": "Non-oncology longitudinal example, diagnostic classification example or conventional reference method. A paper may inform two sections; every claim remains bounded by its role."
+    },
+    "out_of_scope": "Imaging-only AI, delivery design alone and standalone pharmacokinetic prediction are outside scope unless a separable relevant sensing result exists."
+  },
+  "edited_theme_framework": null,
+  "scope_guide": {
+    "version": "cp1-scope-guide-1",
+    "organizing_question": "Where does a learned model contribute to nanosensor design or interpretation, what does the resulting system infer, and how far has that inference been tested?",
+    "scope": "Chapters 1 and 2 only; anticancer drugs and nanomedicines across cancers. Therapeutic response, toxicity, dose adjustment and the glioblastoma case study belong to later sections.",
+    "word_policy": {
+      "chapter_1": 800,
+      "chapter_2": 800,
+      "approximately": true,
+      "exclude": [
+        "headings",
+        "references"
+      ],
+      "subsection_allocations": "flexible",
+      "reference_counts": "Full-review planning targets, not seven-publication pilot quotas."
+    },
+    "eligibility_routes": [
+      {
+        "route": "SENSOR_DESIGN",
+        "rule": "The model selects, recommends or optimizes a sensing material, recognition element, array composition, fabrication condition or operating condition against a stated sensing objective. Record the recommendation and whether it was built and tested. A computational proposal can inform design; improved physical performance requires experimental evidence. Feature selection from spectra already collected belongs under interpretation."
+      },
+      {
+        "route": "SENSOR_INTERPRETATION",
+        "rule": "A nanoscale component has an identifiable recognition or signal-generation role and a learned model uses its measured response to identify, classify, estimate or track something. Record physical signal and model output. Conventional calibration is eligible as a comparator. Exploratory PCA alone supports patterns in analyzed data; predictive claims require a prediction task and evaluation."
+      }
+    ],
+    "evidence_roles": {
+      "DIRECT_ONCOLOGY_EXPOSURE": "Relevant sensing measurement of anticancer drug, metabolite, payload, carrier-associated signal or release process.",
+      "METHODOLOGICAL": "Work directly answering a Chapter 1 question.",
+      "BENCHMARK_CONTEXT": "Non-oncology longitudinal example, diagnostic classification example or conventional reference method. A paper may inform two sections; every claim remains bounded by its role."
+    },
+    "exclusions": "Imaging-only AI, delivery design alone and standalone pharmacokinetic prediction are outside scope unless a separable relevant sensing result exists.",
+    "selection_policy": {
+      "max_publications": 7,
+      "redundancy_rule": "Judge redundancy by relevance, independent evidence and contribution to an outline question. Statistical significance and direction of results must not determine eligibility.",
+      "eligible_unselected_code": "ELIGIBLE_NOT_SELECTED_PILOT_LIMIT",
+      "separate_scientific_exclusions": true,
+      "include_contrary_findings": true
+    },
+    "search_rules": {
+      "separate_questions": true,
+      "rule": "Search each question separately: sensing concept or modality plus computational task plus subtheme-specific target. Terms are alternatives; AI need not appear. For S2.2 pair carrier/release with an actual measurement term; for S2.3 pair a sensor readout with a time/sampling term. Include eligible contrary evidence. Keep query and yield by theme.",
+      "alternative_terms": [
+        "sensor array",
+        "electronic nose",
+        "fluorescence",
+        "Raman/SERS",
+        "electrochemical",
+        "molecular fingerprint",
+        "chemometrics",
+        "classification",
+        "regression",
+        "sensor optimization",
+        "drug monitoring",
+        "payload release",
+        "serial sampling",
+        "pharmacokinetics"
+      ],
+      "seed_papers": [],
+      "candidate_papers_in_search_inputs": false,
+      "date_cutoff": null,
+      "language_restriction": null,
+      "record_actual_search_date": true,
+      "record_translation_limits": true,
+      "preprints": "Flag and link publication versions of the same study."
+    },
+    "extraction_checklist": [
+      {
+        "question": "What was inferred?",
+        "record": "Sensing material -> recognition mechanism -> physical signal -> computational output. Design: model input -> recommendation -> experimental test."
+      },
+      {
+        "question": "Against what reference?",
+        "record": "Separate evaluation target value/label, independent analytical reference method and simpler model/calibration for added AI value. Known spike concentration, LC-MS measurement and linear-regression baseline answer different questions; record which are actually present."
+      },
+      {
+        "question": "In what system?",
+        "record": "Analyte and specimen: buffer, synthetic biofluid, spiked biological specimen or after-dosing sample. Preserve sampled compartment and parent drug, metabolite, total/unbound drug, carrier, label or payload wherever reported."
+      },
+      {
+        "question": "How far was it tested?",
+        "record": "Independent unit and held-out spectra/specimens/patients/batches/matrices/later time points. An unspecified test-set split unit remains unknown. Repeated spectra from one specimen are not independent specimens."
+      }
+    ],
+    "output_vocabulary": [
+      "presence",
+      "identity",
+      "concentration category",
+      "numerical concentration",
+      "serial measured concentrations",
+      "continuous or near-continuous readout",
+      "model-estimated exposure"
+    ],
+    "output_limits": "Category classification in spiked serum establishes category discrimination there; numerical accuracy, post-dosing performance and temporal monitoring require their own evidence. Specify the physical source of nanomedicine signals; distinguish observed time points from estimated portions of trajectories.",
+    "writing_rules": "Open each chapter with its question and central distinction. Use the four recurring questions for comparisons in connected prose. Give thin subthemes proportionate space. Report unsupported areas as limitations of selected evidence without padding or asserting field-wide gaps.",
+    "six_heading_map": [
+      {
+        "section_id": "M1.1",
+        "parent_section_id": "S1",
+        "heading": "Designing sensors and probes",
+        "themes": [
+          "T1"
+        ],
+        "discovery_sections": [
+          "S1.1"
+        ]
+      },
+      {
+        "section_id": "M1.2",
+        "parent_section_id": "S1",
+        "heading": "Learning from signals and fingerprints",
+        "themes": [
+          "T2",
+          "T3"
+        ],
+        "discovery_sections": [
+          "S1.2",
+          "S1.3"
+        ]
+      },
+      {
+        "section_id": "M1.3",
+        "parent_section_id": "S1",
+        "heading": "Evaluating accuracy, uncertainty and generalization",
+        "themes": [
+          "T4"
+        ],
+        "discovery_sections": [
+          "S1.4"
+        ]
+      },
+      {
+        "section_id": "M2.1",
+        "parent_section_id": "S2",
+        "heading": "Drug identity and concentration",
+        "themes": [
+          "T5"
+        ],
+        "discovery_sections": [
+          "S2.1"
+        ]
+      },
+      {
+        "section_id": "M2.2",
+        "parent_section_id": "S2",
+        "heading": "Nanomedicine-associated measurements",
+        "themes": [
+          "T6"
+        ],
+        "discovery_sections": [
+          "S2.2"
+        ]
+      },
+      {
+        "section_id": "M2.3",
+        "parent_section_id": "S2",
+        "heading": "Exposure trajectories and limitations",
+        "themes": [
+          "T7",
+          "T8"
+        ],
+        "discovery_sections": [
+          "S2.3",
+          "S2.4"
+        ]
+      }
+    ],
+    "screening_details_format": "Use the existing reason string to serialize one JSON object with rationale, eligibility_route, evidence_role, informs_themes (all supported T1-T8 IDs), target, matrix, inferred_output, target_reference, analytical_reference, ai_baseline, independent_unit and contrary_summary. Unknown screening details must be null. This is screening, not extraction; do not invent details or quotations.",
+    "cp2_stop": "Propose up to seven unique publications with roles, subsections, reason, actual retrieved access/failures, uncovered questions, contrary evidence and revised budget. Stop before corpus freezing or paid extraction."
+  },
+  "answers_to_questions": {
+    "chapter_word_allocation": "Approximately 800 words per chapter, excluding headings and references, with flexible subsection allocations."
+  },
+  "confirm_corpus_policy": true,
+  "corpus_policy_fingerprint": "2350eb129f671f8cff979dc2a5e513cc0188063272622dd7d4e7009c0e52305c",
+  "notes": "Explicit researcher CP1 approval: P1, eight outline-defined themes, corrected eligibility/redundancy policy, six manuscript subheadings, OPEN_CORPUS broad discovery and citation expansion; no seed papers. Discovery has no lower date cutoff or language restriction; record actual date and translation limitations, flag preprints and link versions. Continue under $50 with $25/$48 review pauses. Stop at CP2 before freezing or paid extraction."
+}

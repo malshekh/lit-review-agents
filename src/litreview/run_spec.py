@@ -327,7 +327,8 @@ def configuration_snapshot() -> dict:
     from .agents.registry import AGENTS
     from .paths import SCHEMAS_DIR
     cfg = config.load("pipeline")
-    return {"agents": {a: {"provider": m.provider, "model": m.model, "max_tokens": m.max_tokens, "effort": m.effort,
+    from .extraction_mode import identity as extraction_identity
+    return {"extraction_generation":extraction_identity(),"agents": {a: {"provider": m.provider, "model": m.model, "max_tokens": m.max_tokens, "effort": m.effort,
                            "system_prompt_sha256": hashlib.sha256(build_system_prompt(a).encode("utf-8")).hexdigest()}
                        for a in AGENTS for m in [config.agent_model(a)]},
             "schemas": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(SCHEMAS_DIR.glob("*.json"))},
